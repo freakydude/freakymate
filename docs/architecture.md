@@ -178,7 +178,8 @@ history).
   device is attached; the BTT HDMI5 also registers as a mouse. On the desktop, in a window and in fullscreen switched
   on in the settings, the system's pointer stays.
 - Optional without compositor: cargo feature `linuxkms` (marked experimental in Slint).
-- Builds for `aarch64`, `armv7` and `x86_64` run in CI in a Debian Bookworm container (oldest still maintained glibc).
+- Builds for `aarch64`, `armv7` and `x86_64` run in CI in an Ubuntu 22.04 container: glibc 2.35, the oldest maintained
+  system with `cage` and `seatd`, so one build runs on Ubuntu 22.04/24.04 and Debian Bookworm/Trixie.
 
 ## Extending
 

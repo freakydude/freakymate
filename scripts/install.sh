@@ -16,6 +16,9 @@ POLKIT_RULE="50-freakymate.rules"
 MOONRAKER="http://127.0.0.1:7125"
 DATA_DIR="$HOME/printer_data"
 CHANNEL="stable"
+# glibc of the build container (.github/workflows/build.yml); systems that also have cage and seatd.
+MIN_GLIBC="2.35"
+SUPPORTED_SYSTEMS="Debian 12 or 13, Raspberry Pi OS Bookworm or newer, Ubuntu or Armbian 22.04 or newer"
 
 while getopts "m:d:c:" option; do
   case $option in
@@ -43,10 +46,31 @@ for file in "$NAME" release_info.json system-dependencies.json; do
   fi
 done
 
+report "Checking the system"
+glibc=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')
+if [ -n "$glibc" ] && ! printf '%s\n%s\n' "$MIN_GLIBC" "$glibc" | sort -V -C; then
+  echo "This system has glibc $glibc; FreakyMate needs $MIN_GLIBC or newer: $SUPPORTED_SYSTEMS."
+  exit 1
+fi
+if ! "$SOURCE_DIR/$NAME" --version > /dev/null 2>&1; then
+  echo "The program in this folder does not run on this system ($(uname -m)); download the zip for its architecture."
+  exit 1
+fi
+
 report "Installing system packages"
 mapfile -t packages < <(python3 -c 'import json, sys; print("\n".join(json.load(open(sys.argv[1]))["debian"]))' \
   "$SOURCE_DIR/system-dependencies.json")
 sudo apt-get update
+missing=()
+for package in "${packages[@]}"; do
+  apt-cache show "$package" > /dev/null 2>&1 || missing+=("$package")
+done
+if [ ${#missing[@]} -gt 0 ]; then
+  echo "Not available from the package sources: ${missing[*]}."
+  echo "On Ubuntu and Ubuntu-based Armbian enable 'universe' (sudo add-apt-repository universe); otherwise FreakyMate"
+  echo "needs $SUPPORTED_SYSTEMS."
+  exit 1
+fi
 sudo apt-get install -y "${packages[@]}"
 sudo usermod -aG video,input,render "$USER" || true
 

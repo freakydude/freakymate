@@ -22,14 +22,35 @@ Moonraker installs.
 ## Install on the printer host
 
 This is the main use case: FreakyMate runs on the host of the printer (Raspberry Pi OS, Armbian or another
-Debian-based system with the display attached), starts fullscreen on the display at boot and updates itself through
-Moonraker's update manager, like Mainsail or Fluidd.
+Debian- or Ubuntu-based system with the display attached), starts fullscreen on the display at boot and updates itself
+through Moonraker's update manager, like Mainsail or Fluidd.
 
-1. Download the zip for your system from the [releases](https://github.com/freakydude/freakymate/releases)
-   (release or pre-release, see above):
-   `aarch64-unknown-linux-gnu` (64-bit Raspberry Pi OS/Armbian, CB1/CB2), `armv7-unknown-linux-gnueabihf` (32-bit), `x86_64-unknown-linux-gnu`.
-   Builds target Debian Bookworm and run on Bookworm and Trixie.
-2. Unpack and run the installer as your normal user (the one running Klipper and Moonraker):
+**Supported systems.** One build per architecture runs on every system that has glibc 2.35 or newer and the kiosk
+packages `cage` and `seatd`:
+
+| System                                    | Status                                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------------- |
+| Debian 12 Bookworm, 13 Trixie             | supported                                                              |
+| Raspberry Pi OS Bookworm or newer         | supported (32-bit and 64-bit)                                          |
+| Ubuntu 22.04, 24.04 and Armbian on them   | supported; `cage` and `seatd` come from `universe`                     |
+| Armbian Bookworm or Trixie                | supported (Armbian uses Debian's packages)                             |
+| Debian 11 Bullseye and images based on it | not supported: it has neither `cage` nor `seatd`; update the system    |
+
+Builds for `aarch64-unknown-linux-gnu` (64-bit, e.g. CB1/CB2, Raspberry Pi 4/5 with a 64-bit system),
+`armv7-unknown-linux-gnueabihf` (32-bit systems) and `x86_64-unknown-linux-gnu`. The installer checks glibc,
+architecture and packages first and stops with a message if something does not fit.
+
+1. Download and start the installer as your normal user (the one running Klipper and Moonraker). The script picks
+   the zip for your system's architecture, unpacks it to `~/freakymate-setup` and runs `install.sh` with your options:
+
+   ```bash
+   curl -fsSLO https://github.com/freakydude/freakymate/releases/latest/download/get-freakymate.sh
+   bash get-freakymate.sh -m http://127.0.0.1:7125     # add -c beta for the pre-release channel
+   ```
+
+2. Or by hand: download the zip for your architecture from the
+   [releases](https://github.com/freakydude/freakymate/releases) (release or pre-release, see above), unpack it and
+   run the installer:
 
    ```bash
    unzip freakymate-aarch64-unknown-linux-gnu.zip -d freakymate-setup

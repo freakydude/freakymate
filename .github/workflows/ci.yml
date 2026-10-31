@@ -76,11 +76,12 @@ jobs:
           path: |
             artifacts/*.zip
             artifacts/*.deb
+            artifacts/get-freakymate.sh
       - name: Publish prerelease
         # Versions ending in .0 are releases and are only published by the Release workflow.
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !endsWith(env.VERSION, '.0')
         run: |
-          gh release create "v$VERSION" artifacts/*.zip artifacts/*.deb \
+          gh release create "v$VERSION" artifacts/*.zip artifacts/*.deb artifacts/get-freakymate.sh \
             --target "$GITHUB_SHA" \
             --prerelease \
             --title "FreakyMate v$VERSION (pre-release)" \
