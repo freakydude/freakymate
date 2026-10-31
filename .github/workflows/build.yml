@@ -69,9 +69,10 @@ jobs:
   linux:
     name: Linux ${{ matrix.target }}
     runs-on: ubuntu-latest
-    # Debian Bookworm: oldest still maintained glibc (2.36), so the binary also runs on Trixie.
-    # Bullseye no longer works: after LTS end, packages from bullseye-security are missing from the pool (404).
-    container: debian:bookworm
+    # Ubuntu 22.04: the oldest maintained system that has everything the kiosk needs (cage, seatd), with glibc 2.35;
+    # the binary runs on Ubuntu 22.04/24.04 and Debian Bookworm/Trixie (Armbian included). Debian Bullseye has no cage
+    # or seatd. Keep MIN_GLIBC in scripts/install.sh and libc6 in build-deb.sh in step; move on when jammy ends (04/2027).
+    container: ubuntu:22.04
     strategy:
       fail-fast: false
       matrix:
@@ -103,6 +104,13 @@ jobs:
               exit 1
             fi
           }
+          # Ubuntu serves foreign architectures from ports.ubuntu.com; the default sources carry amd64 only.
+          if [ "${{ matrix.arch }}" != amd64 ]; then
+            sed -i 's/^deb /deb [arch=amd64] /' /etc/apt/sources.list
+            for suite in jammy jammy-updates jammy-security; do
+              echo "deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports $suite main universe"
+            done > /etc/apt/sources.list.d/ports.list
+          fi
           dpkg --add-architecture ${{ matrix.arch }}
           apt_get update
           apt_get install -y --no-install-recommends curl ca-certificates git pkg-config build-essential \
@@ -114,7 +122,8 @@ jobs:
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.target }}
+          # Named after the container: build scripts in the cache are linked against its glibc.
+          key: ${{ matrix.target }}-ubuntu-22.04
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-about

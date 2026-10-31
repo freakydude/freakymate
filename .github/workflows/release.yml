@@ -64,7 +64,7 @@ jobs:
         run: |
           notes_start=()
           if [ -n "$PREVIOUS" ]; then notes_start=(--notes-start-tag "$PREVIOUS"); fi
-          gh release create "$TAG" artifacts/*.zip artifacts/*.deb \
+          gh release create "$TAG" artifacts/*.zip artifacts/*.deb artifacts/get-freakymate.sh \
             --target "$GITHUB_SHA" \
             --title "FreakyMate $TAG" \
             --generate-notes "${notes_start[@]}" \

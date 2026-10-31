@@ -68,14 +68,16 @@ Feedback, bug reports and corrections are welcome, please open an issue.
 
 ## Quick start
 
-On the printer host (Raspberry Pi OS, Armbian or another Debian-based system with the display attached), download the
-zip for your system from the [releases](https://github.com/freakydude/freakymate/releases) and run the installer as
-the user running Klipper and Moonraker:
+On the printer host (Debian 12 or newer, Raspberry Pi OS Bookworm or newer, Ubuntu or Armbian 22.04 or newer, with
+the display attached), run as the user running Klipper and Moonraker:
 
 ```bash
-unzip freakymate-aarch64-unknown-linux-gnu.zip -d freakymate-setup
-cd freakymate-setup && ./install.sh -m http://127.0.0.1:7125
+curl -fsSLO https://github.com/freakydude/freakymate/releases/latest/download/get-freakymate.sh
+bash get-freakymate.sh -m http://127.0.0.1:7125
 ```
+
+The script downloads the zip for your architecture from the [releases](https://github.com/freakydude/freakymate/releases)
+and runs its installer; installing from the zip by hand works as well.
 
 FreakyMate then starts fullscreen on the display at boot and updates through Moonraker's update manager, like Mainsail
 or Fluidd. Release or pre-release, update channels, the Debian package and the desktop window:

@@ -17,7 +17,7 @@ esac
 # Pre-release suffixes sort before the release in Debian via ~.
 version=$(echo "${release#v}" | tr '-' '~')
 
-depends=$(python3 -c 'import json, sys; print(", ".join(["libc6 (>= 2.36)", "libfontconfig1"] + json.load(open(sys.argv[1]))["debian"]))' \
+depends=$(python3 -c 'import json, sys; print(", ".join(["libc6 (>= 2.35)", "libfontconfig1"] + json.load(open(sys.argv[1]))["debian"]))' \
   "$repo/scripts/system-dependencies.json")
 
 root=$(mktemp -d)
