@@ -26,7 +26,7 @@ tokio-tungstenite.workspace = true
 
 # Network management via NetworkManager over D-Bus (pure Rust, no libdbus).
 [target.'cfg(target_os = "linux")'.dependencies]
-zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
+zbus = { version = "6.1.0", default-features = false, features = ["tokio"] }
 
 [dev-dependencies]
 fake-moonraker.workspace = true
