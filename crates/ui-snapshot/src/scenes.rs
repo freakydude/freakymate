@@ -166,7 +166,7 @@ fn pages(session: &mut Session) -> Result<(), String> {
             session.window.global::<Navigation>().set_tune_tab(0);
         }
         if page == Page::Filament && session.presenter.snapshot().status.mmu.is_some() {
-            session.window.global::<Navigation>().set_filament_tab(FilamentTab::Mmu);
+            session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
             session.show_page(Page::Filament, "filament-mmu")?;
             mmu_service(session)?;
             mmu_gate(session)?;
@@ -174,20 +174,20 @@ fn pages(session: &mut Session) -> Result<(), String> {
             mmu_bypass(session)?;
             session.window.global::<Navigation>().set_filament_tab(FilamentTab::Extruder);
             session.show_page(Page::Filament, "filament-extruder")?;
-            session.window.global::<Navigation>().set_filament_tab(FilamentTab::Mmu);
+            session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
         }
     }
     messages(session)?;
     command_running(session)
 }
 
-/// Where taps land in the 800x480 layout: the tile of gate 2 on the MMU tab, and the button "Select" of the gate
+/// Where taps land in the 800x480 layout: the tile of gate 2 on the Gates tab, and the button "Select" of the gate
 /// dialog.
 const GATE_2_TILE: (f32, f32) = (450.0, 190.0);
 const GATE_DIALOG_SELECT: (f32, f32) = (172.0, 230.0);
 
 /// Service tab of the MMU, first as it opens, then after the buttons for the servo and the motors went through the app
-/// to the fake: the servo is down and Home stands out again. Homes the MMU, lifts the servo and returns to the MMU tab
+/// to the fake: the servo is down and Home stands out again. Homes the MMU, lifts the servo and returns to the Gates tab
 /// afterwards.
 fn mmu_service(session: &mut Session) -> Result<(), String> {
     session.window.global::<Navigation>().set_filament_tab(FilamentTab::Service);
@@ -212,12 +212,12 @@ fn mmu_service(session: &mut Session) -> Result<(), String> {
     session.wait_until("MMU homed with the servo up", |snapshot| {
         snapshot.status.mmu.as_ref().is_some_and(|mmu| mmu.homed && mmu.servo == Some(ServoPosition::Up))
     })?;
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Mmu);
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
     Ok(())
 }
 
 /// Tools and EndlessSpool groups through the app to the fake: T3 moves to gate 1 and gate 1 into the group of gate 0,
-/// with EndlessSpool on. The dialog of gate 1 shows both, the Service tab the tools. Everything goes back afterwards.
+/// with EndlessSpool on. The dialog of gate 1 shows both, the Tools tab the map. Everything goes back afterwards.
 fn mmu_tools_and_groups(session: &mut Session) -> Result<(), String> {
     {
         let actions = session.window.global::<Actions>();
@@ -238,9 +238,9 @@ fn mmu_tools_and_groups(session: &mut Session) -> Result<(), String> {
     session.window.global::<MmuDialogs>().set_gate(1);
     session.show_page(Page::Filament, "filament-mmu-gate-tools")?;
     session.window.global::<MmuDialogs>().set_gate(-1);
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Service);
-    session.show_page(Page::Filament, "filament-mmu-service-tools")?;
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Mmu);
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Tools);
+    session.show_page(Page::Filament, "filament-mmu-tools")?;
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
     {
         let actions = session.window.global::<Actions>();
         actions.invoke_mmu_reset_tool_map();
@@ -264,7 +264,7 @@ fn mmu_bypass(session: &mut Session) -> Result<(), String> {
         snapshot.status.mmu.as_ref().is_some_and(|mmu| mmu.bypass_selected())
     })?;
     if !session.window.global::<Printer>().get_mmu_bypass() {
-        return Err("the MMU tab does not show the bypass as selected".into());
+        return Err("the Gates tab does not show the bypass as selected".into());
     }
     session.window.global::<Navigation>().set_mmu_page(1);
     session.show_page(Page::Filament, "filament-mmu-bypass-selected")?;
@@ -340,7 +340,7 @@ fn filament_path_midway(session: &mut Session) -> Result<(), String> {
     };
     session.service.send(Command::RunGcode { script: "FAKE_MMU_FILAMENT POS=3 DIRECTION=1".into() });
     session.wait_until("filament in the bowden", at(3))?;
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Mmu);
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
     session.show_page(Page::Filament, "filament-mmu-loading")?;
     session.service.send(Command::RunGcode { script: "FAKE_MMU_FILAMENT POS=0 DIRECTION=0".into() });
     session.wait_until("filament back in the gate", at(0))

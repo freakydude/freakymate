@@ -148,7 +148,8 @@ history).
   `spool-strip.slint`, `busy-wheel.slint`. Messages (errors and informations) are kept in `status_log.rs`, pure logic
   that the presenter shows.
 - `pages/`: print, move (with the Calibrate tab in `calibrate.slint`), temperature, tune, filament (with Happy Hare the
-  tabs MMU in `mmu.slint` with the dialogs in `mmu-dialogs.slint`, Extruder, and Service in `mmu-service.slint`;
+  tabs Gates in `mmu.slint` with the dialogs in `mmu-dialogs.slint`, Extruder, Tools in `mmu-tools.slint` and
+  Service in `mmu-service.slint`;
   otherwise the extruder alone), and the system tabs: system (machine), updates, network (`network-page.slint` with
   `network.slint`), console (with the macro list), settings (Display); connection replaces the printer pages while
   Moonraker or Klipper is not ready or wants a login.

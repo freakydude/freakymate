@@ -46,8 +46,8 @@ What each page of FreakyMate does. Functions only appear when the printer has th
 
 ## Happy Hare (MMU)
 
-Needs Happy Hare 4.1 or newer. The Filament page then opens on the **MMU** tab, next to **Extruder** and **Service**.
-The MMU tab and a strip on the print page show:
+Needs Happy Hare 4.1 or newer. The Filament page then opens on the **Gates** tab, next to **Extruder**, **Tools** and
+**Service**. The Gates tab and a strip on the print page show:
 
 - the gates and the bypass (five at a time): status, material, colour and the tools that take their filament from each
   gate; unload what is loaded, home, recover and unlock after a pause;
@@ -62,13 +62,13 @@ A tap on a gate opens what can be done with it: select, load, preload, check or 
 it (Happy Hare's tool-to-gate map) and, with EndlessSpool on, choose its group. Without Spoolman the dialog sets
 material and colour of the gate in Happy Hare's gate map instead, from a set of common materials and colours. A tap on
 a gate never moves the selector by itself. The bypass takes filament fed by hand past the gates; its dialog selects
-and loads it. The **Service** tab holds what is rarely needed for the MMU as a whole: home, recover, unlock, motors
-off, check all gates and, on selectors with a servo, servo up and down; the tools with their gates and a reset of the
-map; EndlessSpool on or off.
+and loads it. The **Tools** tab lists the tools with their gates, resets the map and turns EndlessSpool on or off.
+The **Service** tab holds what is rarely needed for the MMU as a whole: home, recover, unlock, motors off, check all
+gates and, on selectors with a servo, servo up and down.
 
-| ![MMU tab](screenshots/mmu.png)      | ![FlowGuard line while tangle prevention raises the gear current](screenshots/print-tangle-boost.png) |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| The MMU tab: gates, sensors, buffer  | The print page while tangle prevention raises the gear current (the FlowGuard line turns yellow)      |
+| ![Gates tab](screenshots/mmu.png)     | ![FlowGuard line while tangle prevention raises the gear current](screenshots/print-tangle-boost.png) |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| The Gates tab: gates, sensors, buffer | The print page while tangle prevention raises the gear current (the FlowGuard line turns yellow)      |
 
 **Quieter console (recommended).** FreakyMate shows Klipper's console messages in its status bar. Happy Hare prints a
 lot there by default: the gate table at startup, a picture of the filament path and statistics after every tool

@@ -406,7 +406,7 @@ export global Printer {
     in property <[PrintObjectItem]> print-objects;
     // The bed the objects lie on; not shown if the slicer did not tell where they are.
     in property <BedMapItem> bed-map;
-    // Happy Hare (4.1 or newer). Without it the Filament page has no MMU tab.
+    // Happy Hare (4.1 or newer). Without it the Filament page has no MMU tabs.
     in property <bool> has-mmu;
     in property <bool> mmu-unsupported;
     in property <[MmuGateItem]> mmu-gates;
@@ -738,22 +738,22 @@ export global SpoolPicker {
     }
 }
 
-// The dialogs of the MMU tab: the gate a tap opened (-1 for none), or the bypass.
+// The dialogs of the Gates tab: the gate a tap opened (-1 for none), or the bypass.
 export global MmuDialogs {
     in-out property <int> gate: -1;
     in-out property <bool> bypass-open;
 }
 
 // Tabs of the Filament page; without an MMU it shows the extruder alone.
-export enum FilamentTab { mmu, extruder, service }
+export enum FilamentTab { gates, extruder, tools, service }
 
 export global Navigation {
     in-out property <Page> page: Page.print;
     in-out property <bool> files-open;
     in-out property <bool> messages-open;
-    // Filament page; with an MMU it opens on the MMU tab.
+    // Filament page; with an MMU it opens on the Gates tab.
     in-out property <FilamentTab> filament-tab;
-    // Page of gate tiles the MMU tab shows, counted from 0.
+    // Page of gate tiles the Gates tab shows, counted from 0.
     in-out property <int> mmu-page;
     // Thermal page: 0 = heaters, 1 = fans, 2 = sensors.
     in-out property <int> heat-tab;

@@ -9,7 +9,7 @@ export component FilamentMmuBypassPreview inherits AppWindow {
     init => {
         Sample.mmu();
         Navigation.page = Page.filament;
-        Navigation.filament-tab = FilamentTab.mmu;
+        Navigation.filament-tab = FilamentTab.gates;
         Printer.mmu-filament = "loaded";
         MmuDialogs.bypass-open = true;
     }

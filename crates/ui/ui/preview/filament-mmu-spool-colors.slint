@@ -1,4 +1,4 @@
-// Preview: MMU tab with Spoolman: spools of one, two and three colours, one nearly empty, one gate without a spool.
+// Preview: Gates tab with Spoolman: spools of one, two and three colours, one nearly empty, one gate without a spool.
 // Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
@@ -9,7 +9,7 @@ export component FilamentMmuSpoolColorsPreview inherits AppWindow {
     init => {
         Sample.mmu();
         Navigation.page = Page.filament;
-        Navigation.filament-tab = FilamentTab.mmu;
+        Navigation.filament-tab = FilamentTab.gates;
         Printer.has-spoolman = true;
         Printer.mmu-gates = [
             { index: 0, availability: "available", name: "Red", material: "ABS+", color: #e31f2b, has-color: true, color-count: 1, tools: "T0", selected: true, spool-text: "613 g", spool-low: false, spool-id: 18 },

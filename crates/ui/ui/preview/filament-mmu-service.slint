@@ -1,5 +1,5 @@
-// Preview: Service tab of an ERCF with a servo selector, not homed after the motors were off, two tools remapped and
-// EndlessSpool on. Open in the Slint preview or render with scripts/ui-preview.sh.
+// Preview: Service tab of an ERCF with a servo selector, not homed after the motors were off. Open in the Slint
+// preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
 import { FilamentTab, Navigation, Page, Printer } from "../state.slint";
@@ -13,7 +13,5 @@ export component FilamentMmuServicePreview inherits AppWindow {
         Printer.mmu-homed = false;
         Printer.mmu-servo = "up";
         Printer.mmu-action = "Homing";
-        Printer.mmu-endless-spool = true;
-        Printer.mmu-tools = [{ tool: 0, gate: 0 }, { tool: 1, gate: 3 }, { tool: 2, gate: 2 }, { tool: 3, gate: 1 }];
     }
 }
