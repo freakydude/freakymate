@@ -48,7 +48,7 @@ Usually Moonraker trusts the machine FreakyMate runs on (`trusted_clients` in `m
 
 - **Log in on the screen** with a Moonraker user. FreakyMate keeps only Moonraker's refresh token, not the password,
   and logs in again with it at every start until it expires (`login_timeout` in `moonraker.conf`, 90 days by default)
-  or the user logs out; then the screen asks again. Logging out (Display tab, or the same user logging out in
+  or the user logs out; then the screen asks again. Logging out (Settings tab, or the same user logging out in
   Mainsail or Fluidd) ends every login of that user, so a user of its own for the display avoids surprises.
 - **API key**, entered by hand in the credentials file below. Moonraker hands it out to an authorized client, for
   example on the printer host, which it usually trusts: `curl http://localhost:7125/access/api_key`.

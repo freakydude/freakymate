@@ -2,7 +2,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Dialogs, Navigation, Network, Page, Printer, StateIcons } from "../state.slint";
+import { Actions, Confirm, Dialogs, Navigation, Network, Page, Printer, StateIcons, TuneTab } from "../state.slint";
 import { BusyWheel } from "busy-wheel.slint";
 import { TextWithValue } from "controls.slint";
 
@@ -202,7 +202,7 @@ component NavItem inherits Rectangle {
         enabled: root.enabled;
         clicked => {
             // The Tune page opens with the basics; the expert tab is one tap away.
-            if (root.page == Page.tune) { Navigation.tune-tab = 0; }
+            if (root.page == Page.tune) { Navigation.tune-tab = TuneTab.basics; }
             Dialogs.dismiss();
             Navigation.page = root.page;
         }

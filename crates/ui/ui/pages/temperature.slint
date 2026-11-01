@@ -2,7 +2,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, FanItem, HeaterItem, Navigation, Printer, SensorItem, UiSettings } from "../state.slint";
+import { Actions, FanItem, HeaterItem, HeatTab, Navigation, Printer, SensorItem, UiSettings } from "../state.slint";
 import { NumberEntryDialog } from "../components/overlays.slint";
 import { IconButton, IconLabel, ProgressBar, ScrollList, StepSelector, TabBar, TabButton, TouchSlider } from "../components/controls.slint";
 
@@ -307,30 +307,30 @@ export component TemperaturePage inherits Rectangle {
     property <bool> has-fans: Printer.fans.length > 0;
     property <bool> has-sensors: Printer.sensors.length > 0;
     // A tab that the printer does not have falls back to the heaters.
-    property <int> tab: (Navigation.heat-tab == 1 && root.has-fans) || (Navigation.heat-tab == 2 && root.has-sensors) ? Navigation.heat-tab : 0;
+    property <HeatTab> tab: (Navigation.heat-tab == HeatTab.fans && root.has-fans) || (Navigation.heat-tab == HeatTab.sensors && root.has-sensors) ? Navigation.heat-tab : HeatTab.heaters;
 
     VerticalLayout {
         if root.has-fans || root.has-sensors: TabBar {
             TabButton {
                 icon: Icons.thermal-heating;
                 text: @tr("Heaters");
-                checked: root.tab == 0;
-                clicked => { Navigation.heat-tab = 0; }
+                checked: root.tab == HeatTab.heaters;
+                clicked => { Navigation.heat-tab = HeatTab.heaters; }
             }
             if root.has-fans: TabButton {
                 icon: Icons.thermal-fan;
                 text: @tr("Fans");
-                checked: root.tab == 1;
-                clicked => { Navigation.heat-tab = 1; }
+                checked: root.tab == HeatTab.fans;
+                clicked => { Navigation.heat-tab = HeatTab.fans; }
             }
             if root.has-sensors: TabButton {
                 icon: Icons.nav-temperature;
                 text: @tr("Sensors");
-                checked: root.tab == 2;
-                clicked => { Navigation.heat-tab = 2; }
+                checked: root.tab == HeatTab.sensors;
+                clicked => { Navigation.heat-tab = HeatTab.sensors; }
             }
         }
-        if root.tab == 0: HeatersTab {
+        if root.tab == HeatTab.heaters: HeatersTab {
             vertical-stretch: 1;
             edit-target(heater) => {
                 root.target-heater = heater.object;
@@ -340,8 +340,8 @@ export component TemperaturePage inherits Rectangle {
                 target-entry.open = true;
             }
         }
-        if root.tab == 1: FansTab { vertical-stretch: 1; }
-        if root.tab == 2: SensorsTab { vertical-stretch: 1; }
+        if root.tab == HeatTab.fans: FansTab { vertical-stretch: 1; }
+        if root.tab == HeatTab.sensors: SensorsTab { vertical-stretch: 1; }
     }
 
     // The heater whose target is being typed. Klipper enforces its limits (min/max_temp) and reports a refusal.

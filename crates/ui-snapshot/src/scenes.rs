@@ -1,7 +1,10 @@
 //! The run, split into scenes that can be chosen on the command line.
 
 use crate::session::Session;
-use freakymate::{Actions, Confirm, FilamentTab, MeshDialogs, MmuDialogs, Navigation, Page, Printer, SpoolPicker};
+use freakymate::{
+    Actions, Confirm, FilamentTab, HeatTab, MeshDialogs, MmuDialogs, MoveTab, Navigation, Page, Printer, SpoolPicker,
+    TuneTab,
+};
 use freakymate_core::network::{Availability, NetworkCommand, NetworkState};
 use freakymate_core::sources::happy_hare::ServoPosition;
 use freakymate_core::sources::klipper::tuning::TuningKey;
@@ -161,9 +164,9 @@ fn pages(session: &mut Session) -> Result<(), String> {
         }
         let has_tuning = session.presenter.snapshot().sources.klipper.tuning.get(TuningKey::MaxAccel).is_some();
         if page == Page::Tune && has_tuning {
-            session.window.global::<Navigation>().set_tune_tab(1);
+            session.window.global::<Navigation>().set_tune_tab(TuneTab::Expert);
             session.show_page(Page::Tune, "tune-expert")?;
-            session.window.global::<Navigation>().set_tune_tab(0);
+            session.window.global::<Navigation>().set_tune_tab(TuneTab::Basics);
         }
         if page == Page::Filament && session.presenter.snapshot().status.mmu.is_some() {
             session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
@@ -391,17 +394,17 @@ fn heat_tabs(session: &mut Session) -> Result<(), String> {
     let status = session.presenter.snapshot().status;
     let navigation = session.window.global::<Navigation>();
     if !status.fans.is_empty() || !status.leds.is_empty() {
-        navigation.set_heat_tab(1);
+        navigation.set_heat_tab(HeatTab::Fans);
         session.show_page(Page::Temperature, "temperature-fans")?;
         if status.fans.iter().any(|fan| fan.object == "fan_generic exhaust") {
             stalled_fan(session)?;
         }
     }
     if !status.sensors.is_empty() {
-        session.window.global::<Navigation>().set_heat_tab(2);
+        session.window.global::<Navigation>().set_heat_tab(HeatTab::Sensors);
         session.show_page(Page::Temperature, "temperature-sensors")?;
     }
-    session.window.global::<Navigation>().set_heat_tab(0);
+    session.window.global::<Navigation>().set_heat_tab(HeatTab::Heaters);
     if !status.leds.is_empty() {
         // A WLED strip switched on with its preset: on, with the brightness unknown.
         for strip in session.presenter.snapshot().sources.wled_strips.iter().filter_map(|led| wled::strip_name(led)) {
@@ -648,7 +651,7 @@ const NAV_MOVE: (f32, f32) = (38.0, 155.0);
 /// changes are saved, so the scenes after it start without pending ones.
 fn calibrate(session: &mut Session) -> Result<(), String> {
     let offered = session.presenter.snapshot().sources.klipper.calibration;
-    session.window.global::<Navigation>().set_move_tab(1);
+    session.window.global::<Navigation>().set_move_tab(MoveTab::Calibrate);
     session.show_page(Page::Move, "calibrate")?;
     if offered.bed_mesh {
         session.service.send(Command::CalibrateBedMesh);
@@ -700,7 +703,7 @@ fn calibrate(session: &mut Session) -> Result<(), String> {
     }
     session.service.send(Command::SaveConfig);
     session.wait_until("saved", |snapshot| !snapshot.status.save_config_pending)?;
-    session.window.global::<Navigation>().set_move_tab(0);
+    session.window.global::<Navigation>().set_move_tab(MoveTab::Axes);
     Ok(())
 }
 
@@ -815,7 +818,7 @@ fn temperature_leads_to_heaters(session: &mut Session) -> Result<(), String> {
     let (x, y) = STATUS_BAR_NOZZLE;
     session.tap(x, y);
     let navigation = session.window.global::<Navigation>();
-    if navigation.get_page() != Page::Temperature || navigation.get_heat_tab() != 0 {
+    if navigation.get_page() != Page::Temperature || navigation.get_heat_tab() != HeatTab::Heaters {
         return Err("a tap on the nozzle temperature did not open the heaters".into());
     }
     navigation.set_page(Page::Print);

@@ -2,7 +2,7 @@
 
 import { Icons } from "icons.slint";
 
-// `updates`, `network`, `console` and `settings` (the Display tab) are tabs of the system pages.
+// `updates`, `network`, `console` and `settings` (the Settings tab) are tabs of the system pages.
 export enum Page { print, move, temperature, tune, filament, console, system, settings, updates, network }
 
 export struct HeaterItem {
@@ -747,6 +747,15 @@ export global MmuDialogs {
 // Tabs of the Filament page; without an MMU it shows the extruder alone.
 export enum FilamentTab { gates, extruder, tools, service }
 
+// Tabs of the Move page; without anything to calibrate it shows the axes alone.
+export enum MoveTab { axes, calibrate }
+
+// Tabs of the Thermal page; a tab the printer has nothing for falls back to the heaters.
+export enum HeatTab { heaters, fans, sensors }
+
+// Tabs of the Tune page; without expert values it shows the basics alone.
+export enum TuneTab { basics, expert }
+
 export global Navigation {
     in-out property <Page> page: Page.print;
     in-out property <bool> files-open;
@@ -755,12 +764,10 @@ export global Navigation {
     in-out property <FilamentTab> filament-tab;
     // Page of gate tiles the Gates tab shows, counted from 0.
     in-out property <int> mmu-page;
-    // Thermal page: 0 = heaters, 1 = fans, 2 = sensors.
-    in-out property <int> heat-tab;
-    // Tune page: 0 = basics, 1 = expert; the navigation rail opens the basics.
-    in-out property <int> tune-tab;
-    // 0 move, 1 calibrate.
-    in-out property <int> move-tab;
+    in-out property <HeatTab> heat-tab;
+    // The navigation rail opens the basics.
+    in-out property <TuneTab> tune-tab;
+    in-out property <MoveTab> move-tab;
     in-out property <bool> history-open;
     // Width to height of the drawing area of the temperature chart; the chart's lines are drawn for this shape.
     in-out property <float> history-aspect: 2;
@@ -770,7 +777,7 @@ export global Navigation {
     // A tap on a temperature reading leads to the heaters; a quiet shortcut, not styled as a button.
     public function show-heaters() {
         self.files-open = false;
-        self.heat-tab = 0;
+        self.heat-tab = HeatTab.heaters;
         self.page = Page.temperature;
     }
 }

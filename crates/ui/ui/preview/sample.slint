@@ -1,7 +1,7 @@
 // Sample data for previews (VS Code Slint preview, slint-viewer, scripts/ui-preview.ps1).
 // Not part of the app: nothing in app.slint imports this folder. In the app, Rust fills these globals.
 
-import { Navigation, Network, Page, Printer, UiSettings } from "../state.slint";
+import { MoveTab, Navigation, Network, Page, Printer, UiSettings } from "../state.slint";
 
 export global Sample {
     // Connected Voron-like printer, homed, nozzle and bed at temperature, no job.
@@ -99,7 +99,7 @@ export global Sample {
     public function calibration() {
         self.ready-printer();
         Navigation.page = Page.move;
-        Navigation.move-tab = 1;
+        Navigation.move-tab = MoveTab.calibrate;
         Printer.can-quad-gantry-level = false;
         Printer.has-probe = true;
         Printer.z-calibration = "probe";

@@ -3,7 +3,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Navigation, Printer, UiSettings } from "../state.slint";
+import { Actions, Confirm, MoveTab, Navigation, Printer, UiSettings } from "../state.slint";
 import { Card, IconButton, StepSelector, TabBar, TabButton } from "../components/controls.slint";
 import { CalibrateTab } from "calibrate.slint";
 
@@ -28,7 +28,7 @@ component AxisValue inherits HorizontalLayout {
     }
 }
 
-component MoveTab inherits Rectangle {
+component AxesTab inherits Rectangle {
     property <float> step: UiSettings.move-step;
 
     // The step row sits under the jog cards only, so the right column with three touch buttons gets the full height.
@@ -133,23 +133,24 @@ component MoveTab inherits Rectangle {
 export component MovePage inherits Rectangle {
     property <bool> can-calibrate: Printer.has-bed-mesh || Printer.has-screws-tilt || Printer.has-bed-screws
         || Printer.z-calibration != "" || Printer.can-quad-gantry-level || Printer.can-z-tilt;
+    property <MoveTab> tab: root.can-calibrate ? Navigation.move-tab : MoveTab.axes;
 
     VerticalLayout {
         if root.can-calibrate: TabBar {
             TabButton {
                 icon: Icons.nav-move;
                 text: @tr("Move");
-                checked: Navigation.move-tab == 0;
-                clicked => { Navigation.move-tab = 0; }
+                checked: root.tab == MoveTab.axes;
+                clicked => { Navigation.move-tab = MoveTab.axes; }
             }
             TabButton {
                 icon: Icons.nav-calibration;
                 text: @tr("Calibrate");
-                checked: Navigation.move-tab == 1;
-                clicked => { Navigation.move-tab = 1; }
+                checked: root.tab == MoveTab.calibrate;
+                clicked => { Navigation.move-tab = MoveTab.calibrate; }
             }
         }
-        if Navigation.move-tab == 0 || !root.can-calibrate: MoveTab { vertical-stretch: 1; }
-        if Navigation.move-tab == 1 && root.can-calibrate: CalibrateTab { vertical-stretch: 1; }
+        if root.tab == MoveTab.axes: AxesTab { vertical-stretch: 1; }
+        if root.tab == MoveTab.calibrate: CalibrateTab { vertical-stretch: 1; }
     }
 }
