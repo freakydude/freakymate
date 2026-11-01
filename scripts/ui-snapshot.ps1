@@ -1,7 +1,8 @@
 <#
   Renders the pages of the Slint UI headless as PNG against a freshly started fake Moonraker.
   Usage (repo root): powershell -File scripts\ui-snapshot.ps1 [-OutDir <folder>] [-Profile voron] [-Size 800x480]
-                     [-NoFit] [-Scenes pages,network,calibrate,printing,shutdown,idle,login|all] [-Port 7125]
+                     [-NoFit] [-Scenes pages,network,calibrate,printing,shutdown,idle,login|all] [-Port 7126]
+  -Port: port of its own fake; 7126 by default, so a fake on Moonraker's 7125 (the debug setup) is left alone.
   -NoFit: the window of the given size without scaling the layout to 800x480 (as a desktop window; at least 800x480).
           Without it the layout is fitted to the size like the app does in fullscreen.
   Without -Scenes all scenes except the slow 'idle' and 'login' run; with 'login' the fake wants a login (user test,
@@ -13,7 +14,7 @@ param(
     [string]$Size = '800x480',
     [string]$Scenes = '',
     [switch]$NoFit,
-    [int]$Port = 7125
+    [int]$Port = 7126
 )
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path

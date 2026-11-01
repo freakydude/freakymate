@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Renders the pages of the Slint UI headless as PNG against a freshly started fake Moonraker.
 # WSL2/Linux counterpart of ui-snapshot.ps1.
-# Usage (repo root): scripts/ui-snapshot.sh [-o <folder>] [-p voron] [-s 800x480] [-F] [-S pages,network] [-P 7125]
+# Usage (repo root): scripts/ui-snapshot.sh [-o <folder>] [-p voron] [-s 800x480] [-F] [-S pages,network] [-P 7126]
+# -P: port of its own fake; 7126 by default, so a fake on Moonraker's 7125 (the debug setup) is left alone.
 # -F: no fit; the window of the given size without scaling the layout to 800x480 (as a desktop window; at least
 #     800x480). Without -F the layout is fitted to the size like the app does in fullscreen.
 # Without -S all scenes except the slow 'idle' and 'login' run; with 'login' the fake wants a login (user test,
@@ -13,7 +14,7 @@ out_dir="${TMPDIR:-/tmp}/freakymate-ui-snapshots"
 profile=voron
 size=800x480
 scenes=
-port=7125
+port=7126
 fit_flag=()
 
 while getopts "o:p:s:S:P:Fh" option; do
