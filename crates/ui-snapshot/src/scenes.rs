@@ -145,7 +145,7 @@ fn pages(session: &mut Session) -> Result<(), String> {
     session.show_page(Page::Print, "print-standby")?;
     session.presenter.request_files();
     session.window.global::<Navigation>().set_files_open(true);
-    session.pump(Duration::from_secs(2));
+    session.settle_replies(Duration::from_secs(2));
     session.capture("print-files")?;
     session.window.global::<Navigation>().set_files_open(false);
     for (page, name) in [
@@ -450,7 +450,7 @@ fn nozzle_history(session: &mut Session) -> Result<(), String> {
 
 /// Without Spoolman in Moonraker there is nothing to show and the scene is skipped.
 fn spools(session: &mut Session) -> Result<(), String> {
-    session.pump(Duration::from_secs(2));
+    session.settle_replies(Duration::from_secs(2));
     let snapshot = session.presenter.snapshot();
     if !snapshot.sources.moonraker.spoolman {
         return Ok(());
@@ -466,7 +466,7 @@ fn spools(session: &mut Session) -> Result<(), String> {
     } else {
         session.service.send(Command::SetActiveSpool { spool_id: Some(6) });
     }
-    session.pump(Duration::from_secs(2));
+    session.settle_replies(Duration::from_secs(2));
     session.service.send(Command::SetHeaterTarget { heater: "extruder".into(), target: 210.0 });
     session.pump(Duration::from_secs(1));
     session.show_page(Page::Print, "print-spool")?;
@@ -476,12 +476,12 @@ fn spools(session: &mut Session) -> Result<(), String> {
     // Opens like a tap on the strip or gate 1: the spool in use is selected.
     let current = session.window.global::<Printer>().get_spool_id();
     session.window.global::<SpoolPicker>().invoke_show(if has_mmu { 1 } else { -1 }, current);
-    session.pump(Duration::from_secs(2));
+    session.settle_replies(Duration::from_secs(2));
     session.capture("spool-picker")?;
     session.window.global::<SpoolPicker>().set_open(false);
 
     session.presenter.request_files();
-    session.pump(Duration::from_secs(2));
+    session.settle_replies(Duration::from_secs(2));
     let hints = session.presenter.print_hints_text("long_job.gcode");
     session.window.global::<Confirm>().invoke_ask(
         "Start print".into(),
@@ -507,7 +507,7 @@ fn network(session: &mut Session) -> Result<(), String> {
     session.network_service.send(NetworkCommand::Connect { ssid: "Cafe Guest".into(), password: None, hidden: false });
     session.pump(Duration::from_millis(200));
     session.capture("network-connecting")?;
-    session.pump(Duration::from_secs(2));
+    session.settle_replies(Duration::from_secs(2));
 
     ask(session, "Remove network", "The saved password of \"Garage\" is deleted.", "forget-network", "Garage");
     session.capture("network-forget")?;
@@ -779,7 +779,7 @@ fn has_mesh_profile(snapshot: &Snapshot, name: &str) -> bool {
 fn printing(session: &mut Session) -> Result<(), String> {
     session.service.send(Command::StartPrint { filename: "benchy.gcode".into() });
     session.wait_until("print running", |snapshot| {
-        snapshot.status.job.state == PrintState::Printing && snapshot.status.job.progress > 0.02
+        snapshot.status.job.state == PrintState::Printing && snapshot.status.job.progress > 0.005
     })?;
     session.pump(Duration::from_secs(1));
     session.show_page(Page::Print, "print-printing")?;
