@@ -18,7 +18,9 @@ use std::time::{Duration, Instant};
 
 const WAIT_LIMIT: Duration = Duration::from_secs(20);
 /// Time for Slint and the services to settle before a picture is taken.
-const SETTLE_TIME: Duration = Duration::from_millis(400);
+const SETTLE_TIME: Duration = Duration::from_millis(200);
+/// Replies to a query count as complete after this long without another one.
+const QUIET_TIME: Duration = Duration::from_millis(300);
 
 struct SnapshotPlatform {
     window: Rc<MinimalSoftwareWindow>,
@@ -116,26 +118,49 @@ impl Session {
     pub fn pump(&mut self, duration: Duration) {
         let deadline = Instant::now() + duration;
         loop {
-            if self.channels.snapshots.has_changed().unwrap_or(false) {
-                let snapshot = self.channels.snapshots.borrow_and_update().clone();
-                self.presenter.apply_snapshot(&snapshot);
-            }
-            while let Ok(event) = self.channels.events.try_recv() {
-                self.presenter.handle_event(event);
-            }
-            if self.network_channels.states.has_changed().unwrap_or(false) {
-                let state = self.network_channels.states.borrow_and_update().clone();
-                self.network.apply_state(state);
-            }
-            while let Ok(notice) = self.network_channels.notices.try_recv() {
-                self.network.show_notice(&notice);
-            }
-            slint::platform::update_timers_and_animations();
+            self.transfer();
             if Instant::now() >= deadline {
                 break;
             }
             std::thread::sleep(Duration::from_millis(20));
         }
+    }
+
+    /// Pumps until the replies to queries (files, spools, history, network) have arrived: no event for a short while,
+    /// at most `limit`. The status snapshots keep coming all the time and do not count.
+    pub fn settle_replies(&mut self, limit: Duration) {
+        let deadline = Instant::now() + limit;
+        let mut last_reply = Instant::now();
+        while Instant::now() < deadline && last_reply.elapsed() < QUIET_TIME {
+            if self.transfer() {
+                last_reply = Instant::now();
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    /// One round of the event loop; true if an event or a network state arrived.
+    fn transfer(&mut self) -> bool {
+        let mut replied = false;
+        if self.channels.snapshots.has_changed().unwrap_or(false) {
+            let snapshot = self.channels.snapshots.borrow_and_update().clone();
+            self.presenter.apply_snapshot(&snapshot);
+        }
+        while let Ok(event) = self.channels.events.try_recv() {
+            self.presenter.handle_event(event);
+            replied = true;
+        }
+        if self.network_channels.states.has_changed().unwrap_or(false) {
+            let state = self.network_channels.states.borrow_and_update().clone();
+            self.network.apply_state(state);
+            replied = true;
+        }
+        while let Ok(notice) = self.network_channels.notices.try_recv() {
+            self.network.show_notice(&notice);
+            replied = true;
+        }
+        slint::platform::update_timers_and_animations();
+        replied
     }
 
     pub fn wait_until(&mut self, what: &str, condition: impl Fn(&Snapshot) -> bool) -> Result<(), String> {

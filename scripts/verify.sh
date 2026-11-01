@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 # Runs all checks of a work package in one go: formatting, Clippy, tests, app build, UI previews and the
 # skill check. Every step runs even when an earlier one fails; the exit code is 1 if any step failed.
-# WSL2/Linux only. Usage (repo root): scripts/verify.sh [--snapshot]
-#   --snapshot  also renders the UI snapshot scenes against a fake Moonraker (slower, needs a free port)
+# WSL2/Linux only. Usage (repo root): scripts/verify.sh [--snapshot[=<scenes>]]
+#   --snapshot           also renders all UI snapshot scenes against a fake Moonraker (about 1.5 minutes more); once
+#                        before a commit
+#   --snapshot=pages,..  only these scenes, for the part of the UI that changed (names: scripts/ui-snapshot.sh -h)
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
 log_dir=$(mktemp -d "${TMPDIR:-/tmp}/freakymate-verify.XXXXXX")
 with_snapshot=false
-[ "${1:-}" = "--snapshot" ] && with_snapshot=true
+snapshot_arguments=()
+case "${1:-}" in
+    --snapshot) with_snapshot=true ;;
+    --snapshot=*) with_snapshot=true; snapshot_arguments=(-S "${1#--snapshot=}") ;;
+esac
 failed=()
 
 run_step() {
@@ -37,7 +43,7 @@ if [ -x "$skill_check" ]; then
     run_step "skill check" "$skill_check"
 fi
 if [ "$with_snapshot" = true ]; then
-    run_step "ui snapshot" scripts/ui-snapshot.sh
+    run_step "ui snapshot" scripts/ui-snapshot.sh ${snapshot_arguments[@]+"${snapshot_arguments[@]}"}
 fi
 
 echo
