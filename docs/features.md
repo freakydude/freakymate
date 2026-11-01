@@ -58,11 +58,12 @@ Needs Happy Hare 4.1 or newer. The Filament page then opens on the **Gates** tab
   tangle prevention at work, or triggered with its reason;
 - the flow rate, measured by the encoder or estimated by the sync-feedback controller with a proportional sensor.
 
-A tap on a gate opens what can be done with it: select, load, preload, check or eject it, pick its spool, move tools to
-it (Happy Hare's tool-to-gate map) and, with EndlessSpool on, choose its group. Without Spoolman the dialog sets
-material and colour of the gate in Happy Hare's gate map instead, from a set of common materials and colours. A tap on
-a gate never moves the selector by itself. The bypass takes filament fed by hand past the gates; its dialog selects
-and loads it. The **Tools** tab lists the tools with their gates, resets the map and turns EndlessSpool on or off.
+A tap on a gate opens what can be done with it: select, load, preload, check or eject it, and pick its spool. Without
+Spoolman the dialog sets material and colour of the gate in Happy Hare's gate map instead, from a set of common
+materials and colours. A tap on a gate never moves the selector by itself. The bypass takes filament fed by hand past
+the gates; its dialog selects and loads it. The **Tools** tab is the one place to set which gate each tool takes its
+filament from (Happy Hare's tool-to-gate map): a tap on a tool offers the gates with their colour and material. It
+also resets the map and turns EndlessSpool on or off; while it is on, it moves each gate from group to group.
 The **Service** tab holds what is rarely needed for the MMU as a whole: home, recover, unlock, motors off, check all
 gates and, on selectors with a servo, servo up and down.
 

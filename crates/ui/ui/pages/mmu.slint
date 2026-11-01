@@ -48,10 +48,11 @@ export component GateAvailabilityLabel inherits IconLabel {
     font-size: Theme.font-small;
 }
 
-// The frame of a gate and of the bypass: a tile to tap, with an accent border while selected.
-component SlotTile inherits Rectangle {
+// The frame of a gate, the bypass or a tool: a tile to tap, with an accent border while selected.
+export component SlotTile inherits Rectangle {
     in property <bool> selected;
     in property <string> label;
+    in property <bool> enabled: true;
     callback clicked;
 
     border-radius: Theme.radius;
@@ -62,6 +63,7 @@ component SlotTile inherits Rectangle {
     accessible-label: root.label;
 
     tile-touch := TouchArea {
+        enabled: root.enabled;
         clicked => { root.clicked(); }
     }
     VerticalLayout {

@@ -8,7 +8,7 @@ import { SpoolStrip } from "../components/spool-strip.slint";
 import { MmuGatesTab } from "mmu.slint";
 import { BypassDialog, GateDialog } from "mmu-dialogs.slint";
 import { MmuServiceTab } from "mmu-service.slint";
-import { MmuToolsTab } from "mmu-tools.slint";
+import { MmuToolsTab, ToolDialog } from "mmu-tools.slint";
 
 component ExtruderTab inherits Rectangle {
     VerticalLayout {
@@ -130,7 +130,8 @@ component ExtruderTab inherits Rectangle {
 }
 
 // With Happy Hare the gates come first, then the extruder by hand, the tools with EndlessSpool and the service
-// commands of the MMU; without it the extruder alone. The dialogs of a gate and of the bypass cover the whole page.
+// commands of the MMU; without it the extruder alone. The dialogs of a gate, the bypass and a tool cover the whole
+// page.
 export component FilamentPage inherits Rectangle {
     property <FilamentTab> tab: Printer.has-mmu ? Navigation.filament-tab : FilamentTab.extruder;
 
@@ -177,5 +178,6 @@ export component FilamentPage inherits Rectangle {
 
     if root.tab == FilamentTab.gates: GateDialog { }
     if root.tab == FilamentTab.gates: BypassDialog { }
+    if root.tab == FilamentTab.tools: ToolDialog { }
 }
 
