@@ -1,14 +1,14 @@
-// Service tab of the Filament page: the commands for the MMU as a whole, which tool takes its filament from which
-// gate, and EndlessSpool. The tools of one gate and its group are set in the gate's dialog.
+// Service tab of the Filament page: the commands for the MMU as a whole, rarely needed.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, Printer } from "../state.slint";
-import { Card, IconButton, ToggleRow } from "../components/controls.slint";
+import { IconButton } from "../components/controls.slint";
 import { GateCheck } from "mmu-dialogs.slint";
 
 export component MmuServiceTab inherits Rectangle {
-    property <length> button-height: 76px;
+    // Large tiles, like the extrude buttons of the Extruder tab.
+    property <length> tile-icon: 40px;
 
     VerticalLayout {
         padding: Theme.padding;
@@ -16,8 +16,9 @@ export component MmuServiceTab inherits Rectangle {
 
         HorizontalLayout {
             spacing: Theme.spacing;
-            height: root.button-height;
+            vertical-stretch: 1;
             IconButton {
+                icon-size: root.tile-icon;
                 icon: Icons.mmu-home;
                 text: @tr("Home");
                 kind: Printer.mmu-homed ? "normal" : "accent";
@@ -25,18 +26,21 @@ export component MmuServiceTab inherits Rectangle {
                 clicked => { Actions.mmu-home(); }
             }
             IconButton {
+                icon-size: root.tile-icon;
                 icon: Icons.mmu-recover;
                 text: @tr("Recover");
                 kind: Printer.mmu-paused ? "accent" : "normal";
                 clicked => { Actions.mmu-recover(); }
             }
             IconButton {
+                icon-size: root.tile-icon;
                 icon: Icons.ui-unlock;
                 text: @tr("Unlock");
                 kind: Printer.mmu-locked ? "accent" : "normal";
                 clicked => { Actions.mmu-unlock(); }
             }
             IconButton {
+                icon-size: root.tile-icon;
                 icon: Icons.motion-steppers-off;
                 text: @tr("Motors off");
                 clicked => {
@@ -47,8 +51,9 @@ export component MmuServiceTab inherits Rectangle {
 
         HorizontalLayout {
             spacing: Theme.spacing;
-            height: root.button-height;
+            vertical-stretch: 1;
             IconButton {
+                icon-size: root.tile-icon;
                 horizontal-stretch: 2;
                 icon: Icons.mmu-check-gate;
                 text: @tr("Check all gates");
@@ -61,6 +66,7 @@ export component MmuServiceTab inherits Rectangle {
                 }
             }
             if Printer.mmu-servo != "": IconButton {
+                icon-size: root.tile-icon;
                 horizontal-stretch: 1;
                 icon: Icons.mmu-servo-up;
                 text: @tr("Servo up");
@@ -68,67 +74,12 @@ export component MmuServiceTab inherits Rectangle {
                 clicked => { Actions.mmu-servo-up(); }
             }
             if Printer.mmu-servo != "": IconButton {
+                icon-size: root.tile-icon;
                 horizontal-stretch: 1;
                 icon: Icons.mmu-servo-down;
                 text: @tr("Servo down");
                 checked: Printer.mmu-servo == "down";
                 clicked => { Actions.mmu-servo-down(); }
-            }
-        }
-
-        HorizontalLayout {
-            spacing: Theme.spacing;
-            vertical-stretch: 1;
-
-            // The tool-to-gate map seen from the tools, as a check of what the gates show.
-            Card {
-                horizontal-stretch: 1;
-                title: @tr("Tools");
-                icon: Icons.mmu-ttg-map;
-                tool-grid := Rectangle {
-                    vertical-stretch: 1;
-                    property <int> columns: max(1, floor(self.width / 110px));
-                    property <length> cell-width: (self.width - (self.columns - 1) * Theme.spacing) / self.columns;
-                    property <length> row-height: 26px;
-                    for mapping[index] in Printer.mmu-tools: Text {
-                        x: mod(index, tool-grid.columns) * (tool-grid.cell-width + Theme.spacing);
-                        y: floor(index / tool-grid.columns) * tool-grid.row-height;
-                        width: tool-grid.cell-width;
-                        height: tool-grid.row-height;
-                        text: @tr("T{} → Gate {}", mapping.tool, mapping.gate);
-                        color: mapping.tool == mapping.gate ? Theme.muted : Theme.foreground;
-                        font-size: Theme.font-normal;
-                        vertical-alignment: center;
-                        overflow: elide;
-                    }
-                }
-                IconButton {
-                    height: 48px;
-                    icon: Icons.ui-refresh;
-                    text: @tr("Reset");
-                    horizontal: true;
-                    clicked => {
-                        Confirm.ask(@tr("Reset tools"), @tr("Every tool takes its filament from the gate configured for it again, usually the gate of its number."), "mmu-reset-tool-map", "", false);
-                    }
-                }
-            }
-
-            Card {
-                width: 300px;
-                title: @tr("EndlessSpool");
-                icon: Icons.mmu-endless-spool;
-                ToggleRow {
-                    text: @tr("On a runout continue");
-                    checked: Printer.mmu-endless-spool;
-                    toggled => { Actions.mmu-set-endless-spool(!Printer.mmu-endless-spool); }
-                }
-                Text {
-                    vertical-stretch: 1;
-                    text: @tr("Instead of pausing, Happy Hare continues with the next gate of the same group. The group of a gate is set in its dialog.");
-                    color: Theme.muted;
-                    font-size: Theme.font-small;
-                    wrap: word-wrap;
-                }
             }
         }
     }

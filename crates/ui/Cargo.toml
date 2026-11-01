@@ -8,6 +8,12 @@ repository.workspace = true
 rust-version.workspace = true
 publish = false
 
+# No tests of its own: without this, `cargo test` and `clippy --all-targets` compile the large generated UI code a
+# second time as a test harness. The UI is checked by the previews and ui-snapshot.
+[lib]
+test = false
+doctest = false
+
 # Kept free of freakymate-core, so changes in the core do not recompile the large generated UI code.
 [dependencies]
 slint = { workspace = true, features = ["std", "compat-1-2"] }

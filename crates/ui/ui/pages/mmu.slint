@@ -1,4 +1,4 @@
-// MMU tab of the Filament page: the gates and the bypass (five slots at a time), the filament path with sensors and
+// Gates tab of the Filament page: the gates and the bypass (five slots at a time), the filament path with sensors and
 // buffer, unload of the loaded filament; a tap on a gate or the bypass opens what can be done with it
 // (`mmu-dialogs.slint`).
 
@@ -8,7 +8,7 @@ import { Actions, MmuDialogs, MmuGateItem, Navigation, Printer } from "../state.
 import { Card, ColorBar, IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
 import { FilamentPath } from "../components/filament-path.slint";
 
-// Texts of the buffer and FlowGuard and the colour of FlowGuard, shared by the MMU tab and the strip on the print page.
+// Texts of the buffer and FlowGuard and the colour of FlowGuard, shared by the Gates tab and the strip on the print page.
 export global MmuTexts {
     pure public function buffer(state: string) -> string {
         if (state == "neutral") { return @tr("Neutral"); }
@@ -37,7 +37,7 @@ export global MmuTexts {
     }
 }
 
-// Whether a gate has filament, as an icon with a word; shared by the MMU tab and the gate dialog.
+// Whether a gate has filament, as an icon with a word; shared by the Gates tab and the gate dialog.
 export component GateAvailabilityLabel inherits IconLabel {
     in property <string> availability;
     property <bool> has-filament: root.availability == "available" || root.availability == "buffered";
@@ -48,10 +48,11 @@ export component GateAvailabilityLabel inherits IconLabel {
     font-size: Theme.font-small;
 }
 
-// The frame of a gate and of the bypass: a tile to tap, with an accent border while selected.
-component SlotTile inherits Rectangle {
+// The frame of a gate, the bypass or a tool: a tile to tap, with an accent border while selected.
+export component SlotTile inherits Rectangle {
     in property <bool> selected;
     in property <string> label;
+    in property <bool> enabled: true;
     callback clicked;
 
     border-radius: Theme.radius;
@@ -62,6 +63,7 @@ component SlotTile inherits Rectangle {
     accessible-label: root.label;
 
     tile-touch := TouchArea {
+        enabled: root.enabled;
         clicked => { root.clicked(); }
     }
     VerticalLayout {
@@ -215,8 +217,8 @@ component MmuRecoverRow inherits HorizontalLayout {
 
 // A tap on a gate opens its dialog instead of moving the selector, so looking at a gate or setting its colour never
 // moves anything. Loading belongs to a gate (its dialog); unloading takes out whatever is loaded, so it sits at the
-// filament path. The commands for the MMU as a whole are on the Service tab.
-export component MmuTab inherits Rectangle {
+// filament path. The tools are on the Tools tab, the commands for the MMU as a whole on the Service tab.
+export component MmuGatesTab inherits Rectangle {
     // The bypass is one more slot after the last gate.
     property <int> bypass-slot: Printer.mmu-gates.length;
     property <int> slots-per-page: 5;

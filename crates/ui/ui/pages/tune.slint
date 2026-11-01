@@ -3,7 +3,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Navigation, Printer, TuningItem, UiSettings } from "../state.slint";
+import { Actions, Confirm, Navigation, Printer, TuneTab, TuningItem, UiSettings } from "../state.slint";
 import { Card, IconButton, ScrollList, StepSelector, TabBar, TabButton } from "../components/controls.slint";
 
 // Names of the expert values; the core identifies them by id.
@@ -190,22 +190,24 @@ component BasicsTab inherits Rectangle {
 }
 
 export component TunePage inherits Rectangle {
+    property <TuneTab> tab: Printer.tuning.length > 0 ? Navigation.tune-tab : TuneTab.basics;
+
     VerticalLayout {
         TabBar {
             TabButton {
                 icon: Icons.nav-tuning;
                 text: @tr("Basics");
-                checked: Navigation.tune-tab == 0;
-                clicked => { Navigation.tune-tab = 0; }
+                checked: root.tab == TuneTab.basics;
+                clicked => { Navigation.tune-tab = TuneTab.basics; }
             }
             if Printer.tuning.length > 0: TabButton {
                 icon: Icons.nav-tuning-advanced;
                 text: @tr("Expert");
-                checked: Navigation.tune-tab == 1;
-                clicked => { Navigation.tune-tab = 1; }
+                checked: root.tab == TuneTab.expert;
+                clicked => { Navigation.tune-tab = TuneTab.expert; }
             }
         }
-        if Navigation.tune-tab == 0 || Printer.tuning.length == 0: BasicsTab { vertical-stretch: 1; }
-        if Navigation.tune-tab == 1 && Printer.tuning.length > 0: ExpertTab { vertical-stretch: 1; }
+        if root.tab == TuneTab.basics: BasicsTab { vertical-stretch: 1; }
+        if root.tab == TuneTab.expert: ExpertTab { vertical-stretch: 1; }
     }
 }

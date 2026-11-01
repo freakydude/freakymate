@@ -1,0 +1,245 @@
+// Tools tab of the Filament page: which tool takes its filament from which gate (Happy Hare's tool-to-gate map) and
+// EndlessSpool with the groups of the gates. Both are set here only; the Gates tab shows them.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, Confirm, MmuDialogs, MmuGateItem, MmuToolItem, Printer } from "../state.slint";
+import { Card, ColorBar, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
+import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
+import { SlotTile } from "mmu.slint";
+
+// The colour of a gate as a vertical bar, the way the tiles of the gates show it.
+component GateColor inherits ColorBar {
+    in property <MmuGateItem> gate;
+
+    width: 10px;
+    height: 32px;
+    vertical: true;
+    first: root.gate.has-color ? root.gate.color : Theme.border;
+    second: root.gate.color-2;
+    third: root.gate.color-3;
+    count: max(1, root.gate.color-count);
+    longitudinal: root.gate.longitudinal;
+}
+
+// A tool with the gate it takes its filament from, in that gate's colour and material; a tap opens the choice of gate.
+component ToolTile inherits SlotTile {
+    in property <MmuToolItem> mapping;
+    property <MmuGateItem> gate: Printer.mmu-gates[root.mapping.gate];
+
+    label: "T" + root.mapping.tool;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            min-width: 32px;
+            text: "T" + root.mapping.tool;
+            color: Theme.accent;
+            font-size: Theme.font-normal;
+            font-weight: 700;
+            vertical-alignment: center;
+        }
+        GateColor {
+            cross-axis-self-alignment: center;
+            gate: root.gate;
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            Text {
+                text: @tr("Gate {}", root.mapping.gate);
+                color: Theme.foreground;
+                font-size: Theme.font-small;
+                overflow: elide;
+            }
+            Text {
+                text: root.gate.material == "" ? "-" : root.gate.material;
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                overflow: elide;
+            }
+        }
+    }
+}
+
+// A gate with its EndlessSpool group; a tap on the group moves the gate to the next one.
+component GroupRow inherits HorizontalLayout {
+    in property <MmuGateItem> gate;
+
+    spacing: 8px;
+    GateColor {
+        cross-axis-self-alignment: center;
+        gate: root.gate;
+    }
+    VerticalLayout {
+        horizontal-stretch: 1;
+        alignment: center;
+        Text {
+            text: @tr("Gate {}", root.gate.index);
+            color: Theme.foreground;
+            font-size: Theme.font-small;
+            overflow: elide;
+        }
+        Text {
+            text: root.gate.material == "" ? "-" : root.gate.material;
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            overflow: elide;
+        }
+    }
+    IconButton {
+        width: 128px;
+        icon: Icons.mmu-endless-spool;
+        text: root.gate.group >= 0 ? @tr("Group {}", root.gate.group) : "-";
+        horizontal: true;
+        enabled: root.gate.group >= 0;
+        clicked => { Actions.mmu-set-endless-spool-group(root.gate.index, mod(root.gate.group + 1, Printer.mmu-gates.length)); }
+    }
+}
+
+export component MmuToolsTab inherits Rectangle {
+    // With one gate every tool takes its filament from it; there is nothing to choose.
+    property <bool> can-choose: Printer.mmu-gates.length > 1;
+
+    HorizontalLayout {
+        padding: Theme.padding;
+        spacing: Theme.spacing;
+
+        // The tool-to-gate map seen from the tools.
+        Card {
+            horizontal-stretch: 1;
+            title: @tr("Tool-to-gate map");
+            icon: Icons.mmu-ttg-map;
+            tool-list := ScrollList {
+                vertical-stretch: 1;
+                // From the whole width: the rows narrow by the scroll bar once they scroll, which depends on the columns.
+                property <int> columns: max(1, floor(self.width / 140px));
+                property <length> cell-width: (self.row-width - (self.columns - 1) * Theme.spacing) / self.columns;
+                property <length> row-step: Theme.touch + Theme.spacing;
+                content-height: ceil(Printer.mmu-tools.length / self.columns) * self.row-step - Theme.spacing;
+                for mapping[index] in Printer.mmu-tools: ToolTile {
+                    x: mod(index, tool-list.columns) * (tool-list.cell-width + Theme.spacing);
+                    y: floor(index / tool-list.columns) * tool-list.row-step;
+                    width: tool-list.cell-width;
+                    height: Theme.touch;
+                    mapping: mapping;
+                    enabled: root.can-choose;
+                    clicked => { MmuDialogs.tool = index; }
+                }
+            }
+            IconButton {
+                height: 48px;
+                icon: Icons.ui-refresh;
+                text: @tr("Reset");
+                horizontal: true;
+                clicked => {
+                    Confirm.ask(@tr("Reset tools"), @tr("Every tool takes its filament from the gate configured for it again, usually the gate of its number."), "mmu-reset-tool-map", "", false);
+                }
+            }
+        }
+
+        Card {
+            width: 300px;
+            title: @tr("EndlessSpool");
+            icon: Icons.mmu-endless-spool;
+            ToggleRow {
+                text: @tr("On a runout continue");
+                checked: Printer.mmu-endless-spool;
+                toggled => { Actions.mmu-set-endless-spool(!Printer.mmu-endless-spool); }
+            }
+            Text {
+                text: Printer.mmu-endless-spool ? @tr("Instead of pausing, Happy Hare continues with the next gate of the same group.") : @tr("Instead of pausing, Happy Hare continues with the next gate of the same group. The groups show when it is on.");
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                wrap: word-wrap;
+            }
+            if Printer.mmu-endless-spool: group-list := ScrollList {
+                vertical-stretch: 1;
+                property <length> row-step: Theme.touch + 4px;
+                content-height: Printer.mmu-gates.length * self.row-step - 4px;
+                for gate[index] in Printer.mmu-gates: GroupRow {
+                    y: index * group-list.row-step;
+                    width: group-list.row-width;
+                    height: Theme.touch;
+                    gate: gate;
+                }
+            }
+            if !Printer.mmu-endless-spool: Rectangle { vertical-stretch: 1; }
+        }
+    }
+}
+
+// A gate to choose for a tool: number, colour and material; the gate the tool takes its filament from now is marked.
+component GateOption inherits SlotTile {
+    in property <MmuGateItem> gate;
+
+    label: @tr("Gate {}", root.gate.index);
+
+    Text {
+        text: @tr("Gate {}", root.gate.index);
+        color: Theme.foreground;
+        font-size: Theme.font-normal;
+        font-weight: 700;
+    }
+    ColorBar {
+        height: 12px;
+        border-radius: 6px;
+        first: root.gate.has-color ? root.gate.color : Theme.border;
+        second: root.gate.color-2;
+        third: root.gate.color-3;
+        count: max(1, root.gate.color-count);
+        longitudinal: root.gate.longitudinal;
+    }
+    Text {
+        text: root.gate.material == "" ? "-" : root.gate.material;
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        overflow: elide;
+    }
+}
+
+// The choice of gate for one tool; a tap on a gate maps the tool to it and closes the dialog.
+export component ToolDialog inherits Scrim {
+    property <MmuToolItem> mapping: Printer.mmu-tools[MmuDialogs.tool];
+    visible: MmuDialogs.tool >= 0 && MmuDialogs.tool < Printer.mmu-tools.length;
+
+    function close() {
+        MmuDialogs.tool = -1;
+    }
+
+    DialogPanel {
+        width: min(parent.width - 16px, 680px);
+        height: content.preferred-height;
+        x: (parent.width - self.width) / 2;
+        y: 8px;
+
+        content := VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing;
+            DialogHeader {
+                title: @tr("Gate for T{}", root.mapping.tool);
+                close => { root.close(); }
+            }
+            gate-grid := Rectangle {
+                property <int> columns: max(1, floor(self.width / 120px));
+                property <length> cell-width: (self.width - (self.columns - 1) * Theme.spacing) / self.columns;
+                property <length> row-step: 84px + Theme.spacing;
+                height: ceil(Printer.mmu-gates.length / self.columns) * self.row-step - Theme.spacing;
+                for gate[index] in Printer.mmu-gates: GateOption {
+                    x: mod(index, gate-grid.columns) * (gate-grid.cell-width + Theme.spacing);
+                    y: floor(index / gate-grid.columns) * gate-grid.row-step;
+                    width: gate-grid.cell-width;
+                    height: 84px;
+                    gate: gate;
+                    selected: gate.index == root.mapping.gate;
+                    clicked => {
+                        if (!self.selected) {
+                            Actions.mmu-map-tool(root.mapping.tool, gate.index);
+                        }
+                        root.close();
+                    }
+                }
+            }
+        }
+    }
+}

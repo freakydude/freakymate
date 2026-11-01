@@ -10,7 +10,7 @@ export component FilamentMmuGateDialogPreview inherits AppWindow {
     init => {
         Sample.mmu();
         Navigation.page = Page.filament;
-        Navigation.filament-tab = FilamentTab.mmu;
+        Navigation.filament-tab = FilamentTab.gates;
         Printer.has-spoolman = false;
         Printer.mmu-endless-spool = true;
         Printer.mmu-gates = [

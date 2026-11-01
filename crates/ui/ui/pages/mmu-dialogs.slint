@@ -1,4 +1,4 @@
-// Dialogs of the MMU tab: what can be done with one gate (a tap on its tile) and with the bypass.
+// Dialogs of the Gates tab: what can be done with one gate (a tap on its tile) and with the bypass.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
@@ -46,54 +46,13 @@ component ColorSwatch inherits Rectangle {
     }
 }
 
-// A tool in the dialog of a gate: checked when it takes its filament from this gate, otherwise with the gate it takes
-// it from now. A tap brings it here.
-component ToolChip inherits Rectangle {
-    in property <int> tool;
-    in property <int> from-gate;
-    in property <bool> here;
-    callback clicked;
-
-    min-width: 40px;
-    height: Theme.touch;
-    border-radius: Theme.radius;
-    background: chip-touch.pressed ? Theme.surface-active : root.here ? Theme.surface-active : Theme.surface-raised;
-    border-width: root.here ? 2px : 0px;
-    border-color: Theme.accent;
-    accessible-role: button;
-    accessible-label: "T" + root.tool;
-    accessible-checked: root.here;
-
-    chip-touch := TouchArea {
-        clicked => { root.clicked(); }
-    }
-    VerticalLayout {
-        alignment: center;
-        Text {
-            text: "T" + root.tool;
-            color: Theme.foreground;
-            font-size: Theme.font-normal;
-            font-weight: 700;
-            horizontal-alignment: center;
-        }
-        if !root.here: Text {
-            text: "→ " + root.from-gate;
-            color: Theme.muted;
-            font-size: Theme.font-small;
-            horizontal-alignment: center;
-        }
-    }
-}
-
-// One gate: select, load, preload, check or eject it, which tools take their filament from it, its EndlessSpool
-// group, and the filament in it: the spool with Spoolman, otherwise material and colour in Happy Hare's gate map.
+// One gate: select, load, preload, check or eject it, and the filament in it: the spool with Spoolman, otherwise
+// material and colour in Happy Hare's gate map. The title names the tools that take their filament from the gate;
+// they and the EndlessSpool group are set on the Tools tab only.
 // Actions that move the filament close the dialog, so the filament path on the tab shows how it goes; the settings
 // keep it open. The dialog hangs from the top, so its actions stay in the same place with and without Spoolman.
 export component GateDialog inherits Scrim {
     property <MmuGateItem> item: Printer.mmu-gates[MmuDialogs.gate];
-    // One gate has every tool anyway; the row only helps with several.
-    property <bool> shows-tools: Printer.mmu-gates.length > 1;
-    property <bool> shows-group: Printer.mmu-endless-spool && root.item.group >= 0;
     visible: MmuDialogs.gate >= 0 && MmuDialogs.gate < Printer.mmu-gates.length;
 
     function close() {
@@ -210,42 +169,6 @@ export component GateDialog inherits Scrim {
                         Confirm.ask(@tr("Eject filament"), @tr("Pulls the filament of gate {} out of the MMU. If it is loaded, it is only unloaded; eject again to pull it out.", root.item.index), "mmu-eject", root.item.index, false);
                         root.close();
                     }
-                }
-            }
-
-            // Which tools take their filament from this gate (Happy Hare's tool-to-gate map), and with EndlessSpool the
-            // group whose gates stand in for each other on a runout; a tap on the group moves the gate to the next one.
-            if root.shows-tools || root.shows-group: HorizontalLayout {
-                spacing: Theme.spacing;
-                height: Theme.touch;
-                if root.shows-tools: Text {
-                    text: @tr("Tools");
-                    color: Theme.muted;
-                    font-size: Theme.font-small;
-                    vertical-alignment: center;
-                }
-                if root.shows-tools: HorizontalLayout {
-                    horizontal-stretch: 1;
-                    spacing: Theme.spacing;
-                    for mapping in Printer.mmu-tools: ToolChip {
-                        horizontal-stretch: 1;
-                        tool: mapping.tool;
-                        from-gate: mapping.gate;
-                        here: mapping.gate == root.item.index;
-                        clicked => {
-                            if (!self.here) {
-                                Actions.mmu-map-tool(mapping.tool, root.item.index);
-                            }
-                        }
-                    }
-                }
-                if !root.shows-tools: Rectangle { horizontal-stretch: 1; }
-                if root.shows-group: IconButton {
-                    width: 132px;
-                    icon: Icons.mmu-endless-spool;
-                    text: @tr("Group {}", root.item.group);
-                    horizontal: true;
-                    clicked => { Actions.mmu-set-endless-spool-group(root.item.index, mod(root.item.group + 1, Printer.mmu-gates.length)); }
                 }
             }
 

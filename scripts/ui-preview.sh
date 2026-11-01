@@ -40,22 +40,41 @@ selected() {
     printf '%s\n' "${names[@]}" | grep -qx -- "$1"
 }
 
+render() {
+    if "$viewer" --screenshot "$2" "$1"; then
+        echo "$2"
+    else
+        echo "WARN $(basename "$1") failed" >&2
+        return 1
+    fi
+}
+
+# Waits for one running render and counts it if it failed.
+reap() {
+    local status=0
+    wait -n || status=$?
+    running=$((running - 1))
+    [[ $status -eq 0 ]] || failed=$((failed + 1))
+}
+
 viewer=$(find_viewer)
 mkdir -p "$out_dir"
+# Renders in parallel, on half the cores at most, as every viewer compiles the whole UI and takes its memory.
+max_jobs=$(( $(nproc) / 2 > 0 ? $(nproc) / 2 : 1 ))
 count=0
 failed=0
+running=0
 for preview in "$preview_dir"/*.slint; do
     name=$(basename "$preview" .slint)
     [[ $name == sample ]] && continue
     selected "$name" || continue
     count=$((count + 1))
-    png="$out_dir/$name.png"
-    if "$viewer" --screenshot "$png" "$preview"; then
-        echo "$png"
-    else
-        failed=$((failed + 1))
-        echo "WARN $name.slint failed" >&2
-    fi
+    [[ $running -ge $max_jobs ]] && reap
+    render "$preview" "$out_dir/$name.png" &
+    running=$((running + 1))
+done
+while [[ $running -gt 0 ]]; do
+    reap
 done
 
 if [[ $count -eq 0 ]]; then

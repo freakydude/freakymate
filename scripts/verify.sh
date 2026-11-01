@@ -15,10 +15,11 @@ run_step() {
     local name=$1
     shift
     local log="$log_dir/${name// /_}.log"
+    local start=$SECONDS
     if "$@" > "$log" 2>&1; then
-        echo "OK    $name"
+        echo "OK    $name ($((SECONDS - start)) s)"
     else
-        echo "FAIL  $name (last lines in $log)"
+        echo "FAIL  $name after $((SECONDS - start)) s (last lines in $log)"
         tail -n 15 "$log" | sed 's/^/        /'
         failed+=("$name")
     fi
@@ -27,7 +28,8 @@ run_step() {
 run_step "cargo fmt --check" cargo fmt --all -- --check
 run_step "cargo clippy" cargo clippy --workspace --all-targets -- -D warnings
 run_step "cargo test" cargo test --workspace
-run_step "cargo build" cargo build -p freakymate
+# The whole workspace, not only -p freakymate: the same features as the test run, so the UI crate is not compiled again.
+run_step "cargo build" cargo build --workspace --bins
 run_step "ui previews" scripts/ui-preview.sh
 # The AI skills are local (.claude/ is not in the repository); check them only where they exist.
 skill_check=.claude/skills/session-handover/scripts/check-skills.sh

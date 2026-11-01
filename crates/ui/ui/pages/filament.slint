@@ -1,13 +1,14 @@
-// Filament: the MMU with its gates, extrude by hand, load and unload, the service commands of the MMU.
+// Filament: the gates of the MMU, extrude by hand, load and unload, the tools of the MMU and its service commands.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, FilamentTab, Navigation, Printer, UiSettings } from "../state.slint";
 import { Card, IconButton, IconLabel, StepSelector, TabBar, TabButton } from "../components/controls.slint";
 import { SpoolStrip } from "../components/spool-strip.slint";
-import { MmuTab } from "mmu.slint";
+import { MmuGatesTab } from "mmu.slint";
 import { BypassDialog, GateDialog } from "mmu-dialogs.slint";
 import { MmuServiceTab } from "mmu-service.slint";
+import { MmuToolsTab, ToolDialog } from "mmu-tools.slint";
 
 component ExtruderTab inherits Rectangle {
     VerticalLayout {
@@ -94,7 +95,7 @@ component ExtruderTab inherits Rectangle {
             }
 
             VerticalLayout {
-                // With Happy Hare, loading and unloading belong to the MMU tab; without buttons the column goes away.
+                // With Happy Hare, loading and unloading belong to the Gates tab; without buttons the column goes away.
                 width: Printer.has-load-macro || Printer.has-unload-macro ? 120px : 0px;
                 spacing: Theme.spacing;
                 if Printer.has-load-macro: IconButton {
@@ -128,8 +129,9 @@ component ExtruderTab inherits Rectangle {
     }
 }
 
-// With Happy Hare the MMU with its gates comes first, then the extruder by hand and the service commands of the MMU;
-// without it the extruder alone. The dialogs of a gate and of the bypass cover the whole page.
+// With Happy Hare the gates come first, then the extruder by hand, the tools with EndlessSpool and the service
+// commands of the MMU; without it the extruder alone. The dialogs of a gate, the bypass and a tool cover the whole
+// page.
 export component FilamentPage inherits Rectangle {
     property <FilamentTab> tab: Printer.has-mmu ? Navigation.filament-tab : FilamentTab.extruder;
 
@@ -137,15 +139,21 @@ export component FilamentPage inherits Rectangle {
         if Printer.has-mmu: TabBar {
             TabButton {
                 icon: Icons.mmu-unit;
-                text: @tr("MMU");
-                checked: root.tab == FilamentTab.mmu;
-                clicked => { Navigation.filament-tab = FilamentTab.mmu; }
+                text: @tr("Gates");
+                checked: root.tab == FilamentTab.gates;
+                clicked => { Navigation.filament-tab = FilamentTab.gates; }
             }
             TabButton {
-                icon: Icons.filament-extrude;
+                icon: Icons.filament-extruder-gears;
                 text: @tr("Extruder");
                 checked: root.tab == FilamentTab.extruder;
                 clicked => { Navigation.filament-tab = FilamentTab.extruder; }
+            }
+            TabButton {
+                icon: Icons.mmu-ttg-map;
+                text: @tr("Tools");
+                checked: root.tab == FilamentTab.tools;
+                clicked => { Navigation.filament-tab = FilamentTab.tools; }
             }
             TabButton {
                 icon: Icons.mmu-maintenance;
@@ -154,10 +162,13 @@ export component FilamentPage inherits Rectangle {
                 clicked => { Navigation.filament-tab = FilamentTab.service; }
             }
         }
-        if root.tab == FilamentTab.mmu: MmuTab {
+        if root.tab == FilamentTab.gates: MmuGatesTab {
             vertical-stretch: 1;
         }
         if root.tab == FilamentTab.extruder: ExtruderTab {
+            vertical-stretch: 1;
+        }
+        if root.tab == FilamentTab.tools: MmuToolsTab {
             vertical-stretch: 1;
         }
         if root.tab == FilamentTab.service: MmuServiceTab {
@@ -165,7 +176,8 @@ export component FilamentPage inherits Rectangle {
         }
     }
 
-    if root.tab == FilamentTab.mmu: GateDialog { }
-    if root.tab == FilamentTab.mmu: BypassDialog { }
+    if root.tab == FilamentTab.gates: GateDialog { }
+    if root.tab == FilamentTab.gates: BypassDialog { }
+    if root.tab == FilamentTab.tools: ToolDialog { }
 }
 

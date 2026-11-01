@@ -2,7 +2,7 @@
 
 import { Icons } from "icons.slint";
 
-// `updates`, `network`, `console` and `settings` (the Display tab) are tabs of the system pages.
+// `updates`, `network`, `console` and `settings` (the Settings tab) are tabs of the system pages.
 export enum Page { print, move, temperature, tune, filament, console, system, settings, updates, network }
 
 export struct HeaterItem {
@@ -406,7 +406,7 @@ export global Printer {
     in property <[PrintObjectItem]> print-objects;
     // The bed the objects lie on; not shown if the slicer did not tell where they are.
     in property <BedMapItem> bed-map;
-    // Happy Hare (4.1 or newer). Without it the Filament page has no MMU tab.
+    // Happy Hare (4.1 or newer). Without it the Filament page has no MMU tabs.
     in property <bool> has-mmu;
     in property <bool> mmu-unsupported;
     in property <[MmuGateItem]> mmu-gates;
@@ -738,29 +738,38 @@ export global SpoolPicker {
     }
 }
 
-// The dialogs of the MMU tab: the gate a tap opened (-1 for none), or the bypass.
+// The dialogs of the Gates and Tools tabs: the gate a tap opened (-1 for none), the bypass, or the tool.
 export global MmuDialogs {
     in-out property <int> gate: -1;
     in-out property <bool> bypass-open;
+    // The choice of gate for a tool on the Tools tab: its index in `Printer.mmu-tools`, -1 for none.
+    in-out property <int> tool: -1;
 }
 
 // Tabs of the Filament page; without an MMU it shows the extruder alone.
-export enum FilamentTab { mmu, extruder, service }
+export enum FilamentTab { gates, extruder, tools, service }
+
+// Tabs of the Move page; without anything to calibrate it shows the axes alone.
+export enum MoveTab { axes, calibrate }
+
+// Tabs of the Thermal page; a tab the printer has nothing for falls back to the heaters.
+export enum HeatTab { heaters, fans, sensors }
+
+// Tabs of the Tune page; without expert values it shows the basics alone.
+export enum TuneTab { basics, expert }
 
 export global Navigation {
     in-out property <Page> page: Page.print;
     in-out property <bool> files-open;
     in-out property <bool> messages-open;
-    // Filament page; with an MMU it opens on the MMU tab.
+    // Filament page; with an MMU it opens on the Gates tab.
     in-out property <FilamentTab> filament-tab;
-    // Page of gate tiles the MMU tab shows, counted from 0.
+    // Page of gate tiles the Gates tab shows, counted from 0.
     in-out property <int> mmu-page;
-    // Thermal page: 0 = heaters, 1 = fans, 2 = sensors.
-    in-out property <int> heat-tab;
-    // Tune page: 0 = basics, 1 = expert; the navigation rail opens the basics.
-    in-out property <int> tune-tab;
-    // 0 move, 1 calibrate.
-    in-out property <int> move-tab;
+    in-out property <HeatTab> heat-tab;
+    // The navigation rail opens the basics.
+    in-out property <TuneTab> tune-tab;
+    in-out property <MoveTab> move-tab;
     in-out property <bool> history-open;
     // Width to height of the drawing area of the temperature chart; the chart's lines are drawn for this shape.
     in-out property <float> history-aspect: 2;
@@ -770,7 +779,7 @@ export global Navigation {
     // A tap on a temperature reading leads to the heaters; a quiet shortcut, not styled as a button.
     public function show-heaters() {
         self.files-open = false;
-        self.heat-tab = 0;
+        self.heat-tab = HeatTab.heaters;
         self.page = Page.temperature;
     }
 }
@@ -840,6 +849,7 @@ export global Dialogs {
         SpoolPicker.open = false;
         MmuDialogs.gate = -1;
         MmuDialogs.bypass-open = false;
+        MmuDialogs.tool = -1;
         MeshDialogs.map-open = false;
         MeshDialogs.profiles-open = false;
         if (Navigation.history-open) { Actions.close-history(); }

@@ -1,0 +1,16 @@
+// Preview: the choice of gate for T1 on the Tools tab, T1 remapped to gate 3. Open in the Slint preview or render with
+// scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { FilamentTab, MmuDialogs, Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component FilamentMmuToolDialogPreview inherits AppWindow {
+    init => {
+        Sample.mmu();
+        Navigation.page = Page.filament;
+        Navigation.filament-tab = FilamentTab.tools;
+        Printer.mmu-tools = [{ tool: 0, gate: 0 }, { tool: 1, gate: 3 }, { tool: 2, gate: 2 }, { tool: 3, gate: 1 }];
+        MmuDialogs.tool = 1;
+    }
+}
