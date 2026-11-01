@@ -148,15 +148,16 @@ fn pages(session: &mut Session) -> Result<(), String> {
     session.settle_replies(Duration::from_secs(2));
     session.capture("print-files")?;
     session.window.global::<Navigation>().set_files_open(false);
+    // The console comes before the Thermal page, whose fan test would fill it with the fake's commands.
     for (page, name) in [
         (Page::Move, "move"),
+        (Page::Console, "console"),
         (Page::Temperature, "temperature"),
         (Page::Tune, "tune"),
         (Page::Filament, "filament"),
-        (Page::Console, "console"),
         (Page::System, "system"),
         (Page::Updates, "updates"),
-        (Page::Settings, "display"),
+        (Page::Settings, "settings"),
     ] {
         session.show_page(page, name)?;
         if page == Page::Temperature {
