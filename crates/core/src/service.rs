@@ -122,6 +122,8 @@ pub enum Event {
     },
     PowerDevices(Vec<PowerDevice>),
     Updates(Vec<UpdateInfo>),
+    /// Moonraker's update manager looks for or installs updates (from here or another client).
+    UpdateManagerBusy(bool),
     ConsoleHistory(Vec<ConsoleLine>),
     ConsoleLine(ConsoleLine),
     HostNetwork(Vec<HostInterface>),
@@ -679,9 +681,17 @@ impl<'a> Session<'a> {
             "notify_history_changed" => self.answer(Query::PrintHistory),
             "notify_active_spool_set" | "notify_spoolman_status_changed" => self.answer(Query::Spoolman),
             "notify_update_refreshed" => {
-                self.outputs.event(Event::Updates(update_manager::parse_update_status(
-                    notification.params.get(0).unwrap_or(&Value::Null),
-                )));
+                for event in update_status_events(notification.params.get(0).unwrap_or(&Value::Null)) {
+                    self.outputs.event(event);
+                }
+            }
+            // The output of an update in progress, also one started by another client; the last one is `complete`.
+            "notify_update_response" => {
+                let complete = update_manager::is_response_complete(notification.params.get(0).unwrap_or(&Value::Null));
+                self.outputs.event(Event::UpdateManagerBusy(!complete));
+                if complete {
+                    self.answer(Query::Updates);
+                }
             }
             _ => {}
         }
@@ -779,6 +789,11 @@ impl<'a> Session<'a> {
             _ => false,
         };
         let spools_change = command.changes_spools();
+        // Busy from the start: Moonraker's own `busy` and notifications only follow once it has begun.
+        let update_manager_call = matches!(command, Command::RefreshUpdates | Command::Upgrade { .. });
+        if update_manager_call {
+            self.outputs.event(Event::UpdateManagerBusy(true));
+        }
         let wled_answers = matches!(command, Command::SetWledStrip { .. }).then(|| self.wled_answers.clone());
         let label = running_label(&call, &command);
         let spool_events = self.outputs.events.clone();
@@ -795,7 +810,11 @@ impl<'a> Session<'a> {
         match self.connection.start_call(call.method, call.params) {
             Ok(pending) => {
                 tokio::spawn(async move {
-                    match answer_or_report_running(pending, label, &running_events).await {
+                    let answer = answer_or_report_running(pending, label, &running_events).await;
+                    if update_manager_call {
+                        let _ = running_events.send(Event::UpdateManagerBusy(false));
+                    }
+                    match answer {
                         Ok(_) if spools_change => {
                             let _ = spool_events.send(Event::SpoolmanChanged);
                         }
@@ -913,9 +932,7 @@ async fn fetch(
         Query::PowerDevices => {
             vec![Event::PowerDevices(power::parse_power_devices(&call("machine.device_power.devices", None).await?))]
         }
-        Query::Updates => {
-            vec![Event::Updates(update_manager::parse_update_status(&call("machine.update.status", None).await?))]
-        }
+        Query::Updates => update_status_events(&call("machine.update.status", None).await?),
         Query::ConsoleHistory => vec![Event::ConsoleHistory(gcode_store::parse_gcode_store(
             &call("server.gcode_store", Some(json!({ "count": CONSOLE_HISTORY }))).await?,
         ))],
@@ -928,6 +945,14 @@ async fn fetch(
         }
     };
     Ok(events)
+}
+
+/// The versions and whether the update manager is busy, from `machine.update.status` or `notify_update_refreshed`.
+fn update_status_events(status: &Value) -> Vec<Event> {
+    vec![
+        Event::Updates(update_manager::parse_update_status(status)),
+        Event::UpdateManagerBusy(update_manager::is_busy(status)),
+    ]
 }
 
 /// Waits for the answer of a call; if it takes longer than `LONG_COMMAND`, reports the command as running until then.

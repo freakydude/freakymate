@@ -4,6 +4,8 @@
 # itself can install later releases.
 #
 # Run inside the unpacked folder: ./install.sh [-m <moonraker-url>] [-d <printer_data>] [-c stable|beta]
+# Running it again (also as ~/freakymate/install.sh) brings the setup outside the program folder up to date, which
+# Moonraker's updates do not touch; without -m and -d it keeps the values of the existing installation.
 # Young software: use it with care and at your own risk (see the README).
 
 set -euo pipefail
@@ -14,8 +16,9 @@ INSTALL_DIR="$HOME/$NAME"
 SERVICE_FILE="/etc/systemd/system/$NAME.service"
 POLKIT_RULE="50-freakymate.rules"
 UDEV_RULE="70-freakymate-backlight.rules"
-MOONRAKER="http://127.0.0.1:7125"
-DATA_DIR="$HOME/printer_data"
+SETUP_MARKER="/etc/$NAME/setup-version"
+MOONRAKER=""
+DATA_DIR=""
 CHANNEL="stable"
 # glibc of the build container (.github/workflows/build.yml); systems that also have cage and seatd.
 MIN_GLIBC="2.35"
@@ -34,6 +37,24 @@ case $CHANNEL in
   *) echo "channel must be stable or beta"; exit 2 ;;
 esac
 
+# The value of an option in the existing service, e.g. `previous_option moonraker`; empty without one.
+previous_option() {
+  if [ -f "$SERVICE_FILE" ]; then
+    grep -o -- "--$1 [^ ]*" "$SERVICE_FILE" | head -n 1 | cut -d ' ' -f 2 || true
+  fi
+}
+if [ -z "$MOONRAKER" ]; then
+  MOONRAKER=$(previous_option moonraker)
+fi
+if [ -z "$DATA_DIR" ]; then
+  previous_settings=$(previous_option settings)
+  if [ -n "$previous_settings" ]; then
+    DATA_DIR=$(dirname "$(dirname "$previous_settings")")
+  fi
+fi
+MOONRAKER=${MOONRAKER:-http://127.0.0.1:7125}
+DATA_DIR=${DATA_DIR:-$HOME/printer_data}
+
 report() { echo -e "\n###### $1"; }
 
 if [ "$EUID" -eq 0 ]; then
@@ -48,6 +69,7 @@ for file in "$NAME" release_info.json system-dependencies.json; do
 done
 
 report "Checking the system"
+echo "Moonraker: $MOONRAKER, printer_data: $DATA_DIR"
 glibc=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')
 if [ -n "$glibc" ] && ! printf '%s\n%s\n' "$MIN_GLIBC" "$glibc" | sort -V -C; then
   echo "This system has glibc $glibc; FreakyMate needs $MIN_GLIBC or newer: $SUPPORTED_SYSTEMS."
@@ -139,9 +161,14 @@ RestartSec=5
 # Klipper hosts run multi-user.target without a desktop; graphical.target is never reached there.
 WantedBy=multi-user.target
 EOF
+# The program compares it with the setup it needs and asks for this script again when it is older.
+sudo mkdir -p "$(dirname "$SETUP_MARKER")"
+"$INSTALL_DIR/$NAME" --setup-version | sudo tee "$SETUP_MARKER" > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl disable getty@tty1.service || true
-sudo systemctl enable --now "$NAME.service"
+sudo systemctl enable "$NAME.service"
+# Restart, not only start: when run again, the running instance still has the old arguments and the old marker.
+sudo systemctl restart "$NAME.service"
 
 report "Registering with the Moonraker update manager"
 MOONRAKER_CONF="$DATA_DIR/config/moonraker.conf"

@@ -1,0 +1,20 @@
+// Preview: the Updates tab when the setup outside the program folder is older than the program (install.sh must run
+// again), while an update runs (buttons locked). Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer, UiSettings } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component UpdatesSetupHintPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.updates;
+        UiSettings.setup-command = "/home/pi/freakymate/install.sh";
+        Printer.updates-busy = true;
+        Printer.updates = [
+            { name: "freakymate", version: "v0.3.8", detail: "v0.3.8", has-update: false, up-to-date: true },
+            { name: "klipper", version: "v0.13.0-100", detail: "v0.13.0-100 → v0.13.0-120", has-update: true, up-to-date: false },
+            { name: "moonraker", version: "v0.11.0-4", detail: "v0.11.0-4", has-update: false, up-to-date: true },
+        ];
+    }
+}

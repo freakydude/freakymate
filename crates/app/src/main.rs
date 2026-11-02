@@ -6,6 +6,7 @@ use freakymate::app::{Application, Options};
 use freakymate::logging;
 use freakymate_core::backlight::BacklightBackend;
 use freakymate_core::network::NetworkBackend;
+use freakymate_core::setup::{self, SetupState};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -33,6 +34,9 @@ struct Cli {
     #[cfg(feature = "dev-mode")]
     #[arg(long)]
     simulate_backlight: bool,
+    /// Prints the setup version install.sh writes to /etc/freakymate/setup-version and exits
+    #[arg(long, hide = true)]
+    setup_version: bool,
 }
 
 impl Cli {
@@ -52,20 +56,52 @@ impl Cli {
         BacklightBackend::system()
     }
 
+    /// Whether the setup outside the program folder matches this program (see `freakymate_core::setup`).
+    fn setup_state(&self) -> SetupState {
+        let marker = std::fs::read_to_string(setup::MARKER_FILE).ok();
+        SetupState::detect(marker.as_deref(), self.settings.as_deref())
+    }
+
     /// What the log file says about this run at its top. Display and renderer follow once the window exists.
-    fn log_header(&self) -> Vec<(String, String)> {
+    fn log_header(&self, setup: SetupState) -> Vec<(String, String)> {
         let command_line: Vec<String> = std::env::args().skip(1).collect();
-        vec![
+        let mut header = vec![
             ("Version".to_owned(), freakymate_core::VERSION.to_owned()),
             ("Command line".to_owned(), command_line.join(" ")),
             ("System".to_owned(), format!("{} {}", std::env::consts::OS, std::env::consts::ARCH)),
-        ]
+        ];
+        let installed = match setup {
+            SetupState::NotInstalled => None,
+            SetupState::Current => Some(format!("{} (current)", setup::SETUP_VERSION)),
+            SetupState::Outdated { installed } => Some(format!(
+                "{} (outdated, this program needs {})",
+                installed.map_or_else(|| "none".to_owned(), |version| version.to_string()),
+                setup::SETUP_VERSION
+            )),
+        };
+        header.extend(installed.map(|text| ("Setup".to_owned(), text)));
+        header
     }
+}
+
+/// The command that brings an outdated setup up to date: the `install.sh` next to the program, as Moonraker's updates
+/// bring it along.
+fn setup_command() -> String {
+    std::env::current_exe()
+        .ok()
+        .and_then(|program| program.parent().map(|folder| folder.join("install.sh")))
+        .filter(|script| script.exists())
+        .map_or_else(|| "install.sh".to_owned(), |script| script.display().to_string())
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let config = logging::Config { file: cli.logfile.clone(), header: cli.log_header() };
+    if cli.setup_version {
+        println!("{}", setup::SETUP_VERSION);
+        return ExitCode::SUCCESS;
+    }
+    let setup = cli.setup_state();
+    let config = logging::Config { file: cli.logfile.clone(), header: cli.log_header(setup) };
     if let Err(error) = logging::init(config) {
         eprintln!("cannot start the log: {error}");
         return ExitCode::FAILURE;
@@ -74,7 +110,12 @@ fn main() -> ExitCode {
     if cli.fullscreen {
         freakymate::kiosk_pointer::hide();
     }
+    let setup_command = matches!(setup, SetupState::Outdated { .. }).then(setup_command);
+    if let Some(command) = &setup_command {
+        log::warn!("the setup outside the program folder is older than this program; run {command} once");
+    }
     let options = Options {
+        setup_command,
         network: cli.network_backend(),
         backlight: cli.backlight_backend(),
         moonraker: cli.moonraker,

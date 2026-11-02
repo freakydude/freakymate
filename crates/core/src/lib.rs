@@ -13,6 +13,7 @@ pub mod moonraker;
 pub mod network;
 pub mod service;
 pub mod settings;
+pub mod setup;
 pub mod sourced;
 pub mod sources;
 

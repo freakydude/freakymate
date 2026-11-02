@@ -38,6 +38,16 @@ pub fn parse_update_status(result: &Value) -> Vec<UpdateInfo> {
     updates
 }
 
+/// `busy` of `machine.update.status`: an update runs (from any client).
+pub fn is_busy(status: &Value) -> bool {
+    status.get("busy").and_then(Value::as_bool).unwrap_or_default()
+}
+
+/// `notify_update_response` carries the output of a running update; its last message has `complete: true`.
+pub fn is_response_complete(response: &Value) -> bool {
+    response.get("complete").and_then(Value::as_bool).unwrap_or_default()
+}
+
 /// Asks the update manager to look for new versions.
 pub fn refresh() -> Call {
     Call::new("machine.update.refresh")
@@ -105,5 +115,13 @@ mod tests {
         let current: Vec<&str> =
             updates.iter().filter(|update| update.is_up_to_date()).map(|update| update.name.as_str()).collect();
         assert_eq!(current, ["system", "moonraker"]);
+    }
+
+    #[test]
+    fn busy_from_the_status_and_the_end_of_an_update_response() {
+        assert!(is_busy(&json!({ "busy": true, "version_info": {} })));
+        assert!(!is_busy(&json!({ "version_info": {} })));
+        assert!(!is_response_complete(&json!({ "application": "klipper", "message": "Updating", "complete": false })));
+        assert!(is_response_complete(&json!({ "application": "klipper", "message": "Done", "complete": true })));
     }
 }

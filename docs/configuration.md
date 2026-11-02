@@ -45,7 +45,9 @@ after saving.
 
 With the installer or the `.deb` the log is `printer_data/logs/freakymate.log`, next to `klippy.log` and
 `moonraker.log`, so Mainsail and Fluidd list it under Machine → logs. It rotates at midnight, keeps three old files
-(`freakymate.log.YYYY-MM-DD`) and also goes to the journal (`journalctl -u freakymate@<user>`). Each file starts with a
+(`freakymate.log.YYYY-MM-DD`) and also goes to the journal (`journalctl -u freakymate` with `install.sh`,
+`journalctl -u freakymate@<user>` with the `.deb`). An installation from before 0.3.7 writes no log file until
+`install.sh` runs again (see [Updates and channels](install.md#updates-and-channels)). Each file starts with a
 header: FreakyMate version, command line, system, then the versions of Moonraker, Klipper and Happy Hare and what was
 detected on the printer (power devices, Spoolman, LEDs, macros and so on). Attach `freakymate.log`, `klippy.log` and
 `moonraker.log` to a bug report.
@@ -136,8 +138,8 @@ have no `/sys/class/backlight`; there FreakyMate shows neither the slider nor th
 Changing the backlight needs the udev rule `70-freakymate-backlight.rules` (makes `brightness` and `bl_power` writable
 for the group `video`) and the user in `video`. `install.sh` sets up both; the Debian package ships the rule in
 `/lib/udev/rules.d`, add the user yourself: `sudo usermod -aG video $USER` (takes effect after a service restart). An
-installation from before this version gets the rule by running `install.sh` again; updates through Moonraker only
-replace the program folder.
+installation from before this version gets the rule by running `install.sh` again (see
+[Updates and channels](install.md#updates-and-channels)).
 
 In the settings file:
 
