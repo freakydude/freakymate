@@ -108,6 +108,7 @@ Besides the Moonraker route there are plain packages, for example to try it on a
   sudo apt install ./freakymate_0.3.0_arm64.deb
   sudo systemctl disable getty@tty1                # free tty1 for the kiosk
   sudo usermod -aG video $USER                  # brightness and standby, if the display has a backlight
+  sudo usermod -aG i2c $USER                    # the same for a monitor on DDC/CI, with `ddcutil` installed
   sudo systemctl enable --now freakymate@$USER  # fullscreen on tty1 as this user
   # remove again (stops and disables all freakymate@ instances)
   sudo apt remove freakymate && sudo systemctl enable getty@tty1

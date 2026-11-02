@@ -74,6 +74,10 @@ if [ ${#missing[@]} -gt 0 ]; then
 fi
 sudo apt-get install -y "${packages[@]}"
 sudo usermod -aG video,input,render "$USER" || true
+# Monitors on DDC/CI (brightness through ddcutil, if installed) need access to /dev/i2c-*.
+if getent group i2c > /dev/null; then
+  sudo usermod -aG i2c "$USER" || true
+fi
 
 report "Allowing network management (NetworkManager via polkit, group netdev)"
 if [ -f "$SOURCE_DIR/$POLKIT_RULE" ] && [ -d /etc/polkit-1/rules.d ]; then

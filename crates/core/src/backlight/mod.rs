@@ -4,12 +4,14 @@
 //! no controllable backlight, DSI and SPI displays and laptops have one under `/sys/class/backlight`. Each kind of
 //! control is one implementation of [`Backlight`]; the UI only offers brightness and standby when one is writable.
 
+mod ddcutil;
 mod service;
 #[cfg(feature = "dev-mode")]
 mod simulated;
 mod standby;
 mod sysfs;
 
+pub use ddcutil::{Ddcutil, Program, RunError, Runner, DEVICE_PREFIX};
 pub use service::{BacklightBackend, BacklightService};
 pub use standby::{Screen, Standby, StandbyTimeouts, WAKE_LOCK};
 pub use sysfs::Sysfs;
@@ -37,7 +39,8 @@ pub trait Backlight: Send {
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct BacklightSettings {
-    /// Device under `/sys/class/backlight`; without one the first by type (firmware, platform, raw) is used.
+    /// Device under `/sys/class/backlight`, or `ddc:i2c-N` for a monitor on DDC/CI; without one the first by type
+    /// (firmware, platform, raw) is used, and after that the first monitor that answers on DDC/CI.
     pub device: Option<String>,
     /// Last brightness chosen in the UI, in percent; without one the brightness stays as the system set it.
     pub brightness: Option<u8>,
@@ -82,6 +85,13 @@ pub enum BacklightError {
     PermissionDenied(String),
     #[error("backlight is not supported on this system")]
     Unsupported,
+    #[error("{0} is not installed")]
+    NotInstalled(String),
+    #[error("no monitor answers on DDC/CI (is i2c-dev loaded and the user in group 'i2c'?)")]
+    NoDdcMonitor,
+    /// Every way to control the backlight has said why not.
+    #[error("{0}")]
+    Several(String),
     #[error("backlight '{name}': {message}")]
     Device { name: String, message: String },
 }

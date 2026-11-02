@@ -3,10 +3,11 @@
 #[cfg(feature = "dev-mode")]
 use super::simulated::Simulated;
 use super::{
-    usable_brightness, Availability, Backlight, BacklightError, BacklightSettings, BacklightState, Screen, Standby,
-    StandbyTimeouts, Sysfs,
+    usable_brightness, Availability, Backlight, BacklightError, BacklightSettings, BacklightState, Ddcutil, Program,
+    Screen, Standby, StandbyTimeouts, Sysfs, DEVICE_PREFIX,
 };
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::{mpsc, watch};
 
@@ -15,6 +16,10 @@ use tokio::sync::{mpsc, watch};
 pub enum BacklightBackend {
     /// The kernel's backlight class under this directory, normally [`Sysfs::ROOT`].
     Sysfs(PathBuf),
+    /// A monitor on HDMI or DisplayPort through the program of this name (`ddcutil`), if installed.
+    Ddcutil(String),
+    /// The first of these that works.
+    Chain(Vec<BacklightBackend>),
     /// No control (e.g. Windows): the UI offers neither brightness nor standby.
     #[default]
     None,
@@ -27,7 +32,8 @@ impl BacklightBackend {
     /// What this platform offers.
     pub fn system() -> Self {
         if cfg!(target_os = "linux") {
-            Self::Sysfs(PathBuf::from(Sysfs::ROOT))
+            // Displays with a backlight of their own first (a laptop keeps its panel when a monitor is attached).
+            Self::Chain(vec![Self::Sysfs(PathBuf::from(Sysfs::ROOT)), Self::Ddcutil("ddcutil".to_owned())])
         } else {
             Self::None
         }
@@ -101,10 +107,41 @@ impl BacklightService {
 fn open(backend: BacklightBackend, device: Option<&str>) -> Result<Box<dyn Backlight>, BacklightError> {
     match backend {
         BacklightBackend::Sysfs(root) => Ok(Box::new(Sysfs::open(&root, device)?)),
+        BacklightBackend::Ddcutil(program) => Ok(Box::new(Ddcutil::open(Arc::new(Program(program)), device)?)),
+        BacklightBackend::Chain(backends) => open_first(backends, device),
         BacklightBackend::None => Err(BacklightError::Unsupported),
         #[cfg(feature = "dev-mode")]
         BacklightBackend::Simulated => Ok(Box::new(Simulated::default())),
     }
+}
+
+/// Whether a configured `device` can name something of this backend: `ddc:...` is a monitor, anything else a
+/// device of the kernel.
+fn is_meant_for(backend: &BacklightBackend, device: Option<&str>) -> bool {
+    let monitor = device.map(|name| name.starts_with(DEVICE_PREFIX));
+    match backend {
+        BacklightBackend::Sysfs(_) => monitor != Some(true),
+        BacklightBackend::Ddcutil(_) => monitor != Some(false),
+        _ => true,
+    }
+}
+
+/// The first backend that opens. Only "nothing there" goes on to the next one; a device that exists but cannot be
+/// written (no permission) is reported, not replaced by a monitor.
+fn open_first(backends: Vec<BacklightBackend>, device: Option<&str>) -> Result<Box<dyn Backlight>, BacklightError> {
+    let mut reasons = Vec::new();
+    for backend in backends.into_iter().filter(|backend| is_meant_for(backend, device)) {
+        match open(backend, device) {
+            Ok(backlight) => return Ok(backlight),
+            Err(
+                error @ (BacklightError::NoDevice(_) | BacklightError::NotInstalled(_) | BacklightError::NoDdcMonitor),
+            ) => {
+                reasons.push(error.to_string());
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Err(BacklightError::Several(reasons.join("; ")))
 }
 
 struct Controller {
@@ -198,7 +235,12 @@ async fn run(
     mut requests: mpsc::UnboundedReceiver<Request>,
     state: watch::Sender<BacklightState>,
 ) {
-    let mut backlight = match open(backend, settings.device.as_deref()) {
+    // Looking for a monitor runs a program for a while; not on a thread of the runtime that others need.
+    let device = settings.device.clone();
+    let opened = tokio::task::spawn_blocking(move || open(backend, device.as_deref()))
+        .await
+        .unwrap_or_else(|error| Err(BacklightError::Several(format!("backlight search failed: {error}"))));
+    let mut backlight = match opened {
         Ok(backlight) => backlight,
         Err(error) => {
             // Said once, in the header of every log file; the UI simply offers nothing.
