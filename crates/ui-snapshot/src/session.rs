@@ -94,7 +94,7 @@ impl Session {
         let (backlight_service, backlight_states) =
             BacklightService::start(runtime.handle(), BacklightBackend::Simulated, &Settings::default().backlight);
         let backlight = BacklightController::bind(&window, backlight_service.clone(), &presenter);
-        let store = SettingsStore::new(options.out.join("snapshot-settings.json"));
+        let store = SettingsStore::new(options.out.join("snapshot-settings.conf"));
         let settings = SettingsController::bind(
             &window,
             store,

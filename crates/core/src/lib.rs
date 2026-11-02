@@ -16,6 +16,7 @@ pub mod settings;
 pub mod setup;
 pub mod sourced;
 pub mod sources;
+mod toml_merge;
 
 pub use commands::Command;
 pub use credentials::CredentialStore;

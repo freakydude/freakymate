@@ -23,7 +23,7 @@ flowchart LR
         DOM[domain/*<br/>questions across sources]
         SRC[sources/*<br/>one module per origin]
         MR[moonraker/*<br/>JSON-RPC over WebSocket]
-        SET[settings.rs, credentials.rs<br/>JSON files]
+        SET[settings.rs, credentials.rs<br/>settings TOML, credentials JSON]
         NET[network/*<br/>NetworkService]
     end
     M[(Moonraker / Klipper)]

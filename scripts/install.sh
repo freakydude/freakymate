@@ -129,14 +129,9 @@ chmod 0755 "$INSTALL_DIR/$NAME" "$INSTALL_DIR/install.sh" "$INSTALL_DIR/uninstal
 
 report "Creating $SERVICE_FILE"
 # Settings live next to the Klipper configs, so they can be edited in Mainsail or Fluidd and backups of printer_data
-# include them.
-SETTINGS_FILE="$DATA_DIR/config/freakymate.json"
-OLD_SETTINGS_FILE="$HOME/.config/$NAME/settings.json"
-if [ -f "$OLD_SETTINGS_FILE" ] && [ ! -f "$SETTINGS_FILE" ]; then
-  mkdir -p "$(dirname "$SETTINGS_FILE")"
-  cp "$OLD_SETTINGS_FILE" "$SETTINGS_FILE"
-  echo "Copied existing settings from $OLD_SETTINGS_FILE"
-fi
+# include them. The program creates the file with the defaults at its first start; an old freakymate.json stays as it
+# is and is no longer read.
+SETTINGS_FILE="$DATA_DIR/config/freakymate.conf"
 USER_ID=$(id -u)
 sudo tee "$SERVICE_FILE" > /dev/null << EOF
 [Unit]

@@ -13,7 +13,7 @@ freakymate [--moonraker <url>] [--fullscreen] [--settings <file>] [--logfile <fi
 | -------------------- | ------------------------------------------------------------------------------------------------ |
 | `-m, --moonraker`    | Moonraker address for this start, e.g. `http://printer.local:7125` (otherwise the saved setting) |
 | `-f, --fullscreen`   | Kiosk mode for a touch screen, as the services start it: fullscreen, no window frame, no mouse pointer |
-| `--settings`         | Settings file, default `~/.config/freakymate/settings.json` (Windows: `%APPDATA%`). The installer passes `printer_data/config/freakymate.json` |
+| `--settings`         | Settings file (TOML), default `~/.config/freakymate/settings.conf` (Windows: `%APPDATA%`). The installer passes `printer_data/config/freakymate.conf` |
 | `-l, --logfile`      | Log file, rotated daily like those of Klipper and Moonraker (default: stderr only). The installer passes `printer_data/logs/freakymate.log` |
 | `--simulate-network` | Simulated Wi-Fi/Ethernet instead of NetworkManager (development builds only, see [Development](development.md#development-builds-and-releases)) |
 
@@ -23,23 +23,33 @@ Without a desktop or compositor the optional cargo feature `linuxkms` renders di
 
 ## Settings file
 
-FreakyMate keeps its settings in a JSON file: `printer_data/config/freakymate.json` when installed with the installer
-(so it can be edited in Mainsail or Fluidd next to the Klipper configs), otherwise `~/.config/freakymate/settings.json`
-(Windows: `%APPDATA%\freakymate\settings.json`). The file is created with the defaults at the first start. Most entries are
-changed on the screen; the **temperature presets** only here:
+FreakyMate keeps its settings in a [TOML](https://toml.io) file with the ending `.conf`, like `moonraker.conf`:
+`printer_data/config/freakymate.conf` when installed with the installer or the `.deb` (so it can be edited in Mainsail or
+Fluidd next to the Klipper configs), otherwise `~/.config/freakymate/settings.conf` (Windows:
+`%APPDATA%\freakymate\settings.conf`). The file is created with the defaults at the first start. Comments (`# …`) are
+yours: when a setting changes on the screen, FreakyMate changes only that value and leaves comments, blank lines and
+order as they are. If the file cannot be read, FreakyMate starts with the defaults and does not overwrite it; the log
+says what is wrong.
 
-```json
-"temperature_presets": [
-  { "name": "PLA", "extruder": 210.0, "bed": 60.0 },
-  { "name": "PETG", "extruder": 240.0, "bed": 80.0 },
-  { "name": "ABS", "extruder": 250.0, "bed": 105.0 },
-  { "name": "TPU", "extruder": 225.0, "bed": 50.0 }
-]
+Most entries are changed on the screen; the **temperature presets** only here:
+
+```toml
+[[temperature_presets]]
+name = "PLA"
+extruder = 210.0
+bed = 60.0
+
+[[temperature_presets]]
+name = "PETG"
+extruder = 240.0
+bed = 80.0
 ```
 
-The Thermal page shows the first four. Restart FreakyMate after editing (`sudo systemctl restart freakymate`); it
-writes the file itself when a setting changes on the screen, so edit it while FreakyMate is stopped or restart right
-after saving.
+The Thermal page shows the first four. Restart FreakyMate after editing (`sudo systemctl restart freakymate`).
+
+Up to 0.3.8 the settings were a JSON file (`freakymate.json`, `settings.json`). It stays where it is and is no longer
+read; FreakyMate starts with the defaults in the new file. Take over what you had changed by hand (presets) and delete
+the JSON file when you like.
 
 ## Log
 
@@ -52,7 +62,7 @@ header: FreakyMate version, command line, system, then the versions of Moonraker
 detected on the printer (power devices, Spoolman, LEDs, macros and so on). Attach `freakymate.log`, `klippy.log` and
 `moonraker.log` to a bug report.
 
-Normally only the important lines are logged. For a bug report set `"verbose_log": true` in the settings file and
+Normally only the important lines are logged. For a bug report set `verbose_log = true` in the settings file and
 restart; FreakyMate then logs its debug messages too. `RUST_LOG` (for example `RUST_LOG=freakymate_core=trace`) takes
 precedence over the setting.
 
@@ -126,7 +136,7 @@ Klipper answers with an error (`!!`).
 **Monitors on HDMI or DisplayPort** are controlled through DDC/CI with the program `ddcutil` (`apt install ddcutil` or
 `pacman -S ddcutil`), if it is installed and lists a monitor that answers on brightness. The user of FreakyMate needs
 access to `/dev/i2c-*` (group `i2c`, the installer adds it) and the kernel module `i2c-dev`, which the `ddcutil`
-package normally loads. With several monitors the first that answers is used; `"device": "ddc:i2c-8"` names one, the
+package normally loads. With several monitors the first that answers is used; `device = "ddc:i2c-8"` names one, the
 log file lists them with their bus. Off switches the monitor through its power mode; a monitor without one is only
 dimmed to 0. Some monitors no longer answer on DDC once switched off, so a touch cannot light them again: the log says
 so, and the standby is then not for that monitor. DDC is slow (a tenth of a second per command), and the buttons of the
@@ -141,19 +151,19 @@ for the group `video`) and the user in `video`. `install.sh` sets up both; the D
 installation from before this version gets the rule by running `install.sh` again (see
 [Updates and channels](install.md#updates-and-channels)).
 
-In the settings file:
+In the settings file, every entry optional:
 
-```json
-"backlight": {
-  "device": null,
-  "brightness": null,
-  "off_when_idle_minutes": null,
-  "off_when_printing_minutes": null
-}
+```toml
+[backlight]
+device = "intel_backlight"
+brightness = 80
+off_when_idle_minutes = 5
+off_when_printing_minutes = 30
 ```
 
 `device` picks a device by its name under `/sys/class/backlight` (for example `10-0045` or `intel_backlight`) or a
-DDC/CI monitor as `ddc:i2c-N`; without one FreakyMate takes the first by type (firmware, platform, raw) and, where
+DDC/CI monitor as `ddc:i2c-N`; without it FreakyMate takes the first by type (firmware, platform, raw) and, where
 there is none, the first monitor on DDC/CI. `brightness` is the last value set on the screen in
-percent, set again at the start; `null` leaves the brightness as the system set it. The minutes are `null` for never.
+percent, set again at the start; without it the brightness stays as the system set it. Without the minutes the screen
+never goes off by itself.
 The log names every backlight found and the one used, and says why the screen went off or on.

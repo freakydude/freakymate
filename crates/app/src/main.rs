@@ -20,7 +20,7 @@ struct Cli {
     /// Kiosk mode on a touch screen: fullscreen, no window frame, no mouse pointer
     #[arg(short, long)]
     fullscreen: bool,
-    /// Settings file (default: <config dir>/freakymate/settings.json; the installer uses printer_data/config)
+    /// Settings file, TOML (default: <config dir>/freakymate/settings.conf; the installer uses printer_data/config/freakymate.conf)
     #[arg(long)]
     settings: Option<PathBuf>,
     /// Log file, rotated daily like those of Klipper and Moonraker (default: stderr only)
