@@ -1,5 +1,6 @@
 //! User settings as a JSON file in the user's configuration directory.
 
+use crate::backlight::BacklightSettings;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -26,6 +27,8 @@ pub struct Settings {
     pub hide_temperature_reports: bool,
     /// Logs the program's own debug messages as well (for a bug report); `RUST_LOG` overrides it.
     pub verbose_log: bool,
+    /// Brightness and standby of this display; only used where a backlight can be controlled.
+    pub backlight: BacklightSettings,
 }
 
 impl Settings {
@@ -79,6 +82,7 @@ impl Default for Settings {
             hidden_macros: Vec::new(),
             hide_temperature_reports: true,
             verbose_log: false,
+            backlight: BacklightSettings::default(),
         }
     }
 }
