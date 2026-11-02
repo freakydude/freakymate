@@ -3,10 +3,73 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Navigation, Printer, UiSettings } from "../state.slint";
+import { Actions, Backlight, Confirm, Dialogs, Navigation, Printer, UiSettings } from "../state.slint";
 import { Card, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
+import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
 import { TextEntryDialog } from "../components/overlays.slint";
 import { SystemTabs } from "../components/system-tabs.slint";
+
+// One row of minute choices for the standby; 0 is never. Temporarily a dialog of its own: the Settings page has no
+// room for it yet.
+component MinutesRow inherits VerticalLayout {
+    in property <string> label;
+    in property <[int]> choices;
+    in property <int> current;
+    callback chosen(int);
+    spacing: Theme.spacing-tight;
+    Text { text: root.label; color: Theme.muted; font-size: Theme.font-small; }
+    HorizontalLayout {
+        spacing: Theme.spacing;
+        for minutes in root.choices: IconButton {
+            height: 52px;
+            text: minutes == 0 ? @tr("Never") : minutes + " min";
+            checked: root.current == minutes;
+            clicked => { root.chosen(minutes); }
+        }
+    }
+}
+
+export component ScreenOffDialog inherits Scrim {
+    in-out property <bool> open;
+    // A tap on the status bar or the navigation closes it, like the other dialogs.
+    property <int> dismissals: Dialogs.dismissals;
+    visible: root.open;
+    changed dismissals => { root.open = false; }
+
+    DialogPanel {
+        width: min(parent.width - 16px, 560px);
+        height: content.preferred-height;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+
+        content := VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing;
+            DialogHeader {
+                title: @tr("Screen off");
+                close => { root.open = false; }
+            }
+            MinutesRow {
+                label: @tr("When idle");
+                choices: [0, 2, 5, 10, 30];
+                current: Backlight.idle-minutes;
+                chosen(minutes) => {
+                    Backlight.idle-minutes = minutes;
+                    Backlight.idle-minutes-chosen(minutes);
+                }
+            }
+            MinutesRow {
+                label: @tr("During a print");
+                choices: [0, 5, 10, 30];
+                current: Backlight.printing-minutes;
+                chosen(minutes) => {
+                    Backlight.printing-minutes = minutes;
+                    Backlight.printing-minutes-chosen(minutes);
+                }
+            }
+        }
+    }
+}
 
 export component SettingsPage inherits Rectangle {
     VerticalLayout {
@@ -83,6 +146,14 @@ export component SettingsPage inherits Rectangle {
                                 UiSettings.hide-temperature-reports-toggled(UiSettings.hide-temperature-reports);
                             }
                         }
+                        // Only where the backlight can be controlled.
+                        if Backlight.available: IconButton {
+                            height: 52px;
+                            icon: Icons.system-brightness;
+                            text: @tr("Screen off");
+                            horizontal: true;
+                            clicked => { screen-off.open = true; }
+                        }
                     }
                 }
                 Text {
@@ -120,6 +191,8 @@ export component SettingsPage inherits Rectangle {
             }
         }
     }
+
+    screen-off := ScreenOffDialog { }
 
     address := TextEntryDialog {
         title: @tr("Moonraker");

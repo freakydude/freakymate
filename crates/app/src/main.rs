@@ -4,6 +4,7 @@
 use clap::Parser;
 use freakymate::app::{Application, Options};
 use freakymate::logging;
+use freakymate_core::backlight::BacklightBackend;
 use freakymate_core::network::NetworkBackend;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -28,6 +29,10 @@ struct Cli {
     #[cfg(feature = "dev-mode")]
     #[arg(long)]
     simulate_network: bool,
+    /// Simulated backlight with brightness and standby (development build only)
+    #[cfg(feature = "dev-mode")]
+    #[arg(long)]
+    simulate_backlight: bool,
 }
 
 impl Cli {
@@ -37,6 +42,14 @@ impl Cli {
             return NetworkBackend::Simulated;
         }
         NetworkBackend::System
+    }
+
+    fn backlight_backend(&self) -> BacklightBackend {
+        #[cfg(feature = "dev-mode")]
+        if self.simulate_backlight {
+            return BacklightBackend::Simulated;
+        }
+        BacklightBackend::system()
     }
 
     /// What the log file says about this run at its top. Display and renderer follow once the window exists.
@@ -63,6 +76,7 @@ fn main() -> ExitCode {
     }
     let options = Options {
         network: cli.network_backend(),
+        backlight: cli.backlight_backend(),
         moonraker: cli.moonraker,
         fullscreen: cli.fullscreen,
         settings_file: cli.settings,

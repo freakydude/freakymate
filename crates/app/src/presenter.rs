@@ -80,6 +80,8 @@ fn now_seconds() -> f64 {
 }
 
 type MacrosLoaded = Box<dyn Fn(&[String])>;
+type SnapshotObserver = Box<dyn Fn(&Snapshot)>;
+type ConsoleObserver = Box<dyn Fn(&ConsoleLine)>;
 
 #[derive(Default)]
 struct Cache {
@@ -125,6 +127,8 @@ pub struct Presenter {
     all_macros: RefCell<Vec<String>>,
     hidden_macros: RefCell<Vec<String>>,
     macros_loaded: RefCell<Option<MacrosLoaded>>,
+    snapshot_observer: RefCell<Option<SnapshotObserver>>,
+    console_observer: RefCell<Option<ConsoleObserver>>,
     macro_details: RefCell<Arc<BTreeMap<String, MacroDetails>>>,
     macro_form: Rc<VecModel<MacroParamItem>>,
     macro_form_state: RefCell<MacroForm>,
@@ -168,6 +172,8 @@ impl Presenter {
             all_macros: RefCell::default(),
             hidden_macros: RefCell::default(),
             macros_loaded: RefCell::default(),
+            snapshot_observer: RefCell::default(),
+            console_observer: RefCell::default(),
             macro_details: RefCell::default(),
             macro_form: Rc::default(),
             macro_form_state: RefCell::default(),
@@ -258,6 +264,9 @@ impl Presenter {
 
     pub fn apply_snapshot(&self, snapshot: &Snapshot) {
         let Some(window) = self.window.upgrade() else { return };
+        if let Some(observer) = self.snapshot_observer.borrow().as_ref() {
+            observer(snapshot);
+        }
         let printer = window.global::<Printer>();
         let status = &snapshot.status;
         let connected = snapshot.connection == ConnectionState::Connected;
@@ -462,6 +471,9 @@ impl Presenter {
                 self.console.set_vec(items.into_iter().skip(skip).collect::<Vec<_>>());
             }
             Event::ConsoleLine(line) => {
+                if let Some(observer) = self.console_observer.borrow().as_ref() {
+                    observer(&line);
+                }
                 let shown = if self.shows_in_console(&line) { console_items(&line) } else { Vec::new() };
                 for item in shown {
                     if self.console.row_count() >= CONSOLE_LIMIT {
@@ -525,6 +537,16 @@ impl Presenter {
     pub fn set_hidden_macros(&self, hidden: Vec<String>) {
         *self.hidden_macros.borrow_mut() = hidden;
         self.refresh_macro_views();
+    }
+
+    /// Called with every snapshot after it is shown (the screen standby reads the printer from it).
+    pub fn on_snapshot(&self, handler: impl Fn(&Snapshot) + 'static) {
+        *self.snapshot_observer.borrow_mut() = Some(Box::new(handler));
+    }
+
+    /// Called with every console line that arrives live, not with the history loaded at the start.
+    pub fn on_console_line(&self, handler: impl Fn(&ConsoleLine) + 'static) {
+        *self.console_observer.borrow_mut() = Some(Box::new(handler));
     }
 
     /// Called with the printer's macros after a connection, so the settings can forget vanished ones.

@@ -1,7 +1,7 @@
 // Main window: status bar, navigation, current page and overlays.
 
 import { Theme } from "theme.slint";
-import { Actions, Confirm, Dialogs, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, StateIcons, UiSettings } from "state.slint";
+import { Actions, Backlight, Confirm, Dialogs, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, StateIcons, UiSettings } from "state.slint";
 import { NavRail, StatusBar } from "components/chrome.slint";
 import { CalibrationDialog, ConfirmDialog, MessagesFlyout, SpoolDialog } from "components/overlays.slint";
 import { HistoryDialog } from "components/history.slint";
@@ -19,7 +19,7 @@ import { SettingsPage } from "pages/settings.slint";
 import { NetworkPage } from "pages/network-page.slint";
 import { ConnectionPage } from "pages/connection.slint";
 
-export { Actions, Confirm, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, UiSettings }
+export { Actions, Backlight, Confirm, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, UiSettings }
 export { ChartLabel, FilamentPathItem, FileItem, HeaterItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, MmuGateItem, MmuSensorItem, SpoolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, ScrewItem, WifiItem, WiredItem, HostInterfaceItem } from "state.slint";
 
 export component AppWindow inherits Window {
@@ -61,6 +61,8 @@ export component AppWindow inherits Window {
     }
 
     VerticalLayout {
+        // Standby draws nothing but the black cover below.
+        visible: !Backlight.off;
         StatusBar { }
         HorizontalLayout {
             vertical-stretch: 1;
@@ -98,5 +100,13 @@ export component AppWindow inherits Window {
     if Navigation.messages-open: MessagesFlyout {
         width: parent.width;
         height: parent.height;
+    }
+
+    // Standby: the backlight is off as well; Rust swallows the touches that wake the screen.
+    if Backlight.off: Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: black;
+        TouchArea { }
     }
 }

@@ -1,11 +1,13 @@
 //! Headless application session: the real UI bindings on a software-rendered window, driven step by step.
 
 use crate::Options;
+use freakymate::backlight_controller::BacklightController;
 use freakymate::display::{DESIGN_HEIGHT, DESIGN_WIDTH};
 use freakymate::network_controller::NetworkController;
 use freakymate::presenter::Presenter;
-use freakymate::settings_controller::SettingsController;
+use freakymate::settings_controller::{Bridges, SettingsController};
 use freakymate::{actions, AppWindow, Navigation, Page};
+use freakymate_core::backlight::{BacklightBackend, BacklightService, BacklightState};
 use freakymate_core::network::{NetworkBackend, NetworkChannels, NetworkService};
 use freakymate_core::settings::{Settings, SettingsStore};
 use freakymate_core::{CredentialStore, Endpoint, PrinterService, ServiceChannels, Snapshot};
@@ -43,9 +45,11 @@ pub struct Session {
     pub service: PrinterService,
     pub network: Rc<NetworkController>,
     pub network_service: NetworkService,
+    pub backlight: Rc<BacklightController>,
     platform_window: Rc<MinimalSoftwareWindow>,
     channels: ServiceChannels,
     network_channels: NetworkChannels,
+    backlight_states: tokio::sync::watch::Receiver<BacklightState>,
     options: Options,
     count: usize,
     _runtime: tokio::runtime::Runtime,
@@ -87,15 +91,21 @@ impl Session {
             &endpoint,
             true,
         );
+        let (backlight_service, backlight_states) =
+            BacklightService::start(runtime.handle(), BacklightBackend::Simulated, &Settings::default().backlight);
+        let backlight = BacklightController::bind(&window, backlight_service.clone(), &presenter);
         let store = SettingsStore::new(options.out.join("snapshot-settings.json"));
         let settings = SettingsController::bind(
             &window,
             store,
             Settings::default(),
             &endpoint,
-            service.clone(),
-            presenter.clone(),
-            network.clone(),
+            Bridges {
+                service: service.clone(),
+                presenter: presenter.clone(),
+                network: network.clone(),
+                backlight: backlight_service,
+            },
         );
         actions::bind(&window, &service, &presenter, &settings);
 
@@ -105,9 +115,11 @@ impl Session {
             service,
             network,
             network_service,
+            backlight,
             platform_window,
             channels,
             network_channels,
+            backlight_states,
             options,
             count: 0,
             _runtime: runtime,
@@ -154,6 +166,10 @@ impl Session {
             let state = self.network_channels.states.borrow_and_update().clone();
             self.network.apply_state(state);
             replied = true;
+        }
+        if self.backlight_states.has_changed().unwrap_or(false) {
+            let state = self.backlight_states.borrow_and_update().clone();
+            self.backlight.apply_state(&state);
         }
         while let Ok(notice) = self.network_channels.notices.try_recv() {
             self.network.show_notice(&notice);

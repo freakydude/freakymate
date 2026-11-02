@@ -2,8 +2,8 @@
 
 use crate::session::Session;
 use freakymate::{
-    Actions, Confirm, FilamentTab, HeatTab, MeshDialogs, MmuDialogs, MoveTab, Navigation, Page, Printer, SpoolPicker,
-    TuneTab,
+    Actions, Backlight, Confirm, FilamentTab, HeatTab, MeshDialogs, MmuDialogs, MoveTab, Navigation, Page, Printer,
+    SpoolPicker, TuneTab,
 };
 use freakymate_core::network::{Availability, NetworkCommand, NetworkState};
 use freakymate_core::sources::happy_hare::ServoPosition;
@@ -436,6 +436,10 @@ fn heat_tabs(session: &mut Session) -> Result<(), String> {
         session.window.global::<Navigation>().set_light_open(true);
         session.capture("light-panel")?;
         session.window.global::<Navigation>().set_light_open(false);
+        // Standby: only the black cover.
+        session.window.global::<Backlight>().set_off(true);
+        session.capture("screen-off")?;
+        session.window.global::<Backlight>().set_off(false);
     }
     Ok(())
 }

@@ -113,7 +113,7 @@ interfaces and addresses read from Moonraker.
 
 On displays whose backlight Linux can control (`/sys/class/backlight`: DSI displays such as the Raspberry Pi Touch
 Display, SPI displays with a backlight pin, laptops) the light panel of the status bar has a row **Display**: the
-slider sets the brightness (10 to 100 %), **Off** switches the screen off at once. Settings → Display and console sets
+slider sets the brightness (10 to 100 %), **Off** switches the screen off at once. Settings → Display and console → Screen off sets
 when the screen goes off by itself, without a touch, once while idle and once while printing (pause included). Both are
 **Never** by default.
 

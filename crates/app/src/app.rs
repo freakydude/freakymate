@@ -1,15 +1,17 @@
 //! Assembling the application: settings, service, window and bridges.
 
 use crate::actions;
+use crate::backlight_controller::BacklightController;
 use crate::display;
 use crate::network_controller::NetworkController;
 use crate::presenter::Presenter;
-use crate::settings_controller::SettingsController;
+use crate::settings_controller::{Bridges, SettingsController};
 use crate::AppWindow;
+use freakymate_core::backlight::{BacklightBackend, BacklightService};
 use freakymate_core::network::{NetworkBackend, NetworkService};
 use freakymate_core::settings::{SettingsError, SettingsStore};
 use freakymate_core::{CredentialStore, Endpoint, PrinterService};
-use slint::winit_030::winit::event::WindowEvent;
+use slint::winit_030::winit::event::{ElementState, KeyEvent, WindowEvent};
 use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, Timer, TimerMode};
 use std::path::PathBuf;
@@ -25,6 +27,8 @@ pub struct Options {
     pub settings_file: Option<PathBuf>,
     /// NetworkManager, or simulated networks in development builds.
     pub network: NetworkBackend,
+    /// The kernel's backlight, or a simulated one in development builds. Default: none, the UI offers no control.
+    pub backlight: BacklightBackend,
 }
 
 #[derive(Debug, Error)]
@@ -48,6 +52,7 @@ pub struct Application {
     pub service: PrinterService,
     _settings: std::rc::Rc<SettingsController>,
     _network: std::rc::Rc<NetworkController>,
+    _backlight: std::rc::Rc<BacklightController>,
     _clock: Timer,
     _runtime: tokio::runtime::Runtime,
 }
@@ -86,18 +91,25 @@ impl Application {
             &endpoint,
             options.network.is_simulated(),
         );
+        let (backlight_service, backlight_states) =
+            BacklightService::start(runtime.handle(), options.backlight, &settings.backlight);
+        let backlight = BacklightController::bind(&window, backlight_service.clone(), &presenter);
         let settings = SettingsController::bind(
             &window,
             store,
             settings,
             &endpoint,
-            service.clone(),
-            presenter.clone(),
-            network.clone(),
+            Bridges {
+                service: service.clone(),
+                presenter: presenter.clone(),
+                network: network.clone(),
+                backlight: backlight_service,
+            },
         );
         actions::bind(&window, &service, &presenter, &settings);
         presenter.follow(channels)?;
         network.follow(network_channels)?;
+        backlight.follow(backlight_states)?;
 
         let clock = Timer::default();
         let clock_presenter = presenter.clone();
@@ -111,13 +123,14 @@ impl Application {
         if options.fullscreen || settings.fullscreen() {
             window.window().set_fullscreen(true);
         }
-        watch_window_events(&window);
+        watch_window_events(&window, Some(backlight.clone()));
         Ok(Self {
             window,
             presenter,
             service,
             _settings: settings,
             _network: network,
+            _backlight: backlight,
             _clock: clock,
             _runtime: runtime,
         })
@@ -134,11 +147,17 @@ impl Application {
 /// [`display`]); the scale of the system is not used there, a compositor reports 1 for a touch screen. A window keeps
 /// the scale of the system, so a larger window shows more room. Whoever sets `SLINT_SCALE_FACTOR` chooses the scale
 /// by hand, and nothing is fitted then. (The pointer of the kiosk is hidden by its cursor theme, see
-/// [`crate::kiosk_pointer`].)
-pub fn watch_window_events(window: &AppWindow) {
+/// [`crate::kiosk_pointer`].) While the screen is dark or just lit, touches, clicks and keys are swallowed here, so the
+/// UI needs no wake-up surface of its own; they restart the idle time (see [`BacklightController::input`]).
+pub fn watch_window_events(window: &AppWindow, backlight: Option<std::rc::Rc<BacklightController>>) {
     let fit = std::env::var_os("SLINT_SCALE_FACTOR").is_none();
     let weak = window.as_weak();
     window.window().on_winit_window_event(move |_, event| {
+        if let (Some(backlight), Some(activity)) = (&backlight, input_activity(event)) {
+            if backlight.input(activity) {
+                return EventResult::PreventDefault;
+            }
+        }
         match event {
             WindowEvent::Resized(_) if fit => {
                 // Applied after the event, not inside it: Slint is still handling it.
@@ -154,6 +173,19 @@ pub fn watch_window_events(window: &AppWindow) {
             _ => EventResult::Propagate,
         }
     });
+}
+
+/// Whether an input event is a press, a touch or a key, which counts as activity for the standby; `None` for events
+/// that are no input. A release or a mouse wheel is input, but no activity of its own.
+fn input_activity(event: &WindowEvent) -> Option<bool> {
+    match event {
+        WindowEvent::MouseInput { state, .. } | WindowEvent::KeyboardInput { event: KeyEvent { state, .. }, .. } => {
+            Some(*state == ElementState::Pressed)
+        }
+        WindowEvent::Touch(_) => Some(true),
+        WindowEvent::MouseWheel { .. } => Some(false),
+        _ => None,
+    }
 }
 
 /// Fullscreen fits the layout to the display; a window shows it at the scale of the system (see

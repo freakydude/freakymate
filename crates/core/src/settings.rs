@@ -251,6 +251,23 @@ mod tests {
     }
 
     #[test]
+    fn standby_times_and_brightness_survive_a_restart() {
+        let (_dir, store) = temporary_store();
+        let mut settings = Settings::default();
+        settings.backlight.brightness = Some(40);
+        settings.backlight.off_when_idle_minutes = Some(5);
+        settings.backlight.off_when_printing_minutes = Some(30);
+
+        store.save(&settings).unwrap();
+        let loaded = store.load().unwrap().backlight;
+
+        assert_eq!(loaded, settings.backlight);
+        let timeouts = loaded.timeouts();
+        assert_eq!(timeouts.idle, Some(std::time::Duration::from_secs(300)));
+        assert_eq!(timeouts.printing, Some(std::time::Duration::from_secs(1800)));
+    }
+
+    #[test]
     fn saved_settings_load_again() {
         let (_dir, store) = temporary_store();
         let settings = Settings {
