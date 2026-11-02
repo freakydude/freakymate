@@ -4,6 +4,7 @@
 //! checked against a real single-gate machine with a proportional sync-feedback buffer and no encoder.
 
 pub mod commands;
+pub mod stale_gate_map;
 
 use super::objects::ObjectStore;
 use super::subscription::Subscription;

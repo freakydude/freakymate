@@ -7,6 +7,7 @@ use crate::commands::Command;
 use crate::credentials::{Credential, CredentialStore};
 use crate::moonraker::access::{self, AccessError};
 use crate::moonraker::{Call, CallError, Connection, Endpoint, Notification, PendingCall};
+use crate::sources::happy_hare::stale_gate_map;
 use crate::sources::klipper::{FanWatch, HeightWatch, KlippyState, PendingTargets, PrintState};
 use crate::sources::moonraker_server::files::{self, FileEntry, FileMetadata, ThumbnailImage};
 use crate::sources::moonraker_server::gcode_store::{self, ConsoleKind, ConsoleLine};
@@ -648,6 +649,15 @@ impl<'a> Session<'a> {
         self.publish();
     }
 
+    /// Workaround for gate map changes Happy Hare makes in place and Klipper never sends; see `stale_gate_map`.
+    async fn requery_stale_gate_map(&mut self, changes: &Value) {
+        let Some(parameters) = stale_gate_map::query_after(changes) else { return };
+        match self.connection.call("printer.objects.query", Some(parameters)).await {
+            Ok(result) => self.store.merge(result.get("status").unwrap_or(&Value::Null)),
+            Err(error) => log::warn!("gate map query failed: {error}"),
+        }
+    }
+
     /// Klipper reports the reason for errors and shutdown via `printer.info`.
     async fn klippy_message(&self) -> String {
         match self.connection.call("printer.info", None).await {
@@ -661,6 +671,7 @@ impl<'a> Session<'a> {
             "notify_status_update" => {
                 if let Some(changes) = notification.params.get(0) {
                     self.store.merge(changes);
+                    self.requery_stale_gate_map(changes).await;
                     self.publish();
                 }
             }
