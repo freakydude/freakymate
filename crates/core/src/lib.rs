@@ -27,3 +27,7 @@ pub const VERSION: &str = match option_env!("FREAKYMATE_VERSION") {
     Some(version) => version,
     None => concat!(env!("CARGO_PKG_VERSION"), "-dev"),
 };
+
+/// Log target for facts about the machine and the printer (`name: value`); the log file repeats the latest of each
+/// in its header.
+pub const HEADER_TARGET: &str = "freakymate::header";

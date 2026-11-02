@@ -116,7 +116,7 @@ TTYPath=/dev/tty1
 StandardInput=tty
 Environment=XDG_RUNTIME_DIR=/run/user/$USER_ID
 # -d: no client-side frame, otherwise winit keeps room for its title bar after leaving fullscreen (black bar).
-ExecStart=/usr/bin/cage -d -s -- $INSTALL_DIR/$NAME --fullscreen --moonraker $MOONRAKER --settings $SETTINGS_FILE
+ExecStart=/usr/bin/cage -d -s -- $INSTALL_DIR/$NAME --fullscreen --moonraker $MOONRAKER --settings $SETTINGS_FILE --logfile $DATA_DIR/logs/freakymate.log
 Restart=always
 RestartSec=5
 
@@ -161,4 +161,4 @@ EOF
   sudo systemctl restart moonraker || echo "Restart Moonraker yourself to activate the update entry."
 fi
 
-echo "Done. Logs: journalctl -u $NAME -f"
+echo "Done. Log: $DATA_DIR/logs/freakymate.log (Mainsail: Machine, logs) or journalctl -u $NAME -f"

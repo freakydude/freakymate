@@ -3,6 +3,7 @@
 
 use clap::Parser;
 use freakymate::app::{Application, Options};
+use freakymate::logging;
 use freakymate_core::network::NetworkBackend;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -20,6 +21,9 @@ struct Cli {
     /// Settings file (default: <config dir>/freakymate/settings.json; the installer uses printer_data/config)
     #[arg(long)]
     settings: Option<PathBuf>,
+    /// Log file, rotated daily like those of Klipper and Moonraker (default: stderr only)
+    #[arg(short = 'l', long)]
+    logfile: Option<PathBuf>,
     /// Simulated Wi-Fi and Ethernet instead of NetworkManager (development build only)
     #[cfg(feature = "dev-mode")]
     #[arg(long)]
@@ -34,11 +38,25 @@ impl Cli {
         }
         NetworkBackend::System
     }
+
+    /// What the log file says about this run at its top. Display and renderer follow once the window exists.
+    fn log_header(&self) -> Vec<(String, String)> {
+        let command_line: Vec<String> = std::env::args().skip(1).collect();
+        vec![
+            ("Version".to_owned(), freakymate_core::VERSION.to_owned()),
+            ("Command line".to_owned(), command_line.join(" ")),
+            ("System".to_owned(), format!("{} {}", std::env::consts::OS, std::env::consts::ARCH)),
+        ]
+    }
 }
 
 fn main() -> ExitCode {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     let cli = Cli::parse();
+    let config = logging::Config { file: cli.logfile.clone(), header: cli.log_header() };
+    if let Err(error) = logging::init(config) {
+        eprintln!("cannot start the log: {error}");
+        return ExitCode::FAILURE;
+    }
     // The kiosk on the touch screen shows no pointer; set up before the window and the runtime's threads exist.
     if cli.fullscreen {
         freakymate::kiosk_pointer::hide();
@@ -49,11 +67,14 @@ fn main() -> ExitCode {
         fullscreen: cli.fullscreen,
         settings_file: cli.settings,
     };
-    match Application::build(options).and_then(Application::run) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            log::error!("{error}");
-            ExitCode::FAILURE
-        }
+    let result = Application::build(options).and_then(Application::run);
+    if let Err(error) = &result {
+        log::error!("{error}");
+    }
+    log::logger().flush();
+    if result.is_ok() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
     }
 }
