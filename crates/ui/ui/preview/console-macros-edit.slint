@@ -1,0 +1,28 @@
+// Preview: the macro panel of the console while choosing which macros it offers; long names, one switched off.
+// Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { ConsolePage } from "../pages/console.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component ConsoleMacrosEditPreview inherits AppWindow {
+    ConsolePage {
+        macros-open: true;
+        macros-editing: true;
+    }
+
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.console;
+        Printer.macro-items = [
+            { name: "LOAD_FILAMENT", visible: true },
+            { name: "PARK", visible: true },
+            { name: "PRINT_END", visible: true },
+            { name: "PRINT_START", visible: true },
+            { name: "SET_PAUSE_AT_LAYER", visible: false },
+            { name: "TEST_SPEED_WITH_A_LONG_NAME", visible: true },
+            { name: "UNLOAD_FILAMENT", visible: true },
+        ];
+    }
+}

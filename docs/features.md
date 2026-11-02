@@ -36,13 +36,14 @@ What each page of FreakyMate does. Functions only appear when the printer has th
   - **Network**: Wi-Fi and Ethernet (see [Network settings](configuration.md#network-settings)).
   - **Console** (also from the message flyout): G-code history and live responses, a command field (on-screen keyboard
     or physical keyboard), and an expandable list of macros. Like Mainsail it hides the temperature reports Klipper
-    sends while waiting for a heater (can be turned off). Macros starting with `_` and macros that rename a built-in
-    command (`rename_existing`) are hidden; further macros can be hidden on the Settings tab. Macros with parameters
+    sends while waiting for a heater (the thermometer button next to the command field shows them). Macros starting
+    with `_` and macros that rename a built-in command (`rename_existing`) are hidden; **Edit** in the macro list
+    switches further macros off and on. Macros with parameters
     open a form first: each parameter is read from the macro's template, Klipper defaults show as placeholders in
     brackets.
   - **Settings**: Moonraker address and login (see [Moonraker login](configuration.md#moonraker-login)), fullscreen,
-    the console filter and which macros the console offers. Temperature presets are set in the
-    [settings file](configuration.md#settings-file).
+    and when the screen goes off by itself (see [Brightness and standby](configuration.md#brightness-and-standby)).
+    Temperature presets are set in the [settings file](configuration.md#settings-file).
 
 | ![Pause at a layer](screenshots/layer-pause.png)            | ![Exclude objects on the bed map](screenshots/objects-map.png)        |
 | ----------------------------------------------------------- | --------------------------------------------------------------------- |
