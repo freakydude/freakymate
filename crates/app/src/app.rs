@@ -62,6 +62,8 @@ impl Application {
             log::warn!("{error}; using defaults");
             freakymate_core::Settings::default()
         });
+        crate::logging::set_verbose(settings.verbose_log);
+        crate::logging::header("Renderer", &std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "default".to_owned()));
         let endpoint = Endpoint::parse(options.moonraker.as_deref().unwrap_or(&settings.moonraker))?;
         log::info!("Moonraker at {}", endpoint.display());
 
@@ -164,4 +166,9 @@ fn scale_to_mode(window: &slint::Window) {
     } else {
         display::apply_system_scale(window, system_scale);
     }
+    let mode = if window.is_fullscreen() { "fullscreen" } else { "window" };
+    crate::logging::header(
+        "Display",
+        &format!("{mode} {}x{}, scale factor {:.3}", size.width, size.height, window.scale_factor()),
+    );
 }

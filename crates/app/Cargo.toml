@@ -24,10 +24,7 @@ chrono = { version = "0.4", default-features = false, features = [
     "std",
 ] }
 clap = { version = "4.6.7", features = ["derive"] }
-env_logger = { version = "0.11.11", default-features = false, features = [
-    "auto-color",
-    "humantime",
-] }
+env_filter = { version = "2.0.0", default-features = false, features = ["std"] }
 log.workspace = true
 slint = { workspace = true, features = [
     "std",

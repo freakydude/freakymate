@@ -231,17 +231,25 @@ async fn run(
     outputs: Outputs,
 ) {
     let http = reqwest::Client::new();
+    // A printer that stays off would otherwise fill the log (an SD card) with the same failure on every retry.
+    let mut reported_failure: Option<String> = None;
     loop {
         publish_connection(&outputs, &endpoint, ConnectionState::Connecting);
         let end = match Connection::open(&endpoint.websocket_url()).await {
             Ok((connection, notifications)) => {
+                reported_failure = None;
+                log::info!("connected to {}", endpoint.websocket_url());
                 let (wled_answers, wled_answers_rx) = mpsc::unbounded_channel();
                 let session =
                     Session::new(connection, http.clone(), endpoint.clone(), &credentials, &outputs, wled_answers);
                 session.run(notifications, wled_answers_rx, &mut requests).await
             }
             Err(error) => {
-                log::info!("cannot connect to {}: {error}", endpoint.websocket_url());
+                let failure = error.to_string();
+                if reported_failure.as_deref() != Some(failure.as_str()) {
+                    log::info!("cannot connect to {}: {failure}", endpoint.websocket_url());
+                    reported_failure = Some(failure);
+                }
                 SessionEnd::ConnectionLost
             }
         };
@@ -545,6 +553,7 @@ impl<'a> Session<'a> {
 
     async fn refresh_klippy(&mut self) -> Result<(), CallError> {
         let info = server_info::parse_server_info(&self.connection.call("server.info", None).await?);
+        log_fact("Moonraker", &info.moonraker_version);
         self.components = ServerComponents::from_names(info.components.iter().map(String::as_str));
         let state =
             if info.klippy_connected { KlippyState::parse(&info.klippy_state) } else { KlippyState::Disconnected };
@@ -568,6 +577,7 @@ impl<'a> Session<'a> {
         let parameters = sources.subscription(&available);
         let result = self.connection.call("printer.objects.subscribe", Some(parameters)).await?;
         sources.apply_settings(result.pointer("/status/configfile/settings"));
+        self.log_detected(&sources, &result).await;
         self.wled = self.fetch_wled().await;
         sources.wled_strips = self.wled.iter().map(WledStrip::object).collect();
         self.sources = sources;
@@ -577,6 +587,18 @@ impl<'a> Session<'a> {
         self.klippy_ready = true;
         self.publish();
         Ok(())
+    }
+
+    /// Notes the versions and the detected sources for the log, which a bug report needs.
+    async fn log_detected(&self, sources: &Sources, subscription: &Value) {
+        let klipper = self.connection.call("printer.info", None).await.ok();
+        let version = |value: Option<&Value>, key: &str| {
+            value.and_then(|value| value.get(key)).and_then(Value::as_str).unwrap_or_default().to_owned()
+        };
+        log_fact("Klipper", &version(klipper.as_ref(), "software_version"));
+        let machine = subscription.pointer("/status/mmu_machine");
+        log_fact("Happy Hare", &version(machine, "happy_hare_version"));
+        log_fact("Detected", &sources.summary());
     }
 
     /// Moonraker's WLED strips; none without its `wled` component or when it cannot be asked.
@@ -938,6 +960,13 @@ fn running_label(call: &Call, command: &Command) -> String {
 }
 
 /// The script of a call that runs G-code.
+/// A fact about the printer for the log header; nothing when the printer did not report it.
+fn log_fact(name: &str, value: &str) {
+    if !value.is_empty() {
+        log::info!(target: crate::HEADER_TARGET, "{name}: {value}");
+    }
+}
+
 fn gcode_script(call: &Call) -> Option<&str> {
     if call.method != "printer.gcode.script" {
         return None;

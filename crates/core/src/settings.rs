@@ -24,6 +24,8 @@ pub struct Settings {
     pub hidden_macros: Vec<String>,
     /// Leaves out the temperature reports that Klipper sends while waiting for a heater (like Mainsail).
     pub hide_temperature_reports: bool,
+    /// Logs the program's own debug messages as well (for a bug report); `RUST_LOG` overrides it.
+    pub verbose_log: bool,
 }
 
 impl Settings {
@@ -76,6 +78,7 @@ impl Default for Settings {
             known_macros: Vec::new(),
             hidden_macros: Vec::new(),
             hide_temperature_reports: true,
+            verbose_log: false,
         }
     }
 }

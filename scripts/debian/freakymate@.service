@@ -12,7 +12,7 @@ TTYPath=/dev/tty1
 StandardInput=tty
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 # -d: no client-side frame, otherwise winit keeps room for its title bar after leaving fullscreen (black bar).
-ExecStart=/usr/bin/cage -d -s -- /usr/bin/freakymate --fullscreen --settings /home/%i/printer_data/config/freakymate.json
+ExecStart=/usr/bin/cage -d -s -- /usr/bin/freakymate --fullscreen --settings /home/%i/printer_data/config/freakymate.json --logfile /home/%i/printer_data/logs/freakymate.log
 Restart=always
 RestartSec=5
 

@@ -66,7 +66,7 @@ architecture and packages first and stops with a message if something does not f
    Options: `-m <moonraker url>`, `-d <printer_data folder>` (default `~/printer_data`), `-c stable|beta` (update channel, see below).
    Settings go to `printer_data/config/freakymate.json`, next to the Klipper configs, so they can be edited in
    Mainsail or Fluidd (see [Configuration](configuration.md)). An existing `~/.config/freakymate/settings.json` is
-   copied there once.
+   copied there once. The log is `printer_data/logs/freakymate.log` (Mainsail: Machine → logs), see [Configuration](configuration.md#log).
    Remove everything with `~/freakymate/uninstall.sh`; the settings file stays.
 
 ## Updates and channels

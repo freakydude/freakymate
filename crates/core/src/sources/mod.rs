@@ -55,6 +55,35 @@ impl Sources {
         }
     }
 
+    /// One line for the log: what was detected on this printer.
+    pub fn summary(&self) -> String {
+        let klipper = &self.klipper;
+        let moonraker = &self.moonraker;
+        let flags = [
+            ("leveling", klipper.leveling.is_some()),
+            ("probe", klipper.probe),
+            ("layer pause", self.layer_pause.is_some()),
+            ("filament macros", self.filament_macros.is_some()),
+            ("power", moonraker.power),
+            ("update manager", moonraker.update_manager),
+            ("history", moonraker.history),
+            ("Spoolman", moonraker.spoolman),
+        ];
+        let counts = [
+            ("macros", klipper.macros.len()),
+            ("extra heaters", klipper.extra_heaters.len()),
+            ("temperature sensors", klipper.temperature_sensors.len()),
+            ("filament sensors", klipper.filament_sensors.len()),
+            ("fans", klipper.fans.len()),
+            ("LEDs", klipper.leds.len()),
+            ("LED effects", self.led_effects.len()),
+            ("WLED strips", self.wled_strips.len()),
+        ];
+        let flags = flags.iter().filter(|(_, present)| *present).map(|(name, _)| (*name).to_owned());
+        let counts = counts.iter().filter(|(_, count)| *count > 0).map(|(name, count)| format!("{count} {name}"));
+        flags.chain(counts).collect::<Vec<_>>().join(", ")
+    }
+
     /// What only the configuration tells, from `configfile.settings` of the first subscription answer.
     pub fn apply_settings(&mut self, settings: Option<&Value>) {
         self.klipper.apply_settings(settings);
@@ -90,6 +119,24 @@ mod tests {
         assert_eq!(names, ["extruder", "heater_generic chamber", "webhooks"]);
         assert_eq!(objects["webhooks"], Value::Null);
         assert_eq!(objects["extruder"][0], "temperature");
+    }
+
+    #[test]
+    fn summarizes_what_was_detected_for_the_log() {
+        let available: Vec<String> =
+            ["extruder", "heater_generic chamber", "fan", "heater_fan hotend", "gcode_macro START"]
+                .map(String::from)
+                .to_vec();
+        let components = ServerComponents::from_names(["power", "spoolman"]);
+        let sources = Sources::detect(&available, components);
+
+        let summary = sources.summary();
+
+        assert!(summary.contains("power, Spoolman"), "{summary}");
+        assert!(summary.contains("1 macros"), "{summary}");
+        assert!(summary.contains("1 extra heaters"), "{summary}");
+        assert!(summary.contains("2 fans"), "{summary}");
+        assert!(!summary.contains("history"), "{summary}");
     }
 
     #[test]

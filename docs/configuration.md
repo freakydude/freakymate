@@ -6,7 +6,7 @@ the Moonraker login, displays and the network settings.
 ## Command line
 
 ```text
-freakymate [--moonraker <url>] [--fullscreen] [--settings <file>] [--simulate-network]
+freakymate [--moonraker <url>] [--fullscreen] [--settings <file>] [--logfile <file>] [--simulate-network]
 ```
 
 | Option               | Meaning                                                                                          |
@@ -14,6 +14,7 @@ freakymate [--moonraker <url>] [--fullscreen] [--settings <file>] [--simulate-ne
 | `-m, --moonraker`    | Moonraker address for this start, e.g. `http://printer.local:7125` (otherwise the saved setting) |
 | `-f, --fullscreen`   | Kiosk mode for a touch screen, as the services start it: fullscreen, no window frame, no mouse pointer |
 | `--settings`         | Settings file, default `~/.config/freakymate/settings.json` (Windows: `%APPDATA%`). The installer passes `printer_data/config/freakymate.json` |
+| `-l, --logfile`      | Log file, rotated daily like those of Klipper and Moonraker (default: stderr only). The installer passes `printer_data/logs/freakymate.log` |
 | `--simulate-network` | Simulated Wi-Fi/Ethernet instead of NetworkManager (development builds only, see [Development](development.md#development-builds-and-releases)) |
 
 Useful environment variables: `RUST_LOG=debug` (logging), `SLINT_BACKEND=winit-software` (force software rendering if the GPU
@@ -39,6 +40,19 @@ changed on the screen; the **temperature presets** only here:
 The Thermal page shows the first four. Restart FreakyMate after editing (`sudo systemctl restart freakymate`); it
 writes the file itself when a setting changes on the screen, so edit it while FreakyMate is stopped or restart right
 after saving.
+
+## Log
+
+With the installer or the `.deb` the log is `printer_data/logs/freakymate.log`, next to `klippy.log` and
+`moonraker.log`, so Mainsail and Fluidd list it under Machine → logs. It rotates at midnight, keeps three old files
+(`freakymate.log.YYYY-MM-DD`) and also goes to the journal (`journalctl -u freakymate@<user>`). Each file starts with a
+header: FreakyMate version, command line, system, then the versions of Moonraker, Klipper and Happy Hare and what was
+detected on the printer (power devices, Spoolman, LEDs, macros and so on). Attach `freakymate.log`, `klippy.log` and
+`moonraker.log` to a bug report.
+
+Normally only the important lines are logged. For a bug report set `"verbose_log": true` in the settings file and
+restart; FreakyMate then logs its debug messages too. `RUST_LOG` (for example `RUST_LOG=freakymate_core=trace`) takes
+precedence over the setting.
 
 ## Moonraker login
 
