@@ -55,12 +55,14 @@ impl Setup {
             match (kind, instance) {
                 (_, None) if Leveling::objects().contains(&kind) => leveling_objects.push(kind),
                 ("probe" | "bltouch" | "smart_effector" | "probe_eddy_current", _) => setup.probe = true,
+                // What is only shown leaves out helpers; what changes behaviour (probe, leveling) counts above.
+                _ if devices::is_hidden(name) => {}
                 ("heater_generic" | "temperature_fan", Some(_)) => setup.extra_heaters.push(name.to_owned()),
                 ("temperature_sensor" | "tmc2240", Some(_)) => setup.temperature_sensors.push(name.to_owned()),
                 _ if FanKind::of(name).is_some() => setup.fans.push(name.to_owned()),
                 _ if devices::is_led(name) => setup.leds.push(name.to_owned()),
                 (_, Some(_)) if is_filament_sensor(kind) => setup.filament_sensors.push(name.to_owned()),
-                ("gcode_macro", Some(macro_name)) if !macro_name.starts_with('_') => {
+                ("gcode_macro", Some(macro_name)) => {
                     setup.macros.push(macro_name.to_ascii_uppercase());
                 }
                 (extruder, None) if is_additional_extruder(extruder) => setup.extra_heaters.push(name.to_owned()),
@@ -198,6 +200,28 @@ mod tests {
         assert_eq!(setup.filament_sensors, ["filament_switch_sensor runout"]);
         assert_eq!(setup.macros, ["LOAD_FILAMENT", "PRINT_START"]);
         assert!(setup.has_macro("load_filament"));
+    }
+
+    #[test]
+    fn helper_sections_are_not_shown_but_still_count() {
+        let setup = Setup::from_objects([
+            "fan",
+            "fan_generic _exhaust",
+            "heater_fan _hotend",
+            "controller_fan _mcu",
+            "heater_generic _chamber",
+            "temperature_fan _electronics",
+            "temperature_sensor _mcu",
+            "neopixel _status",
+            "filament_switch_sensor _runout",
+            "gcode_macro _HELPER",
+            "probe_eddy_current _scanner",
+        ]);
+
+        assert_eq!(setup.fans, ["fan"]);
+        assert!(setup.extra_heaters.is_empty() && setup.temperature_sensors.is_empty());
+        assert!(setup.leds.is_empty() && setup.filament_sensors.is_empty() && setup.macros.is_empty());
+        assert!(setup.probe);
     }
 
     #[test]

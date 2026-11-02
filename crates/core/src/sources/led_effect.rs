@@ -2,7 +2,7 @@
 //!
 //! Field names follow `klipper-led_effect/src/led_effect.py` (`enabled`).
 
-use super::klipper::{instance, label};
+use super::klipper::{instance, is_hidden, label};
 use super::objects::ObjectStore;
 use super::subscription::Subscription;
 use serde_json::Value;
@@ -21,9 +21,9 @@ pub fn is_effect(object: &str) -> bool {
     object.starts_with(OBJECT_PREFIX)
 }
 
-/// The effect objects of the plugin; empty without it.
+/// The effect objects of the plugin, without helpers starting with `_`; empty without it.
 pub(super) fn detect<'a>(objects: impl IntoIterator<Item = &'a str>) -> Vec<String> {
-    objects.into_iter().filter(|name| is_effect(name)).map(str::to_owned).collect()
+    objects.into_iter().filter(|name| is_effect(name) && !is_hidden(name)).map(str::to_owned).collect()
 }
 
 pub(super) fn subscribe(effects: &[String], subscription: &mut Subscription) {
@@ -69,6 +69,13 @@ mod tests {
         let effects = read_effects(&store);
 
         assert_eq!(effects, [LedEffect { name: "rainbow".into(), label: "Rainbow".into(), enabled: true }]);
+    }
+
+    #[test]
+    fn helper_effects_are_left_out() {
+        let effects = detect(["led_effect rainbow", "led_effect _boot", "neopixel _status"]);
+
+        assert_eq!(effects, ["led_effect rainbow"]);
     }
 
     #[test]

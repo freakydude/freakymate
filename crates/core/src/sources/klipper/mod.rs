@@ -26,7 +26,7 @@ pub use bed_mesh::{BedMesh, MeshPoint, MeshSpan};
 pub use calibration::{
     BedMeshState, CalibrationMode, CalibrationSetup, CalibrationState, PendingSection, ScrewAdjustment, TestZ,
 };
-pub use devices::{instance, is_led, white_channel, Fan, FanKind, Led, WhiteChannel};
+pub use devices::{instance, is_hidden, is_led, white_channel, Fan, FanKind, Led, WhiteChannel};
 pub use exclude_object::{object_at, PrintObject};
 pub use extruder::ExtruderState;
 pub use fan_watch::FanWatch;

@@ -1,7 +1,9 @@
 # Features
 
 What each page of FreakyMate does. Functions only appear when the printer has them (capabilities from
-`printer.objects.list` and `server.info`).
+`printer.objects.list` and `server.info`). Configuration sections whose name starts with `_` are helpers and not
+shown, as in Mainsail: macros, heaters, temperature sensors, fans, LEDs, LED effects and filament sensors (a hidden
+probe still counts as the probe).
 
 - **Print**: thumbnail, progress, elapsed/remaining/ETA, layers with current and object height, filament; start, pause, resume, cancel, pause at a layer (planned pause shown), exclude objects (on a map of the bed if the slicer defines their outlines);
   file browser with thumbnails, filament, nozzle and print time of each file.
@@ -37,7 +39,7 @@ What each page of FreakyMate does. Functions only appear when the printer has th
   - **Console** (also from the message flyout): G-code history and live responses, a command field (on-screen keyboard
     or physical keyboard), and an expandable list of macros. Like Mainsail it hides the temperature reports Klipper
     sends while waiting for a heater (the thermometer button next to the command field shows them). Macros starting
-    with `_` and macros that rename a built-in command (`rename_existing`) are hidden; **Edit** in the macro list
+    with `_` and macros that rename a built-in command (`rename_existing`) are left out; **Edit** in the macro list
     switches further macros off and on. Macros with parameters
     open a form first: each parameter is read from the macro's template, Klipper defaults show as placeholders in
     brackets.
