@@ -557,6 +557,23 @@ export global UiSettings {
     callback hide-temperature-reports-toggled(bool);
 }
 
+// Brightness and standby of a display whose backlight can be controlled; without one nothing of it is shown.
+export global Backlight {
+    in property <bool> available;
+    // Percent while the screen is on, from 10 to 100.
+    in property <float> brightness: 100;
+    // Standby: a black screen, the content hidden. Touches are swallowed in Rust until the screen is lit again.
+    in property <bool> off;
+    // Screen off after this many minutes without a touch, outside of a print and during one; 0 is never.
+    in-out property <int> idle-minutes;
+    in-out property <int> printing-minutes;
+    callback brightness-chosen(float);
+    callback sleep();
+    // Rust saves after every change.
+    callback idle-minutes-chosen(int);
+    callback printing-minutes-chosen(int);
+}
+
 export global Actions {
     callback home(bool, bool, bool);
     callback jog(string, float);

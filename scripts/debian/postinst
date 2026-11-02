@@ -3,8 +3,13 @@ set -e
 
 if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
   systemctl daemon-reload || true
+  # The backlight rule applies to the device that is already there, without a reboot.
+  udevadm control --reload-rules || true
+  udevadm trigger --subsystem-match=backlight --action=add || true
   echo "freakymate installed. Start it in kiosk mode on tty1 for user <name>:"
   echo "  sudo systemctl enable --now freakymate@<name>"
   echo "Wi-Fi settings need NetworkManager and membership in the group netdev:"
   echo "  sudo usermod -aG netdev <name>"
+  echo "Brightness and screen standby (displays with a controllable backlight) need the group video:"
+  echo "  sudo usermod -aG video <name>"
 fi

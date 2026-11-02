@@ -7,4 +7,5 @@ pub mod file_catalog;
 pub mod job_end;
 pub mod light;
 pub mod pause;
+pub mod screen_wake;
 pub mod spools;

@@ -108,3 +108,50 @@ service restart). Changing the network while printing asks for confirmation, bec
 
 On Windows, on Linux without NetworkManager or with a remote Moonraker the section only shows the printer host's
 interfaces and addresses read from Moonraker.
+
+## Brightness and standby
+
+On displays whose backlight Linux can control (`/sys/class/backlight`: DSI displays such as the Raspberry Pi Touch
+Display, SPI displays with a backlight pin, laptops) the light panel of the status bar has a row **Display**: the
+slider sets the brightness (10 to 100 %), **Off** switches the screen off at once. Settings → Display sets when
+the screen goes off by itself, without a touch, once while idle and once while printing (pause included). Both are
+**Never** by default.
+
+A dark screen wakes up with the next touch; that touch does nothing else, nor do further touches in the next half
+second. The printer wakes it too: a print starts or ends, pauses or fails, Klipper shuts down, the connection is lost or
+Klipper answers with an error (`!!`).
+
+**Monitors on HDMI or DisplayPort** are controlled through DDC/CI with the program `ddcutil` (`apt install ddcutil` or
+`pacman -S ddcutil`), if it is installed and lists a monitor that answers on brightness. The user of FreakyMate needs
+access to `/dev/i2c-*` (group `i2c`, the installer adds it) and the kernel module `i2c-dev`, which the `ddcutil`
+package normally loads. With several monitors the first that answers is used; `"device": "ddc:i2c-8"` names one, the
+log file lists them with their bus. Off switches the monitor through its power mode; a monitor without one is only
+dimmed to 0. Some monitors no longer answer on DDC once switched off, so a touch cannot light them again: the log says
+so, and the standby is then not for that monitor. DDC is slow (a tenth of a second per command), and the buttons of the
+monitor are not followed.
+
+Displays on HDMI that have no DDC/CI, such as the BTT HDMI5, keep their backlight on as long as they get a signal and
+have no `/sys/class/backlight`; there FreakyMate shows neither the slider nor the standby settings.
+
+Changing the backlight needs the udev rule `70-freakymate-backlight.rules` (makes `brightness` and `bl_power` writable
+for the group `video`) and the user in `video`. `install.sh` sets up both; the Debian package ships the rule in
+`/lib/udev/rules.d`, add the user yourself: `sudo usermod -aG video $USER` (takes effect after a service restart). An
+installation from before this version gets the rule by running `install.sh` again; updates through Moonraker only
+replace the program folder.
+
+In the settings file:
+
+```json
+"backlight": {
+  "device": null,
+  "brightness": null,
+  "off_when_idle_minutes": null,
+  "off_when_printing_minutes": null
+}
+```
+
+`device` picks a device by its name under `/sys/class/backlight` (for example `10-0045` or `intel_backlight`) or a
+DDC/CI monitor as `ddc:i2c-N`; without one FreakyMate takes the first by type (firmware, platform, raw) and, where
+there is none, the first monitor on DDC/CI. `brightness` is the last value set on the screen in
+percent, set again at the start; `null` leaves the brightness as the system set it. The minutes are `null` for never.
+The log names every backlight found and the one used, and says why the screen went off or on.

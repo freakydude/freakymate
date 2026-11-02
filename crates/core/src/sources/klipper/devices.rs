@@ -128,6 +128,12 @@ pub fn instance(object: &str) -> &str {
     object.split_once(' ').map_or(object, |(_, name)| name)
 }
 
+/// A configuration section whose name starts with `_` is a helper that frontends do not show, by the convention of
+/// Mainsail: `gcode_macro _HELPER`, `fan_generic _exhaust`, `output_pin _status`.
+pub fn is_hidden(object: &str) -> bool {
+    object.split_once(' ').is_some_and(|(_, name)| name.starts_with('_'))
+}
+
 /// Part fan first, then generic, heater and controller fans, each in name order.
 pub(super) fn read_fans(store: &ObjectStore) -> Vec<Fan> {
     let settings = store.object("configfile").and_then(|configfile| configfile.get("settings"));

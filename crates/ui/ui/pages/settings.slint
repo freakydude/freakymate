@@ -1,12 +1,106 @@
-// The Settings tab of the system pages: settings of this display (Moonraker address, fullscreen, console filter) and
-// which macros the console offers. Temperature presets are edited in the settings file, see docs/configuration.md.
+// The Settings tab of the system pages: settings of this display (Moonraker address, fullscreen, standby). The
+// settings of the console are on the Console tab, temperature presets in the settings file, see docs/configuration.md.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Navigation, Printer, UiSettings } from "../state.slint";
-import { Card, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
+import { Backlight, Confirm, Printer, UiSettings } from "../state.slint";
+import { Card, IconButton, ToggleRow } from "../components/controls.slint";
 import { TextEntryDialog } from "../components/overlays.slint";
 import { SystemTabs } from "../components/system-tabs.slint";
+
+// One row of minute choices for the standby; 0 is never.
+component MinutesRow inherits VerticalLayout {
+    in property <string> label;
+    in property <[int]> choices;
+    in property <int> current;
+    callback chosen(int);
+    spacing: Theme.spacing-tight;
+    Text { text: root.label; color: Theme.muted; font-size: Theme.font-small; }
+    HorizontalLayout {
+        spacing: Theme.spacing;
+        for minutes in root.choices: IconButton {
+            height: 52px;
+            text: minutes == 0 ? @tr("Never") : minutes + " min";
+            checked: root.current == minutes;
+            clicked => { root.chosen(minutes); }
+        }
+    }
+}
+
+component ConnectionCard inherits Card {
+    title: @tr("Moonraker address");
+    icon: Icons.system-host;
+    callback change();
+
+    Text {
+        text: UiSettings.moonraker;
+        color: Theme.foreground;
+        font-size: Theme.font-normal;
+        overflow: elide;
+    }
+    // Only when the display shows credentials; a trusted display has nothing to say here.
+    if Printer.login-user != "" || Printer.api-key: Text {
+        text: Printer.login-user != "" ? @tr("Logged in as {}", Printer.login-user) : @tr("With API key");
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        overflow: elide;
+    }
+    HorizontalLayout {
+        spacing: Theme.spacing;
+        IconButton {
+            height: 52px;
+            icon: Icons.ui-edit;
+            text: @tr("Change");
+            horizontal: true;
+            clicked => { root.change(); }
+        }
+        if Printer.login-user != "": IconButton {
+            height: 52px;
+            icon: Icons.ui-lock;
+            text: @tr("Log out");
+            horizontal: true;
+            clicked => {
+                Confirm.ask(@tr("Log out"), @tr("The next connection needs the password again."), "log-out", "", false);
+            }
+        }
+    }
+}
+
+component DisplayCard inherits Card {
+    title: @tr("Display");
+    icon: Icons.system-brightness;
+
+    VerticalLayout {
+        spacing: Theme.spacing;
+        ToggleRow {
+            text: @tr("Fullscreen");
+            checked: UiSettings.fullscreen;
+            toggled => {
+                UiSettings.fullscreen = !UiSettings.fullscreen;
+                UiSettings.fullscreen-toggled(UiSettings.fullscreen);
+            }
+        }
+        // Only where the backlight can be controlled.
+        if Backlight.available: MinutesRow {
+            label: @tr("Screen off when idle");
+            choices: [0, 2, 5, 10, 30];
+            current: Backlight.idle-minutes;
+            chosen(minutes) => {
+                Backlight.idle-minutes = minutes;
+                Backlight.idle-minutes-chosen(minutes);
+            }
+        }
+        if Backlight.available: MinutesRow {
+            label: @tr("Screen off during a print");
+            choices: [0, 5, 10, 30];
+            current: Backlight.printing-minutes;
+            chosen(minutes) => {
+                Backlight.printing-minutes = minutes;
+                Backlight.printing-minutes-chosen(minutes);
+            }
+        }
+    }
+}
 
 export component SettingsPage inherits Rectangle {
     VerticalLayout {
@@ -22,101 +116,26 @@ export component SettingsPage inherits Rectangle {
                 // Room for "Change" and "Log out" side by side; below each other they would not fit in height.
                 width: 290px;
                 spacing: Theme.spacing;
-                Card {
-                    title: @tr("Moonraker address");
-                    icon: Icons.system-host;
-                    Text {
-                        text: UiSettings.moonraker;
-                        color: Theme.foreground;
-                        font-size: Theme.font-normal;
-                        overflow: elide;
-                    }
-                    // Only when the display shows credentials; a trusted display has nothing to say here.
-                    if Printer.login-user != "" || Printer.api-key: Text {
-                        text: Printer.login-user != "" ? @tr("Logged in as {}", Printer.login-user) : @tr("With API key");
-                        color: Theme.muted;
-                        font-size: Theme.font-small;
-                        overflow: elide;
-                    }
-                    HorizontalLayout {
-                        spacing: Theme.spacing;
-                        IconButton {
-                            height: 52px;
-                            icon: Icons.ui-edit;
-                            text: @tr("Change");
-                            horizontal: true;
-                            clicked => {
-                                address.text = UiSettings.moonraker;
-                                address.open = true;
-                            }
-                        }
-                        if Printer.login-user != "": IconButton {
-                            height: 52px;
-                            icon: Icons.ui-lock;
-                            text: @tr("Log out");
-                            horizontal: true;
-                            clicked => {
-                                Confirm.ask(@tr("Log out"), @tr("The next connection needs the password again."), "log-out", "", false);
-                            }
-                        }
+                ConnectionCard {
+                    vertical-stretch: 0;
+                    change => {
+                        address.text = UiSettings.moonraker;
+                        address.open = true;
                     }
                 }
-                Card {
-                    title: @tr("Display and console");
-                    icon: Icons.system-brightness;
-                    VerticalLayout {
-                        spacing: Theme.spacing;
-                        ToggleRow {
-                            text: @tr("Fullscreen");
-                            checked: UiSettings.fullscreen;
-                            toggled => {
-                                UiSettings.fullscreen = !UiSettings.fullscreen;
-                                UiSettings.fullscreen-toggled(UiSettings.fullscreen);
-                            }
-                        }
-                        // Like Mainsail: the temperature reports of M109/M190 fill the console while a heater warms up.
-                        ToggleRow {
-                            text: @tr("Hide temperatures");
-                            checked: UiSettings.hide-temperature-reports;
-                            toggled => {
-                                UiSettings.hide-temperature-reports = !UiSettings.hide-temperature-reports;
-                                UiSettings.hide-temperature-reports-toggled(UiSettings.hide-temperature-reports);
-                            }
-                        }
-                    }
-                }
+                Rectangle { vertical-stretch: 1; }
                 Text {
                     text: "FreakyMate " + UiSettings.version + "\n" + @tr("Saved in {}", UiSettings.settings-file);
                     color: Theme.disabled-foreground;
                     font-size: Theme.font-small;
                     wrap: word-wrap;
                 }
-                Rectangle { vertical-stretch: 1; }
             }
 
-            // Macros of the printer: which of them the console offers; new ones are shown.
-            Card {
-                title: @tr("Macros in the console");
-                icon: Icons.nav-macros;
+            VerticalLayout {
                 horizontal-stretch: 1;
-                macro-list := ScrollList {
-                    vertical-stretch: 1;
-                    content-height: Printer.macro-items.length * (Theme.touch + Theme.spacing);
-                    for macro[index] in Printer.macro-items: ToggleRow {
-                        y: index * (Theme.touch + Theme.spacing);
-                        width: macro-list.row-width;
-                        height: Theme.touch;
-                        text: macro.name;
-                        checked: macro.visible;
-                        toggled => { Actions.set-macro-visible(macro.name, !macro.visible); }
-                    }
-                }
-                if Printer.macro-items.length == 0: Text {
-                    text: @tr("Connect to the printer to see its macros. New macros appear here automatically.");
-                    color: Theme.muted;
-                    font-size: Theme.font-normal;
-                    wrap: word-wrap;
-                }
+                DisplayCard { vertical-stretch: 0; }
+                Rectangle { vertical-stretch: 1; }
             }
         }
     }

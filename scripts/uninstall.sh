@@ -17,8 +17,10 @@ while getopts "d:" option; do
 done
 
 sudo systemctl disable --now "$NAME.service" || true
-sudo rm -f "/etc/systemd/system/$NAME.service" "/etc/polkit-1/rules.d/50-$NAME.rules"
+sudo rm -f "/etc/systemd/system/$NAME.service" "/etc/polkit-1/rules.d/50-$NAME.rules" \
+  "/etc/udev/rules.d/70-$NAME-backlight.rules"
 sudo systemctl daemon-reload
+sudo udevadm control --reload-rules || true
 sudo systemctl enable getty@tty1.service || true
 
 MOONRAKER_CONF="$DATA_DIR/config/moonraker.conf"

@@ -1,21 +1,81 @@
-// G-code console: history, expandable macro list and a command field that opens the on-screen keyboard.
+// G-code console: history, expandable macro list and a command field that opens the on-screen keyboard. The settings
+// of the console live here too: which macros the list offers and whether temperature reports are shown.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Printer } from "../state.slint";
-import { IconButton, ScrollList } from "../components/controls.slint";
+import { Actions, Confirm, Printer, UiSettings } from "../state.slint";
+import { IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
 import { MacroFormDialog, TextEntryDialog } from "../components/overlays.slint";
 import { SystemTabs } from "../components/system-tabs.slint";
+
+// The offered macros as tiles; a tap runs one.
+component MacroTiles inherits Rectangle {
+    property <int> columns: 3;
+    property <length> tile-height: 56px;
+    property <length> cell-width: (list.row-width - (self.columns - 1) * Theme.spacing) / self.columns;
+    callback run(string);
+
+    list := ScrollList {
+        content-height: ceil(Printer.macros.length / root.columns) * (root.tile-height + Theme.spacing);
+        for macro[index] in Printer.macros: IconButton {
+            x: mod(index, root.columns) * (root.cell-width + Theme.spacing);
+            y: floor(index / root.columns) * (root.tile-height + Theme.spacing);
+            width: root.cell-width;
+            height: root.tile-height;
+            icon: Icons.nav-macros;
+            text: macro;
+            icon-size: 20px;
+            horizontal: true;
+            enabled: !Printer.is-printing || macro != "PRINT_START";
+            clicked => { root.run(macro); }
+        }
+    }
+}
+
+// All macros of the printer with a switch each: on means the tiles offer it. Two columns leave room for long names.
+component MacroChoice inherits Rectangle {
+    property <int> columns: 2;
+    property <length> row-height: 48px;
+    property <length> cell-width: (list.row-width - (self.columns - 1) * Theme.spacing) / self.columns;
+
+    list := ScrollList {
+        content-height: ceil(Printer.macro-items.length / root.columns) * (root.row-height + Theme.spacing);
+        for macro[index] in Printer.macro-items: ToggleRow {
+            x: mod(index, root.columns) * (root.cell-width + Theme.spacing);
+            y: floor(index / root.columns) * (root.row-height + Theme.spacing);
+            width: root.cell-width;
+            height: root.row-height;
+            text: macro.name;
+            checked: macro.visible;
+            toggled => { Actions.set-macro-visible(macro.name, !macro.visible); }
+        }
+    }
+}
 
 export component ConsolePage inherits Rectangle {
     property <length> line-height: 22px;
     property <length> macro-panel-height: 160px;
-    property <int> macro-columns: 3;
-    property <length> macro-tile-height: 56px;
     property <string> draft;
-    property <bool> macros-open;
+    // Public for the previews.
+    in-out property <bool> macros-open;
+    in-out property <bool> macros-editing;
+    // Instead of the tiles: the printer has no macros, or all of them are switched off.
+    property <string> macro-hint: Printer.macro-items.length == 0 ? @tr("No macros found in the Klipper configuration.")
+        : !root.macros-editing && Printer.macros.length == 0 ? @tr("All macros are hidden. Edit shows them again.") : "";
 
     init => { Actions.load-console(); }
+
+    // Without parameters a macro runs at once, unless a print is running. With parameters the form comes first.
+    function run-macro(macro: string) {
+        if (Actions.macro-has-params(macro)) {
+            Actions.open-macro-form(macro);
+            form.open = true;
+        } else if (Printer.print-state == "printing") {
+            Confirm.ask(@tr("Run macro"), macro, "run-macro", macro, false);
+        } else {
+            Actions.run-macro(macro);
+        }
+    }
 
     VerticalLayout {
         padding: Theme.padding;
@@ -71,46 +131,48 @@ export component ConsolePage inherits Rectangle {
             }
         }
 
-        if root.macros-open: macro-panel := Rectangle {
+        if root.macros-open: Rectangle {
             height: root.macro-panel-height;
             background: Theme.surface;
             border-radius: Theme.radius;
             clip: true;
-            property <length> cell-width: (macro-list.row-width - (root.macro-columns - 1) * Theme.spacing) / root.macro-columns;
-            macro-list := ScrollList {
-                x: 8px;
-                width: parent.width - 12px;
-                height: parent.height - 8px;
-                y: 4px;
-                content-height: ceil(Printer.macros.length / root.macro-columns) * (root.macro-tile-height + Theme.spacing);
-                for macro[index] in Printer.macros: IconButton {
-                    x: mod(index, root.macro-columns) * (macro-panel.cell-width + Theme.spacing);
-                    y: floor(index / root.macro-columns) * (root.macro-tile-height + Theme.spacing);
-                    width: macro-panel.cell-width;
-                    height: root.macro-tile-height;
-                    icon: Icons.nav-macros;
-                    text: macro;
-                    icon-size: 20px;
-                    horizontal: true;
-                    enabled: !Printer.is-printing || macro != "PRINT_START";
-                    // Without parameters a macro runs at once, unless a print is running. With parameters the form comes first.
-                    clicked => {
-                        if (Actions.macro-has-params(macro)) {
-                            Actions.open-macro-form(macro);
-                            form.open = true;
-                        } else if (Printer.print-state == "printing") {
-                            Confirm.ask(@tr("Run macro"), macro, "run-macro", macro, false);
-                        } else {
-                            Actions.run-macro(macro);
-                        }
+
+            HorizontalLayout {
+                padding: 4px;
+                padding-left: 8px;
+                spacing: Theme.spacing;
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                    if !root.macros-editing: MacroTiles {
+                        width: parent.width;
+                        height: parent.height;
+                        run(macro) => { root.run-macro(macro); }
+                    }
+                    if root.macros-editing: MacroChoice {
+                        width: parent.width;
+                        height: parent.height;
+                    }
+                    if root.macro-hint != "": Text {
+                        width: parent.width;
+                        height: parent.height;
+                        text: root.macro-hint;
+                        color: Theme.muted;
+                        wrap: word-wrap;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
                     }
                 }
-            }
-            if Printer.macros.length == 0: Text {
-                text: @tr("No macros found in the Klipper configuration.");
-                color: Theme.muted;
-                horizontal-alignment: center;
-                vertical-alignment: center;
+
+                // Which macros the panel offers is chosen here, where they are used; new ones are offered.
+                IconButton {
+                    width: Theme.touch;
+                    icon: Icons.ui-edit;
+                    text: @tr("Edit");
+                    checked: root.macros-editing;
+                    enabled: Printer.macro-items.length > 0;
+                    clicked => { root.macros-editing = !root.macros-editing; }
+                }
             }
         }
 
@@ -123,7 +185,10 @@ export component ConsolePage inherits Rectangle {
                 horizontal: true;
                 checked: root.macros-open;
                 width: 150px;
-                clicked => { root.macros-open = !root.macros-open; }
+                clicked => {
+                    root.macros-open = !root.macros-open;
+                    root.macros-editing = false;
+                }
             }
             Rectangle {
                 horizontal-stretch: 1;
@@ -145,9 +210,21 @@ export component ConsolePage inherits Rectangle {
                     clicked => { entry.open = true; }
                 }
             }
+            // Marked while the temperature reports a heater sends during M109/M190 are shown; hidden by default.
+            IconButton {
+                icon: Icons.nav-temperature;
+                width: Theme.touch;
+                checked: !UiSettings.hide-temperature-reports;
+                accessible-label: @tr("Show temperature reports");
+                clicked => {
+                    UiSettings.hide-temperature-reports = !UiSettings.hide-temperature-reports;
+                    UiSettings.hide-temperature-reports-toggled(UiSettings.hide-temperature-reports);
+                }
+            }
             IconButton {
                 icon: Icons.ui-delete;
                 width: Theme.touch;
+                accessible-label: @tr("Clear the console");
                 clicked => { Actions.clear-console(); }
             }
         }

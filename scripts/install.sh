@@ -13,6 +13,7 @@ SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="$HOME/$NAME"
 SERVICE_FILE="/etc/systemd/system/$NAME.service"
 POLKIT_RULE="50-freakymate.rules"
+UDEV_RULE="70-freakymate-backlight.rules"
 MOONRAKER="http://127.0.0.1:7125"
 DATA_DIR="$HOME/printer_data"
 CHANNEL="stable"
@@ -73,6 +74,10 @@ if [ ${#missing[@]} -gt 0 ]; then
 fi
 sudo apt-get install -y "${packages[@]}"
 sudo usermod -aG video,input,render "$USER" || true
+# Monitors on DDC/CI (brightness through ddcutil, if installed) need access to /dev/i2c-*.
+if getent group i2c > /dev/null; then
+  sudo usermod -aG i2c "$USER" || true
+fi
 
 report "Allowing network management (NetworkManager via polkit, group netdev)"
 if [ -f "$SOURCE_DIR/$POLKIT_RULE" ] && [ -d /etc/polkit-1/rules.d ]; then
@@ -81,6 +86,16 @@ if [ -f "$SOURCE_DIR/$POLKIT_RULE" ] && [ -d /etc/polkit-1/rules.d ]; then
   sudo usermod -aG netdev "$USER" || true
 else
   echo "polkit rules directory not found; Wi-Fi settings in FreakyMate will be read-only."
+fi
+
+report "Allowing brightness and screen standby (backlight via udev, group video)"
+if [ -f "$SOURCE_DIR/$UDEV_RULE" ] && [ -d /etc/udev/rules.d ]; then
+  sudo install -m 0644 "$SOURCE_DIR/$UDEV_RULE" "/etc/udev/rules.d/$UDEV_RULE"
+  sudo udevadm control --reload-rules || true
+  # Applies the rule to the backlight that is already there, without a reboot.
+  sudo udevadm trigger --subsystem-match=backlight --action=add || true
+else
+  echo "udev rules directory not found; FreakyMate will not offer brightness and standby."
 fi
 
 report "Installing to $INSTALL_DIR"

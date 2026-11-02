@@ -3,7 +3,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, LedItem, Navigation, Printer } from "../state.slint";
+import { Actions, Backlight, LedItem, Navigation, Printer } from "../state.slint";
 import { FlyoutPanel, IconButton, ScrollList, ToggleRow, TouchSlider } from "controls.slint";
 
 // On and off, and the brightness: white light on a Klipper LED, the brightness of a WLED strip.
@@ -57,8 +57,59 @@ component LedRow inherits Rectangle {
     }
 }
 
+// The backlight of this display, like a light: Off is the standby, the lowest step keeps the screen usable.
+component DisplayRow inherits Rectangle {
+    height: 60px;
+    background: Theme.surface;
+    border-radius: Theme.radius;
+
+    HorizontalLayout {
+        padding: 4px;
+        padding-left: 10px;
+        spacing: Theme.spacing;
+        Image {
+            cross-axis-self-alignment: center;
+            source: Icons.system-brightness;
+            colorize: Theme.accent;
+            width: 28px;
+            height: 28px;
+        }
+        VerticalLayout {
+            alignment: center;
+            width: 170px;
+            Text { text: @tr("Display"); color: Theme.muted; font-size: Theme.font-small; overflow: elide; }
+            Text {
+                text: round(display-slider.shown) + " %";
+                color: Theme.foreground;
+                font-size: Theme.font-normal;
+                font-weight: 600;
+            }
+        }
+        IconButton {
+            width: 64px;
+            text: @tr("Off");
+            clicked => { Backlight.sleep(); }
+        }
+        display-slider := TouchSlider {
+            cross-axis-self-alignment: center;
+            horizontal-stretch: 1;
+            minimum: 10;
+            value: Backlight.brightness;
+            changed(level) => { Backlight.brightness-chosen(level); }
+        }
+        IconButton {
+            width: 64px;
+            text: "100%";
+            checked: Backlight.brightness > 99;
+            clicked => { Backlight.brightness-chosen(100); }
+        }
+    }
+}
+
 export component LightPanel inherits Rectangle {
     property <length> row-step: 64px;
+    // The display row stands first, the LEDs below it.
+    property <int> display-rows: Backlight.available ? 1 : 0;
 
     // Not modal: the page beside the panel stays usable; the close button or the light symbol closes it.
     FlyoutPanel {
@@ -66,7 +117,7 @@ export component LightPanel inherits Rectangle {
         y: 52px;
         width: min(620px, root.width - 16px);
         height: min(root.height - 60px, 64px + 2 * Theme.padding + Theme.spacing
-            + (Printer.leds.length + (Printer.led-effects.length > 0 ? 1 : 0)) * root.row-step);
+            + (root.display-rows + Printer.leds.length + (Printer.led-effects.length > 0 ? 1 : 0)) * root.row-step);
 
         VerticalLayout {
             padding: Theme.padding;
@@ -90,15 +141,19 @@ export component LightPanel inherits Rectangle {
             }
             list := ScrollList {
                 vertical-stretch: 1;
-                content-height: (Printer.leds.length + (Printer.led-effects.length > 0 ? 1 : 0)) * root.row-step;
+                content-height: (root.display-rows + Printer.leds.length + (Printer.led-effects.length > 0 ? 1 : 0)) * root.row-step;
+                if Backlight.available: DisplayRow {
+                    y: 0;
+                    width: list.row-width;
+                }
                 for led[index] in Printer.leds: LedRow {
-                    y: index * root.row-step;
+                    y: (root.display-rows + index) * root.row-step;
                     width: list.row-width;
                     led: led;
                 }
                 // Effects side by side; a tap starts or stops one.
                 if Printer.led-effects.length > 0: HorizontalLayout {
-                    y: Printer.leds.length * root.row-step;
+                    y: (root.display-rows + Printer.leds.length) * root.row-step;
                     width: list.row-width;
                     height: root.row-step - Theme.spacing;
                     // Same inset as the LED rows, so the symbols stand in one column.

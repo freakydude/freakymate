@@ -2,7 +2,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Dialogs, Navigation, Network, Page, Printer, StateIcons, TuneTab } from "../state.slint";
+import { Actions, Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, StateIcons, TuneTab } from "../state.slint";
 import { BusyWheel } from "busy-wheel.slint";
 import { TextWithValue } from "controls.slint";
 
@@ -129,8 +129,9 @@ export component StatusBar inherits Rectangle {
                 }
             }
         }
-        // Opens the light panel; lit while the main light (chamber or case light) is on.
-        if Printer.leds.length > 0 && Printer.ready: Rectangle {
+        // Opens the light panel; lit while the main light (chamber or case light) is on. A controllable backlight
+        // of the display is reason enough, also without a ready printer.
+        if (Printer.leds.length > 0 && Printer.ready) || Backlight.available: Rectangle {
             width: 44px;
             border-radius: Theme.radius;
             background: light-touch.pressed ? Theme.surface-raised : transparent;
