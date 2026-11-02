@@ -6,7 +6,7 @@ use crate::display;
 use crate::network_controller::NetworkController;
 use crate::presenter::Presenter;
 use crate::settings_controller::{Bridges, SettingsController};
-use crate::AppWindow;
+use crate::{AppWindow, UiSettings};
 use freakymate_core::backlight::{BacklightBackend, BacklightService};
 use freakymate_core::network::{NetworkBackend, NetworkService};
 use freakymate_core::settings::{SettingsError, SettingsStore};
@@ -29,6 +29,9 @@ pub struct Options {
     pub network: NetworkBackend,
     /// The kernel's backlight, or a simulated one in development builds. Default: none, the UI offers no control.
     pub backlight: BacklightBackend,
+    /// Set when the setup outside the program folder is older than the program: the command that updates it, shown
+    /// as a hint on the Updates tab.
+    pub setup_command: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -120,6 +123,7 @@ impl Application {
         // client-side decorations, and winit keeps the height of its own title bar free when leaving fullscreen
         // (800x445 instead of 800x480). This covers compositors without xdg-decoration as well.
         window.set_kiosk(options.fullscreen);
+        window.global::<UiSettings>().set_setup_command(options.setup_command.unwrap_or_default().into());
         if options.fullscreen || settings.fullscreen() {
             window.window().set_fullscreen(true);
         }

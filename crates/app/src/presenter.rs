@@ -464,6 +464,11 @@ impl Presenter {
                     window.global::<Printer>().set_updates_available(available as i32);
                 }
             }
+            Event::UpdateManagerBusy(busy) => {
+                if let Some(window) = self.window.upgrade() {
+                    window.global::<Printer>().set_updates_busy(busy);
+                }
+            }
             Event::ConsoleHistory(lines) => {
                 let items: Vec<ConsoleItem> =
                     lines.iter().filter(|line| self.shows_in_console(line)).flat_map(console_items).collect();

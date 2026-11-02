@@ -35,7 +35,7 @@ pub trait Backlight: Send {
     fn set_power(&mut self, on: bool) -> Result<(), BacklightError>;
 }
 
-/// Backlight part of `freakymate.json`. Everything off by default: after an update the display behaves as before.
+/// Backlight part of `freakymate.conf`. Everything off by default: after an update the display behaves as before.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct BacklightSettings {

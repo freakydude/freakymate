@@ -78,7 +78,8 @@ export component SystemPage inherits Rectangle {
                 }
                 if Printer.host-actions-locked: IconLabel {
                     icon: Icons.ui-lock;
-                    text: Printer.is-printing ? @tr("Locked while printing") : @tr("Locked while Klipper is busy");
+                    text: Printer.updates-busy ? @tr("Locked while updating")
+                        : Printer.is-printing ? @tr("Locked while printing") : @tr("Locked while Klipper is busy");
                     color: Theme.warning;
                     font-size: Theme.font-small;
                 }

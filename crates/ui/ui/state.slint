@@ -530,9 +530,11 @@ export global Printer {
     out property <bool> is-printing: print-state == "printing" || print-state == "paused";
     // Moving and extruding are allowed while paused, e.g. to change the filament; a running print locks them.
     out property <bool> motion-locked: print-state == "printing";
-    // Restarts, reboots and updates would abort a print or a running command (idle_timeout "Printing").
-    // After a shutdown the last print state stays, but nothing runs any more and a restart is the way out.
-    out property <bool> host-actions-locked: klippy-state == "ready" && (is-printing || activity == "busy");
+    // Moonraker's update manager looks for or installs updates, from here or another client.
+    in property <bool> updates-busy;
+    // Restarts, reboots and updates would abort a print or a running command (idle_timeout "Printing"), or an update
+    // in progress. After a shutdown the last print state stays, but nothing runs any more and a restart is the way out.
+    out property <bool> host-actions-locked: updates-busy || (klippy-state == "ready" && (is-printing || activity == "busy"));
     out property <bool> homed-xy: homed-x && homed-y;
 }
 
@@ -549,6 +551,8 @@ export global UiSettings {
     in-out property <[PresetItem]> presets;
     in property <string> settings-file;
     in property <string> version;
+    // Not empty when the setup outside the program folder is older than the program: the command that updates it.
+    in property <string> setup-command;
 
     // Rust saves after every change.
     callback steps-changed();

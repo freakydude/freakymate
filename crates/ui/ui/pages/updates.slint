@@ -2,7 +2,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Printer } from "../state.slint";
+import { Actions, Confirm, Printer, UiSettings } from "../state.slint";
 import { Card, IconButton, IconLabel, ScrollList } from "../components/controls.slint";
 import { SystemTabs } from "../components/system-tabs.slint";
 
@@ -17,6 +17,14 @@ export component UpdatesPage inherits Rectangle {
             title: @tr("Updates");
             icon: Icons.system-update;
             vertical-stretch: 1;
+            // Moonraker's updates replace only the program folder; what install.sh set up as root may be older.
+            if UiSettings.setup-command != "": IconLabel {
+                icon: Icons.ui-warning;
+                text: @tr("Finish the last update: run {} once on the printer host.", UiSettings.setup-command);
+                color: Theme.warning;
+                font-size: Theme.font-small;
+                icon-size: 16px;
+            }
             update-list := ScrollList {
                 property <length> row-pitch: 54px;
                 vertical-stretch: 1;
@@ -47,7 +55,16 @@ export component UpdatesPage inherits Rectangle {
                 }
             }
             HorizontalLayout {
-                alignment: end;
+                spacing: Theme.spacing;
+                // Why the buttons are grey; the busy wheel in the status bar shows the running command.
+                if Printer.updates-busy: IconLabel {
+                    horizontal-stretch: 1;
+                    icon: Icons.ui-lock;
+                    text: @tr("Locked while updating");
+                    color: Theme.warning;
+                    font-size: Theme.font-small;
+                }
+                if !Printer.updates-busy: Rectangle { horizontal-stretch: 1; }
                 IconButton {
                     width: 140px;
                     height: 48px;

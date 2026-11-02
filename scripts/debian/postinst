@@ -1,6 +1,12 @@
 #!/bin/sh
 set -e
 
+if [ "$1" = "configure" ]; then
+  # The program compares it with the setup it needs; the package always brings both together.
+  mkdir -p /etc/freakymate
+  /usr/bin/freakymate --setup-version > /etc/freakymate/setup-version || true
+fi
+
 if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
   systemctl daemon-reload || true
   # The backlight rule applies to the device that is already there, without a reboot.

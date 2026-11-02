@@ -66,9 +66,9 @@ architecture and packages first and stops with a message if something does not f
      `moonraker.asvc`) and restarts Moonraker.
 
    Options: `-m <moonraker url>`, `-d <printer_data folder>` (default `~/printer_data`), `-c stable|beta` (update channel, see below).
-   Settings go to `printer_data/config/freakymate.json`, next to the Klipper configs, so they can be edited in
-   Mainsail or Fluidd (see [Configuration](configuration.md)). An existing `~/.config/freakymate/settings.json` is
-   copied there once. The log is `printer_data/logs/freakymate.log` (Mainsail: Machine → logs), see [Configuration](configuration.md#log).
+   Run again, it keeps the address and folder of the existing installation unless you give them.
+   Settings go to `printer_data/config/freakymate.conf` (TOML), next to the Klipper configs, so they can be edited in
+   Mainsail or Fluidd (see [Configuration](configuration.md#settings-file)). The log is `printer_data/logs/freakymate.log` (Mainsail: Machine → logs), see [Configuration](configuration.md#log).
    Remove everything with `~/freakymate/uninstall.sh`; the settings file stays.
 
 ## Updates and channels
@@ -95,6 +95,12 @@ system_dependencies: system-dependencies.json
 To change the channel set `channel:` in that section and restart Moonraker (`sudo systemctl restart moonraker`). The
 installer only writes the section once: re-running `install.sh` with `-c beta` does not change an existing `channel`
 line, so edit it by hand. Your edits survive later updates, because Moonraker only replaces the program folder.
+
+Because of that, what the installer set up outside the program folder (the service and its options, the udev and
+polkit rules, the groups) stays as it was. When a release needs more there, the Updates tab of the System page says
+so: run `~/freakymate/install.sh` once. Without `-m` and `-d` it keeps the Moonraker address and the `printer_data`
+folder of the existing installation; your settings stay. The Debian package brings everything along with each
+version.
 
 ## Packages and desktop use
 

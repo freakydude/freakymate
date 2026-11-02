@@ -1,12 +1,21 @@
-//! User settings as a JSON file in the user's configuration directory.
+//! User settings as a TOML file with the ending `.conf`, like `moonraker.conf` and the other non-Klipper files in `printer_data/config`. FreakyMate
+//! saves it by changing only the values that changed, so comments written by hand stay.
 
 use crate::backlight::BacklightSettings;
+use crate::toml_merge;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+use toml_edit::DocumentMut;
 
 pub(crate) const APP_FOLDER: &str = "freakymate";
-const FILE_NAME: &str = "settings.json";
+const FILE_NAME: &str = "settings.conf";
+const EXTENSION: &str = "conf";
+/// Up to 0.3.8 the settings were JSON; such a file stays where it is and is no longer read.
+const OLD_EXTENSION: &str = "json";
+/// The top of a new settings file.
+const HEADER: &str = "# FreakyMate settings (TOML). Comments stay when FreakyMate saves a change.\n\
+# Documentation: https://github.com/freakydude/freakymate/blob/main/docs/configuration.md#settings-file\n\n";
 /// Presets the Thermal page has room for beside the heaters.
 pub const MAX_SHOWN_PRESETS: usize = 4;
 
@@ -103,8 +112,8 @@ impl TemperaturePreset {
 pub enum SettingsError {
     #[error("cannot access {path}: {source}")]
     Io { path: PathBuf, source: std::io::Error },
-    #[error("invalid settings file {path}: {source}")]
-    Format { path: PathBuf, source: serde_json::Error },
+    #[error("invalid settings file {path}: {message}")]
+    Format { path: PathBuf, message: String },
     #[error("no configuration directory available on this system")]
     NoConfigDirectory,
 }
@@ -116,11 +125,19 @@ pub struct SettingsStore {
 }
 
 impl SettingsStore {
+    /// A path ending in `.json` (a service set up for the old JSON settings) means the `.conf` next to it; the JSON
+    /// file stays untouched.
     pub fn new(path: impl Into<PathBuf>) -> Self {
-        Self { path: path.into() }
+        let path = path.into();
+        if path.extension().is_some_and(|extension| extension == OLD_EXTENSION) {
+            let replacement = path.with_extension(EXTENSION);
+            log::info!("settings: {} is no longer read, using {}", path.display(), replacement.display());
+            return Self { path: replacement };
+        }
+        Self { path }
     }
 
-    /// Default location: `<config dir>/freakymate/settings.json`.
+    /// Default location: `<config dir>/freakymate/settings.conf`.
     pub fn default_location() -> Result<Self, SettingsError> {
         let directory = dirs::config_dir().ok_or(SettingsError::NoConfigDirectory)?;
         Ok(Self::new(directory.join(APP_FOLDER).join(FILE_NAME)))
@@ -132,12 +149,9 @@ impl SettingsStore {
 
     /// If the file is missing, the defaults apply.
     pub fn load(&self) -> Result<Settings, SettingsError> {
-        match std::fs::read_to_string(&self.path) {
-            Ok(text) => {
-                serde_json::from_str(&text).map_err(|source| SettingsError::Format { path: self.path.clone(), source })
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Settings::default()),
-            Err(source) => Err(SettingsError::Io { path: self.path.clone(), source }),
+        match self.read()? {
+            Some(text) => toml::from_str(&text).map_err(|error| self.format_error(error)),
+            None => Ok(Settings::default()),
         }
     }
 
@@ -152,11 +166,36 @@ impl SettingsStore {
         Ok(settings)
     }
 
+    /// Changes only what differs from the file, so comments and the order written by hand stay. A file that cannot be
+    /// read as TOML is left alone (the error says why), rather than replaced by the settings in memory.
     pub fn save(&self, settings: &Settings) -> Result<(), SettingsError> {
-        let text = serde_json::to_string_pretty(settings)
-            .map_err(|source| SettingsError::Format { path: self.path.clone(), source })?;
+        let fresh: DocumentMut = toml::to_string(settings)
+            .map_err(|error| self.format_error(error))?
+            .parse()
+            .map_err(|error| self.format_error(error))?;
+        let text = match self.read()? {
+            Some(existing) => {
+                let mut document: DocumentMut = existing.parse().map_err(|error| self.format_error(error))?;
+                toml_merge::merge_table(document.as_table_mut(), fresh.as_table());
+                document.to_string()
+            }
+            None => format!("{HEADER}{fresh}"),
+        };
         write_atomically(&self.path, &text, false)
             .map_err(|source| SettingsError::Io { path: self.path.clone(), source })
+    }
+
+    /// The text of the file; `None` if there is none yet.
+    fn read(&self) -> Result<Option<String>, SettingsError> {
+        match std::fs::read_to_string(&self.path) {
+            Ok(text) => Ok(Some(text)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(source) => Err(SettingsError::Io { path: self.path.clone(), source }),
+        }
+    }
+
+    fn format_error(&self, error: impl std::fmt::Display) -> SettingsError {
+        SettingsError::Format { path: self.path.clone(), message: error.to_string() }
     }
 }
 
@@ -166,7 +205,9 @@ pub(crate) fn write_atomically(path: &Path, text: &str, private: bool) -> std::i
     if let Some(directory) = path.parent() {
         std::fs::create_dir_all(directory)?;
     }
-    let temporary = path.with_extension("json.tmp");
+    let mut temporary = path.as_os_str().to_owned();
+    temporary.push(".tmp");
+    let temporary = PathBuf::from(temporary);
     // The mode only applies to a new file; a leftover of an interrupted write keeps its own.
     let _ = std::fs::remove_file(&temporary);
     let mut options = std::fs::OpenOptions::new();
@@ -246,8 +287,53 @@ mod tests {
         assert_eq!(store.load_or_create().unwrap(), Settings::default());
 
         let text = std::fs::read_to_string(store.path()).unwrap();
-        assert!(text.contains("\"temperature_presets\""));
+        assert!(text.starts_with("# FreakyMate settings"));
+        assert!(text.contains("[[temperature_presets]]"));
         assert_eq!(store.load().unwrap(), Settings::default());
+    }
+
+    #[test]
+    fn saving_keeps_comments_written_by_hand() {
+        let (_dir, store) = temporary_store();
+        store.load_or_create().unwrap();
+        let edited = std::fs::read_to_string(store.path()).unwrap().replace(
+            "[[temperature_presets]]\nname = \"PLA\"",
+            "[[temperature_presets]]\n# satin PLA wants it hotter\nname = \"PLA\"",
+        );
+        std::fs::write(store.path(), &edited).unwrap();
+        let mut settings = store.load().unwrap();
+        settings.steps.move_mm = 1.0;
+
+        store.save(&settings).unwrap();
+
+        let saved = std::fs::read_to_string(store.path()).unwrap();
+        assert!(saved.contains("# satin PLA wants it hotter\nname = \"PLA\""));
+        assert!(saved.starts_with("# FreakyMate settings"));
+        assert_eq!(store.load().unwrap(), settings);
+    }
+
+    #[test]
+    fn a_broken_file_is_not_overwritten() {
+        let (_dir, store) = temporary_store();
+        std::fs::create_dir_all(store.path().parent().unwrap()).unwrap();
+        std::fs::write(store.path(), "fullscreen = tru").unwrap();
+
+        assert!(matches!(store.save(&Settings::default()), Err(SettingsError::Format { .. })));
+        assert_eq!(std::fs::read_to_string(store.path()).unwrap(), "fullscreen = tru");
+    }
+
+    #[test]
+    fn an_old_json_path_means_the_conf_next_to_it_and_the_json_stays() {
+        let dir = tempfile::tempdir().unwrap();
+        let json = dir.path().join("freakymate.json");
+        std::fs::write(&json, r#"{ "fullscreen": true }"#).unwrap();
+
+        let store = SettingsStore::new(&json);
+        store.load_or_create().unwrap();
+
+        assert_eq!(store.path(), dir.path().join("freakymate.conf"));
+        assert!(!store.load().unwrap().fullscreen);
+        assert_eq!(std::fs::read_to_string(&json).unwrap(), r#"{ "fullscreen": true }"#);
     }
 
     #[test]
@@ -285,7 +371,7 @@ mod tests {
     fn partial_file_keeps_defaults_for_missing_fields() {
         let (_dir, store) = temporary_store();
         std::fs::create_dir_all(store.path().parent().unwrap()).unwrap();
-        std::fs::write(store.path(), r#"{ "fullscreen": true, "steps": { "move_mm": 1 } }"#).unwrap();
+        std::fs::write(store.path(), "fullscreen = true\n\n[steps]\nmove_mm = 1.0\n").unwrap();
 
         let settings = store.load().unwrap();
 
