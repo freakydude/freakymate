@@ -27,6 +27,8 @@ impl Sysfs {
 
     /// Opens `wanted` or, without a name, the device the type suits best. `root` is [`Self::ROOT`] except in tests.
     pub fn open(root: &Path, wanted: Option<&str>) -> Result<Self, BacklightError> {
+        // Everything there is, so a report shows which device would have been the right one.
+        log::info!("backlight devices in {}: {}", root.display(), describe_devices(root));
         let dir = choose_device(root, wanted)?;
         let name = dir.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
         let max = read_number(&dir.join("max_brightness")).map_err(|error| device_error(&name, &error))?;
@@ -38,7 +40,27 @@ impl Sysfs {
             _ => device_error(&name, &error),
         })?;
         let has_power = check_writable(&dir.join("bl_power")).is_ok();
+        let off = if has_power { "off through bl_power" } else { "off through brightness 0 (bl_power not writable)" };
+        log::info!(
+            "using backlight '{name}' ({}), {off}",
+            if wanted.is_some() { "configured" } else { "chosen by type" }
+        );
         Ok(Self { name, dir, max, has_power, restore: None })
+    }
+
+    /// What the driver reports after switching, for the verbose log: shows whether it really went dark.
+    fn log_power_readback(&self) {
+        if log::log_enabled!(log::Level::Debug) {
+            let read =
+                |file: &str| read_number(&self.dir.join(file)).map_or_else(|_| "-".to_owned(), |v| v.to_string());
+            log::debug!(
+                "backlight '{}': bl_power {}, brightness {}, actual_brightness {}",
+                self.name,
+                read("bl_power"),
+                read("brightness"),
+                read("actual_brightness")
+            );
+        }
     }
 
     fn read_raw(&self) -> Result<u32, BacklightError> {
@@ -74,6 +96,14 @@ impl Backlight for Sysfs {
     }
 
     fn set_power(&mut self, on: bool) -> Result<(), BacklightError> {
+        self.switch_power(on)?;
+        self.log_power_readback();
+        Ok(())
+    }
+}
+
+impl Sysfs {
+    fn switch_power(&mut self, on: bool) -> Result<(), BacklightError> {
         if self.has_power {
             return self.write("bl_power", if on { POWER_ON } else { POWER_OFF });
         }
@@ -107,6 +137,30 @@ fn choose_device(root: &Path, wanted: Option<&str>) -> Result<PathBuf, Backlight
         .collect();
     devices.sort();
     devices.into_iter().next().map(|(_, dir)| dir).ok_or_else(no_device)
+}
+
+/// One entry per device: `10-0045 (raw, 128/255, bl_power, writable)`.
+fn describe_devices(root: &Path) -> String {
+    let Ok(entries) = fs::read_dir(root) else {
+        return "none (directory missing)".to_owned();
+    };
+    let mut devices: Vec<String> = entries
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|dir| is_device(dir))
+        .map(|dir| {
+            let read = |file: &str| fs::read_to_string(dir.join(file)).unwrap_or_default().trim().to_owned();
+            let name = dir.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
+            let power = if dir.join("bl_power").is_file() { ", bl_power" } else { "" };
+            let access = if check_writable(&dir.join("brightness")).is_ok() { "writable" } else { "read-only" };
+            format!("{name} ({}, {}/{}{power}, {access})", read("type"), read("brightness"), read("max_brightness"))
+        })
+        .collect();
+    devices.sort();
+    if devices.is_empty() {
+        "none".to_owned()
+    } else {
+        devices.join(", ")
+    }
 }
 
 fn is_device(dir: &Path) -> bool {

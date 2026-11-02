@@ -138,7 +138,7 @@ jobs:
           cargo build --release -p freakymate --no-default-features --bin freakymate --target ${{ matrix.target }}
           mkdir -p dist
           cp target/${{ matrix.target }}/release/freakymate dist/
-          cp scripts/install.sh scripts/uninstall.sh scripts/system-dependencies.json scripts/polkit/50-freakymate.rules dist/
+          cp scripts/install.sh scripts/uninstall.sh scripts/system-dependencies.json scripts/polkit/50-freakymate.rules scripts/udev/70-freakymate-backlight.rules dist/
           bash .github/scripts/license-files.sh ${{ matrix.target }} dist
       - uses: actions/upload-artifact@v7
         with:

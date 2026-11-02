@@ -26,26 +26,32 @@ impl WakeFacts {
         matches!(self.print, PrintState::Printing | PrintState::Paused)
     }
 
-    /// Whether going from `before` to these facts needs a look at the screen. Start and end of a print wake through
-    /// [`printing`](Self::printing) already; this covers what happens without that changing.
-    pub fn wake_after(&self, before: &Self) -> bool {
-        let lost_connection = self.connection != before.connection && self.connection != ConnectionState::Connected;
-        let klipper_down =
-            self.klippy != before.klippy && matches!(self.klippy, KlippyState::Shutdown | KlippyState::Error);
-        let print_needs_look = self.print != before.print
-            && matches!(
-                self.print,
-                PrintState::Paused | PrintState::Error | PrintState::Complete | PrintState::Cancelled
-            );
+    /// Why going from `before` to these facts needs a look at the screen, for the log; `None` when nothing does.
+    /// Start and end of a print wake through [`printing`](Self::printing) already; this covers the rest.
+    pub fn wake_after(&self, before: &Self) -> Option<String> {
+        if self.connection != before.connection && self.connection != ConnectionState::Connected {
+            return Some(format!("connection {:?}", self.connection));
+        }
+        if self.klippy != before.klippy && matches!(self.klippy, KlippyState::Shutdown | KlippyState::Error) {
+            return Some(format!("Klipper {:?}", self.klippy));
+        }
+        let print_needs_look =
+            matches!(self.print, PrintState::Paused | PrintState::Error | PrintState::Complete | PrintState::Cancelled);
+        if self.print != before.print && print_needs_look {
+            return Some(format!("print {:?}", self.print));
+        }
         // A new reason during the same pause (for example Happy Hare after a runout).
-        let new_reason = self.interruption.is_some() && self.interruption != before.interruption;
-        lost_connection || klipper_down || print_needs_look || new_reason
+        if self.interruption.is_some() && self.interruption != before.interruption {
+            return Some("new reason for the pause".to_owned());
+        }
+        None
     }
 }
 
 /// An error answer of Klipper (`!!`) on the console wakes the screen; replies to commands sent from here included.
-pub fn console_line_wakes(line: &ConsoleLine) -> bool {
-    line.is_error()
+/// Returns the reason for the log.
+pub fn console_line_wake(line: &ConsoleLine) -> Option<String> {
+    line.is_error().then(|| format!("console error: {}", line.text()))
 }
 
 #[cfg(test)]
@@ -78,21 +84,24 @@ mod tests {
     fn pause_error_and_end_of_a_print_wake() {
         let printing = facts(KlippyState::Ready, PrintState::Printing);
         for state in [PrintState::Paused, PrintState::Error, PrintState::Complete, PrintState::Cancelled] {
-            assert!(facts(KlippyState::Ready, state).wake_after(&printing), "{state:?}");
+            assert!(facts(KlippyState::Ready, state).wake_after(&printing).is_some(), "{state:?}");
         }
-        assert!(!facts(KlippyState::Ready, PrintState::Printing).wake_after(&printing));
-        assert!(!printing.wake_after(&facts(KlippyState::Ready, PrintState::Paused)), "resuming is no reason");
+        assert!(facts(KlippyState::Ready, PrintState::Printing).wake_after(&printing).is_none());
+        assert!(printing.wake_after(&facts(KlippyState::Ready, PrintState::Paused)).is_none(), "resuming is no reason");
     }
 
     #[test]
     fn klipper_shutdown_and_lost_connection_wake() {
         let ready = facts(KlippyState::Ready, PrintState::Standby);
-        assert!(facts(KlippyState::Shutdown, PrintState::Standby).wake_after(&ready));
-        assert!(facts(KlippyState::Error, PrintState::Standby).wake_after(&ready));
-        assert!(!ready.wake_after(&facts(KlippyState::Startup, PrintState::Standby)), "coming back is no reason");
+        assert!(facts(KlippyState::Shutdown, PrintState::Standby).wake_after(&ready).is_some());
+        assert!(facts(KlippyState::Error, PrintState::Standby).wake_after(&ready).is_some());
+        assert!(
+            ready.wake_after(&facts(KlippyState::Startup, PrintState::Standby)).is_none(),
+            "coming back is no reason"
+        );
         let offline = WakeFacts::read(ConnectionState::Disconnected, &status(KlippyState::Ready, PrintState::Standby));
-        assert!(offline.wake_after(&ready));
-        assert!(!offline.wake_after(&offline), "only the change wakes, not every snapshot");
+        assert!(offline.wake_after(&ready).is_some());
+        assert!(offline.wake_after(&offline).is_none(), "only the change wakes, not every snapshot");
     }
 
     #[test]
@@ -106,7 +115,7 @@ mod tests {
             ..MmuStatus::default()
         });
         let after = WakeFacts::read(ConnectionState::Connected, &paused);
-        assert!(after.wake_after(&before));
-        assert!(!after.wake_after(&after));
+        assert!(after.wake_after(&before).is_some());
+        assert!(after.wake_after(&after).is_none());
     }
 }

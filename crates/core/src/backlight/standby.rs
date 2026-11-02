@@ -107,7 +107,8 @@ impl Standby {
         }
     }
 
-    fn timeout(&self) -> Option<Duration> {
+    /// The timeout that applies now: the one for printing while a print runs.
+    pub fn timeout(&self) -> Option<Duration> {
         if self.printing {
             self.timeouts.printing
         } else {

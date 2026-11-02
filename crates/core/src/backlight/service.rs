@@ -45,7 +45,8 @@ enum Request {
     SetBrightness(u8),
     Sleep,
     Touch,
-    Wake,
+    /// With the reason for the log.
+    Wake(String),
     Printing(bool),
     Timeouts(StandbyTimeouts),
 }
@@ -78,9 +79,9 @@ impl BacklightService {
         self.send(Request::Touch);
     }
 
-    /// The printer needs attention.
-    pub fn wake(&self) {
-        self.send(Request::Wake);
+    /// The printer needs attention; `reason` goes to the log when this lights the screen.
+    pub fn wake(&self, reason: String) {
+        self.send(Request::Wake(reason));
     }
 
     /// Whether a print runs or is paused; a change wakes the screen.
@@ -110,10 +111,22 @@ struct Controller {
     backlight: Box<dyn Backlight>,
     standby: Standby,
     state: watch::Sender<BacklightState>,
+    /// What the last request was, for the log line when it switches the screen.
+    cause: Option<String>,
+    /// The last error logged; the same one again (say on every step of the slider) is not repeated.
+    last_error: Option<BacklightError>,
 }
 
 impl Controller {
     fn apply(&mut self, request: Request, now: Instant) {
+        self.cause = match &request {
+            Request::Sleep => Some("Off button".to_owned()),
+            Request::Touch => Some("touch".to_owned()),
+            Request::Wake(reason) => Some(reason.clone()),
+            Request::Printing(true) => Some("print started".to_owned()),
+            Request::Printing(false) => Some("print ended".to_owned()),
+            Request::SetBrightness(_) | Request::Timeouts(_) => None,
+        };
         match request {
             Request::SetBrightness(percent) => {
                 let percent = usable_brightness(percent);
@@ -121,14 +134,21 @@ impl Controller {
                     Ok(()) => {
                         self.state.send_if_modified(|state| replace(&mut state.brightness, percent));
                     }
-                    Err(error) => log::warn!("{error}"),
+                    Err(error) => self.warn(error),
                 }
             }
             Request::Sleep => self.standby.sleep(),
             Request::Touch => self.standby.touch(now),
-            Request::Wake => self.standby.wake(now),
+            Request::Wake(_) => self.standby.wake(now),
             Request::Printing(printing) => self.standby.set_printing(printing, now),
-            Request::Timeouts(timeouts) => self.standby.set_timeouts(timeouts, now),
+            Request::Timeouts(timeouts) => {
+                log::info!(
+                    "screen off after {} idle, {} printing",
+                    describe(timeouts.idle),
+                    describe(timeouts.printing)
+                );
+                self.standby.set_timeouts(timeouts, now);
+            }
         }
     }
 
@@ -138,13 +158,30 @@ impl Controller {
         let screen = self.standby.screen();
         let was_off = self.state.borrow().screen == Screen::Off;
         let is_off = screen == Screen::Off;
+        let cause = self.cause.take();
         if was_off != is_off {
+            let cause = cause.unwrap_or_else(|| format!("no touch for {}", describe(self.standby.timeout())));
+            log::info!("screen {} ({cause})", if is_off { "off" } else { "on" });
             if let Err(error) = self.backlight.set_power(!is_off) {
-                log::warn!("{error}");
+                self.warn(error);
             }
-            log::debug!("screen {}", if is_off { "off" } else { "on" });
         }
         self.state.send_if_modified(|state| replace(&mut state.screen, screen));
+    }
+
+    fn warn(&mut self, error: BacklightError) {
+        if self.last_error.as_ref() != Some(&error) {
+            log::warn!("{error}");
+            self.last_error = Some(error);
+        }
+    }
+}
+
+fn describe(timeout: Option<std::time::Duration>) -> String {
+    match timeout {
+        Some(timeout) if timeout.as_secs() % 60 == 0 => format!("{} min", timeout.as_secs() / 60),
+        Some(timeout) => format!("{:.1} s", timeout.as_secs_f64()),
+        None => "never".to_owned(),
     }
 }
 
@@ -164,8 +201,8 @@ async fn run(
     let mut backlight = match open(backend, settings.device.as_deref()) {
         Ok(backlight) => backlight,
         Err(error) => {
-            // Said once; the UI simply offers nothing.
-            log::info!("no brightness or standby: {error}");
+            // Said once, in the header of every log file; the UI simply offers nothing.
+            log::info!(target: crate::HEADER_TARGET, "Backlight: none ({error})");
             state.send_replace(BacklightState {
                 availability: Availability::Unavailable(error.to_string()),
                 ..Default::default()
@@ -180,13 +217,21 @@ async fn run(
         }
     }
     let brightness = backlight.brightness().unwrap_or(100);
-    log::info!("backlight '{}' at {brightness} %", backlight.name());
+    let timeouts = settings.timeouts();
+    log::info!(
+        target: crate::HEADER_TARGET,
+        "Backlight: {} at {brightness} %, off after {} idle, {} printing",
+        backlight.name(),
+        describe(timeouts.idle),
+        describe(timeouts.printing)
+    );
     state.send_replace(BacklightState {
         availability: Availability::Available { device: backlight.name().to_owned() },
         brightness,
         screen: Screen::On,
     });
-    let mut controller = Controller { backlight, standby: Standby::new(settings.timeouts(), Instant::now()), state };
+    let mut controller =
+        Controller { backlight, standby: Standby::new(timeouts, Instant::now()), state, cause: None, last_error: None };
     loop {
         let deadline = controller.standby.deadline().map(tokio::time::Instant::from_std);
         tokio::select! {
@@ -263,7 +308,7 @@ mod tests {
         states.wait_for(|state| state.brightness == 55).await.unwrap();
         service.set_timeouts(StandbyTimeouts { idle: Some(Duration::from_millis(20)), printing: None });
         states.wait_for(|state| state.screen == Screen::Off).await.unwrap();
-        service.wake();
+        service.wake("test".to_owned());
         states.wait_for(|state| state.screen == Screen::Waking).await.unwrap();
     }
 }

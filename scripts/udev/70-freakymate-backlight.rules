@@ -1,0 +1,4 @@
+# FreakyMate: lets the group video set the brightness of the display and switch its backlight off and on
+# (screen standby). Only displays with a controllable backlight have a device here (DSI, SPI, laptops).
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness /sys/class/backlight/%k/bl_power"
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness /sys/class/backlight/%k/bl_power"
