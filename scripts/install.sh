@@ -1,5 +1,6 @@
 #!/bin/bash
-# Installs FreakyMate from an unpacked release zip as a kiosk service (cage on tty1) and
+# Installs FreakyMate from an unpacked release zip as a kiosk service (cage on tty1; on systems without a DRM/KMS
+# device the framebuffer fallback without cage) and
 # registers it with the Moonraker update manager (type: zip), so Mainsail, Fluidd and FreakyMate
 # itself can install later releases.
 #
@@ -133,6 +134,20 @@ report "Creating $SERVICE_FILE"
 # is and is no longer read.
 SETTINGS_FILE="$DATA_DIR/config/freakymate.conf"
 USER_ID=$(id -u)
+ARGUMENTS="--moonraker $MOONRAKER --settings $SETTINGS_FILE --logfile $DATA_DIR/logs/freakymate.log"
+# -d: no client-side frame, otherwise winit keeps room for its title bar after leaving fullscreen (black bar).
+START="/usr/bin/cage -d -s -- $INSTALL_DIR/$NAME --fullscreen $ARGUMENTS"
+CONSOLE_LINES=""
+# cage needs a DRM/KMS device. Without one (only a framebuffer driver such as fbtft) the fallback draws straight to
+# the framebuffer. The text console would draw into it as well, so it is detached from the framebuffer while the
+# service runs (as root: `+`); systemd turns `$$` into `$`.
+if ! compgen -G "/dev/dri/card*" > /dev/null && compgen -G "/dev/fb[0-9]*" > /dev/null; then
+  echo "No DRM/KMS device, only a framebuffer: using the framebuffer fallback without cage."
+  START="$INSTALL_DIR/$NAME --framebuffer $ARGUMENTS"
+  console_loop='for c in /sys/class/vtconsole/vtcon*; do grep -q "frame buffer" "$$c/name" && echo BIND > "$$c/bind"; done; true'
+  CONSOLE_LINES="ExecStartPre=+/bin/sh -c '${console_loop/BIND/0}'
+ExecStopPost=+/bin/sh -c '${console_loop/BIND/1}'"
+fi
 sudo tee "$SERVICE_FILE" > /dev/null << EOF
 [Unit]
 Description=FreakyMate touch UI for Klipper
@@ -147,8 +162,8 @@ PAMName=login
 TTYPath=/dev/tty1
 StandardInput=tty
 Environment=XDG_RUNTIME_DIR=/run/user/$USER_ID
-# -d: no client-side frame, otherwise winit keeps room for its title bar after leaving fullscreen (black bar).
-ExecStart=/usr/bin/cage -d -s -- $INSTALL_DIR/$NAME --fullscreen --moonraker $MOONRAKER --settings $SETTINGS_FILE --logfile $DATA_DIR/logs/freakymate.log
+$CONSOLE_LINES
+ExecStart=$START
 Restart=always
 RestartSec=5
 

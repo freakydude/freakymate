@@ -41,7 +41,8 @@ Builds for `aarch64-unknown-linux-gnu` (64-bit, e.g. CB1/CB2, Raspberry Pi 4/5 w
 architecture and packages first and stops with a message if something does not fit.
 
 1. Download and start the installer as your normal user (the one running Klipper and Moonraker). The script picks
-   the zip for your system's architecture, unpacks it to `~/freakymate-setup` and runs `install.sh` with your options:
+   the zip for your system's architecture, unpacks it to a temporary directory, runs `install.sh` with your options
+   and removes the temporary directory again:
 
    ```bash
    curl -fsSLO https://github.com/freakydude/freakymate/releases/latest/download/get-freakymate.sh
@@ -57,9 +58,16 @@ architecture and packages first and stops with a message if something does not f
    cd freakymate-setup && ./install.sh -m http://127.0.0.1:7125
    ```
 
+   The installer copies everything to `~/freakymate`; the unpacked `freakymate-setup` can be deleted afterwards.
+
    The installer
    - installs the packages from `system-dependencies.json` (among them `cage`, a minimal Wayland kiosk compositor),
-   - copies the program to `~/freakymate` and creates the systemd service `freakymate` (fullscreen on `tty1`),
+   - copies the program to `~/freakymate` and creates the systemd service `freakymate` (fullscreen on `tty1`). cage
+     needs a DRM/KMS device (`/dev/dri/card*`). Only on systems without one, such as a small display with only a
+     framebuffer driver (fbtft, e.g. `fb_st7796s`), the service uses a fallback instead: FreakyMate draws straight to
+     `/dev/fbN` without cage (`--framebuffer`, software rendering), and the text console is detached from the
+     framebuffer while it runs. Rotate such a display in its driver (e.g. `armbianEnv.txt`); touch rotation is not
+     handled yet. Run the installer again after changing the display,
    - allows brightness and screen standby for the group `video` (udev rule `70-freakymate-backlight.rules`; only
      displays with a controllable backlight have one, see [Configuration](configuration.md#brightness-and-standby)),
    - registers it with Moonraker's update manager (`[update_manager freakymate]` in `moonraker.conf`, service in
