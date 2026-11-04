@@ -4,13 +4,13 @@
 #   curl -fsSLO https://github.com/freakydude/freakymate/releases/latest/download/get-freakymate.sh
 #   bash get-freakymate.sh [-c stable|beta] [-m <moonraker-url>] [-d <printer_data>]
 #
-# All options go to install.sh; -c beta also takes the newest pre-release. The zip is unpacked to ~/freakymate-setup.
+# All options go to install.sh; -c beta also takes the newest pre-release. The zip is unpacked to a temporary
+# directory, which is removed afterwards: install.sh copies everything it needs to ~/freakymate.
 # Young software: use it with care and at your own risk (see the README).
 
 set -euo pipefail
 
 REPO="freakydude/freakymate"
-SETUP_DIR="$HOME/freakymate-setup"
 
 channel="stable"
 arguments=("$@")
@@ -57,8 +57,10 @@ if [ -z "$download_url" ]; then
 fi
 
 echo "Downloading $download_url"
-rm -rf "$SETUP_DIR"
-mkdir -p "$SETUP_DIR"
+SETUP_DIR=$(mktemp -d -t freakymate-setup.XXXXXX)
+trap 'rm -rf "$SETUP_DIR"' EXIT
+# mktemp creates it with 0700, and install.sh copies the directory's mode to ~/freakymate.
+chmod 0755 "$SETUP_DIR"
 curl -fSL "$download_url" -o "$SETUP_DIR/$asset"
 (cd "$SETUP_DIR" && unzip -q "$asset" && rm "$asset")
 "$SETUP_DIR/install.sh" "${arguments[@]}"

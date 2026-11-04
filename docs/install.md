@@ -41,7 +41,8 @@ Builds for `aarch64-unknown-linux-gnu` (64-bit, e.g. CB1/CB2, Raspberry Pi 4/5 w
 architecture and packages first and stops with a message if something does not fit.
 
 1. Download and start the installer as your normal user (the one running Klipper and Moonraker). The script picks
-   the zip for your system's architecture, unpacks it to `~/freakymate-setup` and runs `install.sh` with your options:
+   the zip for your system's architecture, unpacks it to a temporary directory, runs `install.sh` with your options
+   and removes the temporary directory again:
 
    ```bash
    curl -fsSLO https://github.com/freakydude/freakymate/releases/latest/download/get-freakymate.sh
@@ -56,6 +57,8 @@ architecture and packages first and stops with a message if something does not f
    unzip freakymate-aarch64-unknown-linux-gnu.zip -d freakymate-setup
    cd freakymate-setup && ./install.sh -m http://127.0.0.1:7125
    ```
+
+   The installer copies everything to `~/freakymate`; the unpacked `freakymate-setup` can be deleted afterwards.
 
    The installer
    - installs the packages from `system-dependencies.json` (among them `cage`, a minimal Wayland kiosk compositor),
