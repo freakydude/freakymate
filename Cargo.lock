@@ -1467,6 +1467,7 @@ dependencies = [
  "env_filter",
  "freakymate-core",
  "freakymate-ui",
+ "input",
  "log",
  "slint",
  "tempfile",
@@ -2022,6 +2023,7 @@ dependencies = [
  "i-slint-core",
  "i-slint-core-macros",
  "i-slint-renderer-femtovg",
+ "input",
 ]
 
 [[package]]

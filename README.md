@@ -54,7 +54,7 @@ Functions only appear when the printer has them. Every page in detail: [docs/fea
 |                    | FreakyMate                                                                                                        |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | Maturity           | Young, one developer, tried on three printers, English only                                                       |
-| Technology         | Rust with Slint, one native binary; fullscreen under `cage` (Wayland) or as a normal window                       |
+| Technology         | Rust with Slint, one native binary; fullscreen under `cage` (Wayland) or as a normal window; fallback straight to the framebuffer for displays without DRM/KMS |
 | Scope              | What a printer needs every day: print, move, heat, tune, filament, console and macros, system, settings, network |
 | Printers and hosts | One Moonraker at a time, on the printer host or elsewhere; Wi-Fi settings only on the printer host               |
 | Displays           | Works best from 5" at 800x480 (tested with the BTT HDMI5); other sizes are scaled, not tested yet                |

@@ -24,6 +24,8 @@ pub struct Options {
     /// Overrides the saved Moonraker address for this start.
     pub moonraker: Option<String>,
     pub fullscreen: bool,
+    /// Fallback for displays without DRM/KMS: draws straight to the framebuffer (see [`crate::framebuffer`], Linux).
+    pub framebuffer: bool,
     pub settings_file: Option<PathBuf>,
     /// NetworkManager, or simulated networks in development builds.
     pub network: NetworkBackend,
@@ -71,15 +73,28 @@ impl Application {
             freakymate_core::Settings::default()
         });
         crate::logging::set_verbose(settings.verbose_log);
-        crate::logging::header("Renderer", &std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "default".to_owned()));
+        let renderer = if options.framebuffer {
+            "linuxkms-software (framebuffer fallback)".to_owned()
+        } else {
+            std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "default".to_owned())
+        };
+        crate::logging::header("Renderer", &renderer);
         let endpoint = Endpoint::parse(options.moonraker.as_deref().unwrap_or(&settings.moonraker))?;
         log::info!("Moonraker at {}", endpoint.display());
 
         let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build()?;
+        #[cfg(target_os = "linux")]
+        let input_target = crate::framebuffer::InputTarget::default();
+        #[cfg(target_os = "linux")]
+        if options.framebuffer {
+            crate::framebuffer::select_backend(input_target.clone())?;
+        }
         let window = AppWindow::new()?;
         // Wayland and X11 desktops find the icon through the app id and `freakymate.desktop`, not the window icon.
-        if let Err(error) = slint::set_xdg_app_id("freakymate") {
-            log::warn!("cannot set the app id: {error}");
+        if !options.framebuffer {
+            if let Err(error) = slint::set_xdg_app_id("freakymate") {
+                log::warn!("cannot set the app id: {error}");
+            }
         }
         // Always in the user's configuration directory, also when the settings lie in printer_data/config.
         let (service, channels) =
@@ -127,7 +142,15 @@ impl Application {
         if options.fullscreen || settings.fullscreen() {
             window.window().set_fullscreen(true);
         }
-        watch_window_events(&window, Some(backlight.clone()));
+        #[cfg(target_os = "linux")]
+        if options.framebuffer {
+            // Set only once, so this cannot fail.
+            let _ = input_target.set(backlight.clone());
+            crate::framebuffer::fit_when_shown(&window);
+        }
+        if !options.framebuffer {
+            watch_window_events(&window, Some(backlight.clone()));
+        }
         Ok(Self {
             window,
             presenter,
@@ -194,7 +217,7 @@ fn input_activity(event: &WindowEvent) -> Option<bool> {
 
 /// Fullscreen fits the layout to the display; a window shows it at the scale of the system (see
 /// [`display::fits_to_display`]).
-fn scale_to_mode(window: &slint::Window) {
+pub(crate) fn scale_to_mode(window: &slint::Window) {
     let system_scale = window.with_winit_window(|winit_window| winit_window.scale_factor() as f32).unwrap_or(1.0);
     let size = window.size();
     if display::fits_to_display(window.is_fullscreen(), size.width, size.height, system_scale) {

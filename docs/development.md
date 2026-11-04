@@ -1,6 +1,7 @@
 # Development
 
-Rust stable (see `rust-toolchain.toml`). On Linux install `libfontconfig1-dev libxkbcommon-dev`.
+Rust stable (see `rust-toolchain.toml`). On Linux install `libfontconfig1-dev libxkbcommon-dev libinput-dev libudev-dev libgbm-dev`
+(the last three for the framebuffer fallback, see [install.md](install.md)).
 For Windows without admin rights (setup, faster linking with `rust-lld`, build times) see
 [windows-without-admin.md](windows-without-admin.md). Structure, data flow and conventions:
 [architecture.md](architecture.md). How pull requests are handled: [CONTRIBUTING.md](../CONTRIBUTING.md).

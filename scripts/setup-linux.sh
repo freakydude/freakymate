@@ -30,6 +30,9 @@ check_command rustup rustup
 check_command pkg-config pkgconf
 check_library fontconfig fontconfig
 check_library xkbcommon libxkbcommon
+check_library libinput libinput
+check_library libudev systemd-libs
+check_library gbm mesa
 check_library wayland-client wayland
 check_library x11 libx11
 

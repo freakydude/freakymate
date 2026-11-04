@@ -20,6 +20,11 @@ struct Cli {
     /// Kiosk mode on a touch screen: fullscreen, no window frame, no mouse pointer
     #[arg(short, long)]
     fullscreen: bool,
+    /// Fallback for displays without DRM/KMS (only a framebuffer driver such as fbtft): draws straight to /dev/fbN,
+    /// without cage; implies --fullscreen
+    #[cfg(target_os = "linux")]
+    #[arg(long)]
+    framebuffer: bool,
     /// Settings file, TOML (default: <config dir>/freakymate/settings.conf; the installer uses printer_data/config/freakymate.conf)
     #[arg(long)]
     settings: Option<PathBuf>,
@@ -40,6 +45,13 @@ struct Cli {
 }
 
 impl Cli {
+    fn framebuffer(&self) -> bool {
+        #[cfg(target_os = "linux")]
+        return self.framebuffer;
+        #[cfg(not(target_os = "linux"))]
+        false
+    }
+
     fn network_backend(&self) -> NetworkBackend {
         #[cfg(feature = "dev-mode")]
         if self.simulate_network {
@@ -106,8 +118,10 @@ fn main() -> ExitCode {
         eprintln!("cannot start the log: {error}");
         return ExitCode::FAILURE;
     }
-    // The kiosk on the touch screen shows no pointer; set up before the window and the runtime's threads exist.
-    if cli.fullscreen {
+    let framebuffer = cli.framebuffer();
+    // The kiosk on the touch screen shows no pointer; set up before the window and the runtime's threads exist. The
+    // framebuffer fallback has no winit and no cage that would load the cursor theme.
+    if cli.fullscreen && !framebuffer {
         freakymate::kiosk_pointer::hide();
     }
     let setup_command = matches!(setup, SetupState::Outdated { .. }).then(setup_command);
@@ -119,7 +133,8 @@ fn main() -> ExitCode {
         network: cli.network_backend(),
         backlight: cli.backlight_backend(),
         moonraker: cli.moonraker,
-        fullscreen: cli.fullscreen,
+        fullscreen: cli.fullscreen || framebuffer,
+        framebuffer,
         settings_file: cli.settings,
     };
     let result = Application::build(options).and_then(Application::run);

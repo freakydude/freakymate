@@ -10,6 +10,8 @@
     "libwayland-client0",
     "libwayland-cursor0",
     "libwayland-egl1",
-    "libinput10"
+    "libinput10",
+    "libgbm1",
+    "libudev1"
   ]
 }

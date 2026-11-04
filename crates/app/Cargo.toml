@@ -13,8 +13,6 @@ publish = false
 default = ["dev-mode"]
 # Development aids that are not shipped: option `--simulate-network`.
 dev-mode = ["freakymate-core/dev-mode"]
-# Render directly via DRM/KMS without desktop or compositor (Linux only, experimental).
-linuxkms = ["slint/backend-linuxkms-noseat"]
 
 [dependencies]
 freakymate-core.workspace = true
@@ -36,6 +34,11 @@ slint = { workspace = true, features = [
 ] }
 tokio.workspace = true
 thiserror.workspace = true
+
+# Fallback for displays without DRM/KMS (`--framebuffer`): Slint draws straight to /dev/fbN, input comes from libinput.
+[target.'cfg(target_os = "linux")'.dependencies]
+slint = { workspace = true, features = ["backend-linuxkms-noseat", "unstable-libinput-09"] }
+input = "0.10.0"
 
 [dev-dependencies]
 tempfile = "3.27.0"

@@ -14,6 +14,8 @@ mod calibration_view;
 mod chart;
 pub mod display;
 pub mod format;
+#[cfg(target_os = "linux")]
+pub mod framebuffer;
 mod history_view;
 mod items;
 pub mod kiosk_pointer;
