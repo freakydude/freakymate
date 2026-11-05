@@ -44,26 +44,54 @@ export component ConfirmDialog inherits Scrim {
     }
 }
 
-// Flyout below the status bar with all errors and informations, newest first. Not modal: the page beside it stays
-// usable; only the close button, "Discard all" and "Console" close it.
+component SectionHeading inherits Text {
+    color: Theme.muted;
+    font-size: Theme.font-small;
+    font-weight: 600;
+    height: 18px;
+    vertical-alignment: center;
+}
+
+// Flyout below the field of the status bar with all errors and informations, newest first: what came since the
+// last time stands under "New", the rest under "Earlier". The page beside it stays covered by a tap catcher: a tap
+// there closes the flyout and does nothing else, like a menu. Every way out goes through `Navigation.close-messages()`.
 export component MessagesFlyout inherits Rectangle {
+    // Below the status bar, so that its field, the light and the emergency stop stay in reach.
+    TouchArea {
+        y: 44px;
+        height: root.height - 44px;
+        clicked => { Navigation.close-messages(); }
+    }
+
     FlyoutPanel {
-        x: root.width - self.width - 8px;
-        y: 52px;
-        width: min(560px, root.width - 16px);
-        height: root.height - 60px;
+        x: 8px;
+        y: 50px;
+        width: min(520px, root.width - 16px);
+        height: root.height - 58px;
 
         VerticalLayout {
             padding: 10px;
             spacing: 8px;
             DialogHeader {
                 title: @tr("Messages");
-                close => { Navigation.messages-open = false; }
+                close => { Navigation.close-messages(); }
             }
 
             messages-list := ScrollList {
                 vertical-stretch: 1;
                 content-height: Printer.messages-height;
+                if Printer.messages-has-new: SectionHeading {
+                    x: 0;
+                    y: 0;
+                    width: messages-list.row-width;
+                    text: @tr("NEW");
+                }
+                if Printer.messages-has-earlier: SectionHeading {
+                    x: 0;
+                    y: Printer.messages-earlier-top;
+                    width: messages-list.row-width;
+                    text: @tr("EARLIER");
+                }
                 for message in Printer.messages: Rectangle {
                     x: 0;
                     y: message.top;
@@ -71,32 +99,29 @@ export component MessagesFlyout inherits Rectangle {
                     height: message.height;
                     background: Theme.surface-raised;
                     border-radius: Theme.radius;
-                    // The text takes the full width; the time is small, below it on the right.
                     HorizontalLayout {
                         padding: 10px;
                         spacing: 10px;
-                        Rectangle {
-                            width: 4px;
-                            background: message.is-error ? Theme.danger : Theme.info;
-                            border-radius: 2px;
+                        Image {
+                            y: 0px;
+                            source: message.is-error ? Icons.ui-error : Icons.ui-info;
+                            colorize: message.is-error ? Theme.danger : Theme.info;
+                            width: 20px;
+                            height: 20px;
                         }
-                        VerticalLayout {
+                        Text {
                             horizontal-stretch: 1;
-                            Text {
-                                vertical-stretch: 1;
-                                text: message.text;
-                                color: message.is-error ? Theme.danger : Theme.foreground;
-                                font-size: Theme.font-normal;
-                                wrap: word-wrap;
-                                overflow: elide;
-                            }
-                            Text {
-                                height: 16px;
-                                text: message.time;
-                                color: Theme.muted;
-                                font-size: Theme.font-small;
-                                horizontal-alignment: right;
-                            }
+                            text: message.text;
+                            color: Theme.foreground;
+                            font-size: Theme.font-normal;
+                            font-weight: message.new ? 600 : 400;
+                            wrap: word-wrap;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: message.time;
+                            color: Theme.muted;
+                            font-size: Theme.font-small;
                         }
                     }
                 }
@@ -106,8 +131,10 @@ export component MessagesFlyout inherits Rectangle {
             HorizontalLayout {
                 spacing: Theme.spacing;
                 height: 44px;
+                alignment: end;
                 IconButton {
-                    text: @tr("Discard all");
+                    width: 140px;
+                    text: @tr("Clear");
                     icon: Icons.ui-delete;
                     icon-size: 20px;
                     horizontal: true;
@@ -115,19 +142,19 @@ export component MessagesFlyout inherits Rectangle {
                     // Nothing is left to read: the flyout closes with it.
                     clicked => {
                         Actions.messages-clear();
-                        Navigation.messages-open = false;
+                        Navigation.close-messages();
                     }
                 }
                 IconButton {
+                    width: 140px;
                     text: @tr("Console");
                     icon: Icons.nav-console;
                     icon-size: 20px;
                     horizontal: true;
                     min-height: 44px;
-                    kind: "accent";
                     clicked => {
+                        Navigation.close-messages();
                         Navigation.page = Page.console;
-                        Navigation.messages-open = false;
                     }
                 }
             }
@@ -241,20 +268,20 @@ export component OnScreenKeyboard inherits VerticalLayout {
         }
 
         Key {
-            label: "space";
+            label: @tr("space");
             horizontal-stretch: 3;
             pressed => { root.typed(" "); }
         }
 
         Key {
-            label: "backspace";
+            label: @tr("backspace");
             icon: Icons.ui-chevron-left;
             horizontal-stretch: 2;
             pressed => { root.backspace(); }
         }
 
         Key {
-            label: "enter";
+            label: @tr("enter");
             icon: Icons.ui-check;
             accent: true;
             horizontal-stretch: 2;
@@ -408,7 +435,7 @@ component NumericKeypad inherits VerticalLayout {
             pressed => { root.typed(key); }
         }
         if index == 0: Key {
-            label: "backspace";
+            label: @tr("backspace");
             icon: Icons.ui-chevron-left;
             pressed => { root.backspace(); }
         }
@@ -428,7 +455,7 @@ component NumericKeypad inherits VerticalLayout {
             pressed => { root.typed("0"); }
         }
         Key {
-            label: "enter";
+            label: @tr("enter");
             icon: Icons.ui-check;
             accent: true;
             horizontal-stretch: 2;
@@ -927,7 +954,7 @@ export component CalibrationDialog inherits Scrim {
             if root.probing: HorizontalLayout {
                 spacing: Theme.spacing;
                 Text {
-                    text: "Z " + Printer.probe-z + " mm";
+                    text: @tr("Z {} mm", Printer.probe-z);
                     color: Theme.foreground;
                     font-size: Theme.font-huge;
                     font-weight: 600;
@@ -1065,6 +1092,7 @@ export component SpoolDialog inherits Scrim {
                             third: spool.color-3;
                             count: spool.color-count;
                             longitudinal: spool.longitudinal;
+                            generic: true;
                         }
                         VerticalLayout {
                             alignment: center;

@@ -1,6 +1,7 @@
 //! Messages of the status bar and its flyout: errors and informations from Klipper and from the app.
 //!
-//! Pure logic without Slint; the presenter puts the result on screen.
+//! Every new message is an event the status bar shows for a while; unread errors are only counted until the flyout
+//! is opened. Pure logic without Slint; the presenter puts the result on screen.
 
 use std::collections::VecDeque;
 use std::time::Duration;
@@ -9,19 +10,22 @@ const LIMIT: usize = 50;
 /// Klipper reports a rejected command twice: as RPC error and as `!!` response. A response this close to the
 /// failure and repeating its reason is the same event.
 const DUPLICATE_WINDOW_SECONDS: f64 = 2.0;
+/// An error stays in the status bar for this long; the counter keeps it unread after that.
+const ERROR_DISPLAY_TIME: Duration = Duration::from_secs(15);
 /// An information stays in the status bar for a base time plus the time to read it.
 const INFO_BASE: Duration = Duration::from_secs(5);
 /// Relaxed reading is about 13 to 15 characters per second.
 const INFO_PER_CHARACTER: Duration = Duration::from_millis(70);
 const MAX_INFO_DISPLAY: Duration = Duration::from_secs(15);
 
-/// Layout of a message row in the flyout, in logical pixels: the text over the full width, the time small below it.
+/// Layout of the flyout list, in logical pixels: a message row has the symbol before and the time after its text.
 pub const ROW_GAP: f32 = 6.0;
+/// Height of a section heading ("New", "Earlier") including the gap below it.
+pub const SECTION_HEIGHT: f32 = 24.0;
 const LINE_HEIGHT: f32 = 22.0;
 const ROW_PADDING: f32 = 20.0;
-const TIME_LINE_HEIGHT: f32 = 16.0;
-/// Roughly what fits into the width of the flyout at the normal font size.
-const CHARACTERS_PER_LINE: usize = 48;
+/// Roughly what fits into the width of the flyout at the normal font size, beside the symbol and the time.
+const CHARACTERS_PER_LINE: usize = 40;
 const MAX_LINES: usize = 10;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -45,10 +49,11 @@ impl Message {
 pub struct StatusLog {
     messages: VecDeque<Message>,
     next_id: u64,
-    /// The message the status bar shows.
-    badge: Option<u64>,
-    /// Errors with a smaller id were seen in the flyout.
-    seen_before: u64,
+    /// The event the status bar shows; it runs out by itself.
+    event: Option<u64>,
+    /// Messages with a smaller id were there when the flyout was closed last: they are "Earlier", the rest is "New".
+    boundary: u64,
+    list_open: bool,
     /// Reason of the last rejected command, to recognise its duplicate response.
     last_failure: Option<(String, f64)>,
     /// The last `!!` response (id, text, time): it may arrive before the rejection it repeats.
@@ -56,15 +61,21 @@ pub struct StatusLog {
 }
 
 impl StatusLog {
-    /// Adds a message and makes it the one the status bar shows. Returns its id.
+    /// Adds a message and makes it the event the status bar shows. Returns its id.
     pub fn add(&mut self, text: &str, is_error: bool, now: f64) -> u64 {
+        let id = self.add_quietly(text, is_error, now);
+        self.event = Some(id);
+        id
+    }
+
+    /// Adds a message to the list only: the status bar keeps showing what it shows. Returns its id.
+    pub fn add_quietly(&mut self, text: &str, is_error: bool, now: f64) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
         self.messages.push_back(Message { id, text: text.to_owned(), is_error, time: now });
         if self.messages.len() > LIMIT {
             self.messages.pop_front();
         }
-        self.badge = Some(id);
         id
     }
 
@@ -100,9 +111,9 @@ impl StatusLog {
             .is_some_and(|(reason, time)| now - time <= DUPLICATE_WINDOW_SECONDS && text.contains(reason.as_str()))
     }
 
-    /// The message the status bar shows, if any.
-    pub fn badge(&self) -> Option<&Message> {
-        let id = self.badge?;
+    /// The event the status bar shows, if any.
+    pub fn event(&self) -> Option<&Message> {
+        let id = self.event?;
         self.messages.iter().find(|message| message.id == id)
     }
 
@@ -111,43 +122,61 @@ impl StatusLog {
         self.messages.iter().rev()
     }
 
-    /// The flyout was opened: the status bar stops showing the message, the list keeps it.
-    pub fn mark_seen(&mut self) {
-        self.badge = None;
-        self.seen_before = self.next_id;
+    /// Whether the flyout lists the message under "New": it came after the flyout was closed last.
+    pub fn is_new(&self, message: &Message) -> bool {
+        message.id >= self.boundary
     }
 
-    /// An information ran out of display time. Hides it only while it is still the one shown; an error that
-    /// nobody has seen yet comes back, because errors stay until they are seen.
-    pub fn hide_badge(&mut self, id: u64) {
-        if self.badge == Some(id) {
-            self.badge = self.newest_unseen_error();
+    /// Errors that came since the flyout was closed last. Zero while it is open, as everything is seen then.
+    pub fn unread_errors(&self) -> usize {
+        if self.list_open {
+            return 0;
         }
+        self.messages.iter().filter(|message| message.is_error && self.is_new(message)).count()
     }
 
-    fn newest_unseen_error(&self) -> Option<u64> {
-        self.messages
-            .iter()
-            .rev()
-            .find(|message| message.is_error && message.id >= self.seen_before)
-            .map(|message| message.id)
+    /// The flyout was opened: what came since it was closed last is "New" until it closes again.
+    pub fn open_list(&mut self) {
+        self.list_open = true;
+    }
+
+    /// The flyout was closed: everything in it is "Earlier" from now on.
+    pub fn close_list(&mut self) {
+        self.list_open = false;
+        self.boundary = self.next_id;
+    }
+
+    /// The event ran out of display time. An older error does not take its place: the counter keeps it.
+    pub fn hide_event(&mut self, id: u64) {
+        if self.event == Some(id) {
+            self.event = None;
+        }
     }
 
     pub fn clear(&mut self) {
         self.messages.clear();
-        self.badge = None;
-        self.seen_before = self.next_id;
+        self.event = None;
+        self.boundary = self.next_id;
     }
 }
 
 /// Height of a message row: one line per wrapped line of the text, but never below the minimum.
 pub fn row_height(text: &str) -> f32 {
     let lines: usize = text.lines().map(|line| line.chars().count().div_ceil(CHARACTERS_PER_LINE).max(1)).sum();
-    lines.clamp(1, MAX_LINES) as f32 * LINE_HEIGHT + ROW_PADDING + TIME_LINE_HEIGHT
+    lines.clamp(1, MAX_LINES) as f32 * LINE_HEIGHT + ROW_PADDING
+}
+
+/// How long a message stays in the status bar as an event.
+pub fn display_time(text: &str, is_error: bool) -> Duration {
+    if is_error {
+        ERROR_DISPLAY_TIME
+    } else {
+        info_display_time(text)
+    }
 }
 
 /// How long an information stays in the status bar.
-pub fn info_display_time(text: &str) -> Duration {
+fn info_display_time(text: &str) -> Duration {
     let characters = u32::try_from(text.chars().count()).unwrap_or(u32::MAX);
     (INFO_BASE + INFO_PER_CHARACTER * characters).min(MAX_INFO_DISPLAY)
 }
@@ -162,31 +191,32 @@ mod tests {
         log.add("first", true, 1.0);
         log.add("second", false, 2.0);
 
-        assert_eq!(log.badge().map(Message::headline), Some("second"));
+        assert_eq!(log.event().map(Message::headline), Some("second"));
         let listed: Vec<&str> = log.messages().map(|message| message.text.as_str()).collect();
         assert_eq!(listed, ["second", "first"]);
     }
 
     #[test]
-    fn marking_seen_hides_the_badge_but_keeps_the_list() {
+    fn closing_the_list_keeps_the_event_and_the_list() {
         let mut log = StatusLog::default();
         log.add("error", true, 1.0);
 
-        log.mark_seen();
+        log.open_list();
+        log.close_list();
 
-        assert!(log.badge().is_none());
+        assert!(log.event().is_some());
         assert_eq!(log.messages().count(), 1);
     }
 
     #[test]
-    fn hiding_an_old_information_keeps_a_newer_one() {
+    fn hiding_an_old_event_keeps_a_newer_one() {
         let mut log = StatusLog::default();
         let old = log.add("old info", false, 1.0);
         log.add("error", true, 2.0);
 
-        log.hide_badge(old);
+        log.hide_event(old);
 
-        assert_eq!(log.badge().map(Message::headline), Some("error"));
+        assert_eq!(log.event().map(Message::headline), Some("error"));
     }
 
     #[test]
@@ -207,7 +237,7 @@ mod tests {
 
         let listed: Vec<&str> = log.messages().map(|message| message.text.as_str()).collect();
         assert_eq!(listed, ["SET_FAN_SPEED FAN=missing: Unknown fan 'missing'"]);
-        assert_eq!(log.badge().map(Message::headline), Some(listed[0]));
+        assert_eq!(log.event().map(Message::headline), Some(listed[0]));
     }
 
     #[test]
@@ -243,7 +273,7 @@ mod tests {
         log.add("Available commands:\nG0, G1\nG28", false, 1.0);
 
         assert_eq!(log.messages().count(), 1);
-        assert_eq!(log.badge().map(Message::headline), Some("Available commands:"));
+        assert_eq!(log.event().map(Message::headline), Some("Available commands:"));
     }
 
     #[test]
@@ -255,7 +285,7 @@ mod tests {
 
     #[test]
     fn row_height_grows_with_wrapped_lines_up_to_a_limit() {
-        let frame = ROW_PADDING + TIME_LINE_HEIGHT;
+        let frame = ROW_PADDING;
         assert_eq!(row_height("short"), 22.0 + frame);
         assert_eq!(row_height("line one\nline two\nline three"), 3.0 * 22.0 + frame);
         assert_eq!(row_height(&"x".repeat(100)), 3.0 * 22.0 + frame);
@@ -263,50 +293,131 @@ mod tests {
     }
 
     #[test]
-    fn clear_empties_list_and_badge() {
+    fn clear_empties_list_event_and_counter() {
         let mut log = StatusLog::default();
         log.add("error", true, 1.0);
 
         log.clear();
 
-        assert!(log.badge().is_none());
+        assert!(log.event().is_none());
         assert_eq!(log.messages().count(), 0);
+        assert_eq!(log.unread_errors(), 0);
     }
 
     #[test]
-    fn an_unseen_error_returns_when_a_later_information_runs_out() {
+    fn an_expired_event_does_not_bring_back_an_older_error() {
         let mut log = StatusLog::default();
         log.add("fault", true, 1.0);
         let info = log.add("note", false, 2.0);
-        assert_eq!(log.badge().map(Message::headline), Some("note"));
+        assert_eq!(log.event().map(Message::headline), Some("note"));
 
-        log.hide_badge(info);
+        log.hide_event(info);
 
-        assert_eq!(log.badge().map(Message::headline), Some("fault"));
+        assert!(log.event().is_none());
+        assert_eq!(log.unread_errors(), 1);
     }
 
     #[test]
-    fn a_seen_error_does_not_return() {
+    fn a_quiet_message_is_listed_without_replacing_the_event() {
         let mut log = StatusLog::default();
         log.add("fault", true, 1.0);
-        log.mark_seen();
-        let info = log.add("note", false, 2.0);
 
-        log.hide_badge(info);
+        log.add_quietly("note", false, 2.0);
 
-        assert!(log.badge().is_none());
+        assert_eq!(log.event().map(Message::headline), Some("fault"));
+        assert_eq!(log.messages().count(), 2);
     }
 
     #[test]
-    fn a_new_error_is_unseen_even_after_an_earlier_one_was_seen() {
+    fn an_error_is_an_event_like_an_information() {
         let mut log = StatusLog::default();
-        log.add("old fault", true, 1.0);
-        log.mark_seen();
-        log.add("new fault", true, 2.0);
-        let info = log.add("note", false, 3.0);
+        let error = log.add("fault", true, 1.0);
 
-        log.hide_badge(info);
+        assert_eq!(log.event().map(Message::headline), Some("fault"));
+        log.hide_event(error);
+        assert!(log.event().is_none());
+    }
 
-        assert_eq!(log.badge().map(Message::headline), Some("new fault"));
+    #[test]
+    fn errors_display_for_fifteen_seconds_informations_by_their_length() {
+        assert_eq!(display_time("x", true), Duration::from_secs(15));
+        assert_eq!(display_time("", false), Duration::from_secs(5));
+    }
+
+    #[test]
+    fn only_errors_count_as_unread() {
+        let mut log = StatusLog::default();
+        log.add("fault", true, 1.0);
+        log.add("note", false, 2.0);
+        log.add("another fault", true, 3.0);
+
+        assert_eq!(log.unread_errors(), 2);
+    }
+
+    #[test]
+    fn opening_the_list_resets_the_counter_and_keeps_new_messages_new() {
+        let mut log = StatusLog::default();
+        log.add("fault", true, 1.0);
+        log.add("note", false, 2.0);
+
+        log.open_list();
+
+        assert_eq!(log.unread_errors(), 0);
+        assert!(log.messages().all(|message| log.is_new(message)));
+    }
+
+    #[test]
+    fn everything_is_new_at_the_first_opening() {
+        let mut log = StatusLog::default();
+        log.add("note", false, 1.0);
+        log.open_list();
+
+        assert!(log.messages().all(|message| log.is_new(message)));
+    }
+
+    #[test]
+    fn a_message_during_the_open_list_is_new_and_not_unread() {
+        let mut log = StatusLog::default();
+        log.add("old", true, 1.0);
+        log.open_list();
+        log.close_list();
+        log.open_list();
+
+        log.add("fault", true, 2.0);
+
+        assert_eq!(log.unread_errors(), 0);
+        let new: Vec<&str> =
+            log.messages().filter(|message| log.is_new(message)).map(|message| message.text.as_str()).collect();
+        assert_eq!(new, ["fault"]);
+    }
+
+    #[test]
+    fn closing_the_list_makes_everything_earlier() {
+        let mut log = StatusLog::default();
+        log.add("fault", true, 1.0);
+        log.open_list();
+        log.add("while open", true, 2.0);
+
+        log.close_list();
+
+        assert!(log.messages().all(|message| !log.is_new(message)));
+        assert_eq!(log.unread_errors(), 0);
+    }
+
+    #[test]
+    fn the_next_opening_shows_only_what_came_after_the_closing_as_new() {
+        let mut log = StatusLog::default();
+        log.add("before", true, 1.0);
+        log.open_list();
+        log.close_list();
+        log.add("after", true, 2.0);
+        assert_eq!(log.unread_errors(), 1);
+
+        log.open_list();
+
+        let new: Vec<&str> =
+            log.messages().filter(|message| log.is_new(message)).map(|message| message.text.as_str()).collect();
+        assert_eq!(new, ["after"]);
+        assert_eq!(log.unread_errors(), 0);
     }
 }

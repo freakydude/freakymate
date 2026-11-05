@@ -9,6 +9,7 @@ export component PrintPausedPreview inherits AppWindow {
         Sample.printing();
         Printer.print-state = "paused";
         Printer.interruption-text = "Toolhead Runout: no filament";
+        Printer.interruption-headline = "Toolhead Runout: no filament";
         Navigation.page = Page.print;
     }
 }

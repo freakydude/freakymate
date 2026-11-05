@@ -10,7 +10,7 @@ use crate::sources::klipper::tuning::TuningKey;
 use crate::sources::klipper::{Axis, CalibrationMode, Leveling, Motion, Setup, TestZ};
 use crate::sources::macro_conventions::{LOAD_FILAMENT_MACRO, UNLOAD_FILAMENT_MACRO};
 use crate::sources::moonraker_server::wled::{self, StripAction};
-use crate::sources::moonraker_server::{machine, power, update_manager};
+use crate::sources::moonraker_server::{files, machine, power, update_manager};
 use crate::sources::{led_effect, spoolman, PrinterStatus, Sources};
 
 /// A command triggered by a person. The UI only knows this level, not G-code or JSON-RPC.
@@ -23,6 +23,10 @@ pub enum Command {
     // Print job
     StartPrint {
         filename: String,
+    },
+    /// Deletes a G-code file; `path` as in the file list. Moonraker refuses the file that is being printed.
+    DeleteFile {
+        path: String,
     },
     PausePrint,
     ResumePrint,
@@ -402,6 +406,7 @@ impl Command {
         let call = match self {
             // Klipper
             Self::StartPrint { filename } => klipper::start_print(filename),
+            Self::DeleteFile { path } => files::delete_file(path),
             Self::PausePrint => klipper::pause_print(),
             Self::ResumePrint => klipper::resume_print(),
             Self::CancelPrint => klipper::cancel_print(),
@@ -606,6 +611,7 @@ mod tests {
         );
         assert_eq!(script(Command::RunMacro { name: "PARK".into() }), "PARK");
         assert_eq!(method(Command::StartPrint { filename: "a.gcode".into() }), "printer.print.start");
+        assert_eq!(method(Command::DeleteFile { path: "a.gcode".into() }), "server.files.delete_file");
         assert_eq!(method(Command::SetActiveSpool { spool_id: None }), "server.spoolman.post_spool_id");
         assert_eq!(
             method(Command::SetPowerDevice { device: "printer".into(), on: true }),

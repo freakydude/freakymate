@@ -629,7 +629,7 @@ export component IconLabel inherits HorizontalLayout {
 // The colours of a filament, one to three. The bar stands for a piece of filament along its long side (`vertical`
 // turns it upright): the colours of a coaxial filament run side by side along the whole length, those of a
 // longitudinal one take turns along it (Spoolman's `multi_color_direction`). Without colour (`count` 0) the bar is
-// neutral. Only the outer pieces are rounded, each on its outer corners, so the bar keeps its shape in every renderer.
+// neutral, or the accent colour with `generic`. Only the outer pieces are rounded, each on its outer corners, so the bar keeps its shape in every renderer.
 export component ColorBar inherits Rectangle {
     in property <color> first;
     in property <color> second;
@@ -637,6 +637,9 @@ export component ColorBar inherits Rectangle {
     in property <int> count: 1;
     in property <bool> vertical;
     in property <bool> longitudinal;
+    // Filament whose colour is not known (`count` 0): the bar is drawn in the accent colour as a generic filament,
+    // purely as a look, instead of neutral. Leave it off where there may be no filament at all (an empty gate).
+    in property <bool> generic;
     // Length of one colour of a longitudinal filament.
     in property <length> stripe: 6px;
     // The ends are as round as the outline minus its width.
@@ -645,10 +648,11 @@ export component ColorBar inherits Rectangle {
     property <length> across: (root.vertical ? root.width : root.height) - 2px;
     // Pieces: the colours across the bar (coaxial) or the stripes along it (longitudinal).
     property <int> pieces: root.count < 1 ? 0 : root.longitudinal && root.count > 1 ? max(1, ceil(root.long / root.stripe)) : root.count;
+    property <bool> shows-generic: root.generic && root.count < 1;
     border-radius: 4px;
     border-width: 1px;
-    border-color: Theme.border;
-    background: Theme.border;
+    border-color: root.shows-generic ? Theme.accent : Theme.border;
+    background: root.shows-generic ? Theme.accent : Theme.border;
 
     pure function nth(index: int) -> color {
         return index == 1 ? root.second : index == 2 ? root.third : root.first;

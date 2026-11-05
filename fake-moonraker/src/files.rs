@@ -234,6 +234,13 @@ impl Catalog {
         self.files.iter().find(|file| file.path == path)
     }
 
+    /// `server.files.delete_file`: false if there is no such file.
+    pub fn remove(&mut self, path: &str) -> bool {
+        let before = self.files.len();
+        self.files.retain(|file| file.path != path);
+        self.files.len() != before
+    }
+
     pub fn list(&self) -> Value {
         Value::Array(self.files.iter().map(GcodeFile::list_entry).collect())
     }
@@ -283,6 +290,15 @@ impl Catalog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn removed_files_are_no_longer_listed() {
+        let mut catalog = Catalog::demo();
+
+        assert!(catalog.remove("benchy.gcode"));
+        assert!(!catalog.remove("benchy.gcode"));
+        assert!(catalog.find("benchy.gcode").is_none());
+    }
 
     #[test]
     fn finds_files_by_path() {

@@ -15,11 +15,12 @@ component GateColor inherits ColorBar {
     width: 10px;
     height: 32px;
     vertical: true;
-    first: root.gate.has-color ? root.gate.color : Theme.border;
+    first: root.gate.color;
     second: root.gate.color-2;
     third: root.gate.color-3;
-    count: max(1, root.gate.color-count);
+    count: root.gate.color-count;
     longitudinal: root.gate.longitudinal;
+    generic: root.gate.availability == "available" || root.gate.availability == "buffered";
 }
 
 // A tool with the gate it takes its filament from, in that gate's colour and material; a tap opens the choice of gate.
@@ -184,11 +185,12 @@ component GateOption inherits SlotTile {
     ColorBar {
         height: 12px;
         border-radius: 6px;
-        first: root.gate.has-color ? root.gate.color : Theme.border;
+        first: root.gate.color;
         second: root.gate.color-2;
         third: root.gate.color-3;
-        count: max(1, root.gate.color-count);
+        count: root.gate.color-count;
         longitudinal: root.gate.longitudinal;
+        generic: root.gate.availability == "available" || root.gate.availability == "buffered";
     }
     Text {
         text: root.gate.material == "" ? "-" : root.gate.material;

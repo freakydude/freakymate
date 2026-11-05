@@ -280,6 +280,11 @@ impl Printer {
         }
     }
 
+    /// The file of a running or paused job; Moonraker does not delete it.
+    pub fn is_printing(&self, path: &str) -> bool {
+        self.print_state.is_active() && self.filename == path
+    }
+
     pub fn print_state(&self) -> PrintState {
         self.print_state
     }

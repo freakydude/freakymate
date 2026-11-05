@@ -8,7 +8,7 @@ use crate::items::{
     led_effect_item, led_item, power_item, replace_rows, sensor_item, spool_rows, tuning_item, update_item,
 };
 use crate::objects_view::ObjectsView;
-use crate::status_log::{self, info_display_time, StatusLog};
+use crate::status_log::{self, display_time, StatusLog};
 use crate::{bed_map, format, thumbnail, view};
 use crate::{
     AppWindow, ConsoleItem, FanItem, FilamentSensorItem, FileItem, HeaterItem, HostInterfaceItem, LedEffectItem,
@@ -31,8 +31,8 @@ use freakymate_core::sources::PrinterStatus;
 use freakymate_core::{Access, Command, ConnectionState, Event, PrinterService, Query, Snapshot};
 use slint::{ComponentHandle, Image, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use std::cell::{Cell, RefCell};
-use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -45,18 +45,27 @@ struct StatusView {
 }
 
 impl StatusView {
-    /// Puts the log on screen: the flyout list and the message the status bar shows.
+    /// Puts the log on screen: the flyout list with its sections, the event the status bar shows and the counter.
     fn refresh(&self) {
         let log = self.log.borrow();
-        let mut top = 0.0;
+        let has_new = log.messages().any(|message| log.is_new(message));
+        let has_earlier = log.messages().any(|message| !log.is_new(message));
+        let mut top = if has_new { status_log::SECTION_HEIGHT } else { 0.0 };
+        let mut earlier_top = -1.0;
         let items: Vec<MessageItem> = log
             .messages()
             .map(|message| {
+                let new = log.is_new(message);
+                if !new && earlier_top < 0.0 {
+                    earlier_top = top;
+                    top += status_log::SECTION_HEIGHT;
+                }
                 let height = status_log::row_height(&message.text);
                 let item = MessageItem {
                     text: SharedString::from(message.text.as_str()),
                     time: format::unix_clock(message.time).into(),
                     is_error: message.is_error,
+                    new,
                     top,
                     height,
                 };
@@ -68,10 +77,14 @@ impl StatusView {
         let Some(window) = self.window.upgrade() else { return };
         let printer = window.global::<Printer>();
         printer.set_messages_height(top);
-        let badge = log.badge();
-        printer.set_status_message(badge.map(|message| SharedString::from(message.headline())).unwrap_or_default());
-        printer.set_status_message_error(badge.is_some_and(|message| message.is_error));
-        printer.set_status_message_visible(badge.is_some());
+        printer.set_messages_has_new(has_new);
+        printer.set_messages_has_earlier(has_earlier);
+        printer.set_messages_earlier_top(earlier_top.max(0.0));
+        printer.set_unread_errors(i32::try_from(log.unread_errors()).unwrap_or(i32::MAX));
+        let event = log.event();
+        printer.set_status_message(event.map(|message| SharedString::from(message.headline())).unwrap_or_default());
+        printer.set_status_message_error(event.is_some_and(|message| message.is_error));
+        printer.set_status_message_visible(event.is_some());
     }
 }
 
@@ -95,6 +108,8 @@ struct Cache {
     spool_list: Vec<Spool>,
     /// The newest job of the history, for the end of a finished print.
     newest_job: Option<FinishedJob>,
+    /// Paths of the files marked in the file list; they outlive a rebuild of the rows.
+    marked_files: BTreeSet<String>,
 }
 
 pub struct Presenter {
@@ -275,6 +290,7 @@ impl Presenter {
         printer.set_connection(connection_name(snapshot.connection).into());
         printer.set_klippy_state(status.klippy_state.as_str().into());
         printer.set_klippy_message(status.klippy_message.as_str().into());
+        printer.set_klippy_headline(status.klippy_message.lines().next().unwrap_or_default().into());
         printer.set_endpoint(snapshot.endpoint.as_str().into());
         printer.set_ready(ready);
         printer.set_login_user(match &snapshot.access {
@@ -291,6 +307,9 @@ impl Presenter {
         printer.set_filename(status.job.filename.as_str().into());
         printer.set_progress(status.job.progress as f32);
         let interruption = pause::interruption(status);
+        printer.set_interruption_headline(
+            interruption.as_ref().map(view::interruption_headline).unwrap_or_default().into(),
+        );
         let interruption_text = interruption.map(|interruption| view::interruption_text(&interruption, &status.job));
         printer.set_interruption_text(interruption_text.unwrap_or_default().into());
         let layer_pause = pause::layer_pause_offer(&snapshot.sources, status);
@@ -435,7 +454,6 @@ impl Presenter {
         let job = &cache.snapshot.status.job;
         let texts =
             view::job_texts(job, cache.catalog.metadata(&job.filename), cache.catalog.last_print(&job.filename), now);
-        printer.set_clock(format::clock(now).into());
         printer.set_job_name(texts.name.into());
         printer.set_elapsed(texts.elapsed.into());
         printer.set_remaining(texts.remaining.into());
@@ -610,6 +628,7 @@ impl Presenter {
         replace_rows(&self.mmu_tools, tools);
         printer.set_mmu_bypass(mmu.bypass_selected());
         printer.set_mmu_endless_spool(mmu.endless_spool);
+        printer.set_mmu_gate_map_local(mmu.gate_map_is_local());
         let selected = usize::try_from(mmu.gate).ok().and_then(|index| mmu.gates.get(index));
         let (colors, longitudinal) =
             selected.map(|gate| gate_colors(gate, gate_spool(lanes, gate.index))).unwrap_or_default();
@@ -739,30 +758,33 @@ impl Presenter {
         self.show_message(id, text, is_error);
     }
 
-    /// Shows a message in the status bar. Informations leave it again after a while, errors stay until seen.
+    /// Shows a message in the status bar as an event; it leaves again after a while, only the newest one is shown
+    /// (hence one timer). Errors stay in the counter until the flyout is opened.
     fn show_message(&self, id: u64, text: &str, is_error: bool) {
-        if !is_error {
-            let status = Rc::clone(&self.status);
-            self.status_timer.start(TimerMode::SingleShot, info_display_time(text), move || {
-                status.log.borrow_mut().hide_badge(id);
-                status.refresh();
-            });
-        }
+        let status = Rc::clone(&self.status);
+        self.status_timer.start(TimerMode::SingleShot, display_time(text, is_error), move || {
+            status.log.borrow_mut().hide_event(id);
+            status.refresh();
+        });
         self.status.refresh();
     }
 
     /// A `!!` (error) or `//` (information) response of Klipper. Other responses stay in the console.
-    /// Informations are left out while a print runs, when Klipper sends many of them.
+    /// While a print runs, informations only go to the list: Klipper sends many of them and the status bar would flicker.
     fn show_console_response(&self, line: &ConsoleLine) {
         let is_error = line.is_error();
-        let shown = is_error || (line.is_information() && !self.is_printing());
-        if !shown {
+        if !is_error && !line.is_information() {
             return;
         }
         let text = line.text();
-        let added = self.status.log.borrow_mut().add_response(&text, is_error, now_seconds());
-        if let Some(id) = added {
-            self.show_message(id, &text, is_error);
+        if is_error || !self.is_printing() {
+            let added = self.status.log.borrow_mut().add_response(&text, is_error, now_seconds());
+            if let Some(id) = added {
+                self.show_message(id, &text, is_error);
+            }
+        } else {
+            self.status.log.borrow_mut().add_quietly(&text, false, now_seconds());
+            self.status.refresh();
         }
     }
 
@@ -770,8 +792,13 @@ impl Presenter {
         self.cache.borrow().snapshot.status.job.state.is_active()
     }
 
-    pub fn mark_messages_seen(&self) {
-        self.status.log.borrow_mut().mark_seen();
+    pub fn open_messages(&self) {
+        self.status.log.borrow_mut().open_list();
+        self.status.refresh();
+    }
+
+    pub fn close_messages(&self) {
+        self.status.log.borrow_mut().close_list();
         self.status.refresh();
     }
 
@@ -933,25 +960,44 @@ impl Presenter {
     }
 
     pub fn request_files(&self) {
-        if let Some(window) = self.window.upgrade() {
-            window.global::<Printer>().set_files_loading(true);
-        }
         self.service.query(Query::Files);
         self.service.query(Query::PrintHistory);
         self.service.query(Query::SpoolList);
     }
 
+    /// Marks or unmarks a file of the list; marked files can be deleted, a single one can be printed.
+    pub fn toggle_file_mark(&self, path: &str) {
+        {
+            let mut cache = self.cache.borrow_mut();
+            if !cache.marked_files.remove(path) {
+                cache.marked_files.insert(path.to_owned());
+            }
+        }
+        self.show_file_rows();
+    }
+
+    pub fn clear_file_marks(&self) {
+        self.cache.borrow_mut().marked_files.clear();
+        self.show_file_rows();
+    }
+
+    /// The marked files, which are no longer marked afterwards.
+    pub fn take_marked_files(&self) -> Vec<String> {
+        let marked = std::mem::take(&mut self.cache.borrow_mut().marked_files);
+        self.show_file_rows();
+        marked.into_iter().collect()
+    }
+
     fn show_files(&self, files: Vec<FileEntry>) {
         {
             let mut cache = self.cache.borrow_mut();
+            let listed: BTreeSet<&str> = files.iter().map(|file| file.path.as_str()).collect();
+            cache.marked_files.retain(|path| listed.contains(path.as_str()));
             for changed in cache.catalog.set_entries(files) {
                 cache.thumbnails.remove(&changed);
             }
         }
         self.show_file_rows();
-        if let Some(window) = self.window.upgrade() {
-            window.global::<Printer>().set_files_loading(false);
-        }
         let missing = self.cache.borrow().catalog.needing_details();
         for filename in missing {
             self.service.query(Query::FileDetails { filename });
@@ -964,6 +1010,21 @@ impl Presenter {
             cache.catalog.entries().iter().map(|entry| file_row(&cache, entry)).collect()
         };
         replace_rows(&self.files, rows);
+        self.show_file_marks();
+    }
+
+    /// How many files are marked, and which one if it is a single one (the one to print).
+    fn show_file_marks(&self) {
+        let Some(window) = self.window.upgrade() else { return };
+        let cache = self.cache.borrow();
+        let printer = window.global::<Printer>();
+        printer.set_marked_file_count(i32::try_from(cache.marked_files.len()).unwrap_or(i32::MAX));
+        let single = match cache.marked_files.iter().collect::<Vec<_>>().as_slice() {
+            [path] => Some((*path).clone()),
+            _ => None,
+        };
+        printer.set_marked_file_path(single.as_deref().unwrap_or_default().into());
+        printer.set_marked_file_name(single.as_deref().map(format::job_name).unwrap_or_default().into());
     }
 
     fn store_history(&self, history: PrintHistory) {
@@ -1055,5 +1116,6 @@ fn file_row(cache: &Cache, file: &FileEntry) -> FileItem {
         thumbnail: thumbnail.cloned().unwrap_or_default(),
         has_thumbnail: thumbnail.is_some(),
         show_thumbnail: thumbnail.is_some() || info.thumbnail_expected(),
+        marked: cache.marked_files.contains(&file.path),
     }
 }

@@ -221,6 +221,7 @@ impl Session {
             "server.files.list" => Ok(backend.catalog().list()),
             "server.files.metadata" => Ok(find_file(backend, params)?.metadata()),
             "server.history.list" => Ok(backend.history()),
+            "server.files.delete_file" => delete_file(backend, params),
             "server.files.thumbnails" => Ok(find_file(backend, params)?.thumbnails()),
             "server.spoolman.status" if backend.spoolman_enabled() => {
                 Ok(backend.with_spoolman(|spoolman| spoolman.status()))
@@ -373,7 +374,7 @@ fn post_strip(backend: &Backend, params: &Value) -> Result<Value, RpcError> {
 
 fn start_print(backend: &Backend, params: &Value) -> Result<Value, RpcError> {
     let file = find_file(backend, params)?;
-    backend.with_printer(|printer| printer.start_print(file))?;
+    backend.with_printer(|printer| printer.start_print(&file))?;
     Ok(ok())
 }
 
@@ -385,9 +386,32 @@ fn control_printer(
     Ok(ok())
 }
 
-fn find_file<'a>(backend: &'a Backend, params: &Value) -> Result<&'a GcodeFile, RpcError> {
+fn find_file(backend: &Backend, params: &Value) -> Result<GcodeFile, RpcError> {
     let filename = required_str(params, "filename")?;
-    backend.catalog().find(filename).ok_or_else(|| RpcError::new(NOT_FOUND, format!("File does not exist: {filename}")))
+    backend
+        .catalog()
+        .find(filename)
+        .cloned()
+        .ok_or_else(|| RpcError::new(NOT_FOUND, format!("File does not exist: {filename}")))
+}
+
+/// `path` is `gcodes/<file>`, as Moonraker takes it; the file that is being printed stays.
+fn delete_file(backend: &Backend, params: &Value) -> Result<Value, RpcError> {
+    let path = required_str(params, "path")?;
+    let relative = path
+        .strip_prefix("gcodes/")
+        .ok_or_else(|| RpcError::invalid_params(format!("unknown root in path '{path}'")))?;
+    if backend.with_printer(|printer| printer.is_printing(relative)) {
+        return Err(RpcError::new(INVALID_REQUEST, format!("File is loaded, cannot delete: {relative}")));
+    }
+    if !backend.catalog().remove(relative) {
+        return Err(RpcError::new(NOT_FOUND, format!("File does not exist: {path}")));
+    }
+    backend.notify(
+        "notify_filelist_changed",
+        json!([{ "action": "delete_file", "item": { "root": "gcodes", "path": relative } }]),
+    );
+    Ok(json!({ "item": { "path": relative, "root": "gcodes" }, "action": "delete_file" }))
 }
 
 fn required_str<'a>(params: &'a Value, name: &str) -> Result<&'a str, RpcError> {

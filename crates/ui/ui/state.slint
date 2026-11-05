@@ -1,8 +1,12 @@
 // Shared data between Rust and UI. Rust writes `Printer` and `UiSettings`, the UI calls `Actions`.
 
 import { Icons } from "icons.slint";
+import { Theme } from "theme.slint";
 
 // `updates`, `network`, `console` and `settings` (the Settings tab) are tabs of the system pages.
+// What a state or a message means; each meaning has one colour (`StateIcons.severity-color`).
+export enum Severity { neutral, fine, running, attention, error, info }
+
 export enum Page { print, move, temperature, tune, filament, console, system, settings, updates, network }
 
 export struct HeaterItem {
@@ -234,6 +238,8 @@ export struct FileItem {
     has-thumbnail: bool,
     // False for a file that has no thumbnail: its row then starts with the text.
     show-thumbnail: bool,
+    // Marked for printing (a single one) or deleting.
+    marked: bool,
 }
 
 export struct ConsoleItem {
@@ -247,6 +253,8 @@ export struct MessageItem {
     text: string,
     time: string,
     is-error: bool,
+    // Came after the list was closed last: stands under "New", the rest under "Earlier".
+    new: bool,
     top: length,
     height: length,
 }
@@ -316,6 +324,8 @@ export global Printer {
     in property <string> connection: "connecting";
     in property <string> klippy-state: "disconnected";
     in property <string> klippy-message;
+    // The first line of it, for the status bar.
+    in property <string> klippy-headline;
     in property <string> endpoint;
     in property <bool> ready;
     // How the display got into Moonraker: as the user logged in here, with the API key of the credentials file,
@@ -345,6 +355,8 @@ export global Printer {
     in property <string> ended;
     // What the sources state about a pause or an error, one fact per line; empty if nothing is stated.
     in property <string> interruption-text;
+    // The first fact of it alone, for the status bar.
+    in property <string> interruption-headline;
     // A pause at a layer can be planned with Mainsail's macros (only while the slicer reports the layers).
     in property <bool> layer-pause-next;
     in property <bool> layer-pause-at;
@@ -424,6 +436,8 @@ export global Printer {
     in property <[MmuToolItem]> mmu-tools;
     // EndlessSpool: on a runout Happy Hare continues with the next gate of the same group.
     in property <bool> mmu-endless-spool;
+    // Material and colour of a gate can be set in Happy Hare; false when it takes them from Spoolman (`pull`).
+    in property <bool> mmu-gate-map-local;
     in property <bool> mmu-paused;
     in property <bool> mmu-locked;
     in property <bool> mmu-homed;
@@ -512,20 +526,28 @@ export global Printer {
     in property <[SpoolItem]> spools;
     in property <bool> spools-loading;
     in property <[FileItem]> files;
-    in property <bool> files-loading;
+    // Files marked in the file list; the path and name only when it is a single one, which can be printed.
+    in property <int> marked-file-count;
+    in property <string> marked-file-path;
+    in property <string> marked-file-name;
     in property <[ConsoleItem]> console;
     in property <[PowerItem]> power-devices;
     in property <[UpdateItem]> updates;
     // How many of them have an update waiting.
     in property <int> updates-available;
 
-    in property <string> clock;
-    // Status bar: the message it shows (first line), and the flyout list, newest first.
+    // Status bar: the event it shows for a while (first line of a message), the errors not read yet, and the flyout
+    // list, newest first, in two sections ("New" above "Earlier") of which one may be empty.
     in property <string> status-message;
     in property <bool> status-message-error;
     in property <bool> status-message-visible;
+    in property <int> unread-errors;
     in property <[MessageItem]> messages;
     in property <length> messages-height;
+    in property <bool> messages-has-new;
+    in property <bool> messages-has-earlier;
+    // Where the heading "Earlier" stands.
+    in property <length> messages-earlier-top;
 
     out property <bool> is-printing: print-state == "printing" || print-state == "paused";
     // Moving and extruding are allowed while paused, e.g. to change the filament; a running print locks them.
@@ -663,6 +685,10 @@ export global Actions {
     callback set-gate-color(int, color);
     callback run-gcode(string);
     callback refresh-files();
+    callback toggle-file-mark(string);
+    callback clear-file-marks();
+    // Deletes the marked files from the printer.
+    callback delete-marked-files();
     callback start-print(string);
     callback pause-print();
     callback resume-print();
@@ -683,7 +709,9 @@ export global Actions {
     callback upgrade(string);
     callback load-console();
     callback clear-console();
-    callback messages-seen();
+    // The message list was opened or closed; use `Navigation.open-messages()` and `close-messages()`.
+    callback messages-opened();
+    callback messages-closed();
     callback messages-clear();
     // A key of the on-screen keyboard (the text it types, or a special key such as Key.Backspace); the focused field
     // handles it like a key of a physical keyboard.
@@ -782,7 +810,7 @@ export enum TuneTab { basics, expert }
 export global Navigation {
     in-out property <Page> page: Page.print;
     in-out property <bool> files-open;
-    in-out property <bool> messages-open;
+    out property <bool> messages-open;
     // Filament page; with an MMU it opens on the Gates tab.
     in-out property <FilamentTab> filament-tab;
     // Page of gate tiles the Gates tab shows, counted from 0.
@@ -796,6 +824,20 @@ export global Navigation {
     in-out property <float> history-aspect: 2;
     // The light panel at the light symbol of the status bar.
     in-out property <bool> light-open;
+
+    // The message list opens and closes only here, so that Rust learns of every close (what was new becomes earlier).
+    public function open-messages() {
+        self.light-open = false;
+        self.messages-open = true;
+        Actions.messages-opened();
+    }
+
+    public function close-messages() {
+        if (self.messages-open) {
+            self.messages-open = false;
+            Actions.messages-closed();
+        }
+    }
 
     // A tap on a temperature reading leads to the heaters; a quiet shortcut, not styled as a button.
     public function show-heaters() {
@@ -826,6 +868,7 @@ export global Confirm {
     public function execute() {
         self.open = false;
         if (self.action == "start-print") { Actions.start-print(self.argument); }
+        if (self.action == "delete-files") { Actions.delete-marked-files(); }
         if (self.action == "cancel-print") { Actions.cancel-print(); }
         if (self.action == "emergency-stop") { Actions.emergency-stop(); }
         if (self.action == "run-macro") { Actions.run-macro(self.argument); }
@@ -866,6 +909,7 @@ export global Dialogs {
     out property <int> dismissals;
 
     public function dismiss() {
+        Navigation.close-messages();
         Confirm.open = false;
         SpoolPicker.open = false;
         MmuDialogs.gate = -1;
@@ -925,9 +969,10 @@ export global StateIcons {
     }
 
     // Status bar: connection/Klipper while not ready, then a print job if there is one, otherwise the activity.
+    // While printing the progress and the remaining time say it all, the file name is on the print page.
     public pure function summary-label() -> string {
         if (!Printer.ready) { return self.klippy-label(Printer.connection, Printer.klippy-state); }
-        if (Printer.is-printing) { return Printer.job-name; }
+        if (Printer.print-state == "printing") { return ""; }
         if (Printer.print-state != "standby") { return self.print-state-label(Printer.print-state); }
         return self.activity-label(Printer.activity);
     }
@@ -938,11 +983,49 @@ export global StateIcons {
         return "";
     }
 
-    // Whether the summary says that all is fine: Klipper ready and nothing running, or the print finished.
-    public pure function summary-is-fine() -> bool {
-        if (!Printer.ready) { return false; }
-        if (Printer.print-state == "complete") { return true; }
-        return Printer.print-state == "standby" && Printer.activity != "busy";
+    // The part of the summary that is shortened first: remaining time, first fact of a pause or an error, or
+    // Klipper's message.
+    public pure function summary-detail() -> string {
+        if (!Printer.ready) {
+            if (Printer.connection == "connected" && (Printer.klippy-state == "shutdown" || Printer.klippy-state == "error")) {
+                return Printer.klippy-headline;
+            }
+            return "";
+        }
+        if (Printer.print-state == "printing") { return Printer.remaining == "-" ? "" : @tr("{} left", Printer.remaining); }
+        if (Printer.print-state == "paused" || Printer.print-state == "error") { return Printer.interruption-headline; }
+        return "";
+    }
+
+    // The one place that says what a state means; the colour follows from it (see `severity-color`).
+    public pure function summary-severity() -> Severity {
+        if (!Printer.ready) {
+            if (Printer.connection == "connecting") { return Severity.info; }
+            if (Printer.connection == "login-required") { return Severity.attention; }
+            if (Printer.connection == "connected" && Printer.klippy-state == "startup") { return Severity.info; }
+            return Severity.error;
+        }
+        if (Printer.print-state == "paused") { return Severity.attention; }
+        if (Printer.print-state == "error") { return Severity.error; }
+        if (Printer.print-state == "complete") { return Severity.fine; }
+        if (Printer.print-state == "standby" && Printer.activity != "busy") { return Severity.fine; }
+        return Severity.neutral;
+    }
+
+    // One colour per meaning, for a symbol, a word or a line; never a filled area.
+    public pure function severity-color(severity: Severity) -> color {
+        if (severity == Severity.fine) { return Theme.success; }
+        if (severity == Severity.running) { return Theme.accent; }
+        if (severity == Severity.attention) { return Theme.warning; }
+        if (severity == Severity.error) { return Theme.danger; }
+        if (severity == Severity.info) { return Theme.info; }
+        return Theme.foreground;
+    }
+
+    // The word of a state carries the colour only when it asks for a human.
+    public pure function label-color(severity: Severity) -> color {
+        if (severity == Severity.attention || severity == Severity.error) { return self.severity-color(severity); }
+        return Theme.foreground;
     }
 
     public pure function summary() -> image {

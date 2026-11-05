@@ -39,6 +39,7 @@ component Tube inherits Rectangle {
         third: root.filament-3;
         count: root.colors;
         longitudinal: root.longitudinal;
+        generic: true;
     }
 }
 
@@ -133,8 +134,8 @@ export component FilamentPath inherits VerticalLayout {
         padding-left: 24px;
         padding-right: root.distance != "" ? 100px : 26px;
         Label { text: root.path.gate-label; horizontal-stretch: 1; horizontal-alignment: left; }
-        Label { text: "Bowden"; horizontal-stretch: 5; }
-        Label { text: "Extruder"; horizontal-stretch: 3; }
-        Label { text: "Nozzle"; horizontal-stretch: 1; horizontal-alignment: right; }
+        Label { text: @tr("Bowden"); horizontal-stretch: 5; }
+        Label { text: @tr("Extruder"); horizontal-stretch: 3; }
+        Label { text: @tr("Nozzle"); horizontal-stretch: 1; horizontal-alignment: right; }
     }
 }

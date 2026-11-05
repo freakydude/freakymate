@@ -513,6 +513,7 @@ impl HappyHare {
 
     fn mmu_json(&self, print_state: &str) -> Value {
         let printing = print_state == "printing";
+        let paused = print_state == "paused";
         let mut mmu = json!({
             "enabled": true,
             "num_gates": self.gates,
@@ -531,8 +532,10 @@ impl HappyHare {
             "filament_position": PATH_LENGTH * f64::from(self.filament_position().max(0)) / f64::from(FILAMENT_POSITION_LOADED)
                 * f64::from(if self.direction < 0 { -1 } else { 1 }),
             "action": "Idle",
-            "reason_for_pause": "",
-            "is_paused": false,
+            // The fake states a reason for every pause; `pause_hint` is Happy Hare 4.2 and newer.
+            "reason_for_pause": if paused { "Runout on gate 1" } else { "" },
+            "pause_hint": if paused { "Load a new spool into gate 1, then RESUME" } else { "" },
+            "is_paused": paused,
             "is_locked": false,
             "sensors": self.sensors_json(printing),
             "sync_drive": false,

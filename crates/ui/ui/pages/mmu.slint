@@ -109,6 +109,7 @@ component GateTile inherits SlotTile {
         third: root.gate.color-3;
         count: root.gate.color-count;
         longitudinal: root.gate.longitudinal;
+        generic: root.has-filament;
     }
     Text {
         text: root.gate.material == "" ? "-" : root.gate.material;
@@ -117,10 +118,11 @@ component GateTile inherits SlotTile {
         overflow: elide;
     }
     // With Spoolman the line of the filament name says what is left of the spool instead (the name repeats the
-    // material and the colour above); a gate without one invites to pick one in the gate's dialog.
+    // material and the colour above); a gate without one invites to pick one in the gate's dialog. A spool that Happy
+    // Hare knows but Spoolman does not tell about (not reachable) shows its number.
     Text {
-        text: !root.shows-spool ? root.gate.name : root.gate.spool-text != "" ? root.gate.spool-text : @tr("+ spool");
-        color: root.shows-spool && root.gate.spool-low ? Theme.warning : root.shows-spool && root.gate.spool-text == "" ? Theme.accent : Theme.muted;
+        text: !root.shows-spool ? root.gate.name : root.gate.spool-text != "" ? root.gate.spool-text : root.gate.spool-id >= 0 ? @tr("Spool #{}", root.gate.spool-id) : @tr("+ spool");
+        color: root.shows-spool && root.gate.spool-low ? Theme.warning : root.shows-spool && root.gate.spool-text == "" && root.gate.spool-id < 0 ? Theme.accent : Theme.muted;
         font-size: Theme.font-small;
         overflow: elide;
     }
@@ -384,6 +386,7 @@ export component MmuStrip inherits Card {
                 third: Printer.spool-color-3;
                 count: Printer.spool-color-count;
                 longitudinal: Printer.spool-longitudinal;
+                generic: true;
             }
             if Printer.has-spool: TextWithValue {
                 alignment: end;
