@@ -133,18 +133,21 @@ pub fn ended_text(job: &PrintJob, newest: Option<&FinishedJob>, now: DateTime<Lo
 /// What the sources state about a pause or an error, one fact per line, and where the print stands (layer and
 /// height); empty if nothing is known.
 pub fn interruption_text(interruption: &Interruption, job: &PrintJob) -> String {
-    interruption
-        .facts
-        .iter()
-        .map(|fact| match fact {
-            InterruptionFact::KlipperMessage(text)
-            | InterruptionFact::MmuReason(text)
-            | InterruptionFact::MmuHint(text) => text.clone(),
-            InterruptionFact::SensorEmpty { label } => format!("{label}: no filament"),
-        })
-        .chain(stands_at(job))
-        .collect::<Vec<_>>()
-        .join("\n")
+    interruption.facts.iter().map(fact_text).chain(stands_at(job)).collect::<Vec<_>>().join("\n")
+}
+
+/// The first fact of a pause or an error for the status bar, without where the print stands; empty if none is stated.
+pub fn interruption_headline(interruption: &Interruption) -> String {
+    interruption.facts.first().map(fact_text).unwrap_or_default()
+}
+
+fn fact_text(fact: &InterruptionFact) -> String {
+    match fact {
+        InterruptionFact::KlipperMessage(text)
+        | InterruptionFact::MmuReason(text)
+        | InterruptionFact::MmuHint(text) => text.clone(),
+        InterruptionFact::SensorEmpty { label } => format!("{label}: no filament"),
+    }
 }
 
 /// `Layer 50 · 10.00 mm`, or the part that is known.
@@ -531,6 +534,20 @@ mod tests {
         );
         let job = PrintJob { current_layer: Some(50), height: Some(10.0), ..PrintJob::default() };
         assert_eq!(interruption_text(&Interruption { failed: false, facts: Vec::new() }, &job), "Layer 50 · 10.00 mm");
+    }
+
+    #[test]
+    fn the_headline_of_an_interruption_is_its_first_fact_without_the_layer() {
+        let interruption = Interruption {
+            failed: false,
+            facts: vec![
+                InterruptionFact::KlipperMessage("Filament runout".into()),
+                InterruptionFact::SensorEmpty { label: "Toolhead Runout".into() },
+            ],
+        };
+
+        assert_eq!(interruption_headline(&interruption), "Filament runout");
+        assert_eq!(interruption_headline(&Interruption { failed: false, facts: Vec::new() }), "");
     }
 
     fn file_metadata() -> FileMetadata {

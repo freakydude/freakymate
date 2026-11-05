@@ -379,13 +379,28 @@ fn filament_path_midway(session: &mut Session) -> Result<(), String> {
     session.wait_until("filament back in the gate", at(0))
 }
 
-/// The message flyout with an error from a command the printer refuses.
+/// An error from a command the printer refuses: first an event in the field of the status bar with the counter, then
+/// the flyout, which resets the counter, and after closing it nothing is unread.
 fn messages(session: &mut Session) -> Result<(), String> {
     session.service.send(Command::RunGcode { script: "SET_FAN_SPEED FAN=missing SPEED=1".into() });
     session.pump(Duration::from_secs(1));
-    session.window.global::<Navigation>().set_messages_open(true);
+    let printer = session.window.global::<Printer>();
+    if printer.get_unread_errors() < 1 || !printer.get_status_message_visible() {
+        return Err("the status bar shows neither the error nor the counter".into());
+    }
+    session.capture("messages-event")?;
+    let navigation = session.window.global::<Navigation>();
+    navigation.invoke_open_messages();
+    session.pump(Duration::from_millis(200));
+    if session.window.global::<Printer>().get_unread_errors() != 0 {
+        return Err("the counter is not reset by opening the list".into());
+    }
     session.capture("messages")?;
-    session.window.global::<Navigation>().set_messages_open(false);
+    session.window.global::<Navigation>().invoke_close_messages();
+    session.pump(Duration::from_millis(200));
+    if session.window.global::<Printer>().get_messages().row_data(0).is_some_and(|message| message.new) {
+        return Err("the messages are still new after closing the list".into());
+    }
     // The scenes after it should not show this made-up error in the status bar.
     session.presenter.clear_messages();
     session.pump(Duration::from_millis(200));
@@ -577,16 +592,16 @@ const LAYER_TILE: (f32, f32) = (580.0, 133.0);
 const LAYER_PAUSE_BUTTON: (f32, f32) = (440.0, 320.0);
 /// How far ahead the scene plans a pause first, so that it shows without pausing.
 const PLANNED_LAYERS_AHEAD: i32 = 40;
-/// The nozzle temperature of the status bar while a print runs and no message is shown (800x480, no fitting).
-const STATUS_BAR_NOZZLE: (f32, f32) = (440.0, 22.0);
+/// The nozzle temperature of the status bar while a print runs (800x480, no fitting).
+const STATUS_BAR_NOZZLE: (f32, f32) = (510.0, 22.0);
 /// The Objects button of the paused print page, then in its dialog: the fake's BENCHY_1 on the bed map (centre
 /// 200/160 mm on a 300 mm bed, map at 96/128 with 268 px), the Exclude button and the close cross (800x480).
 const OBJECTS_BUTTON: (f32, f32) = (740.0, 204.0);
 const MAP_BENCHY_1: (f32, f32) = (275.0, 253.0);
 const EXCLUDE_BUTTON: (f32, f32) = (560.0, 432.0);
 const CLOSE_OBJECTS_BUTTON: (f32, f32) = (752.0, 92.0);
-/// The light symbol of the status bar while a print runs and a message is shown (800x480, no fitting).
-const STATUS_BAR_LIGHT: (f32, f32) = (641.0, 22.0);
+/// The light symbol of the status bar (800x480, no fitting).
+const STATUS_BAR_LIGHT: (f32, f32) = (700.0, 22.0);
 
 /// The command field of the console (800x480, no fitting).
 const COMMAND_FIELD: (f32, f32) = (480.0, 444.0);

@@ -290,8 +290,10 @@ pub fn bind(
             .and_then(|index| i32::try_from(index).ok())
             .unwrap_or(-1)
     });
-    let seen_presenter = presenter.clone();
-    actions.on_messages_seen(move || seen_presenter.mark_messages_seen());
+    let opened_presenter = presenter.clone();
+    actions.on_messages_opened(move || opened_presenter.open_messages());
+    let closed_presenter = presenter.clone();
+    actions.on_messages_closed(move || closed_presenter.close_messages());
     let clear_presenter = presenter.clone();
     actions.on_messages_clear(move || clear_presenter.clear_messages());
 

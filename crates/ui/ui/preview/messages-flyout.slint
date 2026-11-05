@@ -1,8 +1,10 @@
-// Preview: status bar with an error and the messages flyout open. Open in the Slint preview or render with scripts/ui-preview.sh.
+// Preview: status bar with an error and the messages flyout open (two new messages, two earlier ones). Open in the Slint
+// preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
 import { MessagesFlyout } from "../components/overlays.slint";
 import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
 
 export component MessagesFlyoutPreview inherits AppWindow {
     MessagesFlyout {
@@ -11,17 +13,18 @@ export component MessagesFlyoutPreview inherits AppWindow {
     }
 
     init => {
-        Navigation.page = Page.console;
-        Navigation.messages-open = true;
-        Printer.status-message = "Must home axis first: 150.000 150.000 20.000 [0.000]";
-        Printer.status-message-error = true;
-        Printer.status-message-visible = true;
+        Navigation.page = Page.temperature;
+        Navigation.open-messages();
+        Sample.printing();
+        Printer.messages-has-new = true;
+        Printer.messages-has-earlier = true;
         Printer.messages = [
-            { text: "Must home axis first: 150.000 150.000 20.000 [0.000]", time: "11:32:05", is-error: true, top: 0px, height: 72px },
-            { text: "Klipper state: Ready", time: "11:31:58", is-error: false, top: 78px, height: 72px },
-            { text: "Lost connection to the MCU 'mcu' (secondary)\nreconnect the printer", time: "11:20:41", is-error: true, top: 156px, height: 90px },
-            { text: "Available commands:\nG0, G1: Move to a position\nG28: Home axes", time: "11:12:03", is-error: false, top: 252px, height: 90px },
+            { text: "Unknown command:\"G29\"", time: "11:34:12", is-error: true, new: true, top: 24px, height: 42px },
+            { text: "Must home axis first: 150.000 150.000 20.000 [0.000]", time: "11:32:05", is-error: true, new: true, top: 72px, height: 64px },
+            { text: "Probe accuracy results: maximum 2.512500, minimum 2.507500, range 0.005000", time: "11:20:41", is-error: false, new: false, top: 166px, height: 64px },
+            { text: "Klipper state: Ready", time: "11:12:03", is-error: false, new: false, top: 236px, height: 42px },
         ];
-        Printer.messages-height = 348px;
+        Printer.messages-earlier-top = 142px;
+        Printer.messages-height = 284px;
     }
 }

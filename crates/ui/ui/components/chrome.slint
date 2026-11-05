@@ -2,9 +2,8 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, StateIcons, TuneTab } from "../state.slint";
+import { Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, Severity, StateIcons, TuneTab } from "../state.slint";
 import { BusyWheel } from "busy-wheel.slint";
-import { TextWithValue } from "controls.slint";
 
 // A temperature of the status bar; a tap leads to the heaters without looking like a button.
 component TemperatureReading inherits Rectangle {
@@ -39,44 +38,176 @@ component TemperatureReading inherits Rectangle {
     }
 }
 
+// Counter of the errors not read yet; it stays until the message list is opened. The one coloured area besides buttons.
+component UnreadCounter inherits Rectangle {
+    in property <int> count;
+    width: counter-row.preferred-width;
+    height: 26px;
+    border-radius: 13px;
+    background: Theme.danger-fill;
+    counter-row := HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 9px;
+        spacing: 3px;
+        Image {
+            cross-axis-self-alignment: center;
+            source: Icons.ui-error;
+            colorize: Theme.foreground;
+            width: 16px;
+            height: 16px;
+        }
+        Text {
+            text: root.count;
+            color: Theme.foreground;
+            font-size: Theme.font-normal;
+            font-weight: 700;
+            vertical-alignment: center;
+        }
+    }
+}
+
 export component StatusBar inherits Rectangle {
     // The one place for what is running right now: a command of this display that waits long for its answer, what
     // the MMU is doing (whoever started it), or the network being changed.
     property <string> activity: Printer.running-command != "" ? Printer.running-command
         : Printer.mmu-action != "" && Printer.mmu-action != "Idle" ? Printer.mmu-action
         : Network.busy;
+    property <Severity> severity: StateIcons.summary-severity();
+    property <bool> shows-progress: Printer.ready && (Printer.print-state == "printing" || Printer.print-state == "paused");
 
     height: 44px;
     background: Theme.surface;
 
     HorizontalLayout {
-        padding-left: 10px;
+        padding-left: 4px;
         padding-right: 2px;
         spacing: 12px;
 
-        HorizontalLayout {
-            spacing: 6px;
+        // State and messages in one field. The state rests here; an event (an error or an information) lies in
+        // front of it for a while; a tap opens the message list, or closes it.
+        field := Rectangle {
             horizontal-stretch: 1;
-            // While something runs, the turning wheel and its name replace the summary.
-            if root.activity != "": BusyWheel {
-                cross-axis-self-alignment: center;
-                width: 40px;
-                height: 40px;
+            border-radius: Theme.radius;
+            background: field-touch.pressed || Navigation.messages-open ? Theme.surface-active
+                : Printer.status-message-visible ? Theme.surface-raised : transparent;
+            accessible-role: button;
+            accessible-label: Printer.status-message-visible ? Printer.status-message : StateIcons.summary-label();
+            field-touch := TouchArea {
+                clicked => {
+                    if (Navigation.messages-open) {
+                        Navigation.close-messages();
+                    } else {
+                        Dialogs.dismiss();
+                        Navigation.open-messages();
+                    }
+                }
             }
-            if root.activity == "": Image {
-                cross-axis-self-alignment: center;
-                source: StateIcons.summary();
-                colorize: !Printer.ready ? Theme.warning : StateIcons.summary-is-fine() ? Theme.success : Theme.foreground;
-                width: 24px;
-                height: 24px;
+
+            HorizontalLayout {
+                padding-left: 6px;
+                padding-right: 6px;
+                spacing: 8px;
+
+                if Printer.status-message-visible: HorizontalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 8px;
+                    Image {
+                        cross-axis-self-alignment: center;
+                        source: Printer.status-message-error ? Icons.ui-error : Icons.ui-info;
+                        colorize: Printer.status-message-error ? Theme.danger : Theme.info;
+                        width: 22px;
+                        height: 22px;
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        text: Printer.status-message;
+                        color: Theme.foreground;
+                        font-size: Theme.font-normal;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+
+                // While something runs, the turning wheel and its name replace the state.
+                if !Printer.status-message-visible && root.activity != "": HorizontalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 6px;
+                    BusyWheel {
+                        cross-axis-self-alignment: center;
+                        width: 40px;
+                        height: 40px;
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        text: root.activity + " …";
+                        color: Theme.foreground;
+                        font-size: Theme.font-normal;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+
+                if !Printer.status-message-visible && root.activity == "": HorizontalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 8px;
+                    Image {
+                        cross-axis-self-alignment: center;
+                        source: StateIcons.summary();
+                        colorize: StateIcons.severity-color(root.severity);
+                        width: 24px;
+                        height: 24px;
+                    }
+                    // The progress of a print stays whole when the detail is shortened.
+                    HorizontalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 8px;
+                        if StateIcons.summary-label() != "": Text {
+                            min-width: self.preferred-width;
+                            text: StateIcons.summary-label();
+                            color: StateIcons.label-color(root.severity);
+                            font-size: Theme.font-normal;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                        if StateIcons.summary-value() != "": Text {
+                            min-width: self.preferred-width;
+                            text: StateIcons.summary-value();
+                            color: Theme.foreground;
+                            font-size: Theme.font-normal;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            horizontal-stretch: 1;
+                            text: StateIcons.summary-detail();
+                            color: Theme.muted;
+                            font-size: Theme.font-normal;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+                }
+
+                if Printer.unread-errors > 0: UnreadCounter {
+                    y: (parent.height - self.height) / 2;
+                    count: Printer.unread-errors;
+                }
             }
-            // The progress of a print stays whole when a long file name is shortened.
-            TextWithValue {
-                text: root.activity != "" ? root.activity + " …" : StateIcons.summary-label();
-                value: root.activity != "" ? "" : StateIcons.summary-value();
-                separator: "  ";
-                color: Theme.foreground;
-                font-size: Theme.font-normal;
+
+            // Progress of the print along the lower edge: accent while it runs, grey while it stands.
+            if root.shows-progress: Rectangle {
+                x: 6px;
+                y: parent.height - 4px;
+                width: parent.width - 12px;
+                height: 3px;
+                border-radius: 1.5px;
+                background: Theme.surface-active;
+                Rectangle {
+                    x: 0;
+                    width: parent.width * Printer.progress;
+                    border-radius: 1.5px;
+                    background: Printer.print-state == "printing" ? StateIcons.severity-color(Severity.running) : Theme.muted;
+                }
             }
         }
 
@@ -91,43 +222,6 @@ export component StatusBar inherits Rectangle {
             icon: Icons.thermal-bed;
             heating: Printer.bed-target > 0;
             text: round(Printer.bed-temperature) + "°" + (Printer.bed-target > 0 ? " / " + round(Printer.bed-target) + "°" : "");
-        }
-        // Newest message of the status bar; tapping it opens the flyout with all messages.
-        if Printer.status-message-visible: Rectangle {
-            horizontal-stretch: 1;
-            // Leaves the state, the temperatures and the light symbol their room.
-            max-width: 300px;
-            border-radius: Theme.radius;
-            // An error is filled red and stays until seen; an information is quiet, only its symbol is blue.
-            background: Printer.status-message-error ? Theme.danger-fill : Theme.surface-raised;
-            accessible-role: button;
-            accessible-label: Printer.status-message;
-            status-touch := TouchArea {
-                clicked => {
-                    Dialogs.dismiss();
-                    Navigation.messages-open = true;
-                    Actions.messages-seen();
-                }
-            }
-            HorizontalLayout {
-                padding-left: 8px;
-                padding-right: 8px;
-                spacing: 6px;
-                Image {
-                    cross-axis-self-alignment: center;
-                    source: Printer.status-message-error ? Icons.ui-error : Icons.ui-info;
-                    colorize: Printer.status-message-error ? Theme.foreground : Theme.info;
-                    width: 20px;
-                    height: 20px;
-                }
-                Text {
-                    text: Printer.status-message;
-                    color: Theme.foreground;
-                    font-size: Theme.font-small;
-                    vertical-alignment: center;
-                    overflow: elide;
-                }
-            }
         }
         // Opens the light panel; lit while the main light (chamber or case light) is on. A controllable backlight
         // of the display is reason enough, also without a ready printer.
@@ -149,12 +243,6 @@ export component StatusBar inherits Rectangle {
                 width: 24px;
                 height: 24px;
             }
-        }
-        Text {
-            text: Printer.clock;
-            color: Theme.muted;
-            font-size: Theme.font-normal;
-            vertical-alignment: center;
         }
         VerticalLayout {
             padding-top: Theme.spacing-tight;
