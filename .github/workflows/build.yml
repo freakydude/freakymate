@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: System libraries for Slint
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libinput-dev libudev-dev libgbm-dev
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libinput-dev libudev-dev
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
@@ -115,7 +115,7 @@ jobs:
           apt_get update
           apt_get install -y --no-install-recommends curl ca-certificates git pkg-config build-essential \
             ${{ matrix.compiler }} libfontconfig1-dev:${{ matrix.arch }} libxkbcommon-dev:${{ matrix.arch }} \
-            libinput-dev:${{ matrix.arch }} libudev-dev:${{ matrix.arch }} libgbm-dev:${{ matrix.arch }}
+            libinput-dev:${{ matrix.arch }} libudev-dev:${{ matrix.arch }}
       - uses: actions/checkout@v7
       - name: Rust
         run: |

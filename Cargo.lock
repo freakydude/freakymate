@@ -1468,7 +1468,9 @@ dependencies = [
  "freakymate-core",
  "freakymate-ui",
  "input",
+ "libc",
  "log",
+ "memmap2",
  "slint",
  "tempfile",
  "thiserror 2.0.21",
@@ -2023,7 +2025,6 @@ dependencies = [
  "i-slint-core",
  "i-slint-core-macros",
  "i-slint-renderer-femtovg",
- "input",
 ]
 
 [[package]]

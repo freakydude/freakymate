@@ -179,10 +179,12 @@ history).
   device is attached; the BTT HDMI5 also registers as a mouse. On the desktop, in a window and in fullscreen switched
   on in the settings, the system's pointer stays.
 - Fallback for displays without DRM/KMS (only a framebuffer driver such as fbtft, no `/dev/dri/card*`):
-  `--framebuffer` selects Slint's `linuxkms` backend with the software renderer, which draws straight to `/dev/fbN`
-  and reads input through libinput (`framebuffer.rs`). There are no winit events then: the layout is fitted once when
-  shown, and a libinput hook feeds the standby. The installer starts it without cage and only when no DRM device
-  exists; cage with the GPU stays the standard.
+  `--framebuffer` sets a small Slint platform of its own (`framebuffer/`): the software renderer draws into a picture
+  in memory, a thread copies only the changed rectangle to `/dev/fbN`, and input comes through libinput. Slint's
+  `linuxkms` backend copies the whole picture on every change; fbtft sends every changed line over SPI (about 0.3 s
+  for a 480x320 picture at 12.5 MHz), and the event loop read touches late. There are no winit events: the layout is
+  fitted once when shown, and the input handling feeds the standby. The installer starts it without cage and only
+  when no DRM device exists; cage with the GPU stays the standard.
 - Builds for `aarch64`, `armv7` and `x86_64` run in CI in an Ubuntu 22.04 container: glibc 2.35, the oldest maintained
   system with `cage` and `seatd`, so one build runs on Ubuntu 22.04/24.04 and Debian Bookworm/Trixie.
 
