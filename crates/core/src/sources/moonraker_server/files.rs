@@ -1,7 +1,8 @@
 //! Moonraker's file manager: G-code files, their metadata and thumbnails.
 
+use crate::moonraker::Call;
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 #[derive(Debug, Clone, PartialEq, Default, Deserialize)]
 pub struct FileEntry {
@@ -109,6 +110,11 @@ impl FileMetadata {
     }
 }
 
+/// `server.files.delete_file`: removes a G-code file; `path` is relative to the `gcodes` root, as in the file list.
+pub fn delete_file(path: &str) -> Call {
+    Call::with("server.files.delete_file", json!({ "path": format!("gcodes/{path}") }))
+}
+
 pub fn parse_file_list(result: &Value) -> Vec<FileEntry> {
     let mut files: Vec<FileEntry> = serde_json::from_value::<Vec<FileEntry>>(result.clone())
         .unwrap_or_default()
@@ -142,6 +148,14 @@ fn encode_segment(segment: &str) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn delete_names_the_file_below_the_gcodes_root() {
+        let call = delete_file("my parts/cube.gcode");
+
+        assert_eq!(call.method, "server.files.delete_file");
+        assert_eq!(call.params, Some(json!({ "path": "gcodes/my parts/cube.gcode" })));
+    }
 
     #[test]
     fn thumbnails_are_decoded_to_pixels_and_svg_stays_text() {

@@ -687,6 +687,8 @@ impl<'a> Session<'a> {
                     self.outputs.event(Event::ConsoleLine(console_line(ConsoleKind::Response, message)));
                 }
             }
+            // Files added, removed or renamed, from here or another client.
+            "notify_filelist_changed" => self.answer(Query::Files),
             "notify_power_changed" => self.answer(Query::PowerDevices),
             // Moonraker may record the end of a job after the state change was published.
             "notify_history_changed" => self.answer(Query::PrintHistory),

@@ -241,20 +241,20 @@ export component OnScreenKeyboard inherits VerticalLayout {
         }
 
         Key {
-            label: "space";
+            label: @tr("space");
             horizontal-stretch: 3;
             pressed => { root.typed(" "); }
         }
 
         Key {
-            label: "backspace";
+            label: @tr("backspace");
             icon: Icons.ui-chevron-left;
             horizontal-stretch: 2;
             pressed => { root.backspace(); }
         }
 
         Key {
-            label: "enter";
+            label: @tr("enter");
             icon: Icons.ui-check;
             accent: true;
             horizontal-stretch: 2;
@@ -408,7 +408,7 @@ component NumericKeypad inherits VerticalLayout {
             pressed => { root.typed(key); }
         }
         if index == 0: Key {
-            label: "backspace";
+            label: @tr("backspace");
             icon: Icons.ui-chevron-left;
             pressed => { root.backspace(); }
         }
@@ -428,7 +428,7 @@ component NumericKeypad inherits VerticalLayout {
             pressed => { root.typed("0"); }
         }
         Key {
-            label: "enter";
+            label: @tr("enter");
             icon: Icons.ui-check;
             accent: true;
             horizontal-stretch: 2;
@@ -927,7 +927,7 @@ export component CalibrationDialog inherits Scrim {
             if root.probing: HorizontalLayout {
                 spacing: Theme.spacing;
                 Text {
-                    text: "Z " + Printer.probe-z + " mm";
+                    text: @tr("Z {} mm", Printer.probe-z);
                     color: Theme.foreground;
                     font-size: Theme.font-huge;
                     font-weight: 600;

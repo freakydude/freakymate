@@ -91,6 +91,7 @@ component FileRow inherits Rectangle {
     in property <image> thumbnail;
     in property <bool> has-thumbnail;
     in property <bool> show-thumbnail;
+    // Marked for printing or deleting.
     in property <bool> selected;
     callback clicked;
     height: 72px;
@@ -172,12 +173,20 @@ component FileRow inherits Rectangle {
 
 // File list over the print page; scroll by swiping or with the bar at the right edge.
 export component FileBrowser inherits Rectangle {
-    property <int> selected: -1;
     property <length> row-step: 76px;
+    property <bool> print-running: Printer.is-printing;
     background: Theme.background;
     visible: Navigation.files-open;
 
     TouchArea { }
+
+    // A print started elsewhere (another client, a macro) leaves nothing to choose here.
+    changed print-running => {
+        if (self.print-running) {
+            Actions.clear-file-marks();
+            Navigation.files-open = false;
+        }
+    }
 
     HorizontalLayout {
         padding: Theme.padding;
@@ -201,8 +210,8 @@ export component FileBrowser inherits Rectangle {
                 thumbnail: file.thumbnail;
                 has-thumbnail: file.has-thumbnail;
                 show-thumbnail: file.show-thumbnail;
-                selected: index == root.selected;
-                clicked => { root.selected = index; }
+                selected: file.marked;
+                clicked => { Actions.toggle-file-mark(file.path); }
             }
         }
 
@@ -212,15 +221,20 @@ export component FileBrowser inherits Rectangle {
             IconButton {
                 icon: Icons.ui-close;
                 text: @tr("Close");
-                clicked => { Navigation.files-open = false; }
+                clicked => {
+                    Actions.clear-file-marks();
+                    Navigation.files-open = false;
+                }
             }
             IconButton {
-                icon: Icons.ui-refresh;
-                text: Printer.files-loading ? @tr("Loading") : @tr("Refresh");
-                enabled: !Printer.files-loading;
+                icon: Icons.ui-delete;
+                text: @tr("Delete");
+                enabled: Printer.marked-file-count > 0;
                 clicked => {
-                    root.selected = -1;
-                    Actions.refresh-files();
+                    Confirm.ask(
+                        @tr("Delete files"),
+                        Printer.marked-file-count == 1 ? Printer.marked-file-name : @tr("{n} file" | "{n} files" % Printer.marked-file-count),
+                        "delete-files", "", true);
                 }
             }
             IconButton {
@@ -228,9 +242,10 @@ export component FileBrowser inherits Rectangle {
                 text: @tr("Print");
                 kind: "accent";
                 vertical-stretch: 1;
-                enabled: root.selected >= 0 && root.selected < Printer.files.length && !Printer.is-printing;
+                enabled: Printer.marked-file-path != "";
                 clicked => {
-                    Confirm.ask(@tr("Start print"), Printer.files[root.selected].name + Actions.print-hints(Printer.files[root.selected].path), "start-print", Printer.files[root.selected].path, false);
+                    Confirm.ask(@tr("Start print"), Printer.marked-file-name + Actions.print-hints(Printer.marked-file-path), "start-print", Printer.marked-file-path, false);
+                    Actions.clear-file-marks();
                     Navigation.files-open = false;
                 }
             }

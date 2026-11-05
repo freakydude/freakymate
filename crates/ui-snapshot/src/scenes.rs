@@ -147,6 +147,14 @@ fn pages(session: &mut Session) -> Result<(), String> {
     session.window.global::<Navigation>().set_files_open(true);
     session.settle_replies(Duration::from_secs(2));
     session.capture("print-files")?;
+    // Two marked files: the delete button is enabled and the print button waits for a single one.
+    for row in 0..2 {
+        let path =
+            session.window.global::<Printer>().get_files().row_data(row).map(|file| file.path).unwrap_or_default();
+        session.window.global::<Actions>().invoke_toggle_file_mark(path);
+    }
+    session.capture("print-files-marked")?;
+    session.window.global::<Actions>().invoke_clear_file_marks();
     session.window.global::<Navigation>().set_files_open(false);
     // The console comes before the Thermal page, whose fan test would fill it with the fake's commands.
     for (page, name) in [

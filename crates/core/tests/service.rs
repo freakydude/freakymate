@@ -408,6 +408,22 @@ async fn the_picker_list_is_most_recently_used_first() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_deleted_file_comes_back_as_a_new_file_list_without_asking() {
+    let endpoint = start_fake().await;
+    let (service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+    wait_for(&mut channels, ready).await;
+
+    service.send(Command::DeleteFile { path: "calibration_cube.gcode".into() });
+    let Event::Files(files) = next_event(&mut channels, |event| matches!(event, Event::Files(_))).await else {
+        unreachable!()
+    };
+
+    assert!(files.iter().all(|file| file.path != "calibration_cube.gcode"));
+    assert!(files.iter().any(|file| file.path == "benchy.gcode"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn runs_print_job_and_loads_file_details() {
     let endpoint = start_fake().await;
     let (service, mut channels) =

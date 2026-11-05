@@ -223,6 +223,17 @@ pub fn bind(
 
     let files_presenter = Rc::clone(presenter);
     actions.on_refresh_files(move || files_presenter.request_files());
+    let mark_presenter = Rc::clone(presenter);
+    actions.on_toggle_file_mark(move |path| mark_presenter.toggle_file_mark(&path));
+    let clear_presenter = Rc::clone(presenter);
+    actions.on_clear_file_marks(move || clear_presenter.clear_file_marks());
+    let delete_presenter = Rc::clone(presenter);
+    let delete_service = service.clone();
+    actions.on_delete_marked_files(move || {
+        for path in delete_presenter.take_marked_files() {
+            delete_service.send(Command::DeleteFile { path });
+        }
+    });
     actions.on_start_print(with(service, |service, filename: slint::SharedString| {
         service.send(Command::StartPrint { filename: filename.into() });
     }));

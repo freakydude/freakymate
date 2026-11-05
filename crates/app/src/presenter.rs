@@ -31,8 +31,8 @@ use freakymate_core::sources::PrinterStatus;
 use freakymate_core::{Access, Command, ConnectionState, Event, PrinterService, Query, Snapshot};
 use slint::{ComponentHandle, Image, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use std::cell::{Cell, RefCell};
-use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -95,6 +95,8 @@ struct Cache {
     spool_list: Vec<Spool>,
     /// The newest job of the history, for the end of a finished print.
     newest_job: Option<FinishedJob>,
+    /// Paths of the files marked in the file list; they outlive a rebuild of the rows.
+    marked_files: BTreeSet<String>,
 }
 
 pub struct Presenter {
@@ -934,25 +936,44 @@ impl Presenter {
     }
 
     pub fn request_files(&self) {
-        if let Some(window) = self.window.upgrade() {
-            window.global::<Printer>().set_files_loading(true);
-        }
         self.service.query(Query::Files);
         self.service.query(Query::PrintHistory);
         self.service.query(Query::SpoolList);
     }
 
+    /// Marks or unmarks a file of the list; marked files can be deleted, a single one can be printed.
+    pub fn toggle_file_mark(&self, path: &str) {
+        {
+            let mut cache = self.cache.borrow_mut();
+            if !cache.marked_files.remove(path) {
+                cache.marked_files.insert(path.to_owned());
+            }
+        }
+        self.show_file_rows();
+    }
+
+    pub fn clear_file_marks(&self) {
+        self.cache.borrow_mut().marked_files.clear();
+        self.show_file_rows();
+    }
+
+    /// The marked files, which are no longer marked afterwards.
+    pub fn take_marked_files(&self) -> Vec<String> {
+        let marked = std::mem::take(&mut self.cache.borrow_mut().marked_files);
+        self.show_file_rows();
+        marked.into_iter().collect()
+    }
+
     fn show_files(&self, files: Vec<FileEntry>) {
         {
             let mut cache = self.cache.borrow_mut();
+            let listed: BTreeSet<&str> = files.iter().map(|file| file.path.as_str()).collect();
+            cache.marked_files.retain(|path| listed.contains(path.as_str()));
             for changed in cache.catalog.set_entries(files) {
                 cache.thumbnails.remove(&changed);
             }
         }
         self.show_file_rows();
-        if let Some(window) = self.window.upgrade() {
-            window.global::<Printer>().set_files_loading(false);
-        }
         let missing = self.cache.borrow().catalog.needing_details();
         for filename in missing {
             self.service.query(Query::FileDetails { filename });
@@ -965,6 +986,21 @@ impl Presenter {
             cache.catalog.entries().iter().map(|entry| file_row(&cache, entry)).collect()
         };
         replace_rows(&self.files, rows);
+        self.show_file_marks();
+    }
+
+    /// How many files are marked, and which one if it is a single one (the one to print).
+    fn show_file_marks(&self) {
+        let Some(window) = self.window.upgrade() else { return };
+        let cache = self.cache.borrow();
+        let printer = window.global::<Printer>();
+        printer.set_marked_file_count(i32::try_from(cache.marked_files.len()).unwrap_or(i32::MAX));
+        let single = match cache.marked_files.iter().collect::<Vec<_>>().as_slice() {
+            [path] => Some((*path).clone()),
+            _ => None,
+        };
+        printer.set_marked_file_path(single.as_deref().unwrap_or_default().into());
+        printer.set_marked_file_name(single.as_deref().map(format::job_name).unwrap_or_default().into());
     }
 
     fn store_history(&self, history: PrintHistory) {
@@ -1056,5 +1092,6 @@ fn file_row(cache: &Cache, file: &FileEntry) -> FileItem {
         thumbnail: thumbnail.cloned().unwrap_or_default(),
         has_thumbnail: thumbnail.is_some(),
         show_thumbnail: thumbnail.is_some() || info.thumbnail_expected(),
+        marked: cache.marked_files.contains(&file.path),
     }
 }

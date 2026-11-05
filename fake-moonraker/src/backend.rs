@@ -22,7 +22,7 @@ pub struct Backend {
     wled: Mutex<Wled>,
     /// Moonraker's `wled` component, with the extra devices of the profile.
     wled_enabled: bool,
-    catalog: Catalog,
+    catalog: Mutex<Catalog>,
     /// Jobs that ended while the fake runs, newest first; the history lists them before the demo jobs.
     ended_jobs: Mutex<Vec<Value>>,
     started: Instant,
@@ -43,7 +43,7 @@ impl Backend {
             spoolman_enabled: profile.spoolman,
             wled: Mutex::new(Wled::default()),
             wled_enabled: profile.devices,
-            catalog: Catalog::demo(),
+            catalog: Mutex::new(Catalog::demo()),
             ended_jobs: Mutex::new(Vec::new()),
             started: Instant::now(),
             notifications: broadcast::channel(NOTIFICATION_BUFFER).0,
@@ -104,13 +104,13 @@ impl Backend {
         action(&mut spoolman)
     }
 
-    pub fn catalog(&self) -> &Catalog {
-        &self.catalog
+    pub fn catalog(&self) -> std::sync::MutexGuard<'_, Catalog> {
+        self.catalog.lock().expect("catalog lock poisoned")
     }
 
     /// `server.history.list`: the jobs that ended here, then the demo history.
     pub fn history(&self) -> Value {
-        let demo = self.catalog.history();
+        let demo = self.catalog().history();
         let mut jobs = self.ended_jobs.lock().expect("history lock poisoned").clone();
         jobs.extend(demo["jobs"].as_array().cloned().unwrap_or_default());
         json!({ "count": jobs.len(), "jobs": jobs })

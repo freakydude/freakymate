@@ -234,6 +234,8 @@ export struct FileItem {
     has-thumbnail: bool,
     // False for a file that has no thumbnail: its row then starts with the text.
     show-thumbnail: bool,
+    // Marked for printing (a single one) or deleting.
+    marked: bool,
 }
 
 export struct ConsoleItem {
@@ -514,7 +516,10 @@ export global Printer {
     in property <[SpoolItem]> spools;
     in property <bool> spools-loading;
     in property <[FileItem]> files;
-    in property <bool> files-loading;
+    // Files marked in the file list; the path and name only when it is a single one, which can be printed.
+    in property <int> marked-file-count;
+    in property <string> marked-file-path;
+    in property <string> marked-file-name;
     in property <[ConsoleItem]> console;
     in property <[PowerItem]> power-devices;
     in property <[UpdateItem]> updates;
@@ -665,6 +670,10 @@ export global Actions {
     callback set-gate-color(int, color);
     callback run-gcode(string);
     callback refresh-files();
+    callback toggle-file-mark(string);
+    callback clear-file-marks();
+    // Deletes the marked files from the printer.
+    callback delete-marked-files();
     callback start-print(string);
     callback pause-print();
     callback resume-print();
@@ -828,6 +837,7 @@ export global Confirm {
     public function execute() {
         self.open = false;
         if (self.action == "start-print") { Actions.start-print(self.argument); }
+        if (self.action == "delete-files") { Actions.delete-marked-files(); }
         if (self.action == "cancel-print") { Actions.cancel-print(); }
         if (self.action == "emergency-stop") { Actions.emergency-stop(); }
         if (self.action == "run-macro") { Actions.run-macro(self.argument); }
