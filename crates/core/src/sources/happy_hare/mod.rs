@@ -245,6 +245,8 @@ pub struct MmuStatus {
     pub operation: String,
     pub print_state: String,
     pub reason_for_pause: String,
+    /// What to do about the pause (`pause_hint`, Happy Hare 4.2 and newer); empty before or outside a pause.
+    pub pause_hint: String,
     pub filament: LoadedFilament,
     /// Where the filament of the selected gate is, see [`FilamentPath`].
     pub filament_pos: i32,
@@ -351,6 +353,7 @@ pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
         operation: text(mmu, "operation"),
         print_state: text(mmu, "print_state"),
         reason_for_pause: text(mmu, "reason_for_pause"),
+        pause_hint: text(mmu, "pause_hint"),
         filament: LoadedFilament::parse(&text(mmu, "filament")),
         filament_pos: integer(mmu, "filament_pos", FILAMENT_POS_UNKNOWN),
         filament_direction: integer(mmu, "filament_direction", 0),
@@ -590,6 +593,17 @@ mod tests {
         let flowguard = mmu.flowguard.unwrap();
         assert!(flowguard.enabled && !flowguard.active);
         assert_eq!(mmu.servo, None);
+    }
+
+    #[test]
+    fn the_pause_hint_is_empty_before_happy_hare_4_2_and_read_after() {
+        assert_eq!(read_mmu(&single_gate_machine()).unwrap().pause_hint, "");
+
+        let with_hint = store(json!({
+            "mmu": { "enabled": true, "pause_hint": "Check the nozzle, then RESUME" },
+            "mmu_machine": { "happy_hare_version": "4.2.0" }
+        }));
+        assert_eq!(read_mmu(&with_hint).unwrap().pause_hint, "Check the nozzle, then RESUME");
     }
 
     #[test]

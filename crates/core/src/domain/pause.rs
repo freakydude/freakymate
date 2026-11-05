@@ -14,6 +14,8 @@ pub enum InterruptionFact {
     KlipperMessage(String),
     /// Happy Hare's `reason_for_pause`.
     MmuReason(String),
+    /// Happy Hare's `pause_hint` (4.2 and newer): what to do about the pause.
+    MmuHint(String),
     /// An enabled filament sensor sees no filament. A fact, not necessarily the cause of the pause.
     SensorEmpty { label: String },
 }
@@ -39,7 +41,10 @@ pub fn interruption(status: &PrinterStatus) -> Option<Interruption> {
         facts.push(InterruptionFact::KlipperMessage(message));
     }
     match status.happy_hare() {
-        Some(mmu) => facts.extend(non_empty(&mmu.reason_for_pause).map(InterruptionFact::MmuReason)),
+        Some(mmu) => {
+            facts.extend(non_empty(&mmu.reason_for_pause).map(InterruptionFact::MmuReason));
+            facts.extend(non_empty(&mmu.pause_hint).map(InterruptionFact::MmuHint));
+        }
         None => facts.extend(
             status
                 .filament_sensors
@@ -164,6 +169,24 @@ mod tests {
         let facts = interruption(&status).unwrap().facts;
 
         assert_eq!(facts, [InterruptionFact::MmuReason("Runout at gate 1".into())]);
+    }
+
+    #[test]
+    fn the_pause_hint_follows_the_reason_and_is_optional() {
+        let mut status = status(PrintState::Paused);
+        let mut mmu = happy_hare(true);
+        mmu.pause_hint = "Check the nozzle, then RESUME".into();
+        status.mmu = Some(mmu);
+
+        let facts = interruption(&status).unwrap().facts;
+
+        assert_eq!(
+            facts,
+            [
+                InterruptionFact::MmuReason("Runout at gate 1".into()),
+                InterruptionFact::MmuHint("Check the nozzle, then RESUME".into())
+            ]
+        );
     }
 
     #[test]

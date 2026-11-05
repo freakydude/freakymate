@@ -137,7 +137,9 @@ pub fn interruption_text(interruption: &Interruption, job: &PrintJob) -> String 
         .facts
         .iter()
         .map(|fact| match fact {
-            InterruptionFact::KlipperMessage(text) | InterruptionFact::MmuReason(text) => text.clone(),
+            InterruptionFact::KlipperMessage(text)
+            | InterruptionFact::MmuReason(text)
+            | InterruptionFact::MmuHint(text) => text.clone(),
             InterruptionFact::SensorEmpty { label } => format!("{label}: no filament"),
         })
         .chain(stands_at(job))
