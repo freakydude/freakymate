@@ -1,4 +1,4 @@
-// Preview: Gates tab with Spoolman: spools of one, two and three colours, one nearly empty, one gate without a spool.
+// Preview: Gates tab with Spoolman: spools of one, two and three colours, one nearly empty, one gate without a spool and without a colour (the accent colour as a generic filament).
 // Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
@@ -15,7 +15,7 @@ export component FilamentMmuSpoolColorsPreview inherits AppWindow {
             { index: 0, availability: "available", name: "Red", material: "ABS+", color: #e31f2b, has-color: true, color-count: 1, tools: "T0", selected: true, spool-text: "613 g", spool-low: false, spool-id: 18 },
             { index: 1, availability: "available", name: "Red+Green", material: "PLA", color: #e31f2b, color-2: #2e7d32, has-color: true, color-count: 2, tools: "T1", selected: false, spool-text: "38 g", spool-low: true, spool-id: 21 },
             { index: 2, availability: "buffered", name: "Silk Red+Gold+Black", material: "PLA", color: #ff0004, color-2: #ffa424, color-3: #000000, has-color: true, color-count: 3, tools: "T2", selected: false, spool-text: "802 g", spool-low: false, spool-id: 19 },
-            { index: 3, availability: "available", name: "", material: "PETG", color: #26a69a, has-color: true, color-count: 1, tools: "T3", selected: false, spool-text: "", spool-low: false, spool-id: -1 },
+            { index: 3, availability: "available", name: "", material: "PETG", color: #000000, has-color: false, color-count: 0, tools: "T3", selected: false, spool-text: "", spool-low: false, spool-id: -1 },
         ];
     }
 }

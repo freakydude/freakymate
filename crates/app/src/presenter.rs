@@ -610,6 +610,7 @@ impl Presenter {
         replace_rows(&self.mmu_tools, tools);
         printer.set_mmu_bypass(mmu.bypass_selected());
         printer.set_mmu_endless_spool(mmu.endless_spool);
+        printer.set_mmu_gate_map_local(mmu.gate_map_is_local());
         let selected = usize::try_from(mmu.gate).ok().and_then(|index| mmu.gates.get(index));
         let (colors, longitudinal) =
             selected.map(|gate| gate_colors(gate, gate_spool(lanes, gate.index))).unwrap_or_default();

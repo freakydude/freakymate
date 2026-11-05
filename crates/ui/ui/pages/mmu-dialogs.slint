@@ -53,6 +53,10 @@ component ColorSwatch inherits Rectangle {
 // keep it open. The dialog hangs from the top, so its actions stay in the same place with and without Spoolman.
 export component GateDialog inherits Scrim {
     property <MmuGateItem> item: Printer.mmu-gates[MmuDialogs.gate];
+    // A gate without a spool of Spoolman (no Spoolman at all, or a spool that is not kept there) has its material and
+    // colour in Happy Hare's gate map, and a tap sets them right away. With a spool, Spoolman gives them, and when
+    // Happy Hare takes them from Spoolman (`pull`) they cannot be set here.
+    property <bool> sets-filament: Printer.mmu-gate-map-local && (!Printer.has-spoolman || root.item.spool-id < 0);
     visible: MmuDialogs.gate >= 0 && MmuDialogs.gate < Printer.mmu-gates.length;
 
     function close() {
@@ -84,11 +88,12 @@ export component GateDialog inherits Scrim {
                     width: 14px;
                     height: 36px;
                     vertical: true;
-                    first: root.item.has-color ? root.item.color : Theme.border;
+                    first: root.item.color;
                     second: root.item.color-2;
                     third: root.item.color-3;
-                    count: max(1, root.item.color-count);
+                    count: root.item.color-count;
                     longitudinal: root.item.longitudinal;
+                    generic: root.item.availability == "available" || root.item.availability == "buffered";
                 }
                 VerticalLayout {
                     horizontal-stretch: 1;
@@ -172,8 +177,7 @@ export component GateDialog inherits Scrim {
                 }
             }
 
-            // Without Spoolman material and colour live in Happy Hare's gate map; a tap sets them right away.
-            if !Printer.has-spoolman: HorizontalLayout {
+            if root.sets-filament: HorizontalLayout {
                 spacing: Theme.spacing;
                 for material in GateFilaments.materials: IconButton {
                     horizontal-stretch: 1;
@@ -182,7 +186,7 @@ export component GateDialog inherits Scrim {
                     clicked => { Actions.set-gate-material(root.item.index, material); }
                 }
             }
-            if !Printer.has-spoolman: HorizontalLayout {
+            if root.sets-filament: HorizontalLayout {
                 spacing: Theme.spacing;
                 for swatch in GateFilaments.colors: ColorSwatch {
                     horizontal-stretch: 1;

@@ -123,6 +123,7 @@ export global Sample {
     public function mmu() {
         self.ready-printer();
         Printer.has-mmu = true;
+        Printer.mmu-gate-map-local = true;
         Printer.mmu-homed = true;
         Printer.mmu-filament = "unloaded";
         Printer.mmu-action = "Idle";

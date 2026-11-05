@@ -424,6 +424,8 @@ export global Printer {
     in property <[MmuToolItem]> mmu-tools;
     // EndlessSpool: on a runout Happy Hare continues with the next gate of the same group.
     in property <bool> mmu-endless-spool;
+    // Material and colour of a gate can be set in Happy Hare; false when it takes them from Spoolman (`pull`).
+    in property <bool> mmu-gate-map-local;
     in property <bool> mmu-paused;
     in property <bool> mmu-locked;
     in property <bool> mmu-homed;
