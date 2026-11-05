@@ -74,7 +74,7 @@ impl Application {
         });
         crate::logging::set_verbose(settings.verbose_log);
         let renderer = if options.framebuffer {
-            "linuxkms-software (framebuffer fallback)".to_owned()
+            "software (framebuffer fallback)".to_owned()
         } else {
             std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "default".to_owned())
         };
@@ -87,7 +87,7 @@ impl Application {
         let input_target = crate::framebuffer::InputTarget::default();
         #[cfg(target_os = "linux")]
         if options.framebuffer {
-            crate::framebuffer::select_backend(input_target.clone())?;
+            crate::framebuffer::install_platform(input_target.clone())?;
         }
         let window = AppWindow::new()?;
         // Wayland and X11 desktops find the icon through the app id and `freakymate.desktop`, not the window icon.

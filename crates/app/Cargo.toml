@@ -35,10 +35,12 @@ slint = { workspace = true, features = [
 tokio.workspace = true
 thiserror.workspace = true
 
-# Fallback for displays without DRM/KMS (`--framebuffer`): Slint draws straight to /dev/fbN, input comes from libinput.
+# Fallback for displays without DRM/KMS (`--framebuffer`): a platform of its own draws with Slint's software renderer
+# to /dev/fbN (mapped with memmap2, read with ioctls from libc), input comes from libinput.
 [target.'cfg(target_os = "linux")'.dependencies]
-slint = { workspace = true, features = ["backend-linuxkms-noseat", "unstable-libinput-09"] }
 input = "0.10.0"
+libc = "0.2.191"
+memmap2 = "0.9.11"
 
 [dev-dependencies]
 tempfile = "3.27.0"
