@@ -1,8 +1,8 @@
 //! Klipper's filament sensors (`filament_switch_sensor`, `filament_motion_sensor`). Which of them belong to the
 //! printer and which to an MMU is decided in [`crate::domain::filament`].
 
-use super::fields::flag;
 use super::status::label;
+use crate::sources::fields::flag;
 use crate::sources::objects::ObjectStore;
 
 #[derive(Debug, Clone, PartialEq, Default)]

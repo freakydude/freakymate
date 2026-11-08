@@ -68,12 +68,12 @@ export component SystemPage inherits Rectangle {
                 HorizontalLayout {
                     spacing: Theme.spacing;
                     height: 64px;
-                    for service in ["klipper", "moonraker"]: IconButton {
-                        text: service;
+                    for service in [{ id: "klipper", name: @tr("Klipper") }, { id: "moonraker", name: @tr("Moonraker") }]: IconButton {
+                        text: service.name;
                         icon: Icons.system-restart;
                         icon-size: 20px;
                         enabled: Printer.connection == "connected" && !Printer.host-actions-locked;
-                        clicked => { Confirm.ask(@tr("Restart service"), service, "restart-service", service, false); }
+                        clicked => { Confirm.ask(@tr("Restart service"), service.name, "restart-service", service.id, false); }
                     }
                 }
                 if Printer.host-actions-locked: IconLabel {

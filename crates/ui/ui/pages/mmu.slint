@@ -119,11 +119,7 @@ component GateTile inherits SlotTile {
     ColorBar {
         height: 12px;
         border-radius: 6px;
-        first: root.gate.color;
-        second: root.gate.color-2;
-        third: root.gate.color-3;
-        count: root.gate.color-count;
-        longitudinal: root.gate.longitudinal;
+        colors: root.gate.colors;
         generic: root.has-filament;
     }
     Text {
@@ -396,11 +392,7 @@ export component MmuStrip inherits Card {
                 width: 34px;
                 height: 12px;
                 border-radius: 6px;
-                first: Printer.spool-color;
-                second: Printer.spool-color-2;
-                third: Printer.spool-color-3;
-                count: Printer.spool-color-count;
-                longitudinal: Printer.spool-longitudinal;
+                colors: Printer.spool-colors;
                 generic: true;
             }
             if Printer.has-spool: TextWithValue {

@@ -1,5 +1,6 @@
 // Basic building blocks for touch input: buttons, step selection, cards, progress.
 
+import { BarColors } from "../state.slint";
 import { Theme } from "../theme.slint";
 
 // Button with icon and optional text. `kind`: normal | accent | danger.
@@ -631,12 +632,8 @@ export component IconLabel inherits HorizontalLayout {
 // longitudinal one take turns along it (Spoolman's `multi_color_direction`). Without colour (`count` 0) the bar is
 // neutral, or the accent colour with `generic`. Only the outer pieces are rounded, each on its outer corners, so the bar keeps its shape in every renderer.
 export component ColorBar inherits Rectangle {
-    in property <color> first;
-    in property <color> second;
-    in property <color> third;
-    in property <int> count: 1;
+    in property <BarColors> colors: { count: 1 };
     in property <bool> vertical;
-    in property <bool> longitudinal;
     // Filament whose colour is not known (`count` 0): the bar is drawn in the accent colour as a generic filament,
     // purely as a look, instead of neutral. Leave it off where there may be no filament at all (an empty gate).
     in property <bool> generic;
@@ -647,21 +644,21 @@ export component ColorBar inherits Rectangle {
     property <length> long: (root.vertical ? root.height : root.width) - 2px;
     property <length> across: (root.vertical ? root.width : root.height) - 2px;
     // Pieces: the colours across the bar (coaxial) or the stripes along it (longitudinal).
-    property <int> pieces: root.count < 1 ? 0 : root.longitudinal && root.count > 1 ? max(1, ceil(root.long / root.stripe)) : root.count;
-    property <bool> shows-generic: root.generic && root.count < 1;
+    property <int> pieces: root.colors.count < 1 ? 0 : root.colors.longitudinal && root.colors.count > 1 ? max(1, ceil(root.long / root.stripe)) : root.colors.count;
+    property <bool> shows-generic: root.generic && root.colors.count < 1;
     border-radius: 4px;
     border-width: 1px;
     border-color: root.shows-generic ? Theme.accent : Theme.border;
     background: root.shows-generic ? Theme.accent : Theme.border;
 
     pure function nth(index: int) -> color {
-        return index == 1 ? root.second : index == 2 ? root.third : root.first;
+        return index == 1 ? root.colors.second : index == 2 ? root.colors.third : root.colors.first;
     }
 
     for piece in root.pieces: Rectangle {
         // Along the long side for stripes, across it for coaxial colours.
-        property <bool> along: root.longitudinal && root.count > 1;
-        property <length> size: self.along ? root.stripe : root.across / root.count;
+        property <bool> along: root.colors.longitudinal && root.colors.count > 1;
+        property <length> size: self.along ? root.stripe : root.across / root.colors.count;
         property <length> start: piece * self.size;
         property <length> length: self.along ? min(root.stripe, root.long - self.start) : self.size;
         property <bool> head: piece == 0;
@@ -678,7 +675,7 @@ export component ColorBar inherits Rectangle {
         height: root.vertical == self.along ? self.length : (root.vertical ? root.long : root.across);
         // A colour with alpha lies over a checkerboard of 2x2 fields, so it reads as see-through. Rounded corners are set
         // on every layer (no clipping), the dark fields only on their outer corner.
-        property <color> tint: root.nth(mod(piece, root.count));
+        property <color> tint: root.nth(mod(piece, root.colors.count));
         property <bool> see-through: self.tint.alpha < 255;
         background: self.see-through ? Theme.checker-light : self.tint;
         border-top-left-radius: self.top-round && self.left-round ? root.end : 0px;

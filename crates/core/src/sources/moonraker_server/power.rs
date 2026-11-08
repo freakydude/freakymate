@@ -19,6 +19,11 @@ impl PowerDevice {
     }
 }
 
+/// `machine.device_power.devices`.
+pub fn devices_call() -> Call {
+    Call::new("machine.device_power.devices")
+}
+
 pub fn parse_power_devices(result: &Value) -> Vec<PowerDevice> {
     result.get("devices").cloned().and_then(|devices| serde_json::from_value(devices).ok()).unwrap_or_default()
 }

@@ -3,14 +3,14 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { FilamentTab, MmuToolItem, Navigation, Page, Printer, SpoolPicker } from "../state.slint";
+import { FilamentTab, ToolMatchItem, Navigation, Page, Printer, SpoolPicker } from "../state.slint";
 import { Card, ColorBar, ScrollList, TextWithValue, ValueTile } from "../components/controls.slint";
 import { VerdictIcon } from "mmu.slint";
 import { GateColor, WantedColor } from "mmu-tools.slint";
 
 // A tool of the file: the colour it asks for beside the colour of its gate, and whether they fit.
 component ToolChip inherits Rectangle {
-    in property <MmuToolItem> mapping;
+    in property <ToolMatchItem> mapping;
     property <bool> has-gate: root.mapping.gate >= 0;
     callback clicked;
     background: chip-touch.pressed ? Theme.surface-active : Theme.surface-raised;
@@ -66,7 +66,7 @@ component ToolChip inherits Rectangle {
 
 // Tools of the file as chips, five in a row; more than two rows scroll. The first `skip` tools are left out.
 component ToolChipGrid inherits ScrollList {
-    in property <[MmuToolItem]> tools;
+    in property <[ToolMatchItem]> tools;
     in property <int> skip;
     property <int> columns: 5;
     property <int> count: max(0, root.tools.length - root.skip);
@@ -175,7 +175,7 @@ component FilamentLine inherits HorizontalLayout {
 // What the file asks of the extruder beside the spool in use; a tap opens the spool picker when Spoolman is there.
 // Without MMU only tool 0 can be compared: Spoolman knows one spool in use. Further tools of the file show as chips.
 component ExtruderMatchCard inherits Card {
-    property <MmuToolItem> first: Printer.prepared-tools[0];
+    property <ToolMatchItem> first: Printer.prepared-tools[0];
     property <bool> several: Printer.prepared-tools.length > 1;
     title: @tr("Filament");
     icon: Icons.filament-spool;
@@ -192,7 +192,7 @@ component ExtruderMatchCard inherits Card {
         label: root.several ? "T" + root.first.tool : @tr("File");
         title: root.first.wanted-material != "" ? root.first.wanted-material : @tr("No filament named");
         detail: root.first.wanted-profile;
-        value: root.first.wanted-grams;
+        value: root.first.wanted-weight;
         if root.first.wanted-has-color: WantedColor {
             cross-axis-self-alignment: center;
             mapping: root.first;
@@ -209,11 +209,7 @@ component ExtruderMatchCard inherits Card {
             width: 12px;
             height: 30px;
             vertical: true;
-            first: Printer.spool-color;
-            second: Printer.spool-color-2;
-            third: Printer.spool-color-3;
-            count: Printer.spool-color-count;
-            longitudinal: Printer.spool-longitudinal;
+            colors: Printer.spool-colors;
             generic: true;
         }
     }

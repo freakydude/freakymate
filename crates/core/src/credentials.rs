@@ -4,8 +4,9 @@
 //! backed up to a git repository. The credentials therefore always stay in the user's configuration directory, in a
 //! file only the owner can read.
 
+use crate::atomic_file::write_atomically;
 use crate::moonraker::Endpoint;
-use crate::settings::{write_atomically, APP_FOLDER};
+use crate::settings::APP_FOLDER;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

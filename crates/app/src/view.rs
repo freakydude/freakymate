@@ -3,12 +3,12 @@
 use crate::format;
 use chrono::{DateTime, Local};
 use freakymate_core::domain::estimates;
-use freakymate_core::domain::filament_match::{self, Difference, PrintHint, ToolMatch, Verdict};
+use freakymate_core::domain::filament_match::{self, Difference, PrintHint, PrintHintKind, ToolMatch, Verdict};
 use freakymate_core::domain::file_catalog::FileInfo;
 use freakymate_core::domain::job_end;
 use freakymate_core::domain::pause::{Interruption, InterruptionFact};
 use freakymate_core::sources::happy_hare::{
-    path_sensor_names, FlowGuardState, GateAvailability, LoadedFilament, MmuSensor, ServoPosition, SyncFeedbackState,
+    FlowGuardState, GateAvailability, LoadedFilament, ServoPosition, SyncFeedbackState,
 };
 use freakymate_core::sources::klipper::tuning::TuningRange;
 use freakymate_core::sources::klipper::{FanKind, PrintJob, PrintState};
@@ -172,26 +172,38 @@ pub fn spool_preset_text(spool: &Spool) -> Option<String> {
 
 /// A hint before the print as a line of text. `show_tool` names the tool when there are several lanes.
 pub fn print_hint_text(hint: &PrintHint, show_tool: bool) -> String {
-    let tool = |tool: usize| if show_tool { format!("T{tool}: ") } else { String::new() };
-    match hint {
-        PrintHint::Material { tool: number, expected, loaded } => {
-            format!("{}the file is for {expected}, the spool is {loaded}", tool(*number))
-        }
-        PrintHint::Weight { tool: number, needed, left } => {
-            format!(
-                "{}needs ~{}, the spool has {} left",
-                tool(*number),
-                format::filament_weight(*needed),
-                format::filament_weight(*left)
-            )
-        }
-        PrintHint::Color { tool: number } => format!("{}the colour differs from the file", tool(*number)),
-        PrintHint::GateEmpty { tool: number } => format!("{}the gate is empty", tool(*number)),
-        PrintHint::NoGate { tool: number } => format!("T{number}: the printer has no gate for this tool"),
+    let tool = if show_tool { format!("T{}: ", hint.tool) } else { String::new() };
+    let spool = "The spool";
+    match &hint.kind {
+        PrintHintKind::Differs(difference) => format!("{tool}{}", difference_sentence(spool, spool, difference)),
+        PrintHintKind::GateEmpty => format!("{tool}{}", empty_gate_sentence("The gate")),
+        PrintHintKind::NoGate => no_gate_sentence(hint.tool),
     }
 }
 
-/// The key of a verdict for the UI (`MmuToolItem.verdict`): "fits", "differs", "gate-empty", "no-gate" or "".
+/// One difference between the file and the filament as a sentence, for the print page and the question before the
+/// start alike. `source` names where the tool prints from, `spool` the spool for the weight.
+fn difference_sentence(source: &str, spool: &str, difference: &Difference) -> String {
+    match difference {
+        Difference::Material { loaded, .. } => format!("{source} holds {loaded}."),
+        Difference::Color => format!("{source} has another colour."),
+        Difference::Weight { needed, left } => format!(
+            "{spool} has {} left, the print needs ~{}.",
+            format::filament_weight(*left),
+            format::filament_weight(*needed)
+        ),
+    }
+}
+
+fn empty_gate_sentence(source: &str) -> String {
+    format!("{source} is empty.")
+}
+
+fn no_gate_sentence(tool: usize) -> String {
+    format!("The printer has no gate for T{tool}.")
+}
+
+/// The key of a verdict for the UI (`ToolMatchItem.verdict`): "fits", "differs", "gate-empty", "no-gate" or "".
 pub fn verdict_key(verdict: &Verdict) -> &'static str {
     match verdict {
         Verdict::Fits => "fits",
@@ -202,21 +214,12 @@ pub fn verdict_key(verdict: &Verdict) -> &'static str {
     }
 }
 
-/// Several verdicts as one: "differs" when one does not fit, "fits" when all fit, "" when some cannot be compared or
-/// there are none.
+/// Several verdicts as one key, see [`Verdict::combine`]: "fits", "" or "differs" for any that does not fit.
 pub fn combined_verdict<'a>(verdicts: impl IntoIterator<Item = &'a Verdict>) -> &'static str {
-    let mut fitting = None;
-    for verdict in verdicts {
-        match verdict {
-            Verdict::Fits => fitting = Some(fitting.unwrap_or(true)),
-            Verdict::Unknown => fitting = Some(false),
-            Verdict::Differs(_) | Verdict::GateEmpty | Verdict::NoGate => return "differs",
-        }
-    }
-    if fitting == Some(true) {
-        "fits"
-    } else {
-        ""
+    match Verdict::combine(verdicts) {
+        Verdict::Fits => "fits",
+        Verdict::Unknown => "",
+        Verdict::Differs(_) | Verdict::GateEmpty | Verdict::NoGate => "differs",
     }
 }
 
@@ -233,19 +236,11 @@ pub fn tool_differences(found: &ToolMatch) -> String {
     let spool = found.gate.map_or_else(|| "The spool".to_owned(), |gate| format!("The spool in gate {gate}"));
     match &found.verdict {
         Verdict::Fits | Verdict::Unknown => String::new(),
-        Verdict::GateEmpty => format!("{source} is empty."),
-        Verdict::NoGate => format!("The printer has no gate for T{}.", found.request.tool),
+        Verdict::GateEmpty => empty_gate_sentence(&source),
+        Verdict::NoGate => no_gate_sentence(found.request.tool),
         Verdict::Differs(differences) => differences
             .iter()
-            .map(|difference| match difference {
-                Difference::Material { loaded, .. } => format!("{source} holds {loaded}."),
-                Difference::Color => format!("{source} has another colour."),
-                Difference::Weight { needed, left } => format!(
-                    "{spool} has {} left, the print needs ~{}.",
-                    format::filament_weight(*left),
-                    format::filament_weight(*needed)
-                ),
-            })
+            .map(|difference| difference_sentence(&source, &spool, difference))
             .collect::<Vec<_>>()
             .join("\n"),
     }
@@ -339,20 +334,8 @@ pub fn mmu_sensor_label(name: &str) -> String {
     characters.next().map_or_else(String::new, |first| first.to_uppercase().chain(characters).collect())
 }
 
-/// The sensors of the MMU for the chip list. The three buffer sensors are left out when a buffer gauge shows them, and
-/// those that the filament path draws.
-pub fn mmu_chip_sensors(sensors: &[MmuSensor], has_buffer: bool) -> Vec<&MmuSensor> {
-    const BUFFER_SENSORS: [&str; 3] = ["filament_compression", "filament_tension", "filament_proportional"];
-    let on_path = path_sensor_names(sensors);
-    sensors
-        .iter()
-        .filter(|sensor| !(has_buffer && BUFFER_SENSORS.contains(&sensor.name.as_str())))
-        .filter(|sensor| !on_path.contains(&sensor.name.as_str()))
-        .collect()
-}
-
 /// The tools of a gate as the tile shows them, e.g. `T0 T3`; empty without one.
-pub fn mmu_tools(tools: &[usize]) -> String {
+pub fn gate_tools_text(tools: &[usize]) -> String {
     tools.iter().map(|tool| format!("T{tool}")).collect::<Vec<_>>().join(" ")
 }
 
@@ -738,9 +721,27 @@ mod tests {
     }
 
     #[test]
+    fn the_hints_before_the_print_word_differences_like_the_print_page() {
+        let hint = |tool, difference| PrintHint { tool, kind: PrintHintKind::Differs(difference) };
+        let material = hint(1, Difference::Material { expected: "PLA".into(), loaded: "PETG".into() });
+        assert_eq!(print_hint_text(&material, true), "T1: The spool holds PETG.");
+        assert_eq!(print_hint_text(&hint(0, Difference::Color), false), "The spool has another colour.");
+        assert_eq!(
+            print_hint_text(&hint(0, Difference::Weight { needed: 52.0, left: 38.0 }), false),
+            "The spool has 38 g left, the print needs ~52 g."
+        );
+    }
+
+    #[test]
     fn missing_gates_and_empty_gates_are_hints_before_the_print() {
-        assert_eq!(print_hint_text(&PrintHint::GateEmpty { tool: 1 }, true), "T1: the gate is empty");
-        assert_eq!(print_hint_text(&PrintHint::NoGate { tool: 3 }, false), "T3: the printer has no gate for this tool");
+        assert_eq!(
+            print_hint_text(&PrintHint { tool: 1, kind: PrintHintKind::GateEmpty }, true),
+            "T1: The gate is empty."
+        );
+        assert_eq!(
+            print_hint_text(&PrintHint { tool: 3, kind: PrintHintKind::NoGate }, false),
+            "The printer has no gate for T3."
+        );
     }
 
     #[test]
@@ -780,15 +781,7 @@ mod tests {
     }
 
     #[test]
-    fn buffer_sensors_are_hidden_only_when_the_gauge_shows_them() {
-        let sensors = ["mmu_entry", "mmu_exit", "filament_tension", "filament_proportional", "toolhead"]
-            .map(|name| MmuSensor { name: name.into(), triggered: Some(false) });
-        let names = |has_buffer| -> Vec<String> {
-            mmu_chip_sensors(&sensors, has_buffer).iter().map(|sensor| sensor.name.clone()).collect()
-        };
-
-        assert!(names(true).is_empty(), "entry, exit and toolhead are on the filament path, the buffer has its gauge");
-        assert_eq!(names(false), ["filament_tension", "filament_proportional"]);
+    fn the_path_distance_has_one_decimal() {
         assert_eq!(path_distance(412.63), "412.6 mm");
     }
 

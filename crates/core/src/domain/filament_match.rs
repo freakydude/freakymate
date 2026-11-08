@@ -57,6 +57,26 @@ pub enum Verdict {
     Unknown,
 }
 
+impl Verdict {
+    /// Several verdicts as one: the first that does not fit wins over those without facts; `Fits` only when all fit;
+    /// `Unknown` when some cannot be compared or there are none.
+    pub fn combine<'a>(verdicts: impl IntoIterator<Item = &'a Verdict>) -> Verdict {
+        let mut all_fit = None;
+        for verdict in verdicts {
+            match verdict {
+                Verdict::Fits => all_fit = Some(all_fit.unwrap_or(true)),
+                Verdict::Unknown => all_fit = Some(false),
+                Verdict::Differs(_) | Verdict::GateEmpty | Verdict::NoGate => return verdict.clone(),
+            }
+        }
+        if all_fit == Some(true) {
+            Verdict::Fits
+        } else {
+            Verdict::Unknown
+        }
+    }
+}
+
 /// A tool of the file, the gate it prints from (with Happy Hare) and how it compares.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolMatch {
@@ -221,12 +241,17 @@ fn color_distance(left: [u8; 3], right: [u8; 3]) -> f64 {
 
 /// A hint before the print: what does not fit for a tool. Only hints, nothing here forbids anything.
 #[derive(Debug, Clone, PartialEq)]
-pub enum PrintHint {
-    Material { tool: usize, expected: String, loaded: String },
-    Weight { tool: usize, needed: f64, left: f64 },
-    Color { tool: usize },
-    GateEmpty { tool: usize },
-    NoGate { tool: usize },
+pub struct PrintHint {
+    pub tool: usize,
+    pub kind: PrintHintKind,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PrintHintKind {
+    /// The filament differs from what the file expects.
+    Differs(Difference),
+    GateEmpty,
+    NoGate,
 }
 
 /// The hints for the start dialog: every difference, empty gate and missing tool, in tool order.
@@ -238,18 +263,14 @@ pub fn print_hints(metadata: &FileMetadata, status: &PrinterStatus, lanes: &[Lan
 }
 
 fn hints_of(tool: usize, verdict: Verdict) -> Vec<PrintHint> {
+    let hint = |kind| PrintHint { tool, kind };
     match verdict {
         Verdict::Fits | Verdict::Unknown => Vec::new(),
-        Verdict::GateEmpty => vec![PrintHint::GateEmpty { tool }],
-        Verdict::NoGate => vec![PrintHint::NoGate { tool }],
-        Verdict::Differs(differences) => differences
-            .into_iter()
-            .map(|difference| match difference {
-                Difference::Material { expected, loaded } => PrintHint::Material { tool, expected, loaded },
-                Difference::Weight { needed, left } => PrintHint::Weight { tool, needed, left },
-                Difference::Color => PrintHint::Color { tool },
-            })
-            .collect(),
+        Verdict::GateEmpty => vec![hint(PrintHintKind::GateEmpty)],
+        Verdict::NoGate => vec![hint(PrintHintKind::NoGate)],
+        Verdict::Differs(differences) => {
+            differences.into_iter().map(|difference| hint(PrintHintKind::Differs(difference))).collect()
+        }
     }
 }
 
@@ -259,12 +280,21 @@ mod tests {
     use crate::domain::spools::lanes;
     use crate::sources::happy_hare::MmuStatus;
     use crate::sources::moonraker_server::files::parse_metadata;
+    use crate::sources::spoolman::test_spool;
     use crate::sources::spoolman::{Spool, SpoolmanState};
 
     /// The metadata Moonraker reported for the sliced test files (OrcaSlicer 2.5, Voron with Happy Hare 4.2.0).
     fn fixture(name: &str) -> FileMetadata {
         let text = match name {
             "4 tools" => include_str!("../../tests/fixtures/multicolor/cb-mc4-used4-all_pla-t0-t3.metadata.json"),
+            "two of four" => {
+                include_str!("../../tests/fixtures/multicolor/cb-mc4-used2-all_pla-t0_and_t3.metadata.json")
+            }
+            "white to black" => {
+                include_str!(
+                    "../../tests/fixtures/multicolor/cb-mc4-used4-white_to_black-all_pla-t0_and_t3.metadata.json"
+                )
+            }
             "only T2" => include_str!("../../tests/fixtures/multicolor/cb-mc4-used4-all_pla-t2.metadata.json"),
             "PETG support" => {
                 include_str!("../../tests/fixtures/multicolor/cb-mc4-used4-all_pla_support_petg-t0-t3.metadata.json")
@@ -279,16 +309,6 @@ mod tests {
         };
         let response: serde_json::Value = serde_json::from_str(text).unwrap();
         parse_metadata(&response["result"]).unwrap()
-    }
-
-    fn spool(id: u32, material: &str, left: f64, color: [u8; 3]) -> Spool {
-        Spool {
-            id,
-            material: material.into(),
-            remaining_weight: Some(left),
-            colors: vec![[color[0], color[1], color[2], 0xff]],
-            ..Spool::default()
-        }
     }
 
     fn spoolman(spools: &[Spool], active: Option<u32>) -> SpoolmanState {
@@ -369,6 +389,32 @@ mod tests {
     }
 
     #[test]
+    fn a_file_that_calls_two_of_its_four_tools_asks_only_those() {
+        let requests = tool_requests(&fixture("two of four"));
+
+        assert_eq!(requests.iter().map(|request| request.tool).collect::<Vec<_>>(), [0, 1]);
+    }
+
+    #[test]
+    fn swapped_black_and_white_gates_differ_in_colour() {
+        let metadata = fixture("white to black");
+        let gates = |colors: [[u8; 3]; 4]| {
+            happy_hare(colors.iter().map(|color| gate("PLA", Some(*color))).collect(), &[0, 1, 2, 3])
+        };
+        let grey = [[0x63; 3], [0xB4; 3]];
+
+        let fitting = gates([grey[0], grey[1], [0, 0, 0], [0xFF; 3]]);
+        assert!(verdicts(&metadata, &fitting, &SpoolmanState::default())
+            .iter()
+            .all(|(_, verdict)| *verdict == Verdict::Fits));
+
+        let swapped = gates([grey[0], grey[1], [0xFF; 3], [0, 0, 0]]);
+        let found = verdicts(&metadata, &swapped, &SpoolmanState::default());
+        assert_eq!(found[2], (2, Verdict::Differs(vec![Difference::Color])));
+        assert_eq!(found[3], (3, Verdict::Differs(vec![Difference::Color])));
+    }
+
+    #[test]
     fn a_clear_filament_is_transparent_and_its_colour_not_compared() {
         let metadata = fixture("transparent");
         assert_eq!(tool_requests(&metadata)[3].color, Some([0xFF, 0xFF, 0xFF, 0x00]));
@@ -433,7 +479,7 @@ mod tests {
         let mut with_spool = gate("PLA", Some([0, 0, 0]));
         with_spool.spool_id = Some(7);
         let status = happy_hare(vec![with_spool], &[0]);
-        let spools = spoolman(&[spool(7, "PETG", 5.0, [0xF7, 0x67, 0x07])], None);
+        let spools = spoolman(&[test_spool(7, "PETG", 5.0, [0xF7, 0x67, 0x07])], None);
 
         let found = verdicts(&file(&[20.0], &["PETG"], &["#F76707"]), &status, &spools);
 
@@ -442,7 +488,7 @@ mod tests {
 
     #[test]
     fn spoolman_without_happy_hare_compares_tool_0_with_the_active_spool() {
-        let spools = spoolman(&[spool(5, "PLA", 800.0, [0x26, 0xA6, 0x9A])], Some(5));
+        let spools = spoolman(&[test_spool(5, "PLA", 800.0, [0x26, 0xA6, 0x9A])], Some(5));
         let metadata = FileMetadata {
             referenced_tools: vec![0, 1],
             ..file(&[5.0, 5.0], &["PLA", "PLA"], &["#26A69A", "#000000"])
@@ -469,7 +515,7 @@ mod tests {
 
     #[test]
     fn close_colours_count_as_equal_and_abs_plus_as_abs() {
-        let spools = spoolman(&[spool(5, "ABS+", 500.0, [0xE3, 0x1F, 0x2B])], Some(5));
+        let spools = spoolman(&[test_spool(5, "ABS+", 500.0, [0xE3, 0x1F, 0x2B])], Some(5));
 
         let found = verdicts(&file(&[10.0], &["abs"], &["#FF2020"]), &PrinterStatus::default(), &spools);
 
@@ -478,7 +524,7 @@ mod tests {
 
     #[test]
     fn a_multi_colour_spool_fits_when_one_of_its_colours_is_close() {
-        let mut two_colours = spool(5, "PLA", 800.0, [0xFF, 0x00, 0x04]);
+        let mut two_colours = test_spool(5, "PLA", 800.0, [0xFF, 0x00, 0x04]);
         two_colours.colors.push([0x26, 0xA6, 0x9A, 0xFF]);
         let spools = spoolman(&[two_colours], Some(5));
         let status = PrinterStatus::default();
@@ -497,7 +543,7 @@ mod tests {
         let mut petg = gate("PETG", None);
         petg.spool_id = Some(6);
         let status = happy_hare(vec![petg, empty], &[0, 1]);
-        let spools = spoolman(&[spool(6, "PETG", 20.0, [0; 3])], None);
+        let spools = spoolman(&[test_spool(6, "PETG", 20.0, [0; 3])], None);
         let metadata =
             FileMetadata { referenced_tools: vec![0, 1, 2], ..file(&[30.0, 5.0, 5.0], &["PLA", "PLA", "PLA"], &[]) };
 
@@ -506,10 +552,16 @@ mod tests {
         assert_eq!(
             hints,
             [
-                PrintHint::Material { tool: 0, expected: "PLA".into(), loaded: "PETG".into() },
-                PrintHint::Weight { tool: 0, needed: 30.0, left: 20.0 },
-                PrintHint::GateEmpty { tool: 1 },
-                PrintHint::NoGate { tool: 2 },
+                PrintHint {
+                    tool: 0,
+                    kind: PrintHintKind::Differs(Difference::Material {
+                        expected: "PLA".into(),
+                        loaded: "PETG".into()
+                    })
+                },
+                PrintHint { tool: 0, kind: PrintHintKind::Differs(Difference::Weight { needed: 30.0, left: 20.0 }) },
+                PrintHint { tool: 1, kind: PrintHintKind::GateEmpty },
+                PrintHint { tool: 2, kind: PrintHintKind::NoGate },
             ]
         );
     }
@@ -543,5 +595,17 @@ mod tests {
         // Gate 1 has the wrong material, gate 2 no colour to compare, gate 3 is empty.
         assert_eq!(fits, [true, false, false, false]);
         assert!(fitting_gates(&request, &PrinterStatus::default(), &[]).is_empty());
+    }
+
+    #[test]
+    fn verdicts_that_do_not_fit_win_over_those_without_facts() {
+        let differs = Verdict::Differs(vec![Difference::Color]);
+
+        assert_eq!(Verdict::combine([&Verdict::Fits, &Verdict::Fits]), Verdict::Fits);
+        assert_eq!(Verdict::combine([&Verdict::Fits, &Verdict::Unknown]), Verdict::Unknown);
+        assert_eq!(Verdict::combine([&Verdict::Unknown, &Verdict::Fits]), Verdict::Unknown);
+        assert_eq!(Verdict::combine([&Verdict::Unknown, &differs, &Verdict::NoGate]), differs);
+        assert_eq!(Verdict::combine([&Verdict::Fits, &Verdict::GateEmpty]), Verdict::GateEmpty);
+        assert_eq!(Verdict::combine([]), Verdict::Unknown);
     }
 }

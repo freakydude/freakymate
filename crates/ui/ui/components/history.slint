@@ -1,10 +1,8 @@
 // Temperature history of one heater or sensor: the last minutes from Moonraker, growing while it is open.
 
 import { Theme } from "../theme.slint";
-import { Icons } from "../icons.slint";
 import { Actions, Navigation, Printer } from "../state.slint";
-import { IconButton } from "controls.slint";
-import { DialogTitle } from "dialog.slint";
+import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
 
 // A line of the chart. The view box is 1000 high and as wide as the drawing area's shape, because a path is scaled
 // evenly; the lines are computed for that shape (`Navigation.history-aspect`).
@@ -23,41 +21,26 @@ component Legend inherits HorizontalLayout {
     Text { text: root.text; color: Theme.muted; font-size: Theme.font-small; vertical-alignment: center; }
 }
 
-export component HistoryDialog inherits Rectangle {
+export component HistoryDialog inherits Scrim {
     visible: Navigation.history-open;
-    background: Theme.background;
 
-    // Keeps taps away from the page below.
-    TouchArea { }
-
+    DialogPanel {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: parent.height - 16px;
     VerticalLayout {
-        padding: Theme.padding;
+        padding: Theme.dialog-padding;
         spacing: Theme.spacing;
-        HorizontalLayout {
-            spacing: Theme.spacing;
-            height: Theme.touch;
-            Image {
-                cross-axis-self-alignment: center;
-                source: Icons.nav-history;
-                colorize: Theme.muted;
-                width: 28px;
-                height: 28px;
-            }
-            DialogTitle {
-                text: Printer.history-title;
-            }
+        DialogHeader {
+            title: Printer.history-title;
+            close => { Actions.close-history(); }
             Text {
-                horizontal-stretch: 1;
                 text: Printer.history-current;
                 color: Theme.accent;
                 font-size: Theme.font-large;
                 vertical-alignment: center;
                 horizontal-alignment: right;
-            }
-            IconButton {
-                width: Theme.touch;
-                icon: Icons.ui-close;
-                clicked => { Actions.close-history(); }
             }
         }
 
@@ -161,5 +144,6 @@ export component HistoryDialog inherits Rectangle {
             if Printer.history-target-path != "": Legend { color: Theme.muted; text: @tr("Target"); }
             if Printer.history-power-path != "": Legend { color: Theme.chart-secondary; text: @tr("Power"); }
         }
+    }
     }
 }

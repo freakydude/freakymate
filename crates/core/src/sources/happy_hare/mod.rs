@@ -4,62 +4,28 @@
 //! checked against a real single-gate machine with a proportional sync-feedback buffer and no encoder.
 
 pub mod commands;
+mod gates;
+mod sensors;
 pub mod stale_gate_map;
+mod sync_feedback;
 
+pub use gates::{GateAvailability, LoadedFilament, MmuGate, BYPASS};
+pub use sensors::{is_shown_by_mmu, FilamentPath, MmuSensor, PathSensor};
+pub use sync_feedback::{
+    FlowGuard, FlowGuardState, SyncFeedback, SyncFeedbackState, ORIGIN_ENCODER, ORIGIN_SYNC_FEEDBACK,
+};
+
+use super::fields::{count, flag, integer, text};
 use super::objects::ObjectStore;
 use super::subscription::Subscription;
-use crate::color::{parse_hex, Rgba};
-use crate::sourced::{prefer_measured, Sourced};
+use crate::sourced::Sourced;
+use gates::{read_gates, read_tool_to_gate};
+use sensors::{listed_sensors, read_sensors};
 use serde_json::Value;
+use sync_feedback::{read_flow_rate, read_flowguard, read_sync_feedback};
 
 /// Oldest Happy Hare the project supports; older versions report different fields.
 const MIN_VERSION: (u32, u32) = (4, 1);
-
-const PROPORTIONAL_SENSOR: &str = "filament_proportional";
-pub const ORIGIN_ENCODER: &str = "encoder";
-pub const ORIGIN_SYNC_FEEDBACK: &str = "sync feedback with proportional sensor";
-
-/// Happy Hare 4.1 still lists the Happy Hare 3 names of the gate sensors in `mmu.sensors` as aliases.
-const LEGACY_SENSOR_NAMES: [&str; 3] = ["mmu_pre_gate", "mmu_gear", "mmu_gate"];
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum GateAvailability {
-    #[default]
-    Unknown,
-    Empty,
-    Available,
-    /// Filament is available from the buffer of the gate.
-    Buffered,
-}
-
-impl GateAvailability {
-    fn parse(value: i64) -> Self {
-        match value {
-            0 => Self::Empty,
-            1 => Self::Available,
-            2 => Self::Buffered,
-            _ => Self::Unknown,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum LoadedFilament {
-    Loaded,
-    Unloaded,
-    #[default]
-    Unknown,
-}
-
-impl LoadedFilament {
-    fn parse(text: &str) -> Self {
-        match text {
-            "Loaded" => Self::Loaded,
-            "Unloaded" => Self::Unloaded,
-            _ => Self::Unknown,
-        }
-    }
-}
 
 /// Position of the selector servo (`mmu.selector.servo`, `mmu_linear_servo_selector.py`): up releases the filament,
 /// down grips it, move holds it while the selector moves.
@@ -82,155 +48,8 @@ impl ServoPosition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct MmuGate {
-    pub index: usize,
-    pub availability: GateAvailability,
-    pub name: String,
-    pub material: String,
-    /// Only known when the gate has a colour set (`gate_color` is not empty).
-    pub color: Option<Rgba>,
-    /// Tools that take their filament from this gate (`ttg_map`), ascending; none, one or several.
-    pub tools: Vec<usize>,
-    /// EndlessSpool group (`endless_spool_groups`); gates of one group stand in for each other on a runout.
-    pub endless_spool_group: Option<u32>,
-    /// Spoolman spool of the gate (`gate_spool_id`); `None` for none (Happy Hare reports -1).
-    pub spool_id: Option<u32>,
-    /// Print temperature of the gate in °C (`gate_temperature`), from Spoolman if the gate has a spool.
-    pub temperature: Option<f64>,
-}
-
-/// A filament sensor of the MMU as reported in `mmu.sensors`; `triggered` is `None` when the sensor is disabled.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MmuSensor {
-    pub name: String,
-    pub triggered: Option<bool>,
-}
-
-/// `gate` and `tool` while the bypass is selected (`TOOL_GATE_BYPASS` in `mmu_constants.py`).
-pub const BYPASS: i32 = -2;
-
 /// Happy Hare's `filament_pos` when it does not know (`FILAMENT_POS_UNKNOWN` in `mmu_constants.py`).
 const FILAMENT_POS_UNKNOWN: i32 = -1;
-/// The sensor where the filament enters the gate from the spool.
-const GATE_ENTRY_SENSOR: &str = "mmu_entry";
-/// Sensors where the filament leaves the gate, in order of preference: the gate's own exit, then a shared exit.
-const GATE_EXIT_SENSORS: [&str; 2] = ["mmu_exit", "mmu_shared_exit"];
-const EXTRUDER_PATH_SENSOR: &str = "extruder";
-const TOOLHEAD_PATH_SENSOR: &str = "toolhead";
-
-/// A sensor drawn on the filament path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PathSensor {
-    /// Not fitted or disabled: not drawn.
-    Absent,
-    Free,
-    Triggered,
-}
-
-impl PathSensor {
-    fn of(sensors: &[MmuSensor], name: &str) -> Self {
-        match sensors.iter().find(|sensor| sensor.name == name).and_then(|sensor| sensor.triggered) {
-            Some(true) => Self::Triggered,
-            Some(false) => Self::Free,
-            None => Self::Absent,
-        }
-    }
-}
-
-/// The way of the filament from the gate to the nozzle, as Happy Hare's console draws it (`log_visual`): the
-/// position on the way (`filament_pos`, -1 unknown, 0 parked in the gate up to 10 loaded to the nozzle, see
-/// `FILAMENT_POS_*` in `mmu_constants.py`), the direction and the sensors along it.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct FilamentPath {
-    pub position: i32,
-    pub direction: i32,
-    pub distance: f64,
-    /// 0 to 1 of the bowden while Happy Hare moves through it (`bowden_progress`), `None` otherwise.
-    pub bowden_progress: Option<f64>,
-    pub gate_entry_sensor: PathSensor,
-    pub gate_exit_sensor: PathSensor,
-    pub extruder_sensor: PathSensor,
-    pub toolhead_sensor: PathSensor,
-}
-
-/// Names of the sensors the path draws, so they are not listed a second time.
-pub fn path_sensor_names(sensors: &[MmuSensor]) -> Vec<&'static str> {
-    let exit = GATE_EXIT_SENSORS.into_iter().find(|name| PathSensor::of(sensors, name) != PathSensor::Absent);
-    [GATE_ENTRY_SENSOR].into_iter().chain(exit).chain([EXTRUDER_PATH_SENSOR, TOOLHEAD_PATH_SENSOR]).collect()
-}
-
-/// Sync-feedback state as Happy Hare reports it (`get_sync_feedback_string`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum SyncFeedbackState {
-    Compressed,
-    Neutral,
-    Tension,
-    /// Enabled, but the controller is not active (for example while not printing).
-    Inactive,
-    #[default]
-    Disabled,
-}
-
-impl SyncFeedbackState {
-    fn parse(text: &str) -> Self {
-        match text {
-            "compressed" => Self::Compressed,
-            "neutral" => Self::Neutral,
-            "tension" => Self::Tension,
-            "inactive" => Self::Inactive,
-            _ => Self::Disabled,
-        }
-    }
-}
-
-/// Buffer of the gear stepper: `bias` runs from -1 (tension) over 0 (neutral) to +1 (compressed).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct SyncFeedback {
-    pub state: SyncFeedbackState,
-    pub bias: f64,
-}
-
-/// Clog and tangle protection; it works with the buffer controller or with an encoder.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct FlowGuard {
-    pub enabled: bool,
-    pub active: bool,
-    /// Tangle prevention raises the gear current right now: it is on, a proportional sensor reports the tension and
-    /// the tension is above its threshold.
-    pub boosting: bool,
-    pub trigger: String,
-    pub reason: String,
-    pub level: f64,
-}
-
-/// One word for the operator: a trigger wins over the boost of tangle prevention, which wins over monitoring, which
-/// wins over ready.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FlowGuardState {
-    Off,
-    Triggered,
-    Boosting,
-    Monitoring,
-    Ready,
-}
-
-impl FlowGuard {
-    pub fn state(&self) -> FlowGuardState {
-        if !self.enabled {
-            FlowGuardState::Off
-        } else if !self.trigger.is_empty() {
-            FlowGuardState::Triggered
-        } else if self.boosting {
-            FlowGuardState::Boosting
-        } else if self.active {
-            FlowGuardState::Monitoring
-        } else {
-            FlowGuardState::Ready
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MmuStatus {
     /// `mmu_machine.happy_hare_version`, for example `4.1.0`; empty when not reported.
@@ -278,25 +97,22 @@ pub struct MmuStatus {
 }
 
 impl MmuStatus {
-    /// Happy Hare 4.1 or newer; the rest of this model relies on its field names.
     pub fn filament_path(&self) -> FilamentPath {
-        let gate_exit_sensor = GATE_EXIT_SENSORS
-            .into_iter()
-            .map(|name| PathSensor::of(&self.sensors, name))
-            .find(|sensor| *sensor != PathSensor::Absent)
-            .unwrap_or(PathSensor::Absent);
-        FilamentPath {
-            position: self.filament_pos,
-            direction: self.filament_direction.signum(),
-            distance: self.filament_position,
-            bowden_progress: self.bowden_progress,
-            gate_entry_sensor: PathSensor::of(&self.sensors, GATE_ENTRY_SENSOR),
-            gate_exit_sensor,
-            extruder_sensor: PathSensor::of(&self.sensors, EXTRUDER_PATH_SENSOR),
-            toolhead_sensor: PathSensor::of(&self.sensors, TOOLHEAD_PATH_SENSOR),
-        }
+        FilamentPath::new(
+            &self.sensors,
+            self.filament_pos,
+            self.filament_direction.signum(),
+            self.filament_position,
+            self.bowden_progress,
+        )
     }
 
+    /// The sensors to list on their own: neither the filament path draws them nor the buffer (sync feedback).
+    pub fn listed_sensors(&self) -> Vec<&MmuSensor> {
+        listed_sensors(&self.sensors, self.sync_feedback.is_some())
+    }
+
+    /// Happy Hare 4.1 or newer; the rest of this model relies on its field names.
     pub fn is_supported(&self) -> bool {
         parse_version(&self.version).is_some_and(|version| version >= MIN_VERSION)
     }
@@ -341,21 +157,22 @@ pub(super) fn subscribe(subscription: &mut Subscription) {
 pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
     let mmu = store.object("mmu")?;
     let machine = store.object("mmu_machine").unwrap_or(&Value::Null);
-    let num_gates = count(mmu, "num_gates").max(count(machine, "num_gates"));
+    let num_gates = count::<usize>(mmu, "num_gates").max(count(machine, "num_gates")).unwrap_or_default();
     let sensors = read_sensors(mmu);
+    let tool_to_gate = read_tool_to_gate(mmu);
     Some(MmuStatus {
-        version: text(machine, "happy_hare_version"),
+        version: text(machine, "happy_hare_version").to_owned(),
         enabled: flag(mmu, "enabled"),
         num_gates,
-        num_units: count(machine, "num_units").max(1),
+        num_units: count::<usize>(machine, "num_units").unwrap_or_default().max(1),
         gate: integer(mmu, "gate", -1),
         tool: integer(mmu, "tool", -1),
-        action: text(mmu, "action"),
-        operation: text(mmu, "operation"),
-        print_state: text(mmu, "print_state"),
-        reason_for_pause: text(mmu, "reason_for_pause"),
-        pause_hint: text(mmu, "pause_hint"),
-        filament: LoadedFilament::parse(&text(mmu, "filament")),
+        action: text(mmu, "action").to_owned(),
+        operation: text(mmu, "operation").to_owned(),
+        print_state: text(mmu, "print_state").to_owned(),
+        reason_for_pause: text(mmu, "reason_for_pause").to_owned(),
+        pause_hint: text(mmu, "pause_hint").to_owned(),
+        filament: LoadedFilament::parse(text(mmu, "filament")),
         filament_pos: integer(mmu, "filament_pos", FILAMENT_POS_UNKNOWN),
         filament_direction: integer(mmu, "filament_direction", 0),
         filament_position: mmu.get("filament_position").and_then(Value::as_f64).unwrap_or_default(),
@@ -372,184 +189,26 @@ pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
             .and_then(|selector| selector.get("servo"))
             .and_then(Value::as_str)
             .map(ServoPosition::parse),
-        gates: read_gates(mmu, num_gates),
-        tool_to_gate: mmu
-            .get("ttg_map")
-            .and_then(Value::as_array)
-            .map(|map| map.iter().filter_map(|gate| gate.as_u64().map(|gate| gate as usize)).collect())
-            .unwrap_or_default(),
+        gates: read_gates(mmu, num_gates, &tool_to_gate),
+        tool_to_gate,
         endless_spool: flag(mmu, "endless_spool_enabled"),
-        spoolman_support: text(mmu, "spoolman_support"),
+        spoolman_support: text(mmu, "spoolman_support").to_owned(),
         flow_rate: read_flow_rate(mmu, &sensors),
         flowguard: read_flowguard(mmu, &sensors),
         sensors,
         sync_feedback: read_sync_feedback(mmu),
     })
 }
-
-/// Happy Hare keeps `sync_feedback_flow_rate` at 100 for every buffer and only estimates it when an enabled
-/// proportional sensor exists (`mmu_sync_feedback.py`), so the field alone says nothing without that sensor.
-fn read_flow_rate(mmu: &Value, sensors: &[MmuSensor]) -> Option<Sourced<f64>> {
-    let measured = mmu
-        .get("encoder")
-        .and_then(|encoder| encoder.get("flow_rate"))
-        .and_then(Value::as_f64)
-        .map(|rate| Sourced::measured(rate, ORIGIN_ENCODER));
-    let estimated = mmu
-        .get("sync_feedback_flow_rate")
-        .and_then(Value::as_f64)
-        .filter(|_| has_proportional_sensor(sensors))
-        .map(|rate| Sourced::estimated(rate, ORIGIN_SYNC_FEEDBACK));
-    prefer_measured(measured, estimated)
-}
-
-fn has_proportional_sensor(sensors: &[MmuSensor]) -> bool {
-    sensors.iter().any(|sensor| sensor.name == PROPORTIONAL_SENSOR && sensor.triggered.is_some())
-}
-
-/// A Klipper filament sensor that Happy Hare creates and the MMU view shows: those of the gates and the buffer, and
-/// `extruder` and `toolhead`, which the filament path draws. Others (a runout sensor at the spool, a motion sensor)
-/// belong to the printer. `object` is the Klipper object name, for example `filament_switch_sensor mmu_entry_0`.
-pub fn is_shown_by_mmu(object: &str) -> bool {
-    let name = object.split_once(' ').map_or(object, |(_, name)| name);
-    let name = name.rsplit_once(':').map_or(name, |(_, name)| name);
-    name.starts_with("mmu_")
-        || matches!(
-            name,
-            "filament_compression"
-                | "filament_tension"
-                | "filament_proportional"
-                | EXTRUDER_PATH_SENSOR
-                | TOOLHEAD_PATH_SENSOR
-        )
-}
-
 /// `major.minor` of a version such as `4.1.0` or `v4.10`.
 fn parse_version(text: &str) -> Option<(u32, u32)> {
     let mut parts = text.trim().trim_start_matches('v').split('.');
     Some((parts.next()?.parse().ok()?, parts.next()?.parse().ok()?))
 }
 
-fn read_gates(mmu: &Value, num_gates: usize) -> Vec<MmuGate> {
-    let list = |field: &str| mmu.get(field).and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
-    let (status, names, materials, colors, rgb, ttg_map, groups, spool_ids, temperatures) = (
-        list("gate_status"),
-        list("gate_filament_name"),
-        list("gate_material"),
-        list("gate_color"),
-        list("gate_color_rgb"),
-        list("ttg_map"),
-        list("endless_spool_groups"),
-        list("gate_spool_id"),
-        list("gate_temperature"),
-    );
-    let string_at =
-        |values: &[Value], index: usize| values.get(index).and_then(Value::as_str).unwrap_or_default().to_owned();
-    (0..num_gates)
-        .map(|index| MmuGate {
-            index,
-            availability: status
-                .get(index)
-                .and_then(Value::as_i64)
-                .map_or(GateAvailability::Unknown, GateAvailability::parse),
-            name: string_at(names, index),
-            material: string_at(materials, index),
-            color: gate_color(&string_at(colors, index), rgb.get(index)),
-            tools: ttg_map
-                .iter()
-                .enumerate()
-                .filter(|(_, gate)| gate.as_u64() == Some(index as u64))
-                .map(|(tool, _)| tool)
-                .collect(),
-            endless_spool_group: groups.get(index).and_then(Value::as_u64).and_then(|group| u32::try_from(group).ok()),
-            spool_id: spool_ids.get(index).and_then(Value::as_i64).and_then(|id| u32::try_from(id).ok()),
-            temperature: temperatures.get(index).and_then(Value::as_f64).filter(|degrees| *degrees > 0.0),
-        })
-        .collect()
-}
-
-/// The colour of a gate: red, green and blue from `gate_color_rgb` (three floats from 0 to 1, which cuts the alpha
-/// channel off), the alpha from `gate_color` when that is `rrggbbaa` (`gate_color` may also be a colour name).
-fn gate_color(text: &str, rgb: Option<&Value>) -> Option<Rgba> {
-    if text.is_empty() {
-        return None;
-    }
-    let [red, green, blue] = color_from_rgb(rgb?)?;
-    let alpha = parse_hex(text).map_or(0xff, |[.., alpha]| alpha);
-    Some([red, green, blue, alpha])
-}
-
-fn color_from_rgb(value: &Value) -> Option<[u8; 3]> {
-    let channels = value.as_array()?;
-    let channel = |index: usize| {
-        channels.get(index).and_then(Value::as_f64).map(|part| (part.clamp(0.0, 1.0) * 255.0).round() as u8)
-    };
-    Some([channel(0)?, channel(1)?, channel(2)?])
-}
-
-fn read_sensors(mmu: &Value) -> Vec<MmuSensor> {
-    mmu.get("sensors")
-        .and_then(Value::as_object)
-        .map(|sensors| {
-            sensors
-                .iter()
-                .filter(|(name, _)| !LEGACY_SENSOR_NAMES.contains(&name.as_str()))
-                .map(|(name, state)| MmuSensor { name: name.clone(), triggered: state.as_bool() })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-/// Only present with a buffer; the modelled bias is the better value while printing.
-fn read_sync_feedback(mmu: &Value) -> Option<SyncFeedback> {
-    let state = mmu.get("sync_feedback_state").and_then(Value::as_str)?;
-    let bias = mmu
-        .get("sync_feedback_bias_modelled")
-        .and_then(Value::as_f64)
-        .or_else(|| mmu.get("sync_feedback_bias_raw").and_then(Value::as_f64))
-        .unwrap_or_default();
-    Some(SyncFeedback { state: SyncFeedbackState::parse(state), bias: bias.clamp(-1.0, 1.0) })
-}
-
-/// Tangle prevention counts only with a proportional sensor, as Happy Hare arms it only then.
-fn read_flowguard(mmu: &Value, sensors: &[MmuSensor]) -> Option<FlowGuard> {
-    let flowguard = mmu.get("flowguard").filter(|value| value.is_object())?;
-    let tangle_prevention = mmu.get("tangle_prevention").filter(|value| value.is_object());
-    let boosting = tangle_prevention
-        .is_some_and(|prevention| flag(prevention, "enabled") && flag(prevention, "boosted"))
-        && has_proportional_sensor(sensors);
-    Some(FlowGuard {
-        enabled: flag(flowguard, "enabled"),
-        active: flag(flowguard, "active"),
-        boosting,
-        trigger: text(flowguard, "trigger"),
-        reason: text(flowguard, "reason"),
-        level: flowguard.get("level").and_then(Value::as_f64).unwrap_or_default(),
-    })
-}
-
-fn text(object: &Value, field: &str) -> String {
-    object.get(field).and_then(Value::as_str).unwrap_or_default().to_owned()
-}
-
-fn flag(object: &Value, field: &str) -> bool {
-    match object.get(field) {
-        Some(Value::Bool(value)) => *value,
-        Some(Value::Number(value)) => value.as_i64().is_some_and(|number| number != 0),
-        _ => false,
-    }
-}
-
-fn integer(object: &Value, field: &str, default: i32) -> i32 {
-    object.get(field).and_then(Value::as_i64).and_then(|value| i32::try_from(value).ok()).unwrap_or(default)
-}
-
-fn count(object: &Value, field: &str) -> usize {
-    object.get(field).and_then(Value::as_u64).and_then(|value| usize::try_from(value).ok()).unwrap_or_default()
-}
-
 #[cfg(test)]
 mod tests {
+    use super::gates::gate_color;
+    use super::sensors::path_sensor_names;
     use super::*;
     use serde_json::json;
 
@@ -654,6 +313,20 @@ mod tests {
 
         let disabled = store(json!({ "mmu": { "sensors": { "toolhead": null } } }));
         assert_eq!(read_mmu(&disabled).unwrap().sensors, vec![MmuSensor { name: "toolhead".into(), triggered: None }]);
+    }
+
+    #[test]
+    fn buffer_sensors_are_only_listed_without_sync_feedback_and_path_sensors_never() {
+        let sensors = ["mmu_entry", "mmu_exit", "filament_tension", "filament_proportional", "toolhead"]
+            .map(|name| MmuSensor { name: name.into(), triggered: Some(false) })
+            .to_vec();
+        let names = |sync_feedback| -> Vec<String> {
+            let mmu = MmuStatus { sensors: sensors.clone(), sync_feedback, ..MmuStatus::default() };
+            mmu.listed_sensors().iter().map(|sensor| sensor.name.clone()).collect()
+        };
+
+        assert!(names(Some(SyncFeedback::default())).is_empty(), "entry, exit and toolhead are on the filament path");
+        assert_eq!(names(None), ["filament_tension", "filament_proportional"]);
     }
 
     #[test]

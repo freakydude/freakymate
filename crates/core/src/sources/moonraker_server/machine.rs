@@ -19,6 +19,11 @@ impl HostInterface {
     }
 }
 
+/// `machine.system_info`.
+pub fn system_info_call() -> Call {
+    Call::new("machine.system_info")
+}
+
 pub fn parse_host_network(result: &Value) -> Vec<HostInterface> {
     let Some(network) = result.pointer("/system_info/network").and_then(Value::as_object) else {
         return Vec::new();

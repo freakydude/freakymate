@@ -41,8 +41,11 @@ impl ThumbnailImage {
     }
 }
 
+/// Bytes at the start of a thumbnail that tell whether it is an SVG.
+const SVG_SNIFF_BYTES: usize = 256;
+
 fn looks_like_svg(data: &[u8]) -> bool {
-    let start = &data[..data.len().min(256)];
+    let start = &data[..data.len().min(SVG_SNIFF_BYTES)];
     let text = String::from_utf8_lossy(start);
     let trimmed = text.trim_start();
     trimmed.starts_with("<svg") || (trimmed.starts_with("<?xml") && text.contains("<svg"))
@@ -142,6 +145,16 @@ fn split_per_filament(text: &str) -> Vec<String> {
 /// `server.files.delete_file`: removes a G-code file; `path` is relative to the `gcodes` root, as in the file list.
 pub fn delete_file(path: &str) -> Call {
     Call::with("server.files.delete_file", json!({ "path": format!("gcodes/{path}") }))
+}
+
+/// `server.files.list` for the G-code files.
+pub fn list_call() -> Call {
+    Call::with("server.files.list", json!({ "root": "gcodes" }))
+}
+
+/// `server.files.metadata`.
+pub fn metadata_call(filename: &str) -> Call {
+    Call::with("server.files.metadata", json!({ "filename": filename }))
 }
 
 pub fn parse_file_list(result: &Value) -> Vec<FileEntry> {

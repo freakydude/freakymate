@@ -5,13 +5,13 @@ use super::calibration::CalibrationState;
 use super::devices::{self, Fan, Led};
 use super::exclude_object::{read_print_objects, PrintObject};
 use super::extruder::{read_extruder, ExtruderState};
-use super::fields::{flag, text};
 use super::filament_sensors::{read_filament_sensors, FilamentSensor};
 use super::firmware_retraction::{read_retraction, Retraction};
 use super::heaters::{read_heaters, read_sensors, Heater, TemperatureSensor};
 use super::job::{read_job, PrintJob};
 use super::leveling;
 use super::motion::{read_motion, Motion};
+use crate::sources::fields::{flag, text};
 use crate::sources::objects::ObjectStore;
 use serde_json::Value;
 

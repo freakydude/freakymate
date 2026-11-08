@@ -18,8 +18,8 @@ flowchart LR
         V[view.rs / format.rs<br/>pure derivations]
     end
     subgraph core [crates/core – freakymate-core]
-        SVC[service.rs<br/>PrinterService, only collects]
-        CMD[commands.rs<br/>Command → source]
+        SVC[service/<br/>PrinterService, only collects]
+        CMD[commands/<br/>Command → source]
         DOM[domain/*<br/>questions across sources]
         SRC[sources/*<br/>one module per origin]
         MR[moonraker/*<br/>JSON-RPC over WebSocket]
@@ -62,7 +62,7 @@ nothing is loaded at runtime or can be switched off. What is detected is used.
 | Transport   | `moonraker/`                            | JSON-RPC over WebSocket; knows no printer objects.                               |
 | Sources     | `sources/<origin>`                      | One module per origin: detect, subscribe, read the state, know the commands.     |
 | Domain      | `domain/`                               | Questions that need several sources; each answered in one place, with its order. |
-| Service     | `service.rs`, `commands.rs`             | Collects, publishes `Snapshot`s and `Event`s, resolves and sends commands.       |
+| Service     | `service/`, `commands/`                 | Collects, publishes `Snapshot`s and `Event`s, resolves and sends commands.       |
 
 Sources: `klipper/` (Klipper's own objects, one module per kind: `job`, `motion`, `extruder`, `heaters`, `devices`
 (fans, LEDs), `filament_sensors`, `firmware_retraction`, `exclude_object`, `leveling`, `calibration` (bed mesh, bed screws, Z height, the modes Klipper waits in, pending `SAVE_CONFIG` items); `status.rs` puts them together,
@@ -75,7 +75,11 @@ those of its plugins. Happy Hare counts only while it is enabled and at least ve
 (`PrinterStatus::happy_hare`); every rule that depends on it asks there. Each source also knows what it is told:
 Klipper's methods and G-code in `klipper/commands.rs`, Happy Hare's in `happy_hare/commands.rs`, the others beside
 their reader (`led_effect.rs`, `spoolman.rs`, `moonraker_server/power.rs`, `machine.rs`, `update_manager.rs`,
-`wled.rs`). G-code
+`wled.rs`), and what it asks (`files::list_call()`, `spoolman::fetch_state()`, ...); `service/queries.rs` only
+sends those. `sources/fields.rs` reads single fields of the objects. `service/` has `session.rs` (handshake, login,
+loop), `dispatch.rs` (commands) and `queries.rs`; `commands/` has `resolve/` with one module per area (heating,
+lighting, filament, MMU, layer pause, calibration). The texts that name a command for people are in the app
+(`command_name.rs`). G-code
 of every source reaches Klipper through `klipper::commands::run_gcode`.
 
 Domain: `filament.rs` (what Load and Unload run, which filament sensors belong to the printer), `pause.rs` (what is
@@ -118,6 +122,11 @@ history).
 5. `presenter.rs` runs in the Slint event loop (`slint::spawn_local`) and writes the globals `Printer` and `UiSettings`.
    The rows of the Slint models come from `items.rs`; lists are updated with `items::replace_rows`, which changes
    rows in place, so a tap on a button in a row survives the next status update.
+   One area each is written by its own module next to it: `mmu_view.rs` (Happy Hare, tools and what the job's file
+   asks of them), `files_view.rs` (file list and marks), `spool_view.rs` (Spoolman), `macro_view.rs` (macros and their
+   form), `console_view.rs` (console), `status_view.rs` (status bar and flyout, the layout of the list is
+   `StatusLog::layout`), besides `calibration_view.rs`, `history_view.rs` and `objects_view.rs`. The presenter keeps the
+   cache, routes events and writes the rest of the snapshot in small `show_*` steps.
 6. Connection loss: state `disconnected`, retry every 2 s; Klippy shutdown/restart via `notify_klippy_*` and
    `server.info` polling.
 7. Authorization (`moonraker/access.rs`, `credentials.rs`): everything runs over the WebSocket, Moonraker offers its
@@ -146,7 +155,8 @@ history).
   newest message, navigation), `system-tabs.slint`, `history.slint` (temperature chart), `light.slint` (light panel),
   `bed-map.slint` (objects on the bed), `bed-mesh.slint` (mesh map and profiles), `filament-path.slint`,
   `spool-strip.slint`, `busy-wheel.slint`. Messages (errors and informations) are kept in `status_log.rs`, pure logic
-  that the presenter shows.
+  that `status_view.rs` shows. Colours of filament are one struct, `BarColors` (up to three colours and whether they
+  run along the filament), which `ColorBar` draws.
 - `pages/`: print, move (with the Calibrate tab in `calibrate.slint`), temperature, tune, filament (with Happy Hare the
   tabs Gates in `mmu.slint` with the dialogs in `mmu-dialogs.slint`, Extruder, Tools in `mmu-tools.slint` and
   Service in `mmu-service.slint`;

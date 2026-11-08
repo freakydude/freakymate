@@ -1,7 +1,8 @@
 //! Temperature history from Moonraker's temperature store (`server.temperature_store`): about the last 20 minutes,
 //! one value per second, for heaters and temperature sensors. Live values are appended while a chart is open.
 
-use serde_json::Value;
+use crate::moonraker::Call;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 
 /// Moonraker keeps 1200 values by default (`temperature_store_size`); the live part keeps the same length.
@@ -34,6 +35,11 @@ fn push_bounded(values: &mut Vec<f64>, value: f64) {
     if values.len() > HISTORY_LENGTH {
         values.drain(..values.len() - HISTORY_LENGTH);
     }
+}
+
+/// `server.temperature_store` without the monitors.
+pub fn store_call() -> Call {
+    Call::with("server.temperature_store", json!({ "include_monitors": false }))
 }
 
 /// The answer of `server.temperature_store`, by Klipper object name.

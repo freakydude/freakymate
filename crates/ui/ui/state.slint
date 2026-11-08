@@ -80,23 +80,27 @@ export struct FilamentSensorItem {
     detected: bool,
 }
 
+// The colours of a filament bar (`ColorBar`): up to three, how many there are (0 to 3), and whether they follow each
+// other along the filament instead of lying side by side (Spoolman's multi-colour filaments).
+export struct BarColors {
+    first: color,
+    second: color,
+    third: color,
+    count: int,
+    longitudinal: bool,
+}
+
 // One gate of the MMU. `availability`: unknown | empty | available | buffered.
 export struct MmuGateItem {
     index: int,
     availability: string,
     name: string,
     material: string,
-    color: color,
+    colors: BarColors,
     has-color: bool,
-    // Spoolman's multi-colour filaments: the second and third colour, and how many colours there are (0 to 3).
-    color-2: color,
-    color-3: color,
-    color-count: int,
-    // The colours follow each other along the filament instead of lying side by side.
-    longitudinal: bool,
     // Tools that take their filament from this gate, as "T0 T3"; empty without one.
     tools: string,
-    // How the tools of the compared file that print from this gate fit (`MmuToolItem.verdict`, the worst of them).
+    // How the tools of the compared file that print from this gate fit (`ToolMatchItem.verdict`, the worst of them).
     file-verdict: string,
     // EndlessSpool group of the gate, -1 if Happy Hare reports none.
     group: int,
@@ -109,7 +113,7 @@ export struct MmuGateItem {
 }
 
 // A tool of the MMU and the gate it takes its filament from (Happy Hare's tool-to-gate map).
-export struct MmuToolItem {
+export struct ToolMatchItem {
     tool: int,
     // -1: Happy Hare maps no gate to the tool (a tool of the file beyond the printer's tools).
     gate: int,
@@ -119,7 +123,7 @@ export struct MmuToolItem {
     wanted-has-color: bool,
     wanted-material: string,
     // Planned weight with unit, profile name of the slicer.
-    wanted-grams: string,
+    wanted-weight: string,
     wanted-profile: string,
     // "fits", "differs", "gate-empty", "no-gate", or "" when nothing can be compared.
     verdict: string,
@@ -148,11 +152,7 @@ export struct FilamentPathItem {
     gate-sensor: int,
     extruder-sensor: int,
     toolhead-sensor: int,
-    color: color,
-    color-2: color,
-    color-3: color,
-    color-count: int,
-    longitudinal: bool,
+    colors: BarColors,
 }
 
 // A spool of Spoolman in the picker. `place`: where it sits ("Gate 2", "In use") or empty.
@@ -162,12 +162,7 @@ export struct SpoolItem {
     material: string,
     // What is left, e.g. "613 g"; empty if Spoolman does not know.
     remaining: string,
-    color: color,
-    color-2: color,
-    color-3: color,
-    // 0 to 3 colours
-    color-count: int,
-    longitudinal: bool,
+    colors: BarColors,
     place: string,
     low: bool,
 }
@@ -450,7 +445,7 @@ export global Printer {
     // The bypass is selected instead of a gate: filament fed by hand past the gates.
     in property <bool> mmu-bypass;
     // Every tool with its gate, in tool order; tools of the file without a gate at the end.
-    in property <[MmuToolItem]> mmu-tools;
+    in property <[ToolMatchItem]> mmu-tools;
     // The file the tools are compared with (the job's file for now), empty for none; how many of its tools fit, and
     // "fits" when all do, "differs" when one does not, "" when some cannot be compared.
     in property <string> mmu-match-file;
@@ -533,12 +528,7 @@ export global Printer {
     in property <string> spool-material;
     // What is left of the spool, for example "613 g".
     in property <string> spool-weight;
-    in property <color> spool-color;
-    in property <color> spool-color-2;
-    in property <color> spool-color-3;
-    // 0 to 3 colours
-    in property <int> spool-color-count;
-    in property <bool> spool-longitudinal;
+    in property <BarColors> spool-colors;
     // Where the filament of the selected gate is, for the drawing of its way.
     in property <FilamentPathItem> mmu-path;
     in property <bool> spool-low;
@@ -554,7 +544,7 @@ export global Printer {
     in property <FileItem> prepared;
     // The tools the prepared file uses and how they compare: with their gates (MMU), or tool 0 with the spool in use;
     // `gate` is -1 without MMU.
-    in property <[MmuToolItem]> prepared-tools;
+    in property <[ToolMatchItem]> prepared-tools;
     // Files marked in the file list; the path and name only when it is a single one, which can be prepared.
     in property <int> marked-file-count;
     in property <string> marked-file-path;

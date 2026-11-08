@@ -1,6 +1,6 @@
 //! Axes and moves: `toolhead`, `motion_report` and `gcode_move`.
 
-use super::fields::{number, number_or, text, vector};
+use crate::sources::fields::{number, number_or, text, vector};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -44,6 +44,11 @@ pub fn strip_name(object: &str) -> Option<&str> {
     object.strip_prefix(OBJECT_PREFIX)
 }
 
+/// `machine.wled.strips`.
+pub fn strips_call() -> Call {
+    Call::new("machine.wled.strips")
+}
+
 /// The strips of `machine.wled.strips`.
 pub fn parse_strip_list(result: &Value) -> Vec<WledStrip> {
     result.get("strips").and_then(Value::as_object).map(parse_strips).unwrap_or_default()

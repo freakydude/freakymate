@@ -1,7 +1,7 @@
 //! Levelling the gantry or bed: `[quad_gantry_level]` or `[z_tilt]`, and whether it has been applied since the last
 //! homing.
 
-use super::fields::flag;
+use crate::sources::fields::flag;
 use crate::sources::objects::ObjectStore;
 
 /// How the gantry or bed is levelled.

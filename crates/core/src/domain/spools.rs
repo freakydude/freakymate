@@ -2,11 +2,33 @@
 //! spool of a printer without MMU (the active spool of Moonraker). How a print compares with them is
 //! [`super::filament_match`].
 
+use crate::color::Rgba;
+use crate::commands::Command;
+use crate::sources::happy_hare::MmuGate;
+use crate::sources::klipper::BED_HEATER;
 use crate::sources::spoolman::{Spool, SpoolmanState};
 use crate::sources::PrinterStatus;
 
 /// A target that is further off than this from the temperature of the spool gets a hint, in °C.
 const TEMPERATURE_TOLERANCE: f64 = 5.0;
+
+/// The colours a filament shows and whether they follow each other along it.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FilamentColors {
+    pub colors: Vec<Rgba>,
+    pub longitudinal: bool,
+}
+
+impl FilamentColors {
+    /// The colours of a gate: a multi-colour spool of Spoolman shows all of its colours; otherwise the gate has the
+    /// one colour Happy Hare reports.
+    pub fn of_gate(gate: &MmuGate, spool: Option<&Spool>) -> Self {
+        match spool.filter(|spool| spool.is_multi_color()) {
+            Some(spool) => Self { colors: spool.colors.clone(), longitudinal: spool.has_longitudinal_colors() },
+            None => Self { colors: gate.color.into_iter().collect(), longitudinal: false },
+        }
+    }
+}
 
 /// One place for a spool.
 #[derive(Debug, Clone, PartialEq)]
@@ -59,6 +81,14 @@ pub fn temperature_hint(target: f64, recommended: Option<f64>) -> Option<f64> {
     (target > 0.0 && (target - recommended).abs() > TEMPERATURE_TOLERANCE).then_some(recommended)
 }
 
+/// Heats to what the spool recommends; `None` without a nozzle temperature. The bed keeps its target if Spoolman has
+/// no temperature for it.
+pub fn preset(spool: &Spool, status: &PrinterStatus) -> Option<Command> {
+    let extruder = spool.extruder_temp?;
+    let bed = spool.bed_temp.or_else(|| status.heater(BED_HEATER).map(|heater| heater.target)).unwrap_or(0.0);
+    Some(Command::ApplyPreset { extruder, bed })
+}
+
 /// The spools for the picker: those that sit in a lane first, then the most recently used.
 pub fn picker_order(mut spools: Vec<Spool>, inserted: &[u32]) -> Vec<Spool> {
     spools.sort_by(|left, right| {
@@ -74,18 +104,9 @@ pub fn picker_order(mut spools: Vec<Spool>, inserted: &[u32]) -> Vec<Spool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sources::happy_hare::{MmuGate, MmuStatus};
-
-    fn spool(id: u32, material: &str, left: f64, color: [u8; 3]) -> Spool {
-        Spool {
-            id,
-            material: material.into(),
-            remaining_weight: Some(left),
-            initial_weight: Some(1000.0),
-            colors: vec![[color[0], color[1], color[2], 0xff]],
-            ..Spool::default()
-        }
-    }
+    use crate::sources::happy_hare::MmuStatus;
+    use crate::sources::klipper::Heater;
+    use crate::sources::spoolman::test_spool;
 
     fn state_with(spools: &[Spool], active: Option<u32>) -> SpoolmanState {
         SpoolmanState {
@@ -125,7 +146,7 @@ mod tests {
 
     #[test]
     fn a_printer_without_mmu_has_one_lane_with_the_active_spool() {
-        let state = state_with(&[spool(5, "PLA", 800.0, [0; 3])], Some(5));
+        let state = state_with(&[test_spool(5, "PLA", 800.0, [0; 3])], Some(5));
 
         let lanes = lanes(&without_mmu(), &state);
 
@@ -136,7 +157,7 @@ mod tests {
 
     #[test]
     fn with_an_mmu_every_gate_is_a_lane_and_the_selected_one_is_active() {
-        let state = state_with(&[spool(5, "PLA", 800.0, [0; 3]), spool(6, "PETG", 300.0, [0; 3])], Some(6));
+        let state = state_with(&[test_spool(5, "PLA", 800.0, [0; 3]), test_spool(6, "PETG", 300.0, [0; 3])], Some(6));
         let status = mmu_with(&[Some(5), Some(6), None], 1, &[0, 1, 2]);
 
         let lanes = lanes(&status, &state);
@@ -148,7 +169,7 @@ mod tests {
 
     #[test]
     fn a_disabled_mmu_leaves_the_one_active_spool() {
-        let state = state_with(&[spool(5, "PLA", 800.0, [0; 3])], Some(5));
+        let state = state_with(&[test_spool(5, "PLA", 800.0, [0; 3])], Some(5));
         let mut status = mmu_with(&[Some(9), None], 0, &[0, 1]);
         status.mmu.as_mut().unwrap().enabled = false;
 
@@ -181,5 +202,44 @@ mod tests {
         let order: Vec<u32> = picker_order(spools, &[3]).iter().map(|spool| spool.id).collect();
 
         assert_eq!(order, [3, 2, 4, 1]);
+    }
+
+    #[test]
+    fn a_multi_colour_spool_shows_its_colours_instead_of_the_colour_of_the_gate() {
+        let (red, green, blue) = ([0xff, 0, 0, 0xff], [0, 0xff, 0, 0xff], [0, 0, 0xff, 0xff]);
+        let gate = MmuGate { color: Some(red), ..MmuGate::default() };
+        let spool = |colors: Vec<Rgba>| Spool { colors, longitudinal: true, ..Spool::default() };
+
+        assert_eq!(
+            FilamentColors::of_gate(&gate, Some(&spool(vec![green, blue]))),
+            FilamentColors { colors: vec![green, blue], longitudinal: true }
+        );
+        assert_eq!(
+            FilamentColors::of_gate(&gate, Some(&spool(vec![green]))),
+            FilamentColors { colors: vec![red], longitudinal: false }
+        );
+        assert_eq!(FilamentColors::of_gate(&gate, None), FilamentColors { colors: vec![red], longitudinal: false });
+        assert_eq!(FilamentColors::of_gate(&MmuGate::default(), None), FilamentColors::default());
+    }
+
+    #[test]
+    fn the_preset_heats_to_the_spool_and_the_bed_keeps_its_target_without_a_bed_temperature() {
+        let bed = Heater { object: BED_HEATER.into(), target: 55.0, ..Heater::default() };
+        let with_bed = PrinterStatus { heaters: vec![bed], ..PrinterStatus::default() };
+        let spool = |extruder, bed| Spool { extruder_temp: extruder, bed_temp: bed, ..Spool::default() };
+
+        assert_eq!(
+            preset(&spool(Some(240.0), Some(100.0)), &with_bed),
+            Some(Command::ApplyPreset { extruder: 240.0, bed: 100.0 })
+        );
+        assert_eq!(
+            preset(&spool(Some(240.0), None), &with_bed),
+            Some(Command::ApplyPreset { extruder: 240.0, bed: 55.0 })
+        );
+        assert_eq!(
+            preset(&spool(Some(240.0), None), &without_mmu()),
+            Some(Command::ApplyPreset { extruder: 240.0, bed: 0.0 })
+        );
+        assert_eq!(preset(&spool(None, Some(100.0)), &with_bed), None);
     }
 }

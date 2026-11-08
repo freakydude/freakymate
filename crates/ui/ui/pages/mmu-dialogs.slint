@@ -46,8 +46,7 @@ component ColorSwatch inherits Rectangle {
         y: self.x;
         width: parent.width - 2 * self.x;
         height: parent.height - 2 * self.x;
-        count: 1;
-        first: root.swatch;
+        colors: { first: root.swatch, count: 1 };
     }
 
     TouchArea {
@@ -97,11 +96,7 @@ export component GateDialog inherits Scrim {
                     width: 14px;
                     height: 36px;
                     vertical: true;
-                    first: root.item.color;
-                    second: root.item.color-2;
-                    third: root.item.color-3;
-                    count: root.item.color-count;
-                    longitudinal: root.item.longitudinal;
+                    colors: root.item.colors;
                     generic: root.item.availability == "available" || root.item.availability == "buffered";
                 }
                 VerticalLayout {
@@ -200,7 +195,7 @@ export component GateDialog inherits Scrim {
                 for swatch in GateFilaments.colors: ColorSwatch {
                     horizontal-stretch: 1;
                     swatch: swatch;
-                    checked: root.item.has-color && root.item.color == swatch;
+                    checked: root.item.has-color && root.item.colors.first == swatch;
                     clicked => { Actions.set-gate-color(root.item.index, swatch); }
                 }
             }

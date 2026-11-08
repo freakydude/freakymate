@@ -3,7 +3,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, MmuDialogs, MmuGateItem, MmuToolItem, Printer } from "../state.slint";
+import { Actions, Confirm, MmuDialogs, MmuGateItem, ToolMatchItem, Printer } from "../state.slint";
 import { Card, ColorBar, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
 import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
 import { SlotTile, VerdictIcon } from "mmu.slint";
@@ -15,30 +15,25 @@ export component GateColor inherits ColorBar {
     width: 10px;
     height: 32px;
     vertical: true;
-    first: root.gate.color;
-    second: root.gate.color-2;
-    third: root.gate.color-3;
-    count: root.gate.color-count;
-    longitudinal: root.gate.longitudinal;
+    colors: root.gate.colors;
     generic: root.gate.availability == "available" || root.gate.availability == "buffered";
 }
 
 // The colour the file asks of a tool, as a dot beside the gate's bar; a clear filament shows the checkerboard.
 export component WantedColor inherits ColorBar {
-    in property <MmuToolItem> mapping;
+    in property <ToolMatchItem> mapping;
 
     width: 12px;
     height: 12px;
     border-radius: 6px;
-    first: root.mapping.wanted-color;
-    count: 1;
+    colors: { first: root.mapping.wanted-color, count: 1 };
 }
 
 // A tool with the gate it takes its filament from, in that gate's colour and material; a tap opens the choice of gate.
 // With a file to compare, a dot shows the colour the file asks for and an icon whether the gate fits; tools the file
 // does not use fade.
 component ToolTile inherits SlotTile {
-    in property <MmuToolItem> mapping;
+    in property <ToolMatchItem> mapping;
     property <MmuGateItem> gate: Printer.mmu-gates[root.mapping.gate];
     property <bool> has-gate: root.mapping.gate >= 0;
 
@@ -252,11 +247,7 @@ component GateOption inherits SlotTile {
     ColorBar {
         height: 12px;
         border-radius: 6px;
-        first: root.gate.color;
-        second: root.gate.color-2;
-        third: root.gate.color-3;
-        count: root.gate.color-count;
-        longitudinal: root.gate.longitudinal;
+        colors: root.gate.colors;
         generic: root.gate.availability == "available" || root.gate.availability == "buffered";
     }
     Text {
@@ -269,7 +260,7 @@ component GateOption inherits SlotTile {
 
 // What the file asks of a tool: colour, material, weight and the slicer's profile name.
 component WantedLine inherits HorizontalLayout {
-    in property <MmuToolItem> mapping;
+    in property <ToolMatchItem> mapping;
 
     spacing: 8px;
     Text {
@@ -290,7 +281,7 @@ component WantedLine inherits HorizontalLayout {
         vertical-alignment: center;
     }
     Text {
-        text: root.mapping.wanted-grams;
+        text: root.mapping.wanted-weight;
         color: Theme.foreground;
         font-size: Theme.font-normal;
         vertical-alignment: center;
@@ -307,7 +298,7 @@ component WantedLine inherits HorizontalLayout {
 
 // The choice of gate for one tool; a tap on a gate maps the tool to it and closes the dialog.
 export component ToolDialog inherits Scrim {
-    property <MmuToolItem> mapping: Printer.mmu-tools[MmuDialogs.tool];
+    property <ToolMatchItem> mapping: Printer.mmu-tools[MmuDialogs.tool];
     visible: MmuDialogs.tool >= 0 && MmuDialogs.tool < Printer.mmu-tools.length;
 
     function close() {

@@ -84,7 +84,7 @@ component HeaterRow inherits Rectangle {
                     horizontal-alignment: center;
                 }
                 Text {
-                    text: root.heater.target > 0 ? round(root.heater.target) + " °C" : @tr("off");
+                    text: root.heater.target > 0 ? round(root.heater.target) + " °C" : @tr("Off");
                     color: root.heater.target > 0 ? Theme.accent : Theme.muted;
                     font-size: Theme.font-large;
                     font-weight: 600;
@@ -172,7 +172,7 @@ component FanRow inherits Rectangle {
         }
         if !root.fan.controllable: Text {
             width: 64px;
-            text: @tr("auto");
+            text: @tr("Auto");
             color: Theme.muted;
             font-size: Theme.font-small;
             horizontal-alignment: center;

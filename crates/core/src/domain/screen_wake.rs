@@ -2,7 +2,7 @@
 //! print starts or ends. The standby itself lives in [`crate::backlight`]; this only reads the printer.
 
 use super::pause::{interruption, Interruption};
-use crate::service::ConnectionState;
+use crate::moonraker::ConnectionState;
 use crate::sources::klipper::{KlippyState, PrintState};
 use crate::sources::moonraker_server::gcode_store::ConsoleLine;
 use crate::sources::PrinterStatus;

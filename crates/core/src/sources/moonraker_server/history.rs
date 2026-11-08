@@ -1,7 +1,8 @@
 //! Moonraker's `history` component: the jobs printed so far, the last completed print per file and the newest job.
 
+use crate::moonraker::Call;
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 
 /// What the last completed print of a file measured, from the Moonraker job history.
@@ -39,6 +40,14 @@ pub struct FinishedJob {
 pub struct PrintHistory {
     pub last_prints: HashMap<String, LastPrint>,
     pub newest: Option<FinishedJob>,
+}
+
+/// Jobs the history asks for.
+const PRINT_HISTORY_LIMIT: u32 = 300;
+
+/// `server.history.list`.
+pub fn list_call() -> Call {
+    Call::with("server.history.list", json!({ "limit": PRINT_HISTORY_LIMIT }))
 }
 
 pub fn parse_print_history(result: &Value) -> PrintHistory {

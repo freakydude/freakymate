@@ -30,7 +30,7 @@ component LedRow inherits Rectangle {
             Text { text: root.led.label; color: Theme.muted; font-size: Theme.font-small; overflow: elide; }
             Text {
                 // Moonraker does not know a WLED strip's brightness after a preset; then only "on" is certain.
-                text: !root.led.on ? @tr("off") : root.led.level-known ? round(light-slider.shown) + " %" : @tr("on");
+                text: !root.led.on ? @tr("Off") : root.led.level-known ? round(light-slider.shown) + " %" : @tr("On");
                 color: Theme.foreground;
                 font-size: Theme.font-normal;
                 font-weight: 600;

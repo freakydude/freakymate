@@ -14,10 +14,10 @@ export component FilamentMmuGateDialogPreview inherits AppWindow {
         Printer.has-spoolman = false;
         Printer.mmu-endless-spool = true;
         Printer.mmu-gates = [
-            { index: 0, availability: "available", name: "Red PLA", material: "PLA", color: #ff0000, has-color: true, color-count: 1, tools: "T0 T2", group: 0, selected: true },
-            { index: 1, availability: "available", name: "", material: "PETG", color: #ff8000, has-color: true, color-count: 1, tools: "T1 T3", group: 1, selected: false },
-            { index: 2, availability: "empty", name: "", material: "", color: #000000, has-color: false, tools: "", group: 0, selected: false },
-            { index: 3, availability: "available", name: "", material: "PLA", color: #ff0000, has-color: true, color-count: 1, tools: "", group: 0, selected: false },
+            { index: 0, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #ff0000, count: 1 }, has-color: true, tools: "T0 T2", group: 0, selected: true },
+            { index: 1, availability: "available", name: "", material: "PETG", colors: { first: #ff8000, count: 1 }, has-color: true, tools: "T1 T3", group: 1, selected: false },
+            { index: 2, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "", group: 0, selected: false },
+            { index: 3, availability: "available", name: "", material: "PLA", colors: { first: #ff0000, count: 1 }, has-color: true, tools: "", group: 0, selected: false },
         ];
         Printer.mmu-tools = [{ tool: 0, gate: 0 }, { tool: 1, gate: 1 }, { tool: 2, gate: 0 }, { tool: 3, gate: 1 }];
         MmuDialogs.gate = 1;
