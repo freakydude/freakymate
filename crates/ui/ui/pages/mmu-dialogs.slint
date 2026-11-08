@@ -35,11 +35,20 @@ component ColorSwatch inherits Rectangle {
 
     min-height: Theme.touch;
     border-radius: Theme.radius;
-    background: root.swatch;
-    border-width: root.checked ? 3px : 1px;
-    border-color: root.checked ? Theme.accent : Theme.border;
+    border-width: root.checked ? 3px : 0px;
+    border-color: Theme.accent;
     accessible-role: button;
     accessible-checked: root.checked;
+
+    // The bar draws a colour with alpha over a checkerboard.
+    ColorBar {
+        x: root.checked ? 3px : 0px;
+        y: self.x;
+        width: parent.width - 2 * self.x;
+        height: parent.height - 2 * self.x;
+        count: 1;
+        first: root.swatch;
+    }
 
     TouchArea {
         clicked => { root.clicked(); }
