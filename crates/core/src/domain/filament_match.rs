@@ -130,6 +130,22 @@ pub fn match_tools(metadata: &FileMetadata, status: &PrinterStatus, lanes: &[Lan
     tool_requests(metadata).into_iter().map(|request| match_tool(request, status, lanes)).collect()
 }
 
+/// Per gate index of Happy Hare: whether the gate is a good choice for the tool. Stricter than the verdict of a tool:
+/// the gate must know the material and colour the file asks for, and they must fit. An empty gate never fits. Empty
+/// without Happy Hare.
+pub fn fitting_gates(request: &ToolRequest, status: &PrinterStatus, lanes: &[Lane]) -> Vec<bool> {
+    let Some(mmu) = status.happy_hare() else { return Vec::new() };
+    let mut fits = vec![false; mmu.gates.iter().map(|gate| gate.index + 1).max().unwrap_or(0)];
+    for gate in mmu.gates.iter().filter(|gate| gate.availability != GateAvailability::Empty) {
+        let lane = lanes.iter().find(|lane| lane.gate == Some(gate.index));
+        let supply = supply(lane, Some(gate));
+        let knows_material = request.material.is_none() || supply.material.is_some();
+        let knows_color = !matches!(request.color, Some(FileColor::Rgb(_))) || !supply.colors.is_empty();
+        fits[gate.index] = knows_material && knows_color && compare(request, &supply) == Verdict::Fits;
+    }
+    fits
+}
+
 fn match_tool(request: ToolRequest, status: &PrinterStatus, lanes: &[Lane]) -> ToolMatch {
     let Some(mmu) = status.happy_hare().filter(|mmu| !mmu.gates.is_empty()) else {
         let lane = lanes.first().filter(|_| request.tool == 0);
@@ -510,5 +526,27 @@ mod tests {
         assert_eq!(requests.len(), 11);
         assert_eq!(requests[10].color, Some(FileColor::Rgb([0x80, 0x00, 0x80])));
         assert!(requests.iter().all(|request| request.material.as_deref() == Some("PLA")));
+    }
+
+    #[test]
+    fn the_gates_that_fit_a_tool_are_marked_and_an_empty_one_never() {
+        let mut empty_red = gate("PLA", Some([0xE0, 0x31, 0x31]));
+        empty_red.availability = GateAvailability::Empty;
+        let status = happy_hare(
+            vec![
+                gate("PLA", Some([0xE0, 0x31, 0x31])),
+                gate("PETG", Some([0xE0, 0x31, 0x31])),
+                gate("PLA", None),
+                empty_red,
+            ],
+            &[0, 1, 2, 3],
+        );
+        let request = tool_requests(&file(&[5.0], &["PLA"], &["#E8590C"])).remove(0);
+
+        let fits = fitting_gates(&request, &status, &lanes(&status, &SpoolmanState::default()));
+
+        // Gate 1 has the wrong material, gate 2 no colour to compare, gate 3 is empty.
+        assert_eq!(fits, [true, false, false, false]);
+        assert!(fitting_gates(&request, &PrinterStatus::default(), &[]).is_empty());
     }
 }

@@ -96,6 +96,8 @@ export struct MmuGateItem {
     longitudinal: bool,
     // Tools that take their filament from this gate, as "T0 T3"; empty without one.
     tools: string,
+    // How the tools of the compared file that print from this gate fit (`MmuToolItem.verdict`, the worst of them).
+    file-verdict: string,
     // EndlessSpool group of the gate, -1 if Happy Hare reports none.
     group: int,
     selected: bool,
@@ -109,7 +111,23 @@ export struct MmuGateItem {
 // A tool of the MMU and the gate it takes its filament from (Happy Hare's tool-to-gate map).
 export struct MmuToolItem {
     tool: int,
+    // -1: Happy Hare maps no gate to the tool (a tool of the file beyond the printer's tools).
     gate: int,
+    // What the file of the job asks of the tool (see `Printer.mmu-match-file`); empty when it does not use the tool.
+    used: bool,
+    wanted-color: color,
+    wanted-has-color: bool,
+    wanted-transparent: bool,
+    wanted-material: string,
+    // Planned weight with unit, profile name of the slicer.
+    wanted-grams: string,
+    wanted-profile: string,
+    // "fits", "differs", "gate-empty", "no-gate", or "" when nothing can be compared.
+    verdict: string,
+    // What differs, one line each.
+    differences: string,
+    // Per gate index: the gate's filament fits what the file asks of the tool.
+    fitting-gates: [bool],
 }
 
 // A label of the temperature chart at `position`, a share from 0 to 1 along its axis.
@@ -432,8 +450,13 @@ export global Printer {
     in property <int> mmu-tool: -1;
     // The bypass is selected instead of a gate: filament fed by hand past the gates.
     in property <bool> mmu-bypass;
-    // Every tool with its gate, in tool order.
+    // Every tool with its gate, in tool order; tools of the file without a gate at the end.
     in property <[MmuToolItem]> mmu-tools;
+    // The file the tools are compared with (the job's file for now), empty for none; how many of its tools fit, and
+    // "fits" when all do, "differs" when one does not, "" when some cannot be compared.
+    in property <string> mmu-match-file;
+    in property <string> mmu-match-summary;
+    in property <string> mmu-match-verdict;
     // EndlessSpool: on a runout Happy Hare continues with the next gate of the same group.
     in property <bool> mmu-endless-spool;
     // Material and colour of a gate can be set in Happy Hare; false when it takes them from Spoolman (`pull`).

@@ -3,7 +3,7 @@
 use crate::format;
 use chrono::{DateTime, Local};
 use freakymate_core::domain::estimates;
-use freakymate_core::domain::filament_match::{self, PrintHint};
+use freakymate_core::domain::filament_match::{self, Difference, PrintHint, ToolMatch, Verdict};
 use freakymate_core::domain::file_catalog::FileInfo;
 use freakymate_core::domain::job_end;
 use freakymate_core::domain::pause::{Interruption, InterruptionFact};
@@ -188,6 +188,64 @@ pub fn print_hint_text(hint: &PrintHint, show_tool: bool) -> String {
         PrintHint::Color { tool: number } => format!("{}the colour differs from the file", tool(*number)),
         PrintHint::GateEmpty { tool: number } => format!("{}the gate is empty", tool(*number)),
         PrintHint::NoGate { tool: number } => format!("T{number}: the printer has no gate for this tool"),
+    }
+}
+
+/// The key of a verdict for the UI (`MmuToolItem.verdict`): "fits", "differs", "gate-empty", "no-gate" or "".
+pub fn verdict_key(verdict: &Verdict) -> &'static str {
+    match verdict {
+        Verdict::Fits => "fits",
+        Verdict::Differs(_) => "differs",
+        Verdict::GateEmpty => "gate-empty",
+        Verdict::NoGate => "no-gate",
+        Verdict::Unknown => "",
+    }
+}
+
+/// Several verdicts as one: "differs" when one does not fit, "fits" when all fit, "" when some cannot be compared or
+/// there are none.
+pub fn combined_verdict<'a>(verdicts: impl IntoIterator<Item = &'a Verdict>) -> &'static str {
+    let mut fitting = None;
+    for verdict in verdicts {
+        match verdict {
+            Verdict::Fits => fitting = Some(fitting.unwrap_or(true)),
+            Verdict::Unknown => fitting = Some(false),
+            Verdict::Differs(_) | Verdict::GateEmpty | Verdict::NoGate => return "differs",
+        }
+    }
+    if fitting == Some(true) {
+        "fits"
+    } else {
+        ""
+    }
+}
+
+/// How many tools of the file fit, e.g. "3 of 4 tools fit".
+pub fn match_summary(matches: &[ToolMatch]) -> String {
+    let fitting = matches.iter().filter(|found| found.verdict == Verdict::Fits).count();
+    format!("{fitting} of {} tools fit", matches.len())
+}
+
+/// What does not fit for a tool, one sentence per line, naming the gate it prints from.
+pub fn tool_differences(found: &ToolMatch) -> String {
+    let gate = found.gate.map_or_else(String::new, |gate| gate.to_string());
+    match &found.verdict {
+        Verdict::Fits | Verdict::Unknown => String::new(),
+        Verdict::GateEmpty => format!("Gate {gate} is empty."),
+        Verdict::NoGate => format!("The printer has no gate for T{}.", found.request.tool),
+        Verdict::Differs(differences) => differences
+            .iter()
+            .map(|difference| match difference {
+                Difference::Material { loaded, .. } => format!("Gate {gate} holds {loaded}."),
+                Difference::Color => format!("Gate {gate} has another colour."),
+                Difference::Weight { needed, left } => format!(
+                    "The spool in gate {gate} has {} left, the print needs ~{}.",
+                    format::filament_weight(*left),
+                    format::filament_weight(*needed)
+                ),
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
     }
 }
 
@@ -627,6 +685,46 @@ mod tests {
 
         // Tool 2 (TPU) has no weight: the print does not use it.
         assert_eq!(facts_of(Some(&metadata), None).material, "PLA, PETG");
+    }
+
+    fn tool_match(tool: usize, gate: Option<usize>, verdict: Verdict) -> ToolMatch {
+        let request = filament_match::ToolRequest { tool, ..filament_match::ToolRequest::default() };
+        ToolMatch { request, gate, verdict }
+    }
+
+    #[test]
+    fn tools_that_do_not_fit_win_over_those_without_facts() {
+        let differs = Verdict::Differs(vec![Difference::Color]);
+
+        assert_eq!(combined_verdict([&Verdict::Fits, &Verdict::Fits]), "fits");
+        assert_eq!(combined_verdict([&Verdict::Fits, &Verdict::Unknown]), "");
+        assert_eq!(combined_verdict([&Verdict::Unknown, &differs]), "differs");
+        assert_eq!(combined_verdict([&Verdict::NoGate]), "differs");
+        assert_eq!(combined_verdict([]), "");
+    }
+
+    #[test]
+    fn the_summary_counts_the_fitting_tools() {
+        let matches = [tool_match(0, Some(0), Verdict::Fits), tool_match(1, Some(1), Verdict::GateEmpty)];
+
+        assert_eq!(match_summary(&matches), "1 of 2 tools fit");
+    }
+
+    #[test]
+    fn each_difference_of_a_tool_is_a_sentence_about_its_gate() {
+        let differs = Verdict::Differs(vec![
+            Difference::Material { expected: "PLA".into(), loaded: "PETG".into() },
+            Difference::Color,
+            Difference::Weight { needed: 30.0, left: 20.0 },
+        ]);
+
+        assert_eq!(
+            tool_differences(&tool_match(3, Some(1), differs)),
+            "Gate 1 holds PETG.\nGate 1 has another colour.\nThe spool in gate 1 has 20 g left, the print needs ~30 g."
+        );
+        assert_eq!(tool_differences(&tool_match(1, Some(3), Verdict::GateEmpty)), "Gate 3 is empty.");
+        assert_eq!(tool_differences(&tool_match(4, None, Verdict::NoGate)), "The printer has no gate for T4.");
+        assert_eq!(tool_differences(&tool_match(0, Some(0), Verdict::Fits)), "");
     }
 
     #[test]

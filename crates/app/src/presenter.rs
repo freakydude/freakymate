@@ -17,7 +17,7 @@ use crate::{
 };
 use chrono::Local;
 use freakymate_core::domain::filament::{self, FilamentHandling};
-use freakymate_core::domain::filament_match;
+use freakymate_core::domain::filament_match::{self, FileColor, ToolMatch, Verdict};
 use freakymate_core::domain::file_catalog::FileCatalog;
 use freakymate_core::domain::spools::{self, Lane};
 use freakymate_core::domain::{estimates, light, pause};
@@ -592,6 +592,7 @@ impl Presenter {
             return;
         };
 
+        let matches = self.job_matches(status, lanes);
         let gates = mmu
             .gates
             .iter()
@@ -614,19 +615,17 @@ impl Presenter {
                     longitudinal,
                     has_color: gate.color.is_some(),
                     tools: view::mmu_tools(&gate.tools).into(),
+                    file_verdict: view::combined_verdict(
+                        matches.iter().filter(|found| found.gate == Some(gate.index)).map(|found| &found.verdict),
+                    )
+                    .into(),
                     group: gate.endless_spool_group.map_or(-1, |group| group as i32),
                     selected: usize::try_from(mmu.gate) == Ok(gate.index),
                 }
             })
             .collect();
         replace_rows(&self.mmu_gates, gates);
-        let tools = mmu
-            .tool_to_gate
-            .iter()
-            .enumerate()
-            .map(|(tool, gate)| MmuToolItem { tool: tool as i32, gate: *gate as i32 })
-            .collect();
-        replace_rows(&self.mmu_tools, tools);
+        self.set_mmu_tools(&printer, &mmu.tool_to_gate, &matches, status, lanes);
         printer.set_mmu_bypass(mmu.bypass_selected());
         printer.set_mmu_endless_spool(mmu.endless_spool);
         printer.set_mmu_gate_map_local(mmu.gate_map_is_local());
@@ -665,6 +664,51 @@ impl Presenter {
         printer.set_mmu_flowguard_detail(detail.join(": ").into());
         self.note_origin("MMU flow rate", mmu.flow_rate.map(|rate| rate.origin));
         printer.set_mmu_flow_rate(mmu.flow_rate.map_or(-1.0, |rate| rate.value as f32));
+    }
+
+    /// How each tool of the job's file fits the filament it would print with; empty without file or metadata.
+    fn job_matches(&self, status: &PrinterStatus, lanes: &[Lane]) -> Vec<ToolMatch> {
+        let cache = self.cache.borrow();
+        cache
+            .catalog
+            .metadata(&status.job.filename)
+            .map(|metadata| filament_match::match_tools(metadata, status, lanes))
+            .unwrap_or_default()
+    }
+
+    /// The tools of Happy Hare with what the job's file asks of them, then the file's tools that have no gate; and the
+    /// line about the file above them.
+    fn set_mmu_tools(
+        &self,
+        printer: &Printer,
+        tool_to_gate: &[usize],
+        matches: &[ToolMatch],
+        status: &PrinterStatus,
+        lanes: &[Lane],
+    ) {
+        let mapped = tool_to_gate
+            .iter()
+            .enumerate()
+            .map(|(tool, gate)| (tool, Some(*gate), matches.iter().find(|found| found.request.tool == tool)));
+        let without_gate = matches
+            .iter()
+            .filter(|found| found.verdict == Verdict::NoGate)
+            .map(|found| (found.request.tool, None, Some(found)));
+        let tools = mapped
+            .chain(without_gate)
+            .enumerate()
+            .map(|(row, (tool, gate, found))| {
+                let mut item = mmu_tool_item(tool, gate, found);
+                let fitting = found.map(|found| filament_match::fitting_gates(&found.request, status, lanes));
+                item.fitting_gates = reuse_flags(self.mmu_tools.row_data(row).map(|old| old.fitting_gates), fitting);
+                item
+            })
+            .collect();
+        replace_rows(&self.mmu_tools, tools);
+        let file = if matches.is_empty() { String::new() } else { format::job_name(&status.job.filename) };
+        printer.set_mmu_match_file(file.into());
+        printer.set_mmu_match_summary(view::match_summary(matches).into());
+        printer.set_mmu_match_verdict(view::combined_verdict(matches.iter().map(|found| &found.verdict)).into());
     }
 
     /// Stores the printer's macros. An empty list while disconnected must not count as "all macros vanished".
@@ -1048,6 +1092,8 @@ impl Presenter {
         self.update_file_row(&filename);
         if is_job {
             self.refresh_job_texts();
+            let snapshot = self.snapshot();
+            self.set_mmu(&snapshot.status, &self.lanes(&snapshot));
         }
     }
 
@@ -1082,6 +1128,39 @@ impl Presenter {
             }
             None => printer.set_has_job_thumbnail(false),
         }
+    }
+}
+
+/// A tool of Happy Hare (`gate` `None` for a tool of the file without gate) with what the file asks of it.
+fn mmu_tool_item(tool: usize, gate: Option<usize>, found: Option<&ToolMatch>) -> MmuToolItem {
+    let mut item =
+        MmuToolItem { tool: tool as i32, gate: gate.map_or(-1, |gate| gate as i32), ..MmuToolItem::default() };
+    let Some(found) = found else { return item };
+    let request = &found.request;
+    item.used = true;
+    match request.color {
+        Some(FileColor::Rgb([red, green, blue])) => {
+            item.wanted_color = slint::Color::from_rgb_u8(red, green, blue);
+            item.wanted_has_color = true;
+        }
+        Some(FileColor::Transparent) => item.wanted_transparent = true,
+        None => {}
+    }
+    item.wanted_material = request.material.clone().unwrap_or_default().into();
+    item.wanted_grams = request.grams.map(format::filament_weight).unwrap_or_default().into();
+    item.wanted_profile = request.profile.clone().unwrap_or_default().into();
+    item.verdict = view::verdict_key(&found.verdict).into();
+    item.differences = view::tool_differences(found).into();
+    item
+}
+
+/// The flags as a model, the old one while they are unchanged: a new model counts as a changed row and would rebuild
+/// the tiles on every status update.
+fn reuse_flags(old: Option<ModelRc<bool>>, flags: Option<Vec<bool>>) -> ModelRc<bool> {
+    let flags = flags.unwrap_or_default();
+    match old {
+        Some(old) if old.iter().eq(flags.iter().copied()) => old,
+        _ => ModelRc::new(VecModel::from(flags)),
     }
 }
 

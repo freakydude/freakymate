@@ -804,6 +804,20 @@ fn has_mesh_profile(snapshot: &Snapshot, name: &str) -> bool {
         .is_some_and(|mesh| mesh.profiles.iter().any(|profile| profile == name))
 }
 
+/// With Happy Hare the Tools tab compares the tools with the file being printed.
+fn tools_match_the_job(session: &mut Session) -> Result<(), String> {
+    if session.presenter.snapshot().status.happy_hare().is_none() {
+        return Ok(());
+    }
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Tools);
+    session.show_page(Page::Filament, "filament-mmu-tools-match")?;
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
+    if session.window.global::<Printer>().get_mmu_match_file().is_empty() {
+        return Err("the Tools tab does not compare with the file being printed".into());
+    }
+    Ok(())
+}
+
 fn printing(session: &mut Session) -> Result<(), String> {
     session.service.send(Command::StartPrint { filename: "benchy.gcode".into() });
     session.wait_until("print running", |snapshot| {
@@ -811,6 +825,7 @@ fn printing(session: &mut Session) -> Result<(), String> {
     })?;
     session.pump(Duration::from_secs(1));
     session.show_page(Page::Print, "print-printing")?;
+    tools_match_the_job(session)?;
     temperature_leads_to_heaters(session)?;
     nozzle_history(session)?;
     tangle_boost(session)?;

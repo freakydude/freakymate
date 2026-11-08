@@ -6,7 +6,7 @@ import { Icons } from "../icons.slint";
 import { Actions, Confirm, MmuDialogs, MmuGateItem, MmuToolItem, Printer } from "../state.slint";
 import { Card, ColorBar, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
 import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
-import { SlotTile } from "mmu.slint";
+import { SlotTile, VerdictIcon } from "mmu.slint";
 
 // The colour of a gate as a vertical bar, the way the tiles of the gates show it.
 component GateColor inherits ColorBar {
@@ -23,43 +23,101 @@ component GateColor inherits ColorBar {
     generic: root.gate.availability == "available" || root.gate.availability == "buffered";
 }
 
+// The colour the file asks of a tool, as a dot beside the gate's bar; a clear filament is an empty ring.
+component WantedColor inherits Rectangle {
+    in property <MmuToolItem> mapping;
+
+    width: 12px;
+    height: 12px;
+    border-radius: 6px;
+    background: root.mapping.wanted-transparent ? transparent : root.mapping.wanted-color;
+    border-width: root.mapping.wanted-transparent ? 2px : 1px;
+    border-color: root.mapping.wanted-transparent ? Theme.foreground : Theme.border;
+}
+
 // A tool with the gate it takes its filament from, in that gate's colour and material; a tap opens the choice of gate.
+// With a file to compare, a dot shows the colour the file asks for and an icon whether the gate fits; tools the file
+// does not use fade.
 component ToolTile inherits SlotTile {
     in property <MmuToolItem> mapping;
     property <MmuGateItem> gate: Printer.mmu-gates[root.mapping.gate];
+    property <bool> has-gate: root.mapping.gate >= 0;
 
     label: "T" + root.mapping.tool;
+    opacity: Printer.mmu-match-file != "" && !root.mapping.used ? 0.45 : 1.0;
 
     HorizontalLayout {
         spacing: 8px;
         Text {
-            min-width: 32px;
+            min-width: 28px;
             text: "T" + root.mapping.tool;
             color: Theme.accent;
             font-size: Theme.font-normal;
             font-weight: 700;
             vertical-alignment: center;
         }
-        GateColor {
-            cross-axis-self-alignment: center;
-            gate: root.gate;
+        HorizontalLayout {
+            spacing: 4px;
+            if root.mapping.used && (root.mapping.wanted-has-color || root.mapping.wanted-transparent): WantedColor {
+                cross-axis-self-alignment: center;
+                mapping: root.mapping;
+            }
+            if root.has-gate: GateColor {
+                cross-axis-self-alignment: center;
+                gate: root.gate;
+            }
         }
         VerticalLayout {
             horizontal-stretch: 1;
             alignment: center;
             Text {
-                text: @tr("Gate {}", root.mapping.gate);
-                color: Theme.foreground;
+                text: root.has-gate ? @tr("Gate {}", root.mapping.gate) : @tr("No gate");
+                color: root.has-gate ? Theme.foreground : Theme.warning;
                 font-size: Theme.font-small;
                 overflow: elide;
             }
             Text {
-                text: root.gate.material == "" ? "-" : root.gate.material;
+                text: !root.has-gate ? root.mapping.wanted-material : root.gate.material == "" ? "-" : root.gate.material;
                 color: Theme.muted;
                 font-size: Theme.font-small;
                 overflow: elide;
             }
         }
+        VerdictIcon {
+            cross-axis-self-alignment: center;
+            verdict: root.mapping.used ? root.mapping.verdict : "";
+        }
+    }
+}
+
+// The file the tools are compared with and how many of its tools fit.
+component MatchLine inherits HorizontalLayout {
+    spacing: 6px;
+    height: 20px;
+    Image {
+        cross-axis-self-alignment: center;
+        width: 18px;
+        height: 18px;
+        source: Icons.file-gcode;
+        colorize: Theme.muted;
+    }
+    Text {
+        horizontal-stretch: 1;
+        text: Printer.mmu-match-file;
+        color: Theme.foreground;
+        font-size: Theme.font-small;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    VerdictIcon {
+        cross-axis-self-alignment: center;
+        verdict: Printer.mmu-match-verdict;
+    }
+    Text {
+        text: Printer.mmu-match-summary;
+        color: Printer.mmu-match-verdict == "differs" ? Theme.warning : Theme.foreground;
+        font-size: Theme.font-small;
+        vertical-alignment: center;
     }
 }
 
@@ -111,6 +169,7 @@ export component MmuToolsTab inherits Rectangle {
             horizontal-stretch: 1;
             title: @tr("Tool-to-gate map");
             icon: Icons.mmu-ttg-map;
+            if Printer.mmu-match-file != "": MatchLine { }
             tool-list := ScrollList {
                 vertical-stretch: 1;
                 // From the whole width: the rows narrow by the scroll bar once they scroll, which depends on the columns.
@@ -124,7 +183,7 @@ export component MmuToolsTab inherits Rectangle {
                     width: tool-list.cell-width;
                     height: Theme.touch;
                     mapping: mapping;
-                    enabled: root.can-choose;
+                    enabled: root.can-choose && mapping.gate >= 0;
                     clicked => { MmuDialogs.tool = index; }
                 }
             }
@@ -171,16 +230,25 @@ export component MmuToolsTab inherits Rectangle {
 }
 
 // A gate to choose for a tool: number, colour and material; the gate the tool takes its filament from now is marked.
+// With a file to compare, a tick marks a gate whose filament fits what the file asks of the tool.
 component GateOption inherits SlotTile {
     in property <MmuGateItem> gate;
+    in property <bool> fits;
 
     label: @tr("Gate {}", root.gate.index);
 
-    Text {
-        text: @tr("Gate {}", root.gate.index);
-        color: Theme.foreground;
-        font-size: Theme.font-normal;
-        font-weight: 700;
+    HorizontalLayout {
+        spacing: 6px;
+        Text {
+            horizontal-stretch: 1;
+            text: @tr("Gate {}", root.gate.index);
+            color: Theme.foreground;
+            font-size: Theme.font-normal;
+            font-weight: 700;
+        }
+        if root.fits: VerdictIcon {
+            verdict: "fits";
+        }
     }
     ColorBar {
         height: 12px;
@@ -196,6 +264,44 @@ component GateOption inherits SlotTile {
         text: root.gate.material == "" ? "-" : root.gate.material;
         color: Theme.muted;
         font-size: Theme.font-small;
+        overflow: elide;
+    }
+}
+
+// What the file asks of a tool: colour, material, weight and the slicer's profile name.
+component WantedLine inherits HorizontalLayout {
+    in property <MmuToolItem> mapping;
+
+    spacing: 8px;
+    Text {
+        text: @tr("The file wants");
+        color: Theme.muted;
+        font-size: Theme.font-normal;
+        vertical-alignment: center;
+    }
+    if root.mapping.wanted-has-color || root.mapping.wanted-transparent: WantedColor {
+        cross-axis-self-alignment: center;
+        mapping: root.mapping;
+    }
+    Text {
+        text: root.mapping.wanted-material;
+        color: Theme.foreground;
+        font-size: Theme.font-normal;
+        font-weight: 700;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.mapping.wanted-grams;
+        color: Theme.foreground;
+        font-size: Theme.font-normal;
+        vertical-alignment: center;
+    }
+    Text {
+        horizontal-stretch: 1;
+        text: root.mapping.wanted-profile;
+        color: Theme.muted;
+        font-size: Theme.font-normal;
+        vertical-alignment: center;
         overflow: elide;
     }
 }
@@ -222,6 +328,15 @@ export component ToolDialog inherits Scrim {
                 title: @tr("Gate for T{}", root.mapping.tool);
                 close => { root.close(); }
             }
+            if root.mapping.used: WantedLine {
+                mapping: root.mapping;
+            }
+            if root.mapping.used && root.mapping.differences != "": Text {
+                text: root.mapping.differences;
+                color: Theme.warning;
+                font-size: Theme.font-normal;
+                wrap: word-wrap;
+            }
             gate-grid := Rectangle {
                 property <int> columns: max(1, floor(self.width / 120px));
                 property <length> cell-width: (self.width - (self.columns - 1) * Theme.spacing) / self.columns;
@@ -233,6 +348,7 @@ export component ToolDialog inherits Scrim {
                     width: gate-grid.cell-width;
                     height: 84px;
                     gate: gate;
+                    fits: root.mapping.used && root.mapping.fitting-gates[gate.index];
                     selected: gate.index == root.mapping.gate;
                     clicked => {
                         if (!self.selected) {

@@ -73,6 +73,17 @@ export component SlotTile inherits Rectangle {
     }
 }
 
+// How a tool of the compared file fits its gate: a tick when it fits, a warning when not; nothing to say otherwise.
+export component VerdictIcon inherits Image {
+    in property <string> verdict;
+
+    width: 18px;
+    height: 18px;
+    visible: root.verdict != "";
+    source: root.verdict == "fits" ? Icons.ui-check : Icons.ui-warning;
+    colorize: root.verdict == "fits" ? Theme.success : Theme.warning;
+}
+
 component GateTile inherits SlotTile {
     in property <MmuGateItem> gate;
 
@@ -99,6 +110,10 @@ component GateTile inherits SlotTile {
             font-weight: 700;
             horizontal-alignment: right;
             overflow: elide;
+        }
+        if root.gate.file-verdict != "": VerdictIcon {
+            cross-axis-self-alignment: center;
+            verdict: root.gate.file-verdict;
         }
     }
     ColorBar {
