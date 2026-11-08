@@ -997,7 +997,6 @@ fn running_label(call: &Call, command: &Command) -> String {
     }
 }
 
-/// The script of a call that runs G-code.
 /// A fact about the printer for the log header; nothing when the printer did not report it.
 fn log_fact(name: &str, value: &str) {
     if !value.is_empty() {
@@ -1005,6 +1004,7 @@ fn log_fact(name: &str, value: &str) {
     }
 }
 
+/// The script of a call that runs G-code.
 fn gcode_script(call: &Call) -> Option<&str> {
     if call.method != "printer.gcode.script" {
         return None;

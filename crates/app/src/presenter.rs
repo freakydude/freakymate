@@ -558,7 +558,6 @@ impl Presenter {
         window.global::<Printer>().set_running_command(newest.into());
     }
 
-    /// Applies the hidden macros from the settings.
     /// Hides or shows the temperature reports in the console; the history is read again so that it follows.
     pub fn set_hide_temperature_reports(&self, hide: bool) {
         if self.hide_temperature_reports.replace(hide) != hide {
@@ -570,6 +569,7 @@ impl Presenter {
         !(self.hide_temperature_reports.get() && line.is_temperature_report())
     }
 
+    /// Applies the hidden macros from the settings.
     pub fn set_hidden_macros(&self, hidden: Vec<String>) {
         *self.hidden_macros.borrow_mut() = hidden;
         self.refresh_macro_views();
@@ -1028,7 +1028,6 @@ impl Presenter {
         self.snapshot().status.heater(heater).is_some_and(|heater| !heater.accepts_target(target))
     }
 
-    /// What differs between the file and the spools, as lines for the confirmation to start it; empty if nothing.
     /// What was sent to pause at `layer`, in the words of the dialog's button.
     pub fn layer_pause_notice(&self, layer: u32) -> String {
         view::layer_pause_notice(layer, self.cache.borrow().snapshot.status.job.current_layer)
