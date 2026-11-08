@@ -203,7 +203,7 @@ async fn sets_the_filament_of_a_gate_and_loads_it() {
     })
     .await;
     let gate = &snapshot.status.mmu.unwrap().gates[1];
-    assert_eq!((gate.material.as_str(), gate.color), ("PETG", Some([0xff, 0x80, 0x00])));
+    assert_eq!((gate.material.as_str(), gate.color), ("PETG", Some([0xff, 0x80, 0x00, 0xff])));
     assert_eq!(gate.temperature, temperature);
 }
 

@@ -16,8 +16,9 @@ use crate::{
     Printer, SensorItem, SpoolItem, TuningItem, UiSettings, UpdateItem,
 };
 use chrono::Local;
+use freakymate_core::color::Rgba;
 use freakymate_core::domain::filament::{self, FilamentHandling};
-use freakymate_core::domain::filament_match::{self, FileColor, ToolMatch, Verdict};
+use freakymate_core::domain::filament_match::{self, ToolMatch, Verdict};
 use freakymate_core::domain::file_catalog::FileCatalog;
 use freakymate_core::domain::spools::{self, Lane};
 use freakymate_core::domain::{estimates, light, pause};
@@ -1138,13 +1139,9 @@ fn mmu_tool_item(tool: usize, gate: Option<usize>, found: Option<&ToolMatch>) ->
     let Some(found) = found else { return item };
     let request = &found.request;
     item.used = true;
-    match request.color {
-        Some(FileColor::Rgb([red, green, blue])) => {
-            item.wanted_color = slint::Color::from_rgb_u8(red, green, blue);
-            item.wanted_has_color = true;
-        }
-        Some(FileColor::Transparent) => item.wanted_transparent = true,
-        None => {}
+    if let Some(color) = request.color {
+        item.wanted_color = crate::items::color_of(color);
+        item.wanted_has_color = true;
     }
     item.wanted_material = request.material.clone().unwrap_or_default().into();
     item.wanted_grams = request.grams.map(format::filament_weight).unwrap_or_default().into();
@@ -1171,7 +1168,7 @@ fn gate_spool(lanes: &[Lane], gate: usize) -> Option<&Spool> {
 
 /// The colours of a gate and whether they follow each other along the filament: a multi-colour spool of Spoolman
 /// shows all of its colours; otherwise the gate has the one colour Happy Hare reports.
-fn gate_colors(gate: &MmuGate, spool: Option<&Spool>) -> (Vec<[u8; 3]>, bool) {
+fn gate_colors(gate: &MmuGate, spool: Option<&Spool>) -> (Vec<Rgba>, bool) {
     match spool.filter(|spool| spool.colors.len() > 1) {
         Some(spool) => (spool.colors.clone(), spool.longitudinal),
         None => (gate.color.into_iter().collect(), false),

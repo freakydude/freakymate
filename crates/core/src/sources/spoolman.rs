@@ -1,6 +1,7 @@
 //! Spoolman, through Moonraker's `spoolman` component: the spools, the active spool and the connection state. Where
 //! the spools sit in the printer is answered in [`crate::domain::spools`].
 
+use crate::color::{parse_hex, Rgba};
 use crate::moonraker::Call;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -17,7 +18,7 @@ pub struct Spool {
     pub filament_name: String,
     pub material: String,
     /// One to three colours: Spoolman's multi-colour filaments (`multi_color_hexes`) have up to three; empty if unknown.
-    pub colors: Vec<[u8; 3]>,
+    pub colors: Vec<Rgba>,
     /// The colours follow each other along the filament (`multi_color_direction` longitudinal); otherwise a
     /// multi-colour filament has them side by side (coaxial), which is also the common case without the field.
     pub longitudinal: bool,
@@ -68,7 +69,7 @@ impl Spool {
     }
 
     /// The first colour, for places that show one.
-    pub fn color(&self) -> Option<[u8; 3]> {
+    pub fn color(&self) -> Option<Rgba> {
         self.colors.first().copied()
     }
 
@@ -100,20 +101,10 @@ impl Spool {
 }
 
 /// The colours of a filament: `multi_color_hexes` (comma separated) for a multi-colour filament, else `color_hex`.
-fn filament_colors(filament: &Value) -> Vec<[u8; 3]> {
+fn filament_colors(filament: &Value) -> Vec<Rgba> {
     let text = |field: &str| filament.get(field).and_then(Value::as_str).filter(|text| !text.trim().is_empty());
     let hexes = text("multi_color_hexes").or_else(|| text("color_hex")).unwrap_or_default();
-    hexes.split(',').filter_map(parse_color).take(MAX_COLORS).collect()
-}
-
-/// `E31F2B` or `#E31F2B`; an alpha channel at the end is ignored.
-pub fn parse_color(text: &str) -> Option<[u8; 3]> {
-    let hex = text.trim().trim_start_matches('#');
-    if hex.len() < 6 || !hex.is_char_boundary(6) {
-        return None;
-    }
-    let channel = |range: std::ops::Range<usize>| u8::from_str_radix(&hex[range], 16).ok();
-    Some([channel(0..2)?, channel(2..4)?, channel(4..6)?])
+    hexes.split(',').filter_map(parse_hex).take(MAX_COLORS).collect()
 }
 
 /// What Moonraker knows about Spoolman, and the spools the printer needs now.
@@ -198,7 +189,7 @@ mod tests {
             material: material.into(),
             remaining_weight: Some(left),
             initial_weight: Some(1000.0),
-            colors: vec![color],
+            colors: vec![[color[0], color[1], color[2], 0xff]],
             ..Spool::default()
         }
     }
@@ -208,8 +199,8 @@ mod tests {
         let spool = Spool::from_json(&spool_18()).unwrap();
 
         assert_eq!((spool.id, spool.title().as_str(), spool.material.as_str()), (18, "Geeetech Red", "ABS+"));
-        assert_eq!(spool.colors, [[0xE3, 0x1F, 0x2B]]);
-        assert_eq!(spool.color(), Some([0xE3, 0x1F, 0x2B]));
+        assert_eq!(spool.colors, [[0xE3, 0x1F, 0x2B, 0xFF]]);
+        assert_eq!(spool.color(), Some([0xE3, 0x1F, 0x2B, 0xFF]));
         assert_eq!((spool.extruder_temp, spool.bed_temp), (Some(240.0), Some(120.0)));
         assert_eq!((spool.density, spool.diameter, spool.spool_weight), (Some(1.04), Some(1.75), Some(180.0)));
         assert_eq!(spool.location, "voron @ MMU Gate:0");
@@ -245,7 +236,10 @@ mod tests {
         value["filament"]["multi_color_hexes"] = json!("FF0004,FFA424,000000");
         value["filament"]["multi_color_direction"] = json!("coaxial");
 
-        assert_eq!(Spool::from_json(&value).unwrap().colors, [[0xFF, 0x00, 0x04], [0xFF, 0xA4, 0x24], [0, 0, 0]]);
+        assert_eq!(
+            Spool::from_json(&value).unwrap().colors,
+            [[0xFF, 0x00, 0x04, 0xFF], [0xFF, 0xA4, 0x24, 0xFF], [0, 0, 0, 0xFF]]
+        );
         assert!(!Spool::from_json(&value).unwrap().longitudinal);
         value["filament"]["multi_color_direction"] = json!("longitudinal");
         assert!(Spool::from_json(&value).unwrap().longitudinal);
@@ -253,15 +247,7 @@ mod tests {
         assert_eq!(Spool::from_json(&value).unwrap().colors.len(), 3);
         value["filament"]["multi_color_hexes"] = json!("");
         value["filament"]["color_hex"] = json!("E31F2B80");
-        assert_eq!(Spool::from_json(&value).unwrap().colors, [[0xE3, 0x1F, 0x2B]]);
-    }
-
-    #[test]
-    fn colours_come_with_or_without_hash() {
-        assert_eq!(parse_color("#26A69A"), Some([0x26, 0xA6, 0x9A]));
-        assert_eq!(parse_color("26a69a"), Some([0x26, 0xA6, 0x9A]));
-        assert_eq!(parse_color("12"), None);
-        assert_eq!(parse_color("zzzzzz"), None);
+        assert_eq!(Spool::from_json(&value).unwrap().colors, [[0xE3, 0x1F, 0x2B, 0x80]]);
     }
 
     #[test]

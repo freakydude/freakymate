@@ -6,32 +6,14 @@
 //! tool 0 and the active spool of Spoolman. Without either there is nothing to compare.
 
 use super::spools::Lane;
+use crate::color::{is_clear, parse_hex, rgb, Rgba};
 use crate::sources::happy_hare::{GateAvailability, MmuGate};
 use crate::sources::moonraker_server::files::FileMetadata;
-use crate::sources::spoolman::parse_color;
 use crate::sources::PrinterStatus;
 
 /// Colours further apart than this (distance in RGB, at most 441) count as different. Wide enough for "the same red
 /// from another maker", too wide to tell close colours apart (orange and red are 81 apart).
 const COLOR_DISTANCE: f64 = 120.0;
-
-/// The colour of a filament as the slicer gives it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FileColor {
-    Rgb([u8; 3]),
-    /// `#RRGGBB00`: a clear filament; its colour is not compared.
-    Transparent,
-}
-
-impl FileColor {
-    fn parse(text: &str) -> Option<Self> {
-        let hex = text.trim().trim_start_matches('#');
-        if hex.len() == 8 && hex.ends_with("00") {
-            return Some(Self::Transparent);
-        }
-        parse_color(hex).map(Self::Rgb)
-    }
-}
 
 /// What the file asks of one tool.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -40,7 +22,8 @@ pub struct ToolRequest {
     pub material: Option<String>,
     /// Name of the slicer's filament profile, free text: for display, never compared.
     pub profile: Option<String>,
-    pub color: Option<FileColor>,
+    /// The slicer's colour with its alpha; fully clear (`#RRGGBB00`) is a clear filament, whose colour is not compared.
+    pub color: Option<Rgba>,
     pub grams: Option<f64>,
     pub temperature: Option<f64>,
 }
@@ -92,7 +75,7 @@ pub fn tool_requests(metadata: &FileMetadata) -> Vec<ToolRequest> {
             tool,
             material: per_tool(&metadata.filament_types, tool).map(str::to_owned),
             profile: per_tool(&metadata.filament_names, tool).map(str::to_owned),
-            color: metadata.filament_colors.get(tool).and_then(|color| FileColor::parse(color)),
+            color: metadata.filament_colors.get(tool).and_then(|color| parse_hex(color)),
             grams: metadata
                 .filament_weights
                 .get(tool)
@@ -140,7 +123,7 @@ pub fn fitting_gates(request: &ToolRequest, status: &PrinterStatus, lanes: &[Lan
         let lane = lanes.iter().find(|lane| lane.gate == Some(gate.index));
         let supply = supply(lane, Some(gate));
         let knows_material = request.material.is_none() || supply.material.is_some();
-        let knows_color = !matches!(request.color, Some(FileColor::Rgb(_))) || !supply.colors.is_empty();
+        let knows_color = !request.color.is_some_and(|color| !is_clear(color)) || !supply.colors.is_empty();
         fits[gate.index] = knows_material && knows_color && compare(request, &supply) == Verdict::Fits;
     }
     fits
@@ -169,7 +152,7 @@ fn match_tool(request: ToolRequest, status: &PrinterStatus, lanes: &[Lane]) -> T
 #[derive(Debug, Default)]
 struct Supply {
     material: Option<String>,
-    colors: Vec<[u8; 3]>,
+    colors: Vec<Rgba>,
     left: Option<f64>,
 }
 
@@ -198,9 +181,14 @@ fn compare(request: &ToolRequest, supply: &Supply) -> Verdict {
             differences.push(Difference::Material { expected: expected.clone(), loaded: loaded.clone() });
         }
     }
-    if let Some(FileColor::Rgb(wanted)) = request.color {
-        // A multi-colour spool fits when one of its colours is close.
-        let nearest = supply.colors.iter().map(|loaded| color_distance(wanted, *loaded)).min_by(f64::total_cmp);
+    if let Some(wanted) = request.color.filter(|color| !is_clear(*color)) {
+        // A multi-colour spool fits when one of its colours is close; a clear one is nothing to compare with.
+        let nearest = supply
+            .colors
+            .iter()
+            .filter(|loaded| !is_clear(**loaded))
+            .map(|loaded| color_distance(rgb(wanted), rgb(*loaded)))
+            .min_by(f64::total_cmp);
         if let Some(distance) = nearest {
             compared = true;
             if distance > COLOR_DISTANCE {
@@ -294,7 +282,13 @@ mod tests {
     }
 
     fn spool(id: u32, material: &str, left: f64, color: [u8; 3]) -> Spool {
-        Spool { id, material: material.into(), remaining_weight: Some(left), colors: vec![color], ..Spool::default() }
+        Spool {
+            id,
+            material: material.into(),
+            remaining_weight: Some(left),
+            colors: vec![[color[0], color[1], color[2], 0xff]],
+            ..Spool::default()
+        }
     }
 
     fn spoolman(spools: &[Spool], active: Option<u32>) -> SpoolmanState {
@@ -308,6 +302,7 @@ mod tests {
 
     /// A gate of Happy Hare with what it knows of its filament, without spool.
     fn gate(material: &str, color: Option<[u8; 3]>) -> MmuGate {
+        let color = color.map(|[red, green, blue]| [red, green, blue, 0xff]);
         MmuGate { availability: GateAvailability::Available, material: material.into(), color, ..MmuGate::default() }
     }
 
@@ -353,7 +348,7 @@ mod tests {
                 tool: 3,
                 material: Some("PETG".into()),
                 profile: Some("Elegoo PETG @ECC2 - Copy".into()),
-                color: Some(FileColor::Rgb([0x2B, 0x06, 0xCB])),
+                color: Some([0x2B, 0x06, 0xCB, 0xFF]),
                 grams: Some(3.09),
                 temperature: Some(250.0),
             }
@@ -376,7 +371,7 @@ mod tests {
     #[test]
     fn a_clear_filament_is_transparent_and_its_colour_not_compared() {
         let metadata = fixture("transparent");
-        assert_eq!(tool_requests(&metadata)[3].color, Some(FileColor::Transparent));
+        assert_eq!(tool_requests(&metadata)[3].color, Some([0xFF, 0xFF, 0xFF, 0x00]));
 
         let status = happy_hare(
             vec![gate("PETG", None), gate("PETG", None), gate("PETG", None), gate("PETG", Some([0, 0, 0]))],
@@ -484,7 +479,7 @@ mod tests {
     #[test]
     fn a_multi_colour_spool_fits_when_one_of_its_colours_is_close() {
         let mut two_colours = spool(5, "PLA", 800.0, [0xFF, 0x00, 0x04]);
-        two_colours.colors.push([0x26, 0xA6, 0x9A]);
+        two_colours.colors.push([0x26, 0xA6, 0x9A, 0xFF]);
         let spools = spoolman(&[two_colours], Some(5));
         let status = PrinterStatus::default();
 
@@ -524,7 +519,7 @@ mod tests {
         let requests = tool_requests(&fixture("11 tools"));
 
         assert_eq!(requests.len(), 11);
-        assert_eq!(requests[10].color, Some(FileColor::Rgb([0x80, 0x00, 0x80])));
+        assert_eq!(requests[10].color, Some([0x80, 0x00, 0x80, 0xFF]));
         assert!(requests.iter().all(|request| request.material.as_deref() == Some("PLA")));
     }
 

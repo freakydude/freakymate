@@ -5,6 +5,7 @@ use crate::{
     ConsoleItem, FanItem, FilamentPathItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, PowerItem,
     SensorItem, SpoolItem, TuningItem, UpdateItem,
 };
+use freakymate_core::color::Rgba;
 use freakymate_core::domain::spools::{self, Lane};
 use freakymate_core::sources::happy_hare::{FilamentPath, PathSensor};
 use freakymate_core::sources::klipper::tuning::TuningValue;
@@ -70,12 +71,12 @@ pub(crate) fn spool_rows(spools: &[Spool], lanes: &[Lane]) -> Vec<SpoolItem> {
         .collect()
 }
 
-pub(crate) fn color_of([red, green, blue]: [u8; 3]) -> slint::Color {
-    slint::Color::from_rgb_u8(red, green, blue)
+pub(crate) fn color_of([red, green, blue, alpha]: Rgba) -> slint::Color {
+    slint::Color::from_argb_u8(alpha, red, green, blue)
 }
 
 /// The colours of a bar: up to three, and how many there are.
-pub(crate) fn color_bar(colors: &[[u8; 3]]) -> (slint::Color, slint::Color, slint::Color, i32) {
+pub(crate) fn color_bar(colors: &[Rgba]) -> (slint::Color, slint::Color, slint::Color, i32) {
     let color = |index: usize| colors.get(index).copied().map_or_else(slint::Color::default, color_of);
     (color(0), color(1), color(2), colors.len().min(3) as i32)
 }
@@ -211,7 +212,7 @@ pub(crate) fn tuning_item(value: &TuningValue) -> TuningItem {
 pub(crate) fn filament_path_item(
     path: &FilamentPath,
     gate: i32,
-    colors: &[[u8; 3]],
+    colors: &[Rgba],
     longitudinal: bool,
 ) -> FilamentPathItem {
     let sensor = |sensor: PathSensor| match sensor {
@@ -252,12 +253,17 @@ mod tests {
 
     #[test]
     fn a_colour_bar_has_up_to_three_colours() {
-        let red = [255, 0, 0];
+        let red = [255, 0, 0, 255];
         assert_eq!(color_bar(&[]).3, 0);
         assert_eq!(color_bar(&[red]).3, 1);
-        assert_eq!(color_bar(&[red, [0, 255, 0]]).3, 2);
+        assert_eq!(color_bar(&[red, [0, 255, 0, 255]]).3, 2);
         assert_eq!(color_bar(&[red; 5]).3, 3);
-        assert_eq!(color_bar(&[red, [0, 255, 0]]).1, slint::Color::from_rgb_u8(0, 255, 0));
+        assert_eq!(color_bar(&[red, [0, 255, 0, 255]]).1, slint::Color::from_rgb_u8(0, 255, 0));
+    }
+
+    #[test]
+    fn the_alpha_of_a_colour_reaches_the_ui() {
+        assert_eq!(color_of([255, 0, 0, 0x80]), slint::Color::from_argb_u8(0x80, 255, 0, 0));
     }
 
     #[test]

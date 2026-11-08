@@ -82,7 +82,7 @@ mod tests {
             material: material.into(),
             remaining_weight: Some(left),
             initial_weight: Some(1000.0),
-            colors: vec![color],
+            colors: vec![[color[0], color[1], color[2], 0xff]],
             ..Spool::default()
         }
     }

@@ -23,16 +23,15 @@ component GateColor inherits ColorBar {
     generic: root.gate.availability == "available" || root.gate.availability == "buffered";
 }
 
-// The colour the file asks of a tool, as a dot beside the gate's bar; a clear filament is an empty ring.
-component WantedColor inherits Rectangle {
+// The colour the file asks of a tool, as a dot beside the gate's bar; a clear filament shows the checkerboard.
+component WantedColor inherits ColorBar {
     in property <MmuToolItem> mapping;
 
     width: 12px;
     height: 12px;
     border-radius: 6px;
-    background: root.mapping.wanted-transparent ? transparent : root.mapping.wanted-color;
-    border-width: root.mapping.wanted-transparent ? 2px : 1px;
-    border-color: root.mapping.wanted-transparent ? Theme.foreground : Theme.border;
+    first: root.mapping.wanted-color;
+    count: 1;
 }
 
 // A tool with the gate it takes its filament from, in that gate's colour and material; a tap opens the choice of gate.
@@ -58,7 +57,7 @@ component ToolTile inherits SlotTile {
         }
         HorizontalLayout {
             spacing: 4px;
-            if root.mapping.used && (root.mapping.wanted-has-color || root.mapping.wanted-transparent): WantedColor {
+            if root.mapping.used && (root.mapping.wanted-has-color): WantedColor {
                 cross-axis-self-alignment: center;
                 mapping: root.mapping;
             }
@@ -279,7 +278,7 @@ component WantedLine inherits HorizontalLayout {
         font-size: Theme.font-normal;
         vertical-alignment: center;
     }
-    if root.mapping.wanted-has-color || root.mapping.wanted-transparent: WantedColor {
+    if root.mapping.wanted-has-color: WantedColor {
         cross-axis-self-alignment: center;
         mapping: root.mapping;
     }

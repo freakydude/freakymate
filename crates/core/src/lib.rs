@@ -6,6 +6,7 @@
 //! [`PrinterService`]; the UI reads [`Snapshot`]s and [`Event`]s and sends [`Command`]s.
 
 pub mod backlight;
+pub mod color;
 pub mod commands;
 pub mod credentials;
 pub mod domain;

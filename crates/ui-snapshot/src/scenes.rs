@@ -341,7 +341,7 @@ fn mmu_gate(session: &mut Session) -> Result<(), String> {
     }
     session.wait_until("PETG in orange in gate 1", |snapshot| {
         let gate = snapshot.status.mmu.as_ref().and_then(|mmu| mmu.gates.get(1).cloned()).unwrap_or_default();
-        gate.material == "PETG" && gate.color == Some([0xff, 0x80, 0x00])
+        gate.material == "PETG" && gate.color == Some([0xff, 0x80, 0x00, 0xff])
     })?;
     session.show_page(Page::Filament, "filament-mmu-gate-local")?;
     session.window.global::<MmuDialogs>().set_gate(-1);

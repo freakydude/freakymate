@@ -8,6 +8,7 @@ pub mod stale_gate_map;
 
 use super::objects::ObjectStore;
 use super::subscription::Subscription;
+use crate::color::{parse_hex, Rgba};
 use crate::sourced::{prefer_measured, Sourced};
 use serde_json::Value;
 
@@ -88,7 +89,7 @@ pub struct MmuGate {
     pub name: String,
     pub material: String,
     /// Only known when the gate has a colour set (`gate_color` is not empty).
-    pub color: Option<[u8; 3]>,
+    pub color: Option<Rgba>,
     /// Tools that take their filament from this gate (`ttg_map`), ascending; none, one or several.
     pub tools: Vec<usize>,
     /// EndlessSpool group (`endless_spool_groups`); gates of one group stand in for each other on a runout.
@@ -453,7 +454,7 @@ fn read_gates(mmu: &Value, num_gates: usize) -> Vec<MmuGate> {
                 .map_or(GateAvailability::Unknown, GateAvailability::parse),
             name: string_at(names, index),
             material: string_at(materials, index),
-            color: if string_at(colors, index).is_empty() { None } else { rgb.get(index).and_then(color_from_rgb) },
+            color: gate_color(&string_at(colors, index), rgb.get(index)),
             tools: ttg_map
                 .iter()
                 .enumerate()
@@ -467,7 +468,17 @@ fn read_gates(mmu: &Value, num_gates: usize) -> Vec<MmuGate> {
         .collect()
 }
 
-/// Happy Hare reports colours as three floats from 0 to 1.
+/// The colour of a gate: red, green and blue from `gate_color_rgb` (three floats from 0 to 1, which cuts the alpha
+/// channel off), the alpha from `gate_color` when that is `rrggbbaa` (`gate_color` may also be a colour name).
+fn gate_color(text: &str, rgb: Option<&Value>) -> Option<Rgba> {
+    if text.is_empty() {
+        return None;
+    }
+    let [red, green, blue] = color_from_rgb(rgb?)?;
+    let alpha = parse_hex(text).map_or(0xff, |[.., alpha]| alpha);
+    Some([red, green, blue, alpha])
+}
+
 fn color_from_rgb(value: &Value) -> Option<[u8; 3]> {
     let channels = value.as_array()?;
     let channel = |index: usize| {
@@ -646,6 +657,15 @@ mod tests {
     }
 
     #[test]
+    fn a_gate_colour_keeps_the_alpha_of_gate_color() {
+        let rgb = json!([[0.89, 0.12, 0.17]]);
+        assert_eq!(gate_color("e31f2b80", rgb.get(0)), Some([227, 31, 43, 0x80]));
+        assert_eq!(gate_color("e31f2b", rgb.get(0)), Some([227, 31, 43, 0xff]));
+        assert_eq!(gate_color("red", rgb.get(0)), Some([227, 31, 43, 0xff]));
+        assert_eq!(gate_color("", rgb.get(0)), None);
+    }
+
+    #[test]
     fn reads_gates_with_colours_and_tool_mapping() {
         let store = store(json!({
             "mmu": {
@@ -661,7 +681,7 @@ mod tests {
 
         assert_eq!(mmu.gate, 1);
         assert_eq!(mmu.gates[0].availability, GateAvailability::Available);
-        assert_eq!(mmu.gates[0].color, Some([255, 0, 0]));
+        assert_eq!(mmu.gates[0].color, Some([255, 0, 0, 255]));
         assert_eq!(mmu.gates[0].tools, [1]);
         assert_eq!(mmu.gates[1].availability, GateAvailability::Buffered);
         assert_eq!(mmu.gates[1].color, None);

@@ -676,10 +676,36 @@ export component ColorBar inherits Rectangle {
         y: 1px + (root.vertical == self.along ? self.start : 0px);
         width: root.vertical != self.along ? self.length : (root.vertical ? root.across : root.long);
         height: root.vertical == self.along ? self.length : (root.vertical ? root.long : root.across);
-        background: root.nth(mod(piece, root.count));
+        // A colour with alpha lies over a checkerboard of 2x2 fields, so it reads as see-through. Rounded corners are set
+        // on every layer (no clipping), the dark fields only on their outer corner.
+        property <color> tint: root.nth(mod(piece, root.count));
+        property <bool> see-through: self.tint.alpha < 255;
+        background: self.see-through ? Theme.checker-light : self.tint;
         border-top-left-radius: self.top-round && self.left-round ? root.end : 0px;
         border-top-right-radius: self.top-round && self.right-round ? root.end : 0px;
         border-bottom-left-radius: self.bottom-round && self.left-round ? root.end : 0px;
         border-bottom-right-radius: self.bottom-round && self.right-round ? root.end : 0px;
+
+        if self.see-through: Rectangle {
+            x: parent.width / 2;
+            width: parent.width / 2;
+            height: parent.height / 2;
+            background: Theme.checker-dark;
+            border-top-right-radius: parent.border-top-right-radius;
+        }
+        if self.see-through: Rectangle {
+            y: parent.height / 2;
+            width: parent.width / 2;
+            height: parent.height / 2;
+            background: Theme.checker-dark;
+            border-bottom-left-radius: parent.border-bottom-left-radius;
+        }
+        if self.see-through: Rectangle {
+            background: parent.tint;
+            border-top-left-radius: parent.border-top-left-radius;
+            border-top-right-radius: parent.border-top-right-radius;
+            border-bottom-left-radius: parent.border-bottom-left-radius;
+            border-bottom-right-radius: parent.border-bottom-right-radius;
+        }
     }
 }

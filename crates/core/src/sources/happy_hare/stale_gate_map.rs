@@ -63,7 +63,7 @@ mod tests {
         let changes = json!({ "mmu": { "gate_status": [0], "gate_color_rgb": [[0.0, 0.0, 0.0]] } });
         store.merge(&changes);
         let stale = &read_mmu(&store).unwrap().gates[0];
-        assert_eq!((stale.color, stale.material.as_str(), stale.spool_id), (Some([0, 0, 0]), "ABS+", Some(5)));
+        assert_eq!((stale.color, stale.material.as_str(), stale.spool_id), (Some([0, 0, 0, 255]), "ABS+", Some(5)));
 
         let query = query_after(&changes).unwrap();
         assert_eq!(query["objects"]["mmu"].as_array().unwrap().len(), CLEARED_IN_PLACE.len());
