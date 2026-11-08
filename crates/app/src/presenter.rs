@@ -20,6 +20,7 @@ use freakymate_core::color::Rgba;
 use freakymate_core::domain::filament::{self, FilamentHandling};
 use freakymate_core::domain::filament_match::{self, ToolMatch, Verdict};
 use freakymate_core::domain::file_catalog::FileCatalog;
+use freakymate_core::domain::prepared_job::PreparedJob;
 use freakymate_core::domain::spools::{self, Lane};
 use freakymate_core::domain::{estimates, light, pause};
 use freakymate_core::sources::happy_hare::{MmuGate, MmuStatus};
@@ -112,6 +113,8 @@ struct Cache {
     newest_job: Option<FinishedJob>,
     /// Paths of the files marked in the file list; they outlive a rebuild of the rows.
     marked_files: BTreeSet<String>,
+    /// The file prepared as the job of the print page.
+    prepared: PreparedJob,
 }
 
 pub struct Presenter {
@@ -139,6 +142,8 @@ pub struct Presenter {
     mmu_gates: Rc<VecModel<MmuGateItem>>,
     mmu_sensors: Rc<VecModel<MmuSensorItem>>,
     mmu_tools: Rc<VecModel<MmuToolItem>>,
+    prepared_tools: Rc<VecModel<MmuToolItem>>,
+    marked_file_names: Rc<VecModel<SharedString>>,
     macros: Rc<VecModel<SharedString>>,
     macro_items: Rc<VecModel<MacroItem>>,
     all_macros: RefCell<Vec<String>>,
@@ -184,6 +189,8 @@ impl Presenter {
             mmu_gates: Rc::default(),
             mmu_sensors: Rc::default(),
             mmu_tools: Rc::default(),
+            prepared_tools: Rc::default(),
+            marked_file_names: Rc::default(),
             macros: Rc::default(),
             macro_items: Rc::default(),
             all_macros: RefCell::default(),
@@ -217,6 +224,8 @@ impl Presenter {
         printer.set_mmu_gates(ModelRc::from(presenter.mmu_gates.clone()));
         printer.set_mmu_sensors(ModelRc::from(presenter.mmu_sensors.clone()));
         printer.set_mmu_tools(ModelRc::from(presenter.mmu_tools.clone()));
+        printer.set_prepared_tools(ModelRc::from(presenter.prepared_tools.clone()));
+        printer.set_marked_file_names(ModelRc::from(presenter.marked_file_names.clone()));
         printer.set_macros(ModelRc::from(presenter.macros.clone()));
         printer.set_macro_items(ModelRc::from(presenter.macro_items.clone()));
         printer.set_macro_form(ModelRc::from(presenter.macro_form.clone()));
@@ -409,7 +418,9 @@ impl Presenter {
         printer.set_has_update_manager(snapshot.sources.moonraker.update_manager);
         self.set_macro_details(&klipper.macro_details);
         self.set_macros(&klipper.macros, snapshot.connection == ConnectionState::Connected);
+        self.cache.borrow_mut().prepared.follow_job(&status.job);
         self.set_mmu(status, &lanes);
+        self.set_prepared(&printer, status, &lanes);
         self.set_spool_views(&printer, snapshot, active_spool.as_ref());
 
         let previous_job =
@@ -667,14 +678,57 @@ impl Presenter {
         printer.set_mmu_flow_rate(mmu.flow_rate.map_or(-1.0, |rate| rate.value as f32));
     }
 
-    /// How each tool of the job's file fits the filament it would print with; empty without file or metadata.
+    /// How each tool of the job's file (the prepared one, else the printer's) fits the filament it would print with;
+    /// empty without file or metadata.
     fn job_matches(&self, status: &PrinterStatus, lanes: &[Lane]) -> Vec<ToolMatch> {
         let cache = self.cache.borrow();
         cache
-            .catalog
-            .metadata(&status.job.filename)
+            .prepared
+            .job_file(&status.job)
+            .and_then(|file| cache.catalog.metadata(file))
             .map(|metadata| filament_match::match_tools(metadata, status, lanes))
             .unwrap_or_default()
+    }
+
+    /// The file of the print page's job: the prepared one, else the printer's; empty for none.
+    fn job_file(&self, status: &PrinterStatus) -> String {
+        self.cache.borrow().prepared.job_file(&status.job).unwrap_or_default().to_owned()
+    }
+
+    /// The prepared file with its facts and how its tools fit, for the print page; all empty without one.
+    fn set_prepared(&self, printer: &Printer, status: &PrinterStatus, lanes: &[Lane]) {
+        let (path, row) = {
+            let cache = self.cache.borrow();
+            let path = cache.prepared.path().unwrap_or_default().to_owned();
+            let row = cache.catalog.position(&path).map(|index| file_row(&cache, &cache.catalog.entries()[index]));
+            (path, row)
+        };
+        let tools = if path.is_empty() {
+            Vec::new()
+        } else {
+            self.job_matches(status, lanes)
+                .iter()
+                .map(|found| mmu_tool_item(found.request.tool, found.gate, Some(found)))
+                .collect()
+        };
+        printer.set_prepared_path(path.into());
+        printer.set_prepared(row.unwrap_or_default());
+        replace_rows(&self.prepared_tools, tools);
+    }
+
+    /// Prepares the file at `path` as the job of the print page; an empty path drops the prepared file.
+    pub fn prepare_file(&self, path: &str) {
+        self.cache.borrow_mut().prepared.prepare(path);
+        self.refresh_job_matches();
+    }
+
+    /// The comparisons with the job's file again, after the file, its metadata or its thumbnail changed.
+    fn refresh_job_matches(&self) {
+        let Some(window) = self.window.upgrade() else { return };
+        let snapshot = self.snapshot();
+        let lanes = self.lanes(&snapshot);
+        self.set_mmu(&snapshot.status, &lanes);
+        self.set_prepared(&window.global::<Printer>(), &snapshot.status, &lanes);
     }
 
     /// The tools of Happy Hare with what the job's file asks of them, then the file's tools that have no gate; and the
@@ -706,7 +760,7 @@ impl Presenter {
             })
             .collect();
         replace_rows(&self.mmu_tools, tools);
-        let file = if matches.is_empty() { String::new() } else { format::job_name(&status.job.filename) };
+        let file = if matches.is_empty() { String::new() } else { format::job_name(&self.job_file(status)) };
         printer.set_mmu_match_file(file.into());
         printer.set_mmu_match_summary(view::match_summary(matches).into());
         printer.set_mmu_match_verdict(view::combined_verdict(matches.iter().map(|found| &found.verdict)).into());
@@ -988,21 +1042,17 @@ impl Presenter {
         view::height_at_layer(job, cache.catalog.metadata(&job.filename), layer)
     }
 
-    pub fn print_hints_text(&self, path: &str) -> String {
+    /// Hints before printing the file, one line each, for the rows of the question.
+    pub fn print_hints(&self, path: &str) -> Vec<String> {
         let snapshot = self.snapshot();
         let lanes = self.lanes(&snapshot);
         let cache = self.cache.borrow();
-        let Some(metadata) = cache.catalog.metadata(path) else { return String::new() };
+        let Some(metadata) = cache.catalog.metadata(path) else { return Vec::new() };
         let show_tool = lanes.iter().any(|lane| lane.gate.is_some());
-        let lines: Vec<String> = filament_match::print_hints(metadata, &snapshot.status, &lanes)
+        filament_match::print_hints(metadata, &snapshot.status, &lanes)
             .iter()
-            .map(|hint| format!("• {}", view::print_hint_text(hint, show_tool)))
-            .collect();
-        if lines.is_empty() {
-            String::new()
-        } else {
-            format!("\n\n{}", lines.join("\n"))
-        }
+            .map(|hint| view::print_hint_text(hint, show_tool))
+            .collect()
     }
 
     pub fn request_files(&self) {
@@ -1011,7 +1061,7 @@ impl Presenter {
         self.service.query(Query::SpoolList);
     }
 
-    /// Marks or unmarks a file of the list; marked files can be deleted, a single one can be printed.
+    /// Marks or unmarks a file of the list; marked files can be deleted, a single one can be prepared.
     pub fn toggle_file_mark(&self, path: &str) {
         {
             let mut cache = self.cache.borrow_mut();
@@ -1039,11 +1089,13 @@ impl Presenter {
             let mut cache = self.cache.borrow_mut();
             let listed: BTreeSet<&str> = files.iter().map(|file| file.path.as_str()).collect();
             cache.marked_files.retain(|path| listed.contains(path.as_str()));
+            cache.prepared.follow_files(files.iter().map(|file| file.path.as_str()));
             for changed in cache.catalog.set_entries(files) {
                 cache.thumbnails.remove(&changed);
             }
         }
         self.show_file_rows();
+        self.refresh_job_matches();
         let missing = self.cache.borrow().catalog.needing_details();
         for filename in missing {
             self.service.query(Query::FileDetails { filename });
@@ -1059,7 +1111,7 @@ impl Presenter {
         self.show_file_marks();
     }
 
-    /// How many files are marked, and which one if it is a single one (the one to print).
+    /// How many files are marked with their names, and which one if it is a single one (the one to prepare).
     fn show_file_marks(&self) {
         let Some(window) = self.window.upgrade() else { return };
         let cache = self.cache.borrow();
@@ -1071,6 +1123,8 @@ impl Presenter {
         };
         printer.set_marked_file_path(single.as_deref().unwrap_or_default().into());
         printer.set_marked_file_name(single.as_deref().map(format::job_name).unwrap_or_default().into());
+        let names = cache.marked_files.iter().map(|path| format::job_name(path).into()).collect();
+        replace_rows(&self.marked_file_names, names);
     }
 
     fn store_history(&self, history: PrintHistory) {
@@ -1085,16 +1139,18 @@ impl Presenter {
 
     fn store_metadata(&self, metadata: FileMetadata) {
         let filename = metadata.filename.clone();
-        let is_job = {
+        let (is_job, is_compared) = {
             let mut cache = self.cache.borrow_mut();
             cache.catalog.store_metadata(metadata);
-            cache.snapshot.status.job.filename == filename
+            let is_job = cache.snapshot.status.job.filename == filename;
+            (is_job, is_job || cache.prepared.path() == Some(filename.as_str()))
         };
         self.update_file_row(&filename);
         if is_job {
             self.refresh_job_texts();
-            let snapshot = self.snapshot();
-            self.set_mmu(&snapshot.status, &self.lanes(&snapshot));
+        }
+        if is_compared {
+            self.refresh_job_matches();
         }
     }
 
@@ -1103,9 +1159,16 @@ impl Presenter {
             log::info!("thumbnail of {filename} cannot be shown");
             return;
         };
-        self.cache.borrow_mut().thumbnails.insert(filename.to_owned(), image);
+        let is_prepared = {
+            let mut cache = self.cache.borrow_mut();
+            cache.thumbnails.insert(filename.to_owned(), image);
+            cache.prepared.path() == Some(filename)
+        };
         self.update_file_row(filename);
         self.show_job_thumbnail();
+        if is_prepared {
+            self.refresh_job_matches();
+        }
     }
 
     fn update_file_row(&self, filename: &str) {

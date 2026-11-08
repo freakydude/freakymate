@@ -8,7 +8,7 @@ use freakymate_core::sources::klipper::tuning::TuningKey;
 use freakymate_core::sources::klipper::{Axis, TestZ};
 use freakymate_core::{Command, PrinterService, Query};
 use slint::platform::WindowEvent;
-use slint::{ComponentHandle, SharedString};
+use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -213,7 +213,10 @@ pub fn bind(
     let preset_presenter = Rc::clone(presenter);
     actions.on_apply_spool_preset(move || preset_presenter.apply_spool_preset());
     let hints_presenter = Rc::clone(presenter);
-    actions.on_print_hints(move |path| hints_presenter.print_hints_text(&path).into());
+    actions.on_print_hints(move |path| {
+        let hints: Vec<SharedString> = hints_presenter.print_hints(&path).into_iter().map(Into::into).collect();
+        ModelRc::new(VecModel::from(hints))
+    });
     let target_presenter = Rc::clone(presenter);
     actions.on_heater_target_outside(move |heater, typed| target_presenter.heater_target_outside(&heater, &typed));
     let mesh_presenter = Rc::clone(presenter);
@@ -227,6 +230,8 @@ pub fn bind(
     actions.on_toggle_file_mark(move |path| mark_presenter.toggle_file_mark(&path));
     let clear_presenter = Rc::clone(presenter);
     actions.on_clear_file_marks(move || clear_presenter.clear_file_marks());
+    let prepare_presenter = Rc::clone(presenter);
+    actions.on_prepare_file(move |path| prepare_presenter.prepare_file(&path));
     let delete_presenter = Rc::clone(presenter);
     let delete_service = service.clone();
     actions.on_delete_marked_files(move || {

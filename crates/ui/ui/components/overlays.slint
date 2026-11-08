@@ -13,7 +13,8 @@ export component ConfirmDialog inherits Scrim {
 
     DialogPanel {
         width: min(parent.width - 80px, 480px);
-        height: min(parent.height - 24px, 270px);
+        // Rows of items take more room than a message.
+        height: min(parent.height - 24px, Confirm.items.length > 0 ? 340px : 270px);
         danger: Confirm.danger;
 
         VerticalLayout {
@@ -24,12 +25,51 @@ export component ConfirmDialog inherits Scrim {
                 close => { Confirm.open = false; }
             }
 
-            Text {
+            if Confirm.message != "": Text {
                 text: Confirm.message;
                 color: Theme.muted;
                 font-size: Theme.font-normal;
                 wrap: word-wrap;
-                vertical-stretch: 1;
+                overflow: elide;
+                vertical-stretch: Confirm.items.length == 0 ? 1 : 0;
+            }
+            // One row per item, so each stands apart; more than fit scroll. Always there and empty without items: a
+            // conditional list here caps the height of the whole window.
+            items := ScrollList {
+                property <length> row-height: 44px;
+                property <length> row-step: self.row-height + 6px;
+                visible: Confirm.items.length > 0;
+                vertical-stretch: Confirm.items.length > 0 ? 1 : 0;
+                content-height: Confirm.items.length * self.row-step - 6px;
+                for item[index] in Confirm.items: Rectangle {
+                    y: index * items.row-step;
+                    width: items.row-width;
+                    height: items.row-height;
+                    background: Theme.surface-raised;
+                    border-radius: Theme.radius;
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 8px;
+                        Image {
+                            cross-axis-self-alignment: center;
+                            source: Confirm.items-are-hints ? Icons.ui-warning : Icons.file-gcode;
+                            colorize: Confirm.items-are-hints ? Theme.warning : Theme.muted;
+                            width: 18px;
+                            height: 18px;
+                        }
+                        // Two lines at most: a long file name keeps its end, a hint its figures.
+                        Text {
+                            horizontal-stretch: 1;
+                            text: item;
+                            color: Theme.foreground;
+                            font-size: Theme.font-normal;
+                            vertical-alignment: center;
+                            wrap: word-wrap;
+                            overflow: elide;
+                        }
+                    }
+                }
             }
 
             IconButton {

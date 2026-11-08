@@ -1,0 +1,42 @@
+// Preview: like print-prepared-mmu, with ten tools up to T11 (ERCF): five chips in a row, two rows, the third scrolls.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintPreparedMmuManyPreview inherits AppWindow {
+    init => {
+        Sample.mmu();
+        Navigation.page = Page.print;
+        Printer.print-state = "complete";
+        Printer.filename = "benchy.gcode";
+        Printer.job-name = "benchy";
+        Printer.prepared-path = "cube-mc5-all_pla-t0_t1_t3_t4.gcode";
+        Printer.prepared = {
+            path: "cube-mc5-all_pla-t0_t1_t3_t4.gcode",
+            name: "cube-mc5-all_pla-t0_t1_t3_t4",
+            material: "PLA, PETG",
+            weight: "32.6 g",
+            nozzle: "0.4",
+            time: "1h 48m",
+            extruder-temperature: "220°",
+            bed-temperature: "60°",
+            show-thumbnail: true,
+        };
+        Printer.mmu-match-file = "cube-mc5-all_pla-t0_t1_t3_t4.gcode";
+        Printer.mmu-match-summary = @tr("2 of 10 tools fit");
+        Printer.mmu-match-verdict = "differs";
+        Printer.prepared-tools = [
+            { tool: 0, gate: 0, used: true, wanted-color: #e03131, wanted-has-color: true, wanted-material: "PLA", verdict: "fits" },
+            { tool: 1, gate: 1, used: true, wanted-color: #f4e2c1, wanted-has-color: true, wanted-material: "PLA", verdict: "differs" },
+            { tool: 2, gate: 2, used: true, wanted-color: #e8590c80, wanted-has-color: true, wanted-material: "PLA", verdict: "fits" },
+            { tool: 3, gate: 3, used: true, wanted-color: #ffffff00, wanted-has-color: true, wanted-material: "PLA", verdict: "differs" },
+            { tool: 4, gate: -1, used: true, wanted-color: #1c7ed6, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 5, gate: -1, used: true, wanted-color: #2f9e44, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 7, gate: -1, used: true, wanted-color: #ae3ec9, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 8, gate: -1, used: true, wanted-color: #fab005, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 10, gate: -1, used: true, wanted-color: #495057, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 11, gate: -1, used: true, wanted-color: #ffffff, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
+        ];
+    }
+}

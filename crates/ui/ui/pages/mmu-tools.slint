@@ -9,7 +9,7 @@ import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
 import { SlotTile, VerdictIcon } from "mmu.slint";
 
 // The colour of a gate as a vertical bar, the way the tiles of the gates show it.
-component GateColor inherits ColorBar {
+export component GateColor inherits ColorBar {
     in property <MmuGateItem> gate;
 
     width: 10px;
@@ -24,7 +24,7 @@ component GateColor inherits ColorBar {
 }
 
 // The colour the file asks of a tool, as a dot beside the gate's bar; a clear filament shows the checkerboard.
-component WantedColor inherits ColorBar {
+export component WantedColor inherits ColorBar {
     in property <MmuToolItem> mapping;
 
     width: 12px;

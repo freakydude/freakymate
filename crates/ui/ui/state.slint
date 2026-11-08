@@ -548,10 +548,19 @@ export global Printer {
     in property <[SpoolItem]> spools;
     in property <bool> spools-loading;
     in property <[FileItem]> files;
-    // Files marked in the file list; the path and name only when it is a single one, which can be printed.
+    // The file prepared in the app as the job of the print page, empty for none; only the app knows it. A started
+    // print, a deleted file or a restart drops it.
+    in property <string> prepared-path;
+    in property <FileItem> prepared;
+    // The tools the prepared file uses and how they compare: with their gates (MMU), or tool 0 with the spool in use;
+    // `gate` is -1 without MMU.
+    in property <[MmuToolItem]> prepared-tools;
+    // Files marked in the file list; the path and name only when it is a single one, which can be prepared.
     in property <int> marked-file-count;
     in property <string> marked-file-path;
     in property <string> marked-file-name;
+    // Names of all marked files, for the question before deleting them.
+    in property <[string]> marked-file-names;
     in property <[ConsoleItem]> console;
     in property <[PowerItem]> power-devices;
     in property <[UpdateItem]> updates;
@@ -711,6 +720,8 @@ export global Actions {
     callback clear-file-marks();
     // Deletes the marked files from the printer.
     callback delete-marked-files();
+    // Makes the file the job of the print page, in the app only; an empty path drops the prepared file.
+    callback prepare-file(string);
     callback start-print(string);
     callback pause-print();
     callback resume-print();
@@ -748,7 +759,7 @@ export global Actions {
     callback measure-spool(int, string);
     callback apply-spool-preset();
     // What differs between a file and the spools, as lines of text for the confirmation; empty if nothing.
-    pure callback print-hints(string) -> string;
+    pure callback print-hints(string) -> [string];
     // Klipper would refuse the typed target of a heater (Klipper object, text as typed); false while it is no number.
     pure callback heater-target-outside(string, string) -> bool;
     callback open-macro-form(string);
@@ -877,14 +888,25 @@ export global Confirm {
     in-out property <string> action;
     in-out property <string> argument;
     in-out property <bool> danger;
+    // Things the action applies to, one row each, under the message: files to delete, or hints before a print.
+    in-out property <[string]> items;
+    // The rows are hints (warning icon) instead of files.
+    in-out property <bool> items-are-hints;
 
     public function ask(title: string, message: string, action: string, argument: string, danger: bool) {
+        self.items = [];
         self.title = title;
         self.message = message;
         self.action = action;
         self.argument = argument;
         self.danger = danger;
         self.open = true;
+    }
+
+    public function ask-for-items(title: string, message: string, items: [string], hints: bool, action: string, argument: string, danger: bool) {
+        self.ask(title, message, action, argument, danger);
+        self.items = items;
+        self.items-are-hints = hints;
     }
 
     public function execute() {

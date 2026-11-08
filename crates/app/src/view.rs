@@ -228,18 +228,20 @@ pub fn match_summary(matches: &[ToolMatch]) -> String {
 
 /// What does not fit for a tool, one sentence per line, naming the gate it prints from.
 pub fn tool_differences(found: &ToolMatch) -> String {
-    let gate = found.gate.map_or_else(String::new, |gate| gate.to_string());
+    // Without a gate (no MMU) the tool prints from the spool in use.
+    let source = found.gate.map_or_else(|| "The spool".to_owned(), |gate| format!("Gate {gate}"));
+    let spool = found.gate.map_or_else(|| "The spool".to_owned(), |gate| format!("The spool in gate {gate}"));
     match &found.verdict {
         Verdict::Fits | Verdict::Unknown => String::new(),
-        Verdict::GateEmpty => format!("Gate {gate} is empty."),
+        Verdict::GateEmpty => format!("{source} is empty."),
         Verdict::NoGate => format!("The printer has no gate for T{}.", found.request.tool),
         Verdict::Differs(differences) => differences
             .iter()
             .map(|difference| match difference {
-                Difference::Material { loaded, .. } => format!("Gate {gate} holds {loaded}."),
-                Difference::Color => format!("Gate {gate} has another colour."),
+                Difference::Material { loaded, .. } => format!("{source} holds {loaded}."),
+                Difference::Color => format!("{source} has another colour."),
                 Difference::Weight { needed, left } => format!(
-                    "The spool in gate {gate} has {} left, the print needs ~{}.",
+                    "{spool} has {} left, the print needs ~{}.",
                     format::filament_weight(*left),
                     format::filament_weight(*needed)
                 ),
@@ -725,6 +727,14 @@ mod tests {
         assert_eq!(tool_differences(&tool_match(1, Some(3), Verdict::GateEmpty)), "Gate 3 is empty.");
         assert_eq!(tool_differences(&tool_match(4, None, Verdict::NoGate)), "The printer has no gate for T4.");
         assert_eq!(tool_differences(&tool_match(0, Some(0), Verdict::Fits)), "");
+        let without_mmu = Verdict::Differs(vec![
+            Difference::Material { expected: "PLA".into(), loaded: "ABS".into() },
+            Difference::Weight { needed: 52.0, left: 38.0 },
+        ]);
+        assert_eq!(
+            tool_differences(&tool_match(0, None, without_mmu)),
+            "The spool holds ABS.\nThe spool has 38 g left, the print needs ~52 g."
+        );
     }
 
     #[test]

@@ -1,0 +1,40 @@
+// Preview: print page with a prepared file on a printer without MMU, with Spoolman: the file wants PLA, the spool in
+// use holds PETG and too little of it. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintPreparedSpoolPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.print;
+        Printer.prepared-path = "calibration_cube_with_a_rather_long_name_v2.gcode";
+        Printer.prepared = {
+            path: "calibration_cube_with_a_rather_long_name_v2.gcode",
+            name: "calibration_cube_with_a_rather_long_name_v2",
+            material: "PLA",
+            weight: "52 g",
+            nozzle: "0.4",
+            time: "2h 07m",
+            extruder-temperature: "215°",
+            bed-temperature: "60°",
+            chamber-temperature: "45°",
+            show-thumbnail: true,
+        };
+        Printer.prepared-tools = [{
+            tool: 0, gate: -1, used: true, wanted-color: #e8590c, wanted-has-color: true, wanted-material: "PLA",
+            wanted-grams: "52 g", wanted-profile: "Generic PLA @Voron 2.4", verdict: "differs",
+            differences: "The spool holds PETG.\nThe spool has 38 g left, the print takes 52 g.",
+        }];
+        Printer.has-spoolman = true;
+        Printer.has-spool = true;
+        Printer.spool-id = 7;
+        Printer.spool-title = "Sunlu HS Matte PETG";
+        Printer.spool-material = "PETG";
+        Printer.spool-weight = "38 g";
+        Printer.spool-color = #2e7d32;
+        Printer.spool-color-count = 1;
+        Printer.spool-low = true;
+    }
+}

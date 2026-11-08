@@ -1,0 +1,18 @@
+// Preview: the question before printing a prepared file names the file and lists the hints, one row each. Open in the
+// Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Confirm, Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintConfirmHintsPreview inherits AppWindow {
+    init => {
+        Sample.mmu();
+        Navigation.page = Page.print;
+        Confirm.ask-for-items(
+            @tr("Start print"),
+            "calibration_cube_with_a_rather_long_name_v2",
+            ["T1: the gate is empty", "T3: the file is for PLA, the spool is PETG", "T3: needs ~1.2 kg, the spool has 38 g left", "T12: the printer has no gate for this tool"],
+            true, "start-print", "calibration_cube_with_a_rather_long_name_v2.gcode", false);
+    }
+}

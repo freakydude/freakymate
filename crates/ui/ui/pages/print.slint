@@ -7,6 +7,7 @@ import { IconButton, IconLabel, ProgressBar, ScrollList, ValueTile } from "../co
 import { ExcludeObjectsDialog, LayerPauseDialog } from "../components/overlays.slint";
 import { SpoolStrip } from "../components/spool-strip.slint";
 import { MmuStrip } from "mmu.slint";
+import { PreparedJob } from "print-prepared.slint";
 
 component Thumbnail inherits Rectangle {
     in property <image> source;
@@ -91,8 +92,10 @@ component FileRow inherits Rectangle {
     in property <image> thumbnail;
     in property <bool> has-thumbnail;
     in property <bool> show-thumbnail;
-    // Marked for printing or deleting.
+    // Marked for preparing (a single one) or deleting.
     in property <bool> selected;
+    // The job of the print page.
+    in property <bool> prepared;
     callback clicked;
     height: 72px;
     border-radius: Theme.radius;
@@ -123,6 +126,11 @@ component FileRow inherits Rectangle {
                     font-size: Theme.font-normal;
                     overflow: elide;
                     horizontal-stretch: 1;
+                }
+                if root.prepared: FileChip {
+                    icon: Icons.print-load;
+                    text: @tr("Prepared");
+                    color: Theme.foreground;
                 }
                 Text {
                     text: root.modified;
@@ -211,6 +219,7 @@ export component FileBrowser inherits Rectangle {
                 has-thumbnail: file.has-thumbnail;
                 show-thumbnail: file.show-thumbnail;
                 selected: file.marked;
+                prepared: file.path == Printer.prepared-path;
                 clicked => { Actions.toggle-file-mark(file.path); }
             }
         }
@@ -226,25 +235,24 @@ export component FileBrowser inherits Rectangle {
                     Navigation.files-open = false;
                 }
             }
+            // One marked file can be prepared or deleted, several only deleted.
             IconButton {
                 icon: Icons.ui-delete;
-                text: @tr("Delete");
+                text: Printer.marked-file-count > 1 ? @tr("Delete {}", Printer.marked-file-count) : @tr("Delete");
                 enabled: Printer.marked-file-count > 0;
                 clicked => {
-                    Confirm.ask(
-                        @tr("Delete files"),
-                        Printer.marked-file-count == 1 ? Printer.marked-file-name : @tr("{n} file" | "{n} files" % Printer.marked-file-count),
-                        "delete-files", "", true);
+                    Confirm.ask-for-items(@tr("Delete files"), "", Printer.marked-file-names, false, "delete-files", "", true);
                 }
             }
+            // Preparing changes nothing at the printer, so it asks nothing; the print page then shows the file.
             IconButton {
-                icon: Icons.print-start;
-                text: @tr("Print");
+                icon: Icons.print-prepare;
+                text: @tr("Prepare");
                 kind: "accent";
                 vertical-stretch: 1;
                 enabled: Printer.marked-file-path != "";
                 clicked => {
-                    Confirm.ask(@tr("Start print"), Printer.marked-file-name + Actions.print-hints(Printer.marked-file-path), "start-print", Printer.marked-file-path, false);
+                    Actions.prepare-file(Printer.marked-file-path);
                     Actions.clear-file-marks();
                     Navigation.files-open = false;
                 }
@@ -255,6 +263,8 @@ export component FileBrowser inherits Rectangle {
 
 export component PrintPage inherits Rectangle {
     property <bool> has-job: Printer.filename != "";
+    // A prepared file is the job until a print starts; then the running file is.
+    property <bool> prepared: Printer.prepared-path != "" && !Printer.is-printing;
     property <bool> finished: Printer.print-state == "complete" || Printer.print-state == "cancelled" || Printer.print-state == "error";
     property <length> side-width: 220px;
 
@@ -267,27 +277,11 @@ export component PrintPage inherits Rectangle {
             spacing: Theme.spacing;
             Thumbnail {
                 height: root.side-width;
-                source: Printer.job-thumbnail;
-                available: root.has-job && Printer.has-job-thumbnail;
+                source: root.prepared ? Printer.prepared.thumbnail : Printer.job-thumbnail;
+                available: root.prepared ? Printer.prepared.has-thumbnail : root.has-job && Printer.has-job-thumbnail;
             }
-            // The status bar shows the state of the print; long names have no spaces: break anywhere and stop after
-            // three lines, so the name stays in its column.
-            Text {
-                text: root.has-job ? Printer.job-name : @tr("No print loaded");
-                color: Theme.foreground;
-                font-size: Theme.font-normal;
-                font-weight: 600;
-                wrap: char-wrap;
-                overflow: elide;
-                max-height: 3 * 22px;
-            }
-            Rectangle { vertical-stretch: 1; }
-        }
-
-        VerticalLayout {
-            horizontal-stretch: 1;
-            spacing: Theme.spacing;
-            HorizontalLayout {
+            // Progress of the printer's job; a prepared file has none yet.
+            if !root.prepared && root.has-job: HorizontalLayout {
                 spacing: 10px;
                 height: 48px;
                 Text {
@@ -304,77 +298,101 @@ export component PrintPage inherits Rectangle {
                     bar-color: Printer.print-state == "paused" ? Theme.warning : Printer.print-state == "error" ? Theme.danger : Theme.accent;
                 }
             }
-            // Left the times, right the figures of the job. The times are short, the figures need room: 4 to 5.
-            VerticalLayout {
-                spacing: Theme.spacing;
-                HorizontalLayout {
-                    spacing: Theme.spacing;
-                    ValueTile {
-                        weight: 4;
-                        icon: Icons.print-duration;
-                        label: @tr("Elapsed");
-                        value: Printer.elapsed;
-                    }
-                    // The heights take the place of the label, as the flow does on the speed tile. A tap plans a pause
-                    // at a layer, if the printer has Mainsail's macros for it; a planned one shows at the pause icon.
-                    ValueTile {
-                        weight: 5;
-                        icon: Icons.print-layers;
-                        label: Printer.print-heights != "" ? Printer.print-heights : @tr("Layer");
-                        value: Printer.layers;
-                        action-icon: Icons.print-pause;
-                        action-note: Printer.layer-pause-planned;
-                        enabled-action: Printer.layer-pause-next || Printer.layer-pause-at;
-                        clicked => { layer-pause-dialog.open(); }
-                    }
-                }
-                HorizontalLayout {
-                    spacing: Theme.spacing;
-                    if !root.finished: ValueTile {
-                        weight: 4;
-                        icon: Icons.print-eta;
-                        label: @tr("Remaining");
-                        value: Printer.remaining;
-                    }
-                    if root.finished: ValueTile {
-                        weight: 4;
-                        icon: Printer.print-state == "complete" ? Icons.print-complete : Printer.print-state == "cancelled" ? Icons.print-cancel : Icons.state-error;
-                        icon-color: Printer.print-state == "complete" ? Theme.success : Theme.muted;
-                        label: Printer.print-state == "complete" ? @tr("Finished") : Printer.print-state == "cancelled" ? @tr("Cancelled") : @tr("Failed");
-                        value: Printer.ended;
-                    }
-                    ValueTile {
-                        weight: 5;
-                        icon: Icons.filament-spool;
-                        label: @tr("Filament");
-                        value: Printer.filament;
-                    }
-                }
-                // Times and speed only say something while the print runs; a pause or an error shows what is known
-                // about it instead.
-                if Printer.print-state == "paused" || Printer.print-state == "error": InterruptionBanner {
-                    failed: Printer.print-state == "error";
-                    details: Printer.interruption-text;
-                }
-                if Printer.print-state == "printing": HorizontalLayout {
-                    spacing: Theme.spacing;
-                    ValueTile {
-                        weight: 4;
-                        icon: Icons.ui-info;
-                        label: @tr("ETA");
-                        value: Printer.eta;
-                    }
-                    ValueTile {
-                        weight: 5;
-                        icon: Icons.motion-speed;
-                        // Two short lines instead of one long value: the speed, and under the icon's label the flow.
-                        label: @tr("Flow {} mm³/s", Printer.live-flow.to-fixed(1));
-                        value: round(Printer.live-velocity) + " mm/s";
-                    }
-                }
+            Rectangle { vertical-stretch: 1; }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: Theme.spacing;
+            // The status bar shows the state of the print. Long names have no spaces and keep what matters at the end
+            // (a version): break anywhere, two lines at most.
+            Text {
+                height: 48px;
+                text: root.prepared ? Printer.prepared.name : root.has-job ? Printer.job-name : @tr("No print loaded");
+                color: Theme.foreground;
+                font-size: Theme.font-normal;
+                font-weight: 600;
+                wrap: char-wrap;
+                overflow: elide;
+                vertical-alignment: center;
             }
-            if Printer.has-spoolman && !Printer.has-mmu: SpoolStrip { }
-            if Printer.has-mmu: MmuStrip { }
+            if root.prepared: PreparedJob { }
+            if !root.prepared: VerticalLayout {
+                spacing: Theme.spacing;
+                // Left the times, right the figures of the job. The times are short, the figures need room: 4 to 5.
+                VerticalLayout {
+                    spacing: Theme.spacing;
+                    HorizontalLayout {
+                        spacing: Theme.spacing;
+                        ValueTile {
+                            weight: 4;
+                            icon: Icons.print-duration;
+                            label: @tr("Elapsed");
+                            value: Printer.elapsed;
+                        }
+                        // The heights take the place of the label, as the flow does on the speed tile. A tap plans a pause
+                        // at a layer, if the printer has Mainsail's macros for it; a planned one shows at the pause icon.
+                        ValueTile {
+                            weight: 5;
+                            icon: Icons.print-layers;
+                            label: Printer.print-heights != "" ? Printer.print-heights : @tr("Layer");
+                            value: Printer.layers;
+                            action-icon: Icons.print-pause;
+                            action-note: Printer.layer-pause-planned;
+                            enabled-action: Printer.layer-pause-next || Printer.layer-pause-at;
+                            clicked => { layer-pause-dialog.open(); }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: Theme.spacing;
+                        if !root.finished: ValueTile {
+                            weight: 4;
+                            icon: Icons.print-eta;
+                            label: @tr("Remaining");
+                            value: Printer.remaining;
+                        }
+                        if root.finished: ValueTile {
+                            weight: 4;
+                            icon: Printer.print-state == "complete" ? Icons.print-complete : Printer.print-state == "cancelled" ? Icons.print-cancel : Icons.state-error;
+                            icon-color: Printer.print-state == "complete" ? Theme.success : Theme.muted;
+                            label: Printer.print-state == "complete" ? @tr("Finished") : Printer.print-state == "cancelled" ? @tr("Cancelled") : @tr("Failed");
+                            value: Printer.ended;
+                        }
+                        ValueTile {
+                            weight: 5;
+                            icon: Icons.filament-spool;
+                            label: @tr("Filament");
+                            value: Printer.filament;
+                        }
+                    }
+                    // Times and speed only say something while the print runs; a pause or an error shows what is known
+                    // about it instead.
+                    if Printer.print-state == "paused" || Printer.print-state == "error": InterruptionBanner {
+                        failed: Printer.print-state == "error";
+                        details: Printer.interruption-text;
+                    }
+                    if Printer.print-state == "printing": HorizontalLayout {
+                        spacing: Theme.spacing;
+                        ValueTile {
+                            weight: 4;
+                            icon: Icons.ui-info;
+                            label: @tr("ETA");
+                            value: Printer.eta;
+                        }
+                        ValueTile {
+                            weight: 5;
+                            icon: Icons.motion-speed;
+                            // Two short lines instead of one long value: the speed, and under the icon's label the flow.
+                            label: @tr("Flow {} mm³/s", Printer.live-flow.to-fixed(1));
+                            value: round(Printer.live-velocity) + " mm/s";
+                        }
+                    }
+                }
+                if Printer.has-spoolman && !Printer.has-mmu: SpoolStrip { }
+                if Printer.has-mmu: MmuStrip { }
+            }
+            // Free room stays at the bottom; it must sit outside the conditional blocks, which would cap the column's
+            // height otherwise.
             Rectangle { vertical-stretch: 1; }
         }
 
@@ -390,12 +408,19 @@ export component PrintPage inherits Rectangle {
                     Actions.refresh-files();
                 }
             }
-            if !Printer.is-printing && root.has-job: IconButton {
+            if root.prepared: IconButton {
+                height: 96px;
+                icon: Icons.print-start;
+                text: @tr("Print");
+                kind: "accent";
+                clicked => { Confirm.ask-for-items(@tr("Start print"), Printer.prepared.name, Actions.print-hints(Printer.prepared-path), true, "start-print", Printer.prepared-path, false); }
+            }
+            if !Printer.is-printing && !root.prepared && root.has-job: IconButton {
                 height: 96px;
                 icon: root.finished ? Icons.print-repeat : Icons.print-start;
                 text: root.finished ? @tr("Reprint") : @tr("Start");
                 kind: "accent";
-                clicked => { Confirm.ask(@tr("Start print"), Printer.job-name + Actions.print-hints(Printer.filename), "start-print", Printer.filename, false); }
+                clicked => { Confirm.ask-for-items(@tr("Start print"), Printer.job-name, Actions.print-hints(Printer.filename), true, "start-print", Printer.filename, false); }
             }
             if Printer.print-state == "printing": IconButton {
                 height: 96px;

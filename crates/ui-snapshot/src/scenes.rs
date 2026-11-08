@@ -11,7 +11,7 @@ use freakymate_core::sources::klipper::tuning::TuningKey;
 use freakymate_core::sources::klipper::{Activity, CalibrationMode, KlippyState, PrintState, TestZ};
 use freakymate_core::sources::moonraker_server::wled::{self, StripAction};
 use freakymate_core::{Command, ConnectionState, Query, Snapshot};
-use slint::{ComponentHandle, Model};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::time::Duration;
 
 /// The fake's idle timeout passes after about 30 s at time scale 20.
@@ -141,21 +141,58 @@ pub fn run(session: &mut Session, chosen: &[Scene]) -> Result<(), String> {
     Ok(())
 }
 
+/// A file prepared from the list: the print page shows it with its facts and the comparison of its tools (the fake's
+/// `long_job.gcode` asks for PLA and PETG). Dropped afterwards, so the other scenes see the printer's job.
+fn prepared_job(session: &mut Session) -> Result<(), String> {
+    let actions = session.window.global::<Actions>();
+    actions.invoke_toggle_file_mark("long_job.gcode".into());
+    let marked = session.window.global::<Printer>().get_marked_file_path();
+    if marked != "long_job.gcode" {
+        return Err(format!("expected long_job.gcode as the single marked file, got \"{marked}\""));
+    }
+    actions.invoke_prepare_file(marked);
+    actions.invoke_clear_file_marks();
+    session.settle_replies(Duration::from_secs(2));
+    let printer = session.window.global::<Printer>();
+    if printer.get_prepared_path() != "long_job.gcode" || printer.get_prepared_tools().row_count() == 0 {
+        return Err("the prepared file or its tools are missing".into());
+    }
+    session.show_page(Page::Print, "print-prepared")?;
+    session.window.global::<Actions>().invoke_prepare_file(SharedString::new());
+    session.pump(Duration::from_millis(100));
+    Ok(())
+}
+
 fn pages(session: &mut Session) -> Result<(), String> {
     session.show_page(Page::Print, "print-standby")?;
     session.presenter.request_files();
     session.window.global::<Navigation>().set_files_open(true);
     session.settle_replies(Duration::from_secs(2));
     session.capture("print-files")?;
-    // Two marked files: the delete button is enabled and the print button waits for a single one.
+    // Two marked files: the delete button is enabled and the prepare button waits for a single one.
     for row in 0..2 {
         let path =
             session.window.global::<Printer>().get_files().row_data(row).map(|file| file.path).unwrap_or_default();
         session.window.global::<Actions>().invoke_toggle_file_mark(path);
     }
     session.capture("print-files-marked")?;
+    // The question before deleting names the marked files, one row each.
+    let names = session.window.global::<Printer>().get_marked_file_names();
+    session.window.global::<Confirm>().invoke_ask_for_items(
+        "Delete files".into(),
+        SharedString::new(),
+        names,
+        false,
+        "delete-files".into(),
+        SharedString::new(),
+        true,
+    );
+    session.pump(Duration::from_millis(300));
+    session.capture("print-files-delete")?;
+    session.window.global::<Confirm>().set_open(false);
     session.window.global::<Actions>().invoke_clear_file_marks();
     session.window.global::<Navigation>().set_files_open(false);
+    prepared_job(session)?;
     // The console comes before the Thermal page, whose fan test would fill it with the fake's commands.
     for (page, name) in [
         (Page::Move, "move"),
@@ -510,10 +547,13 @@ fn spools(session: &mut Session) -> Result<(), String> {
 
     session.presenter.request_files();
     session.settle_replies(Duration::from_secs(2));
-    let hints = session.presenter.print_hints_text("long_job.gcode");
-    session.window.global::<Confirm>().invoke_ask(
+    let hints: Vec<SharedString> =
+        session.presenter.print_hints("long_job.gcode").into_iter().map(Into::into).collect();
+    session.window.global::<Confirm>().invoke_ask_for_items(
         "Start print".into(),
-        format!("long_job{hints}").into(),
+        "long_job".into(),
+        ModelRc::new(VecModel::from(hints)),
+        true,
         "start-print".into(),
         "long_job.gcode".into(),
         false,

@@ -1,0 +1,32 @@
+// Preview: print page with a prepared file for three tools on a printer without MMU and without Spoolman: only what the
+// file asks for, nothing to compare; T1 and T2 as chips. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintPreparedPlainPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.print;
+        Printer.prepared-path = "benchy.gcode";
+        Printer.prepared = {
+            path: "benchy.gcode",
+            name: "benchy",
+            material: "PLA",
+            weight: "13 g",
+            nozzle: "0.4",
+            time: "52m",
+            extruder-temperature: "215°",
+            bed-temperature: "60°",
+            thumbnail: @image-url("../../../../assets/icons/state/state-printing.svg"),
+            has-thumbnail: true,
+            show-thumbnail: true,
+        };
+        Printer.prepared-tools = [
+            { tool: 0, gate: -1, used: true, wanted-color: #1c7ed6, wanted-has-color: true, wanted-material: "PLA", wanted-grams: "9.4 g", wanted-profile: "Prusament PLA Azure Blue" },
+            { tool: 1, gate: -1, used: true, wanted-color: #ffffff, wanted-has-color: true, wanted-material: "PLA", wanted-grams: "2.1 g" },
+            { tool: 2, gate: -1, used: true, wanted-color: #ffffff00, wanted-has-color: true, wanted-material: "PETG", wanted-grams: "1.5 g" },
+        ];
+    }
+}

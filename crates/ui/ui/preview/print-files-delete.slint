@@ -1,0 +1,22 @@
+// Preview: the question before deleting five marked files names them, one row each; the last ones scroll. Open in the Slint preview or render with
+// scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Confirm, Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintFilesDeletePreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.print;
+        Navigation.files-open = true;
+        Printer.files = [
+            { path: "benchy.gcode", name: "benchy", modified: "17.11.2023 06:46", marked: true, show-thumbnail: true },
+            { path: "long_job.gcode", name: "long_job", modified: "16.11.2023 03:00", marked: true, show-thumbnail: true },
+            { path: "calibration_cube_with_a_rather_long_name_v2.gcode", name: "calibration_cube_with_a_rather_long_name_v2", modified: "14.11.2023 23:13", marked: true },
+        ];
+        Printer.marked-file-count = 5;
+        Printer.marked-file-names = ["benchy", "long_job", "calibration_cube_with_a_rather_long_name_v2", "multicolor", "plain"];
+        Confirm.ask-for-items(@tr("Delete files"), "", Printer.marked-file-names, false, "delete-files", "", true);
+    }
+}
