@@ -5,3 +5,6 @@ target/
 /.cargo/config.toml
 # Local editor tooling, do not publish
 /.claude/
+# Sliced multi-colour sources of the metadata fixtures (large, kept local for now)
+/crates/core/tests/fixtures/multicolor/*.gcode
+/crates/core/tests/fixtures/multicolor/*.3mf

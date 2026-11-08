@@ -3,10 +3,10 @@
 use crate::format;
 use chrono::{DateTime, Local};
 use freakymate_core::domain::estimates;
+use freakymate_core::domain::filament_match::{self, PrintHint};
 use freakymate_core::domain::file_catalog::FileInfo;
 use freakymate_core::domain::job_end;
 use freakymate_core::domain::pause::{Interruption, InterruptionFact};
-use freakymate_core::domain::spools::PrintHint;
 use freakymate_core::sources::happy_hare::{
     path_sensor_names, FlowGuardState, GateAvailability, LoadedFilament, MmuSensor, ServoPosition, SyncFeedbackState,
 };
@@ -186,6 +186,8 @@ pub fn print_hint_text(hint: &PrintHint, show_tool: bool) -> String {
             )
         }
         PrintHint::Color { tool: number } => format!("{}the colour differs from the file", tool(*number)),
+        PrintHint::GateEmpty { tool: number } => format!("{}the gate is empty", tool(*number)),
+        PrintHint::NoGate { tool: number } => format!("T{number}: the printer has no gate for this tool"),
     }
 }
 
@@ -193,7 +195,7 @@ pub fn print_hint_text(hint: &PrintHint, show_tool: bool) -> String {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FileFacts {
     pub modified: String,
-    /// The slicer's filament type; files for several tools list one per tool (`PLA;PETG`).
+    /// The slicer's materials of the tools the print uses, each once (`PLA, PETG`).
     pub material: String,
     pub weight: String,
     pub nozzle: String,
@@ -208,7 +210,7 @@ pub struct FileFacts {
 pub fn file_facts(info: &FileInfo) -> FileFacts {
     let mut facts = FileFacts { modified: format::unix_date(info.entry.modified), ..FileFacts::default() };
     if let Some(metadata) = info.metadata {
-        facts.material = metadata.filament_type.clone().unwrap_or_default();
+        facts.material = file_materials(metadata);
         facts.weight = estimates::filament_weight_grams(metadata, info.last_print, info.spool)
             .map_or_else(String::new, |grams| show(grams, format::filament_weight));
         facts.nozzle =
@@ -219,6 +221,17 @@ pub fn file_facts(info: &FileInfo) -> FileFacts {
         facts.chamber_temperature = degrees(metadata.chamber_temp);
     }
     facts
+}
+
+/// Each material of the used tools once, in tool order.
+fn file_materials(metadata: &FileMetadata) -> String {
+    let mut materials: Vec<String> = Vec::new();
+    for material in filament_match::tool_requests(metadata).into_iter().filter_map(|request| request.material) {
+        if !materials.contains(&material) {
+            materials.push(material);
+        }
+    }
+    materials.join(", ")
 }
 
 /// A temperature of 0 means that the slicer sets none.
@@ -556,7 +569,7 @@ mod tests {
             estimated_time: Some(3600.0),
             filament_total: Some(10_000.0),
             filament_weight_total: Some(30.0),
-            filament_type: Some("PLA".into()),
+            filament_types: vec!["PLA".into()],
             nozzle_diameter: Some(0.4),
             ..FileMetadata::default()
         }
@@ -602,6 +615,24 @@ mod tests {
         let facts = facts_of(Some(&file_metadata()), Some(&last_print));
 
         assert_eq!((facts.material.as_str(), facts.weight.as_str(), facts.time.as_str()), ("PLA", "27 g", "55m 00s"));
+    }
+
+    #[test]
+    fn a_multicolour_file_names_each_material_of_its_used_tools_once() {
+        let metadata = FileMetadata {
+            filament_types: vec!["PLA".into(), "PLA".into(), "TPU".into(), "PETG".into()],
+            filament_weights: vec![5.0, 5.0, 0.0, 2.0],
+            ..file_metadata()
+        };
+
+        // Tool 2 (TPU) has no weight: the print does not use it.
+        assert_eq!(facts_of(Some(&metadata), None).material, "PLA, PETG");
+    }
+
+    #[test]
+    fn missing_gates_and_empty_gates_are_hints_before_the_print() {
+        assert_eq!(print_hint_text(&PrintHint::GateEmpty { tool: 1 }, true), "T1: the gate is empty");
+        assert_eq!(print_hint_text(&PrintHint::NoGate { tool: 3 }, false), "T3: the printer has no gate for this tool");
     }
 
     #[test]

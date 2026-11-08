@@ -1,0 +1,78 @@
+{
+    "result": {
+        "size": 3302136,
+        "modified": 1794162614.1548078,
+        "uuid": "bfe5c230-8ea2-4221-ae9a-3c1e78bc4d03",
+        "file_processors": [
+            "klipper_estimator"
+        ],
+        "slicer": "OrcaSlicer",
+        "slicer_version": "2.5.0",
+        "gcode_start_byte": 3914,
+        "gcode_end_byte": 3273041,
+        "layer_count": 110,
+        "object_height": 22.0,
+        "estimated_time": 5445,
+        "nozzle_diameter": 0.4,
+        "layer_height": 0.2,
+        "first_layer_height": 0.2,
+        "first_layer_extr_temp": 210.0,
+        "first_layer_bed_temp": 60.0,
+        "chamber_temp": 0.0,
+        "filament_name": "[\"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\"]",
+        "filament_type": "[\"PLA\", \"PLA\", \"PLA\", \"PLA\"]",
+        "filament_colors": [
+            "#F76707",
+            "#00C1AE",
+            "#F4E2C1",
+            "#ED1C24"
+        ],
+        "filament_change_count": 330,
+        "extruder_colors": [
+            "#F76707",
+            "#00C1AE",
+            "#F4E2C1",
+            "#ED1C24"
+        ],
+        "filament_temps": [
+            210,
+            210,
+            210,
+            210
+        ],
+        "referenced_tools": [
+            0,
+            1,
+            2,
+            3
+        ],
+        "mmu_print": 1,
+        "filament_total": 12410.76,
+        "filament_weight_total": 37.31,
+        "filament_weights": [
+            10.72,
+            11.1,
+            7.78,
+            7.72
+        ],
+        "printer_model": "Elegoo Centauri Carbon 2",
+        "printer_variant": "0.4",
+        "thumbnails": [
+            {
+                "width": 32,
+                "height": 32,
+                "size": 1626,
+                "relative_path": ".thumbs/cb-mc4-used4-all_pla-t0-t3-32x32.png"
+            },
+            {
+                "width": 144,
+                "height": 144,
+                "size": 1857,
+                "relative_path": ".thumbs/cb-mc4-used4-all_pla-t0-t3-144x144.png"
+            }
+        ],
+        "print_start_time": null,
+        "job_id": null,
+        "filename": "cb-mc4-used4-all_pla-t0-t3.gcode"
+    }
+}

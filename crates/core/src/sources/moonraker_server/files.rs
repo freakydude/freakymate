@@ -68,7 +68,12 @@ pub struct FileMetadata {
     pub estimated_time: Option<f64>,
     pub filament_total: Option<f64>,
     pub filament_weight_total: Option<f64>,
-    pub filament_type: Option<String>,
+    /// Material per filament of the slicer (`filament_type`); the index is the tool.
+    #[serde(rename = "filament_type", deserialize_with = "per_filament_texts")]
+    pub filament_types: Vec<String>,
+    /// Name of the slicer's filament profile per filament (`filament_name`), free text; the index is the tool.
+    #[serde(rename = "filament_name", deserialize_with = "per_filament_texts")]
+    pub filament_names: Vec<String>,
     pub layer_height: Option<f64>,
     pub object_height: Option<f64>,
     pub nozzle_diameter: Option<f64>,
@@ -78,7 +83,7 @@ pub struct FileMetadata {
     /// Per filament of the slicer, in grams; the index is the tool.
     pub filament_weights: Vec<f64>,
     pub filament_temps: Vec<f64>,
-    /// `#RRGGBB` per filament.
+    /// `#RRGGBB` per filament; a transparent one is `#RRGGBB00`.
     pub filament_colors: Vec<String>,
     /// Tools the print really uses.
     pub referenced_tools: Vec<usize>,
@@ -108,6 +113,30 @@ impl FileMetadata {
         };
         Some(format!("server/files/gcodes/{}", encode_path(&relative)))
     }
+}
+
+/// Moonraker reports some lists per filament as text: a JSON list (`["PLA", "PETG"]`) for several filaments, the plain
+/// value (`PLA`) for one. The slicer's own form `PLA;PETG` and a real JSON list are accepted as well.
+fn per_filament_texts<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<String>, D::Error> {
+    let texts = match Value::deserialize(deserializer)? {
+        Value::String(text) => split_per_filament(&text),
+        Value::Array(items) => items.iter().map(|item| item.as_str().unwrap_or_default().trim().to_owned()).collect(),
+        _ => Vec::new(),
+    };
+    Ok(texts)
+}
+
+fn split_per_filament(text: &str) -> Vec<String> {
+    let text = text.trim();
+    if text.starts_with('[') {
+        if let Ok(list) = serde_json::from_str::<Vec<String>>(text) {
+            return list.into_iter().map(|item| item.trim().to_owned()).collect();
+        }
+    }
+    if text.is_empty() {
+        return Vec::new();
+    }
+    text.split(';').map(|item| item.trim().trim_matches('"').to_owned()).collect()
 }
 
 /// `server.files.delete_file`: removes a G-code file; `path` is relative to the `gcodes` root, as in the file list.
@@ -240,5 +269,29 @@ mod tests {
         let metadata = parse_metadata(&json!({ "filename": "a.gcode" })).unwrap();
 
         assert_eq!(metadata.thumbnail_path(), None);
+    }
+
+    #[test]
+    fn materials_per_filament_are_read_in_every_form() {
+        let types = |value: Value| parse_metadata(&json!({ "filament_type": value })).unwrap().filament_types;
+
+        // Moonraker for several filaments (OrcaSlicer 2.5, Voron 2026-11-08), for one, and the slicer's own form.
+        assert_eq!(types(json!("[\"PLA\", \"PETG\"]")), ["PLA", "PETG"]);
+        assert_eq!(types(json!("PLA")), ["PLA"]);
+        assert_eq!(types(json!("PLA;PETG")), ["PLA", "PETG"]);
+        assert_eq!(types(json!(["PLA", "PETG"])), ["PLA", "PETG"]);
+        assert!(types(json!("")).is_empty());
+        assert!(types(Value::Null).is_empty());
+    }
+
+    #[test]
+    fn profile_names_keep_their_spaces_and_lose_the_quotes() {
+        let names = |text: &str| parse_metadata(&json!({ "filament_name": text })).unwrap().filament_names;
+
+        assert_eq!(
+            names("[\"Elegoo PLA @ECC2\", \"Elegoo PETG @ECC2 - Copy\"]"),
+            ["Elegoo PLA @ECC2", "Elegoo PETG @ECC2 - Copy"]
+        );
+        assert_eq!(names("\"Elegoo PLA @ECC2\";\"Generic ASA\""), ["Elegoo PLA @ECC2", "Generic ASA"]);
     }
 }

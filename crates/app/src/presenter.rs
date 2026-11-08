@@ -17,6 +17,7 @@ use crate::{
 };
 use chrono::Local;
 use freakymate_core::domain::filament::{self, FilamentHandling};
+use freakymate_core::domain::filament_match;
 use freakymate_core::domain::file_catalog::FileCatalog;
 use freakymate_core::domain::spools::{self, Lane};
 use freakymate_core::domain::{estimates, light, pause};
@@ -948,7 +949,7 @@ impl Presenter {
         let cache = self.cache.borrow();
         let Some(metadata) = cache.catalog.metadata(path) else { return String::new() };
         let show_tool = lanes.iter().any(|lane| lane.gate.is_some());
-        let lines: Vec<String> = spools::print_hints(metadata, &snapshot.status, &lanes)
+        let lines: Vec<String> = filament_match::print_hints(metadata, &snapshot.status, &lanes)
             .iter()
             .map(|hint| format!("• {}", view::print_hint_text(hint, show_tool)))
             .collect();

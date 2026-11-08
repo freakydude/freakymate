@@ -1,0 +1,113 @@
+{
+    "result": {
+        "size": 8140224,
+        "modified": 1794162623.7507372,
+        "uuid": "03fc2ca6-bc36-477d-af5d-8dc9107f74f9",
+        "file_processors": [
+            "klipper_estimator"
+        ],
+        "slicer": "OrcaSlicer",
+        "slicer_version": "2.5.0",
+        "gcode_start_byte": 8500,
+        "gcode_end_byte": 8102410,
+        "layer_count": 128,
+        "object_height": 25.6,
+        "estimated_time": 23017,
+        "nozzle_diameter": 0.4,
+        "layer_height": 0.2,
+        "first_layer_height": 0.2,
+        "first_layer_extr_temp": 210.0,
+        "first_layer_bed_temp": 60.0,
+        "chamber_temp": 0.0,
+        "filament_name": "[\"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\"]",
+        "filament_type": "[\"PLA\", \"PLA\", \"PLA\", \"PLA\", \"PLA\", \"PLA\", \"PLA\", \"PLA\", \"PLA\", \"PLA\", \"PLA\"]",
+        "filament_colors": [
+            "#636363",
+            "#B4B4B4",
+            "#000000",
+            "#FFFFFF",
+            "#FFEB31",
+            "#7841CE",
+            "#115877",
+            "#ED1E79",
+            "#2EBDEF",
+            "#345B2F",
+            "#800080"
+        ],
+        "filament_change_count": 1280,
+        "extruder_colors": [
+            "#636363",
+            "#B4B4B4",
+            "#000000",
+            "#FFFFFF",
+            "#FFEB31",
+            "#7841CE",
+            "#115877",
+            "#ED1E79",
+            "#2EBDEF",
+            "#345B2F",
+            "#800080"
+        ],
+        "filament_temps": [
+            210,
+            210,
+            210,
+            210,
+            210,
+            210,
+            210,
+            210,
+            210,
+            210,
+            210
+        ],
+        "referenced_tools": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+        ],
+        "mmu_print": 1,
+        "filament_total": 50040.19,
+        "filament_weight_total": 150.45,
+        "filament_weights": [
+            10.47,
+            14.64,
+            14.46,
+            14.46,
+            14.46,
+            14.46,
+            14.46,
+            14.46,
+            14.46,
+            10.53,
+            13.6
+        ],
+        "printer_model": "Elegoo Centauri Carbon 2",
+        "printer_variant": "0.4",
+        "thumbnails": [
+            {
+                "width": 32,
+                "height": 32,
+                "size": 1723,
+                "relative_path": ".thumbs/cb-mc11-used11-11color-all_pla-t0_and_t10-32x32.png"
+            },
+            {
+                "width": 144,
+                "height": 144,
+                "size": 2818,
+                "relative_path": ".thumbs/cb-mc11-used11-11color-all_pla-t0_and_t10-144x144.png"
+            }
+        ],
+        "print_start_time": null,
+        "job_id": null,
+        "filename": "cb-mc11-used11-11color-all_pla-t0_and_t10.gcode"
+    }
+}

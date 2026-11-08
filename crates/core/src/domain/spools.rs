@@ -1,14 +1,12 @@
-//! Spools in the printer: the lanes they sit in and what differs between a print and its spools. A lane is one place
-//! for a spool: a gate of Happy Hare, or the one spool of a printer without MMU (the active spool of Moonraker).
+//! Spools in the printer: the lanes they sit in. A lane is one place for a spool: a gate of Happy Hare, or the one
+//! spool of a printer without MMU (the active spool of Moonraker). How a print compares with them is
+//! [`super::filament_match`].
 
-use crate::sources::moonraker_server::files::FileMetadata;
-use crate::sources::spoolman::{parse_color, Spool, SpoolmanState};
+use crate::sources::spoolman::{Spool, SpoolmanState};
 use crate::sources::PrinterStatus;
 
 /// A target that is further off than this from the temperature of the spool gets a hint, in °C.
 const TEMPERATURE_TOLERANCE: f64 = 5.0;
-/// Colours further apart than this (distance in RGB, at most 441) count as different.
-const COLOR_DISTANCE: f64 = 120.0;
 
 /// One place for a spool.
 #[derive(Debug, Clone, PartialEq)]
@@ -59,93 +57,6 @@ pub fn active_spool(lanes: &[Lane]) -> Option<&Spool> {
 pub fn temperature_hint(target: f64, recommended: Option<f64>) -> Option<f64> {
     let recommended = recommended?;
     (target > 0.0 && (target - recommended).abs() > TEMPERATURE_TOLERANCE).then_some(recommended)
-}
-
-/// What differs between a print and the spools that would print it. Only hints: nothing here forbids anything.
-#[derive(Debug, Clone, PartialEq)]
-pub enum PrintHint {
-    Material {
-        tool: usize,
-        expected: String,
-        loaded: String,
-    },
-    /// Planned grams against what the spool has left.
-    Weight {
-        tool: usize,
-        needed: f64,
-        left: f64,
-    },
-    Color {
-        tool: usize,
-    },
-}
-
-/// Compares what the file asks for per tool with the spool in the lane of that tool (through Happy Hare's tool to
-/// gate map). A fact that is missing on one side (no weights in the file, no weight in Spoolman, no spool in the
-/// gate) is not compared.
-pub fn print_hints(metadata: &FileMetadata, status: &PrinterStatus, lanes: &[Lane]) -> Vec<PrintHint> {
-    let tool_to_gate = status.happy_hare().map_or(&[][..], |mmu| mmu.tool_to_gate.as_slice());
-    let tools: Vec<usize> = if metadata.referenced_tools.is_empty() {
-        (0..metadata.filament_weights.len().max(1)).collect()
-    } else {
-        metadata.referenced_tools.clone()
-    };
-    let materials: Vec<&str> =
-        metadata.filament_type.as_deref().map(|types| types.split(';').collect()).unwrap_or_default();
-    let mut hints = Vec::new();
-    for &tool in &tools {
-        let Some(spool) = lane_of_tool(lanes, tool_to_gate, tool).and_then(|lane| lane.spool.as_ref()) else {
-            continue;
-        };
-        let expected = materials.get(tool).or(materials.first().filter(|_| materials.len() == 1)).copied();
-        if let Some(expected) = expected.filter(|expected| !same_material(expected, &spool.material)) {
-            hints.push(PrintHint::Material {
-                tool,
-                expected: expected.trim().to_owned(),
-                loaded: spool.material.clone(),
-            });
-        }
-        let needed = metadata
-            .filament_weights
-            .get(tool)
-            .copied()
-            .or_else(|| (tools.len() == 1).then_some(metadata.filament_weight_total).flatten());
-        if let (Some(needed), Some(left)) = (needed, spool.remaining_weight) {
-            if needed > left {
-                hints.push(PrintHint::Weight { tool, needed, left });
-            }
-        }
-        let wanted = metadata.filament_colors.get(tool).and_then(|color| parse_color(color));
-        // A multi-colour spool fits when one of its colours is close.
-        let nearest = spool
-            .colors
-            .iter()
-            .map(|loaded| wanted.map(|wanted| color_distance(wanted, *loaded)))
-            .min_by(|left, right| left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal));
-        if nearest.flatten().is_some_and(|distance| distance > COLOR_DISTANCE) {
-            hints.push(PrintHint::Color { tool });
-        }
-    }
-    hints
-}
-
-fn lane_of_tool<'a>(lanes: &'a [Lane], tool_to_gate: &[usize], tool: usize) -> Option<&'a Lane> {
-    if lanes.iter().any(|lane| lane.gate.is_some()) {
-        let gate = tool_to_gate.get(tool).copied().unwrap_or(tool);
-        lanes.iter().find(|lane| lane.gate == Some(gate))
-    } else {
-        lanes.first().filter(|_| tool == 0)
-    }
-}
-
-/// `ABS+` is `ABS`, case does not matter.
-fn same_material(left: &str, right: &str) -> bool {
-    let normalized = |text: &str| text.trim().trim_end_matches('+').to_ascii_uppercase();
-    normalized(left) == normalized(right)
-}
-
-fn color_distance(left: [u8; 3], right: [u8; 3]) -> f64 {
-    left.iter().zip(right).map(|(a, b)| (f64::from(*a) - f64::from(b)).powi(2)).sum::<f64>().sqrt()
 }
 
 /// The spools for the picker: those that sit in a lane first, then the most recently used.
@@ -212,16 +123,6 @@ mod tests {
         PrinterStatus::default()
     }
 
-    fn file(weights: &[f64], types: &str, colors: &[&str]) -> FileMetadata {
-        FileMetadata {
-            filament_weights: weights.to_vec(),
-            filament_weight_total: Some(weights.iter().sum()),
-            filament_type: Some(types.to_owned()),
-            filament_colors: colors.iter().map(|color| (*color).to_owned()).collect(),
-            ..FileMetadata::default()
-        }
-    }
-
     #[test]
     fn a_printer_without_mmu_has_one_lane_with_the_active_spool() {
         let state = state_with(&[spool(5, "PLA", 800.0, [0; 3])], Some(5));
@@ -262,82 +163,6 @@ mod tests {
         let lanes = lanes(&mmu_with(&[Some(9)], 0, &[0]), &SpoolmanState::default());
 
         assert_eq!((lanes[0].spool_id, lanes[0].spool.is_none()), (Some(9), true));
-    }
-
-    #[test]
-    fn a_multi_colour_spool_fits_a_file_when_one_of_its_colours_is_close() {
-        let mut spool = spool(5, "PLA", 800.0, [0xFF, 0x00, 0x04]);
-        spool.colors.push([0x26, 0xA6, 0x9A]);
-        let status = without_mmu();
-        let lanes = lanes(&status, &state_with(&[spool], Some(5)));
-
-        assert!(print_hints(&file(&[10.0], "PLA", &["#26A69A"]), &status, &lanes).is_empty());
-        assert_eq!(print_hints(&file(&[10.0], "PLA", &["#0000FF"]), &status, &lanes), [PrintHint::Color { tool: 0 }]);
-    }
-
-    #[test]
-    fn a_matching_spool_gives_no_hint() {
-        let status = without_mmu();
-        let lanes = lanes(&status, &state_with(&[spool(5, "PLA", 800.0, [0x26, 0xA6, 0x9A])], Some(5)));
-
-        assert!(print_hints(&file(&[64.0], "PLA", &["#26A69A"]), &status, &lanes).is_empty());
-    }
-
-    #[test]
-    fn material_weight_and_colour_that_do_not_fit_are_named() {
-        let status = without_mmu();
-        let lanes = lanes(&status, &state_with(&[spool(5, "PETG", 40.0, [0xE3, 0x1F, 0x2B])], Some(5)));
-
-        let hints = print_hints(&file(&[62.0], "PLA", &["#26A69A"]), &status, &lanes);
-
-        assert_eq!(
-            hints,
-            [
-                PrintHint::Material { tool: 0, expected: "PLA".into(), loaded: "PETG".into() },
-                PrintHint::Weight { tool: 0, needed: 62.0, left: 40.0 },
-                PrintHint::Color { tool: 0 },
-            ]
-        );
-    }
-
-    #[test]
-    fn abs_plus_counts_as_abs_and_close_colours_as_equal() {
-        let status = without_mmu();
-        let lanes = lanes(&status, &state_with(&[spool(5, "ABS+", 500.0, [0xE3, 0x1F, 0x2B])], Some(5)));
-
-        assert!(print_hints(&file(&[10.0], "abs", &["#FF2020"]), &status, &lanes).is_empty());
-    }
-
-    #[test]
-    fn a_multicolour_print_is_compared_tool_by_tool_through_the_tool_to_gate_map() {
-        let state = state_with(&[spool(5, "PLA", 500.0, [0; 3]), spool(6, "PETG", 20.0, [0; 3])], None);
-        let status = mmu_with(&[Some(5), Some(6)], 0, &[1, 0]);
-        let mut metadata = file(&[30.0, 50.0], "PLA;PETG", &[]);
-        metadata.referenced_tools = vec![0, 1];
-
-        let hints = print_hints(&metadata, &status, &lanes(&status, &state));
-
-        // Tool 0 prints from gate 1 (PETG, 20 g left), tool 1 from gate 0 (PLA).
-        assert_eq!(
-            hints,
-            [
-                PrintHint::Material { tool: 0, expected: "PLA".into(), loaded: "PETG".into() },
-                PrintHint::Weight { tool: 0, needed: 30.0, left: 20.0 },
-                PrintHint::Material { tool: 1, expected: "PETG".into(), loaded: "PLA".into() },
-            ]
-        );
-    }
-
-    #[test]
-    fn nothing_is_compared_without_the_facts() {
-        // No weights, no colours, no spool in the gate: no hint, and a gate without a spool says nothing.
-        let status = mmu_with(&[None], 0, &[0]);
-        let metadata = FileMetadata { filament_type: Some("PLA".into()), ..FileMetadata::default() };
-
-        assert!(print_hints(&metadata, &status, &lanes(&status, &SpoolmanState::default())).is_empty());
-        let bare_status = without_mmu();
-        let bare = lanes(&bare_status, &state_with(&[Spool { id: 5, ..Spool::default() }], Some(5)));
-        assert!(print_hints(&FileMetadata::default(), &bare_status, &bare).is_empty());
     }
 
     #[test]
