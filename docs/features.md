@@ -19,11 +19,14 @@ probe still counts as the probe).
     Tools), in the tool list and in the gate picker; it never blocks a print or a change. A clear filament (colour with
     full transparency) is not compared by colour.
     Each tool chip on the print page also shows the material the file asks for, in the warning colour when the gate
-    holds another. A tap on a tool opens a dialog with what to do when it does not fit, in the order to try: map the
-    tool to another gate that holds what the file asks for (with a button to open that gate), load fitting filament or
-    correct what the gate records, or, when the printer has no such tool (no gate mapped by Happy Hare, or without
-    Happy Hare no command `T<n>`), slice the file for the printer's tools. Tools that share a gate share its spool, so
-    their planned weights add up against what the spool has left. These are suggestions only.
+    holds another. A tap on a tool opens a comparison: material, colour, weight and name of the file against the
+    gate, differing values in the warning colour, the slicer's estimate with `~`. FreakyMate does not know why they
+    differ (wrong filament, or only the gate map or the spool in Spoolman), so it gives no instructions, only buttons
+    for what can be done: open the gate, change its spool, choose another gate (a tick marks gates whose data fit).
+    A tool the printer does not have (no gate mapped by Happy Hare, or without Happy Hare no command `T<n>`) shows as
+    "No gate". Tools that share a gate share its spool, so their planned weights add up against what the spool has
+    left; with EndlessSpool the rest of its group is shown as its own line. The question before the start shows the
+    same comparison, compact, for each tool that does not fit.
 - **Move**: jog X/Y/Z with selectable steps, home (all/XY/Z), motors off, Quad Gantry Level or Z-Tilt when configured.
   Move and Filament are locked while a print runs; the screen leaves them when a print starts.
   - **Calibrate** tab: Klipper's own calibration commands, with their results. Bed screws

@@ -6,7 +6,7 @@ use crate::{
     SpoolItem, ToolMatchItem, TuningItem, UpdateItem,
 };
 use freakymate_core::color::Rgba;
-use freakymate_core::domain::filament_match::{Difference, Supply, ToolMatch, Verdict};
+use freakymate_core::domain::filament_match::{self, Difference, Supply, ToolMatch, Verdict};
 use freakymate_core::domain::spools::{self, FilamentColors, Lane};
 use freakymate_core::sources::happy_hare::{self, FilamentPath, PathSensor};
 use freakymate_core::sources::klipper::tuning::TuningValue;
@@ -16,6 +16,7 @@ use freakymate_core::sources::moonraker_server::machine::HostInterface;
 use freakymate_core::sources::moonraker_server::power::PowerDevice;
 use freakymate_core::sources::moonraker_server::update_manager::UpdateInfo;
 use freakymate_core::sources::spoolman::Spool;
+use freakymate_core::sources::PrinterStatus;
 use freakymate_core::ConnectionState;
 use slint::{Model, ModelRc, SharedString, VecModel};
 
@@ -230,19 +231,23 @@ pub(crate) fn id_or_none<T: TryInto<i32>>(id: Option<T>) -> i32 {
     id.and_then(|id| id.try_into().ok()).unwrap_or(-1)
 }
 
-/// A tool of Happy Hare (`gate` `None` for a tool of the file without gate) with what the file asks of it.
-pub(crate) fn tool_match_item(tool: usize, gate: Option<usize>, found: Option<&ToolMatch>) -> ToolMatchItem {
+/// A tool of Happy Hare (`gate` `None` for a tool of the file without gate) with what the file (`matches`) asks of it.
+pub(crate) fn tool_match_item(tool: usize, gate: Option<usize>, matches: &[ToolMatch]) -> ToolMatchItem {
     let mut item = ToolMatchItem { tool: tool as i32, gate: id_or_none(gate), ..ToolMatchItem::default() };
-    let Some(found) = found else { return item };
+    let Some(found) = matches.iter().find(|found| found.request.tool == tool) else { return item };
     let request = &found.request;
     item.used = true;
     item.wanted_colors =
         bar_colors(&FilamentColors { colors: request.color.into_iter().collect(), longitudinal: false });
     item.wanted_material = request.material.clone().unwrap_or_default().into();
-    item.wanted_weight = request.grams.map(format::filament_weight).unwrap_or_default().into();
+    item.wanted_weight = request.grams.map(view::planned_weight).unwrap_or_default().into();
     item.wanted_profile = request.profile.clone().unwrap_or_default().into();
+    item.needed_weight = found.needed.map(view::planned_weight).unwrap_or_default().into();
+    item.shared_tools = gate
+        .map(|gate| view::shared_tools_text(&filament_match::tools_of_gate(matches, gate)))
+        .unwrap_or_default()
+        .into();
     item.verdict = view::verdict_key(&found.verdict).into();
-    item.differences = view::tool_differences(found).into();
     item.material_differs = view::material_difference(found).is_some();
     item.material_line = view::material_line(found).into();
     item.color_differs = differs(found, |difference| matches!(difference, Difference::Color));
@@ -250,25 +255,49 @@ pub(crate) fn tool_match_item(tool: usize, gate: Option<usize>, found: Option<&T
     item
 }
 
+/// The tools of the file that `keep` lets through, each with what it prints with: for the print page and the question
+/// before the start, which show only the file's tools.
+pub(crate) fn compared_tool_items(
+    matches: &[ToolMatch],
+    status: &PrinterStatus,
+    lanes: &[Lane],
+    keep: impl Fn(&ToolMatch) -> bool,
+) -> Vec<ToolMatchItem> {
+    matches
+        .iter()
+        .filter(|found| keep(found))
+        .map(|found| {
+            let mut item = tool_match_item(found.request.tool, found.gate, matches);
+            if let Some(supply) = filament_match::tool_supply(found, status, lanes) {
+                fill_loaded(&mut item, &supply, found.reserve);
+            }
+            item
+        })
+        .collect()
+}
+
 fn differs(found: &ToolMatch, kind: impl Fn(&Difference) -> bool) -> bool {
     matches!(&found.verdict, Verdict::Differs(differences) if differences.iter().any(kind))
 }
 
-/// What the gate of a tool holds: material, colours, name and the grams left; with an EndlessSpool `reserve` also all
-/// the group can still give, only when the gate's own grams are known.
-pub(crate) fn fill_loaded(item: &mut ToolMatchItem, supply: &Supply, reserve: Option<f64>, empty: bool) {
-    item.gate_empty = empty;
+/// What a tool prints with: material, colours, name and the grams left; with an EndlessSpool `reserve` also all the
+/// group can still give and what that adds, only when the own grams are known.
+pub(crate) fn fill_loaded(item: &mut ToolMatchItem, supply: &Supply, reserve: Option<f64>) {
+    item.gate_empty = supply.empty;
     item.loaded_material = supply.material.clone().unwrap_or_default().into();
     item.loaded_colors =
         bar_colors(&FilamentColors { colors: supply.colors.clone(), longitudinal: supply.longitudinal });
     item.loaded_name = supply.name.clone().unwrap_or_default().into();
     item.loaded_weight = supply.left.map(format::filament_weight).unwrap_or_default().into();
+    let reserve = reserve.filter(|_| supply.left.is_some());
     item.endless_weight = supply
         .left
         .zip(reserve)
         .map(|(left, reserve)| format!("∞ {}", format::filament_weight(left + reserve)))
         .unwrap_or_default()
         .into();
+    item.reserve_weight =
+        reserve.map(|grams| format!("+{}", format::filament_weight(grams))).unwrap_or_default().into();
 }
 
 /// The flags as a model, the old one while they are unchanged: a new model counts as a changed row and would rebuild
@@ -322,6 +351,7 @@ mod tests {
                 temperature: None,
             },
             gate: Some(1),
+            needed: Some(12.0),
             reserve: None,
             verdict,
         }
@@ -329,7 +359,7 @@ mod tests {
 
     #[test]
     fn a_tool_without_a_match_is_unused_and_a_tool_without_gate_has_minus_one() {
-        let item = tool_match_item(4, None, None);
+        let item = tool_match_item(4, None, &[]);
 
         assert_eq!((item.tool, item.gate, item.used), (4, -1, false));
         assert!(item.wanted_material.is_empty() && item.verdict.is_empty());
@@ -339,21 +369,33 @@ mod tests {
     fn a_matched_tool_carries_what_the_file_asks_and_the_verdict() {
         let found = tool_match(Verdict::GateEmpty);
 
-        let item = tool_match_item(2, Some(1), Some(&found));
+        let item = tool_match_item(2, Some(1), std::slice::from_ref(&found));
 
         assert_eq!((item.tool, item.gate, item.used), (2, 1, true));
         assert_eq!(item.wanted_colors.count, 1);
         assert_eq!(item.wanted_colors.first, color_of([1, 2, 3, 0xFF]));
         assert_eq!((item.wanted_material.as_str(), item.wanted_profile.as_str()), ("PETG", "Generic PETG"));
         assert_eq!(item.verdict.as_str(), "gate-empty");
-        assert_eq!(item.differences.as_str(), "Gate 1 is empty.");
+        assert_eq!((item.wanted_weight.as_str(), item.needed_weight.as_str()), ("~12 g", "~12 g"));
+        assert_eq!(item.shared_tools.as_str(), "");
+    }
+
+    #[test]
+    fn tools_sharing_a_gate_compare_their_weight_together_and_are_named() {
+        let mut other = tool_match(Verdict::Fits);
+        other.request.tool = 0;
+        let matches = [other, tool_match(Verdict::Fits)];
+
+        let item = tool_match_item(2, Some(1), &matches);
+
+        assert_eq!(item.shared_tools.as_str(), "T0 + T2");
     }
 
     #[test]
     fn each_difference_has_its_own_flag() {
         let found = tool_match(Verdict::Differs(vec![Difference::Weight { needed: 18.0, left: 14.0, reserve: None }]));
 
-        let item = tool_match_item(1, Some(3), Some(&found));
+        let item = tool_match_item(2, Some(1), &[found]);
 
         assert!(item.weight_differs && !item.color_differs && !item.material_differs);
     }
@@ -367,17 +409,19 @@ mod tests {
             left: Some(14.0),
             ..Supply::default()
         };
-        let mut item = tool_match_item(1, Some(3), None);
+        let mut item = tool_match_item(1, Some(3), &[]);
 
-        fill_loaded(&mut item, &supply, Some(230.0), false);
+        fill_loaded(&mut item, &supply, Some(230.0));
 
         assert_eq!((item.loaded_material.as_str(), item.loaded_name.as_str()), ("PLA", "Eryone Silk Dual"));
         assert_eq!((item.loaded_weight.as_str(), item.endless_weight.as_str()), ("14 g", "∞ 244 g"));
+        assert_eq!(item.reserve_weight.as_str(), "+230 g");
         assert_eq!(item.loaded_colors.count, 2);
 
-        // Without its own grams there is no sum to show.
-        fill_loaded(&mut item, &Supply { left: None, ..supply }, Some(230.0), false);
+        // Without its own grams there is no sum to show, and the reserve alone says nothing.
+        fill_loaded(&mut item, &Supply { left: None, ..supply }, Some(230.0));
         assert_eq!((item.loaded_weight.as_str(), item.endless_weight.as_str()), ("", ""));
+        assert_eq!(item.reserve_weight.as_str(), "");
     }
 
     #[test]

@@ -7,8 +7,8 @@ use crate::console_view::ConsoleView;
 use crate::files_view::{FileState, FilesView};
 use crate::history_view::HistoryView;
 use crate::items::{
-    connection_name, fan_item, heater_item, host_interface_item, led_effect_item, led_item, power_item, replace_rows,
-    sensor_item, tuning_item, update_item,
+    compared_tool_items, connection_name, fan_item, heater_item, host_interface_item, led_effect_item, led_item,
+    power_item, replace_rows, sensor_item, tuning_item, update_item,
 };
 use crate::macro_view::MacroView;
 use crate::mmu_view::{JobFile, MmuView};
@@ -18,7 +18,7 @@ use crate::status_view::StatusView;
 use crate::{bed_map, format, thumbnail, view};
 use crate::{
     AppWindow, FanItem, FilamentSensorItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, Network, PowerItem,
-    Printer, SensorItem, TuningItem, UiSettings, UpdateItem,
+    Printer, SensorItem, ToolMatchItem, TuningItem, UiSettings, UpdateItem,
 };
 use chrono::Local;
 use freakymate_core::domain::filament::{self, FilamentHandling};
@@ -566,11 +566,11 @@ impl Presenter {
         if let Some(mmu) = status.happy_hare() {
             self.note_origin("MMU flow rate", mmu.flow_rate.map(|rate| rate.origin));
         }
-        self.show_prepared(printer, &matches);
+        self.show_prepared(printer, &matches, status, lanes);
     }
 
     /// The prepared file with its facts and how its tools fit, for the print page; all empty without one.
-    fn show_prepared(&self, printer: &Printer, matches: &[ToolMatch]) {
+    fn show_prepared(&self, printer: &Printer, matches: &[ToolMatch], status: &PrinterStatus, lanes: &[Lane]) {
         let (path, row) = {
             let cache = self.cache.borrow();
             let path = cache.prepared.path().unwrap_or_default().to_owned();
@@ -578,7 +578,7 @@ impl Presenter {
                 cache.files.catalog.position(&path).map(|index| cache.files.row(&cache.files.catalog.entries()[index]));
             (path, row)
         };
-        self.mmu.show_prepared_tools(if path.is_empty() { &[] } else { matches });
+        self.mmu.show_prepared_tools(if path.is_empty() { &[] } else { matches }, status, lanes);
         printer.set_prepared_path(path.into());
         printer.set_prepared(row.unwrap_or_default());
     }
@@ -745,17 +745,14 @@ impl Presenter {
         view::height_at_layer(job, cache.files.catalog.metadata(&job.filename), layer)
     }
 
-    /// Hints before printing the file, one line each, for the rows of the question.
-    pub fn print_hints(&self, path: &str) -> Vec<String> {
+    /// The tools of the file at `path` that do not fit what they would print with, for the question before the start.
+    pub fn start_tools(&self, path: &str) -> Vec<ToolMatchItem> {
         let snapshot = self.snapshot();
         let lanes = self.lanes(&snapshot);
         let cache = self.cache.borrow();
         let Some(metadata) = cache.files.catalog.metadata(path) else { return Vec::new() };
-        let show_tool = lanes.iter().any(|lane| lane.gate.is_some());
-        filament_match::print_hints(metadata, &snapshot.status, &lanes, &snapshot.sources.klipper)
-            .iter()
-            .map(|hint| view::print_hint_text(hint, show_tool))
-            .collect()
+        let matches = filament_match::match_tools(metadata, &snapshot.status, &lanes, &snapshot.sources.klipper);
+        compared_tool_items(&matches, &snapshot.status, &lanes, |found| found.verdict.differs())
     }
 
     pub fn request_files(&self) {

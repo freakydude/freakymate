@@ -1,4 +1,4 @@
-// Preview: the question before printing a prepared file names the file and lists the hints, one row each. Open in the
+// Preview: the question before printing a prepared file names the file and compares the tools that do not fit, one row each. Open in the
 // Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
@@ -9,10 +9,24 @@ export component PrintConfirmHintsPreview inherits AppWindow {
     init => {
         Sample.mmu();
         Navigation.page = Page.print;
-        Confirm.ask-for-items(
-            @tr("Start print"),
+        Confirm.ask-to-start(
             "calibration_cube_with_a_rather_long_name_v2",
-            ["T1: the gate is empty", "T3: the file is for PLA, the spool is PETG", "T3: needs ~1.2 kg, the spool has 38 g left", "T12: the printer has no gate for this tool"],
-            true, "start-print", "calibration_cube_with_a_rather_long_name_v2.gcode", false);
+            "calibration_cube_with_a_rather_long_name_v2.gcode",
+            [
+                {
+                    tool: 1, gate: 3, used: true, wanted-colors: { first: #e8590c, count: 1 }, wanted-material: "PLA",
+                    wanted-weight: "~54 g", needed-weight: "~54 g", verdict: "differs", material-differs: true,
+                    weight-differs: true, color-differs: true, loaded-material: "PETG",
+                    loaded-colors: { first: #2e7d32, count: 1 }, loaded-weight: "38 g", reserve-weight: "+230 g",
+                },
+                {
+                    tool: 3, gate: 2, used: true, wanted-colors: { first: #1c7ed6, count: 1 }, wanted-material: "PLA",
+                    wanted-weight: "~12 g", needed-weight: "~12 g", verdict: "gate-empty", gate-empty: true,
+                },
+                {
+                    tool: 12, gate: -1, used: true, wanted-colors: { first: #f4f4f0, count: 1 }, wanted-material: "ASA",
+                    wanted-weight: "~3 g", needed-weight: "~3 g", verdict: "no-gate",
+                },
+            ]);
     }
 }

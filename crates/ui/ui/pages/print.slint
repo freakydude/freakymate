@@ -222,13 +222,13 @@ export component PrintPage inherits Rectangle {
                 icon: Icons.print-start;
                 text: @tr("Print");
                 kind: ButtonKind.accent;
-                clicked => { Confirm.ask-for-items(@tr("Start print"), Printer.prepared.name, Actions.print-hints(Printer.prepared-path), true, "start-print", Printer.prepared-path, false); }
+                clicked => { Confirm.ask-to-start(Printer.prepared.name, Printer.prepared-path, Actions.start-tools(Printer.prepared-path)); }
             }
             if !Printer.is-printing && !root.prepared && root.has-job: ActionTile {
                 icon: root.finished ? Icons.print-repeat : Icons.print-start;
                 text: root.finished ? @tr("Reprint") : @tr("Start");
                 kind: ButtonKind.accent;
-                clicked => { Confirm.ask-for-items(@tr("Start print"), Printer.job-name, Actions.print-hints(Printer.filename), true, "start-print", Printer.filename, false); }
+                clicked => { Confirm.ask-to-start(Printer.job-name, Printer.filename, Actions.start-tools(Printer.filename)); }
             }
             if Printer.print-state == "printing": ActionTile {
                 icon: Icons.print-pause;

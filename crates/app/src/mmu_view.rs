@@ -2,12 +2,13 @@
 //! the filament and the state of the MMU.
 
 use crate::items::{
-    bar_colors, filament_path_item, fill_loaded, id_or_none, replace_rows, reuse_flags, tool_match_item,
+    bar_colors, compared_tool_items, filament_path_item, fill_loaded, id_or_none, replace_rows, reuse_flags,
+    tool_match_item,
 };
 use crate::{view, MmuGateItem, MmuSensorItem, Printer, ToolMatchItem};
 use freakymate_core::domain::filament_match::{self, ToolMatch, Verdict};
 use freakymate_core::domain::spools::{FilamentColors, Lane};
-use freakymate_core::sources::happy_hare::{GateAvailability, MmuStatus};
+use freakymate_core::sources::happy_hare::MmuStatus;
 use freakymate_core::sources::spoolman::Spool;
 use freakymate_core::sources::PrinterStatus;
 use slint::{Model, ModelRc, VecModel};
@@ -71,10 +72,9 @@ impl MmuView {
         show_state(printer, mmu);
     }
 
-    /// The tools of the prepared file; none without a prepared file.
-    pub fn show_prepared_tools(&self, matches: &[ToolMatch]) {
-        let tools = matches.iter().map(|found| tool_match_item(found.request.tool, found.gate, Some(found))).collect();
-        replace_rows(&self.prepared_tools, tools);
+    /// The tools of the prepared file with what each prints with; none without a prepared file.
+    pub fn show_prepared_tools(&self, matches: &[ToolMatch], status: &PrinterStatus, lanes: &[Lane]) {
+        replace_rows(&self.prepared_tools, compared_tool_items(matches, status, lanes, |_| true));
     }
 
     /// The tools of Happy Hare with what the job's file asks of them, then the file's tools that have no gate; and the
@@ -95,20 +95,16 @@ impl MmuView {
             .chain(without_gate)
             .enumerate()
             .map(|(row, (tool, gate, found))| {
-                let mut item = tool_match_item(tool, gate, found);
+                let mut item = tool_match_item(tool, gate, matches);
                 if let Some(state) = gate.and_then(|gate| mmu.gates.iter().find(|state| state.index == gate)) {
                     // A tool of the file shares the reserve with the other tools of its group.
                     let reserve = found.map_or_else(
                         || filament_match::endless_spool_reserve(state.index, &busy, status, lanes),
                         |found| found.reserve,
                     );
-                    let empty = state.availability == GateAvailability::Empty;
-                    fill_loaded(&mut item, &filament_match::gate_supply(state, lanes), reserve, empty);
+                    fill_loaded(&mut item, &filament_match::gate_supply(state, lanes), reserve);
                 }
                 let fitting = found.is_some().then(|| filament_match::fitting_gates(matches, tool, status, lanes));
-                if let (Some(found), Some(fitting)) = (found, &fitting) {
-                    item.advice = view::remedy_text(&filament_match::remedies(found, fitting)).into();
-                }
                 item.fitting_gates = reuse_flags(self.tools.row_data(row).map(|old| old.fitting_gates), fitting);
                 item
             })

@@ -19,25 +19,25 @@ export component FilamentMmuToolsMatchPreview inherits AppWindow {
         Printer.mmu-tools = [
             {
                 tool: 0, gate: 0, used: true, wanted-colors: { first: #111111, count: 1 }, wanted-material: "PLA",
-                wanted-weight: "42 g", wanted-profile: "Generic PLA @0.4", verdict: "fits",
+                wanted-weight: "~42 g", needed-weight: "~42 g", wanted-profile: "Generic PLA @0.4", verdict: "fits",
                 loaded-material: "PLA", loaded-colors: { first: #111111, count: 1 }, loaded-name: "Sunlu PLA Black",
                 loaded-weight: "812 g",
             },
             {
                 tool: 1, gate: 3, used: true, wanted-colors: { first: #d1312a, count: 1 }, wanted-material: "PLA Silk",
-                wanted-weight: "18 g", wanted-profile: "Eryone Silk Red", verdict: "differs", color-differs: true,
+                wanted-weight: "~18 g", needed-weight: "~18 g", wanted-profile: "Eryone Silk Red", verdict: "differs", color-differs: true,
                 loaded-material: "PLA Silk", loaded-colors: { first: #d1312a, second: #d9a72b, count: 2 },
-                loaded-name: "Eryone Silk Dual Red/Gold", loaded-weight: "14 g", endless-weight: "∞ 244 g",
+                loaded-name: "Eryone Silk Dual Red/Gold", loaded-weight: "14 g", endless-weight: "∞ 244 g", reserve-weight: "+230 g",
             },
             {
                 tool: 2, gate: 1, used: true, wanted-colors: { first: #e8f1f733, count: 1 }, wanted-material: "PETG",
-                wanted-weight: "25 g", wanted-profile: "Generic PETG Clear", verdict: "differs", color-differs: true,
+                wanted-weight: "~25 g", needed-weight: "~25 g", wanted-profile: "Generic PETG Clear", verdict: "differs", color-differs: true,
                 loaded-material: "PETG", loaded-colors: { first: #3d8bfd66, count: 1 },
                 loaded-name: "Prusament PETG Clear Blue", loaded-weight: "540 g",
             },
             {
                 tool: 3, gate: 2, used: true, wanted-colors: { first: #f4f4f0, count: 1 }, wanted-material: "ASA",
-                wanted-weight: "60 g", wanted-profile: "Generic ASA", verdict: "differs", material-differs: true,
+                wanted-weight: "~60 g", needed-weight: "~80 g", shared-tools: "T0 + T2", wanted-profile: "Generic ASA", verdict: "differs", material-differs: true,
                 loaded-material: "PLA", loaded-colors: { first: #f4f4f0, count: 1 },
                 loaded-name: "Polymaker PolyTerra PLA Cotton White", loaded-weight: "690 g",
             },
@@ -47,18 +47,18 @@ export component FilamentMmuToolsMatchPreview inherits AppWindow {
             },
             {
                 tool: 5, gate: 5, used: true, wanted-colors: { first: #e03131, count: 1 }, wanted-material: "PLA",
-                wanted-weight: "40 g", wanted-profile: "Rainbow PLA", verdict: "differs", weight-differs: true,
+                wanted-weight: "~40 g", needed-weight: "~40 g", wanted-profile: "Rainbow PLA", verdict: "differs", weight-differs: true,
                 loaded-material: "PLA",
                 loaded-colors: { first: #e03131, second: #f59f00, third: #fcc419, fourth: #37b24d, fifth: #1c7ed6, sixth: #7048e8, count: 6, longitudinal: true },
                 loaded-name: "Sunlu Rainbow PLA", loaded-weight: "25 g",
             },
             {
                 tool: 6, gate: 6, used: true, wanted-colors: { first: #1f9e89, count: 1 }, wanted-material: "TPU 95A",
-                wanted-weight: "8 g", wanted-profile: "Generic TPU", verdict: "gate-empty", gate-empty: true,
+                wanted-weight: "~8 g", needed-weight: "~8 g", wanted-profile: "Generic TPU", verdict: "gate-empty", gate-empty: true,
             },
             {
                 tool: 7, gate: -1, used: true, wanted-colors: { first: #ffffff00, count: 1 }, wanted-material: "PA6-GF30",
-                wanted-weight: "3.1 g", wanted-profile: "Fiberon PA6-GF30", verdict: "no-gate",
+                wanted-weight: "~3.1 g", needed-weight: "~3.1 g", wanted-profile: "Fiberon PA6-GF30", verdict: "no-gate",
             },
         ];
     }

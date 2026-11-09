@@ -176,7 +176,7 @@ export component FileBrowser inherits Rectangle {
                 text: Printer.marked-file-count > 1 ? @tr("Delete {}", Printer.marked-file-count) : @tr("Delete");
                 enabled: Printer.marked-file-count > 0;
                 clicked => {
-                    Confirm.ask-for-items(@tr("Delete files"), "", Printer.marked-file-names, false, "delete-files", "", true);
+                    Confirm.ask-for-items(@tr("Delete files"), "", Printer.marked-file-names, "delete-files", "", true);
                 }
             }
             // Preparing changes nothing at the printer, so it asks nothing; the print page then shows the file.

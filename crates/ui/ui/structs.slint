@@ -124,29 +124,32 @@ export struct ToolMatchItem {
     // The slicer's colour with its alpha, one at most (`count` 0 without).
     wanted-colors: BarColors,
     wanted-material: string,
-    // Planned weight with unit, profile name of the slicer.
+    // Planned weight of the tool, an estimate of the slicer ("~54 g"); profile name of the slicer.
     wanted-weight: string,
     wanted-profile: string,
+    // The planned weight that comes from the spool the tool prints from, compared with `loaded-weight`: with the other
+    // tools of the file that share its gate ("~80 g"), named in `shared-tools` ("T0 + T2", empty when not shared).
+    needed-weight: string,
+    shared-tools: string,
     // "fits", "differs", "gate-empty", "no-gate", or "" when nothing can be compared.
     verdict: string,
-    // What differs, one line each.
-    differences: string,
     // The material in a short line: "PLA → ASA" when the filament differs (`material-differs`), else what the file
     // asks for; empty when the file names none.
     material-line: string,
     material-differs: bool,
-    // What can make the tool fit, one line each; empty when it fits (Tools tab only).
-    advice: string,
     // Per gate index: the gate's filament fits what the file asks of the tool.
     fitting-gates: [bool],
-    // What the gate of the tool holds (its spool first, else what Happy Hare knows): material, colours, the name of
-    // spool or filament, the grams left with unit (only with Spoolman) and, with EndlessSpool, everything the group
-    // can still give ("∞ 244 g"); each empty when unknown. `gate-empty`: Happy Hare reports the gate as empty.
+    // What the tool prints with (its gate's spool first, else what Happy Hare knows; without MMU the spool in use):
+    // material, colours, the name of spool or filament, the grams left with unit (only with Spoolman) and, with
+    // EndlessSpool, everything the group can still give ("∞ 244 g") and what it adds to the own grams ("+230 g"),
+    // both only when the own grams are known; each empty when unknown. `gate-empty`: Happy Hare reports the gate as
+    // empty.
     loaded-material: string,
     loaded-colors: BarColors,
     loaded-name: string,
     loaded-weight: string,
     endless-weight: string,
+    reserve-weight: string,
     gate-empty: bool,
     // Which facts of a tool of the file differ from what its gate holds (see `material-differs`).
     color-differs: bool,

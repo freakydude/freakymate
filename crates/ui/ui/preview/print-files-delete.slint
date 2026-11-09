@@ -17,6 +17,6 @@ export component PrintFilesDeletePreview inherits AppWindow {
         ];
         Printer.marked-file-count = 5;
         Printer.marked-file-names = ["benchy", "long_job", "calibration_cube_with_a_rather_long_name_v2", "multicolor", "plain"];
-        Confirm.ask-for-items(@tr("Delete files"), "", Printer.marked-file-names, false, "delete-files", "", true);
+        Confirm.ask-for-items(@tr("Delete files"), "", Printer.marked-file-names, "delete-files", "", true);
     }
 }

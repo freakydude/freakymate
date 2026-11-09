@@ -3,7 +3,7 @@
 use crate::format;
 use chrono::{DateTime, Local};
 use freakymate_core::domain::estimates;
-use freakymate_core::domain::filament_match::{self, Difference, PrintHint, PrintHintKind, Remedy, ToolMatch, Verdict};
+use freakymate_core::domain::filament_match::{self, Difference, ToolMatch, Verdict};
 use freakymate_core::domain::file_catalog::FileInfo;
 use freakymate_core::domain::job_end;
 use freakymate_core::domain::pause::{Interruption, InterruptionFact};
@@ -175,42 +175,6 @@ pub fn spool_preset_text(spool: &Spool) -> Option<String> {
     Some(format!("{}  {nozzle:.0}{bed}", spool.material))
 }
 
-/// A hint before the print as a line of text. `show_tool` names the tool when there are several lanes.
-pub fn print_hint_text(hint: &PrintHint, show_tool: bool) -> String {
-    let tool = if show_tool { format!("T{}: ", hint.tool) } else { String::new() };
-    let spool = "The spool";
-    match &hint.kind {
-        PrintHintKind::Differs(difference) => format!("{tool}{}", difference_sentence(spool, spool, difference)),
-        PrintHintKind::GateEmpty => format!("{tool}{}", empty_gate_sentence("The gate")),
-        PrintHintKind::NoGate => no_gate_sentence(hint.tool),
-    }
-}
-
-/// One difference between the file and the filament as a sentence, for the print page and the question before the
-/// start alike. `source` names where the tool prints from, `spool` the spool for the weight.
-fn difference_sentence(source: &str, spool: &str, difference: &Difference) -> String {
-    match difference {
-        Difference::Material { loaded, .. } => format!("{source} holds {loaded}."),
-        Difference::Color => format!("{source} has another colour."),
-        Difference::Weight { needed, left, reserve } => format!(
-            "{spool} has {} left{}, the print needs ~{}.",
-            format::filament_weight(*left),
-            reserve
-                .map(|grams| format!(" and EndlessSpool {} more", format::filament_weight(grams)))
-                .unwrap_or_default(),
-            format::filament_weight(*needed)
-        ),
-    }
-}
-
-fn empty_gate_sentence(source: &str) -> String {
-    format!("{source} is empty.")
-}
-
-fn no_gate_sentence(tool: usize) -> String {
-    format!("The printer has no T{tool}.")
-}
-
 /// The key of a verdict for the UI (`ToolMatchItem.verdict`): "fits", "differs", "gate-empty", "no-gate" or "".
 pub fn verdict_key(verdict: &Verdict) -> &'static str {
     match verdict {
@@ -237,23 +201,6 @@ pub fn match_summary(matches: &[ToolMatch]) -> String {
     format!("{fitting} of {} tools fit", matches.len())
 }
 
-/// What does not fit for a tool, one sentence per line, naming the gate it prints from.
-pub fn tool_differences(found: &ToolMatch) -> String {
-    // Without a gate (no MMU) the tool prints from the spool in use.
-    let source = found.gate.map_or_else(|| "The spool".to_owned(), |gate| format!("Gate {gate}"));
-    let spool = found.gate.map_or_else(|| "The spool".to_owned(), |gate| format!("The spool in gate {gate}"));
-    match &found.verdict {
-        Verdict::Fits | Verdict::Unknown => String::new(),
-        Verdict::GateEmpty => empty_gate_sentence(&source),
-        Verdict::NoGate => no_gate_sentence(found.request.tool),
-        Verdict::Differs(differences) => differences
-            .iter()
-            .map(|difference| difference_sentence(&source, &spool, difference))
-            .collect::<Vec<_>>()
-            .join("\n"),
-    }
-}
-
 /// The material the file asks of the tool and the one where it prints from, when they differ.
 pub fn material_difference(found: &ToolMatch) -> Option<(&str, &str)> {
     let Verdict::Differs(differences) = &found.verdict else { return None };
@@ -271,32 +218,17 @@ pub fn material_line(found: &ToolMatch) -> String {
     }
 }
 
-/// What can make a tool fit, one sentence per remedy and line.
-pub fn remedy_text(remedies: &[Remedy]) -> String {
-    remedies.iter().map(remedy_sentence).collect::<Vec<_>>().join("\n")
+/// A weight the slicer plans, an estimate: `~54 g`.
+pub fn planned_weight(grams: f64) -> String {
+    format!("~{}", format::filament_weight(grams))
 }
 
-fn remedy_sentence(remedy: &Remedy) -> String {
-    match remedy {
-        Remedy::UseGate(gates) if gates.len() == 1 => {
-            format!("Gate {} holds what the file wants: choose it.", gates[0])
-        }
-        Remedy::UseGate(gates) => format!("Gates {} hold what the file wants: choose one of them.", enumeration(gates)),
-        Remedy::LoadGate(gate) => format!(
-            "Load fitting filament into gate {gate}. If it holds it already, correct its spool, material or colour."
-        ),
-        Remedy::LoadSpool => "Load fitting filament, or choose the spool that holds it.".to_owned(),
-        Remedy::Reslice => "Slice the file for the tools of this printer.".to_owned(),
+/// The tools of the file that share a gate, `T0 + T2`; empty for one tool alone.
+pub fn shared_tools_text(tools: &[usize]) -> String {
+    if tools.len() < 2 {
+        return String::new();
     }
-}
-
-/// Numbers as an enumeration: `0, 2 and 5`.
-fn enumeration(numbers: &[usize]) -> String {
-    let texts: Vec<String> = numbers.iter().map(ToString::to_string).collect();
-    match texts.split_last() {
-        Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
-        _ => texts.concat(),
-    }
+    tools.iter().map(|tool| format!("T{tool}")).collect::<Vec<_>>().join(" + ")
 }
 
 /// What a row of the file list shows; an empty text is a fact the file does not have.
@@ -725,7 +657,7 @@ mod tests {
 
     fn tool_match(tool: usize, gate: Option<usize>, verdict: Verdict) -> ToolMatch {
         let request = filament_match::ToolRequest { tool, ..filament_match::ToolRequest::default() };
-        ToolMatch { request, gate, reserve: None, verdict }
+        ToolMatch { request, gate, needed: None, reserve: None, verdict }
     }
 
     #[test]
@@ -747,56 +679,10 @@ mod tests {
     }
 
     #[test]
-    fn each_difference_of_a_tool_is_a_sentence_about_its_gate() {
-        let differs = Verdict::Differs(vec![
-            Difference::Material { expected: "PLA".into(), loaded: "PETG".into() },
-            Difference::Color,
-            Difference::Weight { needed: 30.0, left: 20.0, reserve: None },
-        ]);
-
-        assert_eq!(
-            tool_differences(&tool_match(3, Some(1), differs)),
-            "Gate 1 holds PETG.\nGate 1 has another colour.\nThe spool in gate 1 has 20 g left, the print needs ~30 g."
-        );
-        assert_eq!(tool_differences(&tool_match(1, Some(3), Verdict::GateEmpty)), "Gate 3 is empty.");
-        assert_eq!(tool_differences(&tool_match(4, None, Verdict::NoGate)), "The printer has no T4.");
-        assert_eq!(tool_differences(&tool_match(0, Some(0), Verdict::Fits)), "");
-        let without_mmu = Verdict::Differs(vec![
-            Difference::Material { expected: "PLA".into(), loaded: "ABS".into() },
-            Difference::Weight { needed: 52.0, left: 38.0, reserve: None },
-        ]);
-        assert_eq!(
-            tool_differences(&tool_match(0, None, without_mmu)),
-            "The spool holds ABS.\nThe spool has 38 g left, the print needs ~52 g."
-        );
-    }
-
-    #[test]
-    fn the_hints_before_the_print_word_differences_like_the_print_page() {
-        let hint = |tool, difference| PrintHint { tool, kind: PrintHintKind::Differs(difference) };
-        let material = hint(1, Difference::Material { expected: "PLA".into(), loaded: "PETG".into() });
-        assert_eq!(print_hint_text(&material, true), "T1: The spool holds PETG.");
-        assert_eq!(print_hint_text(&hint(0, Difference::Color), false), "The spool has another colour.");
-        assert_eq!(
-            print_hint_text(&hint(0, Difference::Weight { needed: 52.0, left: 38.0, reserve: None }), false),
-            "The spool has 38 g left, the print needs ~52 g."
-        );
-        assert_eq!(
-            print_hint_text(&hint(0, Difference::Weight { needed: 100.0, left: 14.0, reserve: Some(80.0) }), false),
-            "The spool has 14 g left and EndlessSpool 80 g more, the print needs ~100 g."
-        );
-    }
-
-    #[test]
-    fn missing_gates_and_empty_gates_are_hints_before_the_print() {
-        assert_eq!(
-            print_hint_text(&PrintHint { tool: 1, kind: PrintHintKind::GateEmpty }, true),
-            "T1: The gate is empty."
-        );
-        assert_eq!(
-            print_hint_text(&PrintHint { tool: 3, kind: PrintHintKind::NoGate }, false),
-            "The printer has no T3."
-        );
+    fn planned_weights_are_estimates_and_shared_gates_name_their_tools() {
+        assert_eq!(planned_weight(54.0), "~54 g");
+        assert_eq!(shared_tools_text(&[0, 2]), "T0 + T2");
+        assert_eq!(shared_tools_text(&[1]), "");
     }
 
     #[test]
@@ -809,18 +695,6 @@ mod tests {
         found.verdict = Verdict::Differs(vec![Difference::Color]);
         assert_eq!(material_line(&found), "PLA");
         assert_eq!(material_difference(&found), None);
-    }
-
-    #[test]
-    fn remedies_read_as_sentences() {
-        let remedies = [Remedy::UseGate(vec![0, 2, 5]), Remedy::LoadGate(3)];
-
-        assert_eq!(
-            remedy_text(&remedies),
-            "Gates 0, 2 and 5 hold what the file wants: choose one of them.\nLoad fitting filament into gate 3. If it \
-             holds it already, correct its spool, material or colour."
-        );
-        assert_eq!(remedy_text(&[Remedy::UseGate(vec![1])]), "Gate 1 holds what the file wants: choose it.");
     }
 
     #[test]

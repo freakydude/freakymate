@@ -50,7 +50,6 @@ pub(super) fn pages(session: &mut Session) -> Result<(), String> {
         "Delete files".into(),
         SharedString::new(),
         names,
-        false,
         "delete-files".into(),
         SharedString::new(),
         true,

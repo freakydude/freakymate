@@ -235,7 +235,7 @@ component ExtruderMatchCard inherits Card {
         }
         Text {
             horizontal-stretch: 1;
-            text: root.first.verdict == "fits" ? @tr("The spool fits the file") : root.first.differences;
+            text: root.first.verdict == "fits" ? @tr("The spool fits the file") : @tr("The spool differs from the file");
             color: root.first.verdict == "fits" ? Theme.foreground : Theme.warning;
             font-size: Theme.font-small;
             wrap: word-wrap;

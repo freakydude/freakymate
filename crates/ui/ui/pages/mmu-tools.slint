@@ -4,9 +4,10 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, ToolMatchItem, Printer } from "../state.slint";
+import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, SpoolPicker, ToolMatchItem, Printer } from "../state.slint";
 import { BarColors } from "../structs.slint";
 import { ButtonKind, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
+import { FilamentCompare } from "../components/filament-compare.slint";
 import { FilamentColors, FilamentSwatch, FilamentText } from "../components/filament-swatch.slint";
 import { DialogHeader, DialogPanel, DialogTitle, Scrim } from "../components/dialog.slint";
 import { SlotTile, VerdictIcon } from "../components/mmu-tiles.slint";
@@ -401,26 +402,6 @@ component LoadedLine inherits FilamentLine {
     }
 }
 
-// What differs and, unless the dialog has no room for it, what to do about it; nothing when the tool fits.
-component Advice inherits VerticalLayout {
-    in property <ToolMatchItem> mapping;
-    in property <bool> with-advice: true;
-
-    spacing: 4px;
-    if root.mapping.used && root.mapping.differences != "": Text {
-        text: root.mapping.differences;
-        color: Theme.warning;
-        font-size: Theme.font-normal;
-        wrap: word-wrap;
-    }
-    if root.with-advice && root.mapping.used && root.mapping.advice != "": Text {
-        text: root.mapping.advice;
-        color: Theme.foreground;
-        font-size: Theme.font-normal;
-        wrap: word-wrap;
-    }
-}
-
 // Opens the gate of a tool on the Gates tab.
 component OpenGateButton inherits IconButton {
     in property <int> gate;
@@ -436,7 +417,7 @@ component OpenGateButton inherits IconButton {
     }
 }
 
-// One tool, compact: what the file asks of it, what its gate holds, what differs and what to do about it.
+// One tool, compact: what the file asks of it next to what its gate holds, yellow where they differ.
 export component ToolDialog inherits Scrim {
     property <ToolMatchItem> mapping: Printer.mmu-tools[MmuDialogs.tool];
     visible: MmuDialogs.tool >= 0 && MmuDialogs.tool < Printer.mmu-tools.length;
@@ -455,27 +436,18 @@ export component ToolDialog inherits Scrim {
             padding: Theme.dialog-padding;
             spacing: Theme.spacing;
             DialogHeader {
-                title: @tr("T{} · What the file wants", root.mapping.tool);
+                title: root.mapping.gate >= 0 ? @tr("T{} · Gate {}", root.mapping.tool, root.mapping.gate) : @tr("T{}", root.mapping.tool);
                 close => { root.close(); }
                 VerdictIcon {
                     cross-axis-self-alignment: center;
                     verdict: root.mapping.used ? root.mapping.verdict : "";
                 }
             }
-            WantedLine {
+            FilamentCompare {
                 mapping: root.mapping;
+                source-title: root.mapping.gate >= 0 ? @tr("Gate {}", root.mapping.gate) : "";
             }
-            if root.mapping.gate >= 0: Text {
-                text: @tr("Gate {} holds", root.mapping.gate);
-                color: Theme.muted;
-                font-size: Theme.font-small;
-            }
-            if root.mapping.gate >= 0: LoadedLine {
-                mapping: root.mapping;
-            }
-            Advice {
-                mapping: root.mapping;
-            }
+            // Equal buttons in the default kind: none of them is the recommended one.
             HorizontalLayout {
                 alignment: end;
                 spacing: Theme.spacing;
@@ -485,10 +457,20 @@ export component ToolDialog inherits Scrim {
                     gate: root.mapping.gate;
                     opened => { root.close(); }
                 }
+                if Printer.has-spoolman && root.mapping.gate >= 0: IconButton {
+                    width: 200px;
+                    height: 48px;
+                    icon: Icons.filament-spool;
+                    text: @tr("Change spool");
+                    horizontal: true;
+                    clicked => {
+                        root.close();
+                        SpoolPicker.show(root.mapping.gate, Printer.mmu-gates[root.mapping.gate].spool-id);
+                    }
+                }
                 if Printer.mmu-gates.length > 1 && root.mapping.gate >= 0: IconButton {
                     width: 200px;
                     height: 48px;
-                    kind: ButtonKind.accent;
                     text: @tr("Choose gate");
                     clicked => {
                         MmuDialogs.tool-gate = MmuDialogs.tool;
@@ -584,10 +566,6 @@ export component ToolGateDialog inherits Scrim {
                 }
                 if root.mapping.gate >= 0: LoadedLine {
                     mapping: root.mapping;
-                }
-                Advice {
-                    mapping: root.mapping;
-                    with-advice: false;
                 }
                 Rectangle { vertical-stretch: 1; }
                 if root.mapping.gate >= 0: OpenGateButton {

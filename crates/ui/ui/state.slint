@@ -428,13 +428,17 @@ export global Confirm {
     in-out property <string> action;
     in-out property <string> argument;
     in-out property <bool> danger;
-    // Things the action applies to, one row each, under the message: files to delete, or hints before a print.
+    // Things the action applies to, one row each, under the message: files to delete.
     in-out property <[string]> items;
-    // The rows are hints (warning icon) instead of files.
-    in-out property <bool> items-are-hints;
+    // Before a print: the tools of the file that do not fit, one compact comparison row each.
+    in-out property <[ToolMatchItem]> tools;
+    // The text of the button; "Confirm" when empty.
+    in-out property <string> confirm-text;
 
     public function ask(title: string, message: string, action: string, argument: string, danger: bool) {
         self.items = [];
+        self.tools = [];
+        self.confirm-text = "";
         self.title = title;
         self.message = message;
         self.action = action;
@@ -443,10 +447,16 @@ export global Confirm {
         self.open = true;
     }
 
-    public function ask-for-items(title: string, message: string, items: [string], hints: bool, action: string, argument: string, danger: bool) {
+    public function ask-for-items(title: string, message: string, items: [string], action: string, argument: string, danger: bool) {
         self.ask(title, message, action, argument, danger);
         self.items = items;
-        self.items-are-hints = hints;
+    }
+
+    // The question before printing the file at `path` (shown as `name`), with the tools that do not fit.
+    public function ask-to-start(name: string, path: string, tools: [ToolMatchItem]) {
+        self.ask(@tr("Start print"), name, "start-print", path, false);
+        self.tools = tools;
+        self.confirm-text = @tr("Start print");
     }
 
     public function execute() {
