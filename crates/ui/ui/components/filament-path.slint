@@ -3,7 +3,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { ColorBar } from "controls.slint";
+import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
 import { BarColors, FilamentPathItem } from "../state.slint";
 
 // A sensor on the way: -1 not fitted (not drawn), 0 free (dim), 1 triggered (bright). The symbol, not a coloured dot,
@@ -16,7 +16,7 @@ component SensorMark inherits Image {
     colorize: root.state == 1 ? Theme.foreground : Theme.disabled-foreground;
 }
 
-// One piece of tube, filled to `fill` (0 to 1) from the left in the colours of the filament (see `ColorBar`).
+// One piece of tube, filled to `fill` (0 to 1) from the left in the colours of the filament (see `FilamentSwatch`).
 component Tube inherits Rectangle {
     in property <float> fill;
     in property <BarColors> filament;
@@ -25,13 +25,12 @@ component Tube inherits Rectangle {
     background: Theme.surface-raised;
     border-width: 1px;
     border-color: Theme.border;
-    if root.fill > 0: ColorBar {
+    if root.fill > 0: FilamentSwatch {
         x: 0;
         width: max(root.height, parent.width * clamp(root.fill, 0, 1));
         height: parent.height;
-        border-radius: parent.border-radius;
-        colors: root.filament;
-        generic: true;
+        radius: parent.border-radius;
+        colors: FilamentColors.generic(root.filament);
     }
 }
 

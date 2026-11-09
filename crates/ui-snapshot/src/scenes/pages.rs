@@ -3,11 +3,14 @@
 use super::mmu::{mmu_bypass, mmu_gate, mmu_service, mmu_tools_and_groups};
 use super::temperature::heat_tabs;
 use crate::session::Session;
-use freakymate::{Actions, Confirm, FilamentTab, Navigation, Page, Printer, TuneTab};
+use freakymate::{Actions, Confirm, FilamentTab, MmuDialogs, Navigation, Page, Printer, TuneTab};
 use freakymate_core::sources::klipper::tuning::TuningKey;
 use freakymate_core::Command;
 use slint::{ComponentHandle, Model, SharedString};
 use std::time::Duration;
+
+/// The chip of T1 in the Tool-to-gate map of the prepared `long_job.gcode` (800x480, Happy Hare).
+const PREPARED_CHIP_T1: (f32, f32) = (585.0, 311.0);
 
 /// A file prepared from the list: the print page shows it with its facts and the comparison of its tools (the fake's
 /// `long_job.gcode` asks for PLA and PETG). Dropped afterwards, so the other scenes see the printer's job.
@@ -26,9 +29,31 @@ pub(super) fn prepared_job(session: &mut Session) -> Result<(), String> {
         return Err("the prepared file or its tools are missing".into());
     }
     session.show_page(Page::Print, "print-prepared")?;
+    if session.has_reference_layout() && session.presenter.snapshot().status.mmu.is_some() {
+        tool_chip_opens_its_dialog(session)?;
+    }
     session.window.global::<Actions>().invoke_prepare_file(SharedString::new());
     session.pump(Duration::from_millis(100));
     Ok(())
+}
+
+/// A tap on a tool of the Tool-to-gate map leads to the Tools tab of the Filament page with that tool's dialog open.
+/// Afterwards back to the print page with the dialog closed and the Gates tab, as the later scenes expect.
+fn tool_chip_opens_its_dialog(session: &mut Session) -> Result<(), String> {
+    session.tap(PREPARED_CHIP_T1.0, PREPARED_CHIP_T1.1);
+    session.pump(Duration::from_millis(300));
+    let (page, tab) = {
+        let navigation = session.window.global::<Navigation>();
+        (navigation.get_page(), navigation.get_filament_tab())
+    };
+    let tool = session.window.global::<MmuDialogs>().get_tool();
+    if page != Page::Filament || tab != FilamentTab::Tools || tool != 1 {
+        return Err(format!("tap on T1 of the map: expected the Tools tab with the dialog of T1, got tool {tool}"));
+    }
+    session.capture("print-prepared-tool-dialog")?;
+    session.window.global::<MmuDialogs>().set_tool(-1);
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
+    session.show_page(Page::Print, "print-prepared-back")
 }
 
 pub(super) fn pages(session: &mut Session) -> Result<(), String> {
@@ -50,7 +75,6 @@ pub(super) fn pages(session: &mut Session) -> Result<(), String> {
         "Delete files".into(),
         SharedString::new(),
         names,
-        false,
         "delete-files".into(),
         SharedString::new(),
         true,

@@ -102,7 +102,7 @@ export component ConsolePage inherits Rectangle {
                     HorizontalLayout {
                         width: parent.width;
                         height: parent.height;
-                        spacing: 8px;
+                        spacing: Theme.spacing;
                         Text {
                             text: line.time;
                             color: Theme.disabled-foreground;
@@ -139,8 +139,8 @@ export component ConsolePage inherits Rectangle {
             clip: true;
 
             HorizontalLayout {
-                padding: 4px;
-                padding-left: 8px;
+                padding: Theme.spacing-small;
+                padding-left: Theme.padding;
                 spacing: Theme.spacing;
 
                 Rectangle {

@@ -19,11 +19,14 @@ probe still counts as the probe).
     Tools), in the tool list and in the gate picker; it never blocks a print or a change. A clear filament (colour with
     full transparency) is not compared by colour.
     Each tool chip on the print page also shows the material the file asks for, in the warning colour when the gate
-    holds another. A tap on a tool opens a dialog with what to do when it does not fit, in the order to try: map the
-    tool to another gate that holds what the file asks for (with a button to open that gate), load fitting filament or
-    correct what the gate records, or, when the printer has no such tool (no gate mapped by Happy Hare, or without
-    Happy Hare no command `T<n>`), slice the file for the printer's tools. Tools that share a gate share its spool, so
-    their planned weights add up against what the spool has left. These are suggestions only.
+    holds another. A tap on a tool opens a comparison: material, colour, weight and name of the file against the
+    gate, differing values in the warning colour, the slicer's estimate with `~`. FreakyMate does not know why they
+    differ (wrong filament, or only the gate map or the spool in Spoolman), so it gives no instructions, only buttons
+    for what can be done: open the gate, change its spool, choose another gate (a tick marks gates whose data fit).
+    A tool the printer does not have (no gate mapped by Happy Hare, or without Happy Hare no command `T<n>`) shows as
+    "No gate". Tools that share a gate share its spool, so their planned weights add up against what the spool has
+    left; with EndlessSpool the rest of its group is shown as its own line. The question before the start shows the
+    same comparison, compact, for each tool that does not fit.
 - **Move**: jog X/Y/Z with selectable steps, home (all/XY/Z), motors off, Quad Gantry Level or Z-Tilt when configured.
   Move and Filament are locked while a print runs; the screen leaves them when a print starts.
   - **Calibrate** tab: Klipper's own calibration commands, with their results. Bed screws
@@ -90,10 +93,13 @@ A tap on a gate opens what can be done with it: select, load, preload, check or 
 Spoolman the dialog sets material and colour of the gate in Happy Hare's gate map instead, from a set of common
 materials and colours. A tap on a gate never moves the selector by itself. The bypass takes filament fed by hand past
 the gates; its dialog selects and loads it. The **Tools** tab is the one place to set which gate each tool takes its
-filament from (Happy Hare's tool-to-gate map): a tap on a tool offers the gates with their colour and material. With a file
-prepared (or the file of the current job), the tab shows beside each tool what the file asks of it and whether the gate
-fits (✓ or ⚠, a hint only); the gate list marks the gates that fit. It
-also resets the map and turns EndlessSpool on or off; while it is on, it moves each gate from group to group.
+filament from (Happy Hare's tool-to-gate map): one row per tool with what its gate holds (material, colour, spool, grams
+left and, with EndlessSpool, what its group can still give), and a tap on a tool offers the gates with their colour and
+material. With a file prepared (or the file of the current job), each row shows on its left what the file asks of the
+tool and whether the gate fits (✓ or ⚠, a hint only); only what differs is yellow: the material, the colour as a frame,
+the weight. A multi-colour spool is compared by its first colour, since slicers know one colour per tool. The gate list
+marks the gates that fit. The tab also resets the map; its EndlessSpool dialog turns EndlessSpool on or off and moves
+each gate from group to group.
 The **Service** tab holds what is rarely needed for the MMU as a whole: home, recover, unlock, motors off, check all
 gates and, on selectors with a servo, servo up and down.
 
@@ -101,7 +107,7 @@ gates and, on selectors with a servo, servo up and down.
 | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | The Gates tab: gates, sensors, buffer                                | The print page while tangle prevention raises the gear current (the FlowGuard line turns yellow)      |
 | ![Gate dialog](screenshots/gate-dialog.png)                          | ![Tools tab](screenshots/mmu-tools.png)                                                               |
-| A tap on a gate: select, load, preload, check, eject, pick its spool | The Tools tab: T3 moved to gate 1, EndlessSpool on with the group of each gate                        |
+| A tap on a gate: select, load, preload, check, eject, pick its spool | The Tools tab: T3 moved to gate 1, what each gate holds, EndlessSpool on                              |
 
 **Quieter console (recommended).** FreakyMate shows Klipper's console messages in its status bar. Happy Hare prints a
 lot there by default: the gate table at startup, a picture of the filament path and statistics after every tool
@@ -124,7 +130,8 @@ This changes the console for every client, Mainsail and Fluidd included.
 Appears when Moonraker has the `spoolman` component, with or without an MMU:
 
 - the spool in use and what is left of it on the print page and at each gate, with a colour bar for multi-colour
-  filaments: side by side for coaxial ones (silk), taking turns for longitudinal ones (gradient);
+  filaments: side by side for coaxial ones (silk), taking turns for longitudinal ones (gradient); on the Tools tab a
+  colour field split diagonally for coaxial ones and blending for longitudinal ones (up to six colours, a rainbow);
 - a picker lists the spools (the ones in a gate first, then the most recently used): assign a spool to a gate or, without
   an MMU, choose the active spool, and correct the remaining weight by weighing;
 - a filament colour with transparency (alpha) shows over a checkerboard in the gate bars, dialogs and the Tools tab;

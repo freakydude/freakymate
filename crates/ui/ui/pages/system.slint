@@ -34,7 +34,7 @@ export component SystemPage inherits Rectangle {
                     height: 64px;
                     IconButton {
                         icon: Icons.system-restart;
-                        text: @tr("Restart");
+                        text: @tr("Reload config");
                         enabled: Printer.is-connected && !Printer.host-actions-locked;
                         clicked => { Confirm.ask(@tr("Restart Klipper"), @tr("Reloads the configuration."), "restart-klipper", "", false); }
                     }
@@ -65,13 +65,13 @@ export component SystemPage inherits Rectangle {
                         clicked => { Confirm.ask(@tr("Shut down host"), @tr("The printer host powers off and must be switched on by hand."), "shutdown-host", "", true); }
                     }
                 }
+                Text { text: @tr("Restart service"); color: Theme.muted; font-size: Theme.font-small; }
                 HorizontalLayout {
                     spacing: Theme.spacing;
                     height: 64px;
                     for service in [{ id: "klipper", name: @tr("Klipper") }, { id: "moonraker", name: @tr("Moonraker") }]: IconButton {
                         text: service.name;
                         icon: Icons.system-restart;
-                        icon-size: 20px;
                         enabled: Printer.is-connected && !Printer.host-actions-locked;
                         clicked => { Confirm.ask(@tr("Restart service"), service.name, "restart-service", service.id, false); }
                     }

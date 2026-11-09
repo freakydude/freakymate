@@ -1,7 +1,10 @@
 //! Happy Hare on the Filament page: the gates, the tools with what the job's file asks of them, the sensors, the way of
 //! the filament and the state of the MMU.
 
-use crate::items::{bar_colors, filament_path_item, id_or_none, replace_rows, reuse_flags, tool_match_item};
+use crate::items::{
+    bar_colors, compared_tool_items, filament_path_item, fill_loaded, id_or_none, replace_rows, reuse_flags,
+    tool_match_item,
+};
 use crate::{view, MmuGateItem, MmuSensorItem, Printer, ToolMatchItem};
 use freakymate_core::domain::filament_match::{self, ToolMatch, Verdict};
 use freakymate_core::domain::spools::{FilamentColors, Lane};
@@ -69,16 +72,32 @@ impl MmuView {
         show_state(printer, mmu);
     }
 
-    /// The tools of the prepared file; none without a prepared file.
-    pub fn show_prepared_tools(&self, matches: &[ToolMatch]) {
-        let tools = matches.iter().map(|found| tool_match_item(found.request.tool, found.gate, Some(found))).collect();
-        replace_rows(&self.prepared_tools, tools);
+    /// The tools of the prepared file with what each prints with; none without a prepared file. Call after `show`, so
+    /// that each tool finds its row on the Tools tab.
+    pub fn show_prepared_tools(&self, matches: &[ToolMatch], status: &PrinterStatus, lanes: &[Lane]) {
+        let mut items = compared_tool_items(matches, status, lanes, |_| true);
+        for item in &mut items {
+            item.tools_row = self.tools_row(item);
+        }
+        replace_rows(&self.prepared_tools, items);
+    }
+
+    /// The row of the tool on the Tools tab: Happy Hare's tools come first in order, the file's tools without a gate
+    /// after them; -1 when it has none.
+    fn tools_row(&self, item: &ToolMatchItem) -> i32 {
+        let has_gate = item.gate >= 0;
+        self.tools
+            .iter()
+            .position(|row| row.tool == item.tool && (row.gate >= 0) == has_gate)
+            .and_then(|row| i32::try_from(row).ok())
+            .unwrap_or(-1)
     }
 
     /// The tools of Happy Hare with what the job's file asks of them, then the file's tools that have no gate; and the
     /// line about the file above them.
     fn show_tools(&self, printer: &Printer, mmu: &MmuStatus, status: &PrinterStatus, lanes: &[Lane], file: &JobFile) {
         let matches = file.matches;
+        let busy = filament_match::busy_gates(matches);
         let mapped = mmu
             .tool_to_gate
             .iter()
@@ -92,13 +111,16 @@ impl MmuView {
             .chain(without_gate)
             .enumerate()
             .map(|(row, (tool, gate, found))| {
-                let mut item = tool_match_item(tool, gate, found);
-                let fitting = found.map(|found| filament_match::fitting_gates(&found.request, status, lanes));
-                if let (Some(found), Some(fitting)) = (found, &fitting) {
-                    let remedies = filament_match::remedies(found, fitting);
-                    item.advice = view::remedy_text(&remedies).into();
-                    item.gate_to_load = id_or_none(view::gate_to_load(&remedies));
+                let mut item = tool_match_item(tool, gate, matches);
+                if let Some(state) = gate.and_then(|gate| mmu.gates.iter().find(|state| state.index == gate)) {
+                    // A tool of the file shares the reserve with the other tools of its group.
+                    let reserve = found.map_or_else(
+                        || filament_match::endless_spool_reserve(state.index, &busy, status, lanes),
+                        |found| found.reserve,
+                    );
+                    fill_loaded(&mut item, &filament_match::gate_supply(state, lanes), reserve);
                 }
+                let fitting = found.is_some().then(|| filament_match::fitting_gates(matches, tool, status, lanes));
                 item.fitting_gates = reuse_flags(self.tools.row_data(row).map(|old| old.fitting_gates), fitting);
                 item
             })
@@ -162,4 +184,23 @@ fn show_state(printer: &Printer, mmu: &MmuStatus) {
 /// The spool Spoolman knows in a gate.
 fn gate_spool(lanes: &[Lane], gate: usize) -> Option<&Spool> {
     lanes.iter().find(|lane| lane.gate == Some(gate)).and_then(|lane| lane.spool.as_ref())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(tool: i32, gate: i32) -> ToolMatchItem {
+        ToolMatchItem { tool, gate, ..ToolMatchItem::default() }
+    }
+
+    #[test]
+    fn a_tool_finds_its_row_on_the_tools_tab() {
+        let view = MmuView::default();
+        // Happy Hare's tools in order, then a tool of the file without a gate.
+        replace_rows(&view.tools, vec![item(0, 2), item(1, 0), item(5, -1)]);
+        assert_eq!(view.tools_row(&item(1, 0)), 1);
+        assert_eq!(view.tools_row(&item(5, -1)), 2);
+        assert_eq!(view.tools_row(&item(7, -1)), -1);
+    }
 }

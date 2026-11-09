@@ -2,13 +2,15 @@
 // nothing here keeps the print from starting.
 
 import { Theme } from "../theme.slint";
+import { ToolLabel } from "../components/tool-label.slint";
 import { Icons } from "../icons.slint";
 import { FilamentTab, MmuDialogs, ToolMatchItem, Navigation, Page, Printer, SpoolPicker } from "../state.slint";
-import { Card, ColorBar, ScrollList, TextWithValue, ValueTile } from "../components/controls.slint";
+import { Card, ScrollList, ValueTile } from "../components/controls.slint";
 import { VerdictIcon } from "../components/mmu-tiles.slint";
-import { GateColor, WantedColor } from "mmu-tools.slint";
+import { FilamentColors, FilamentSwatch, FilamentText } from "../components/filament-swatch.slint";
 
-// A tool of the file: the colour it asks for beside the colour of its gate, its material, and whether they fit.
+// A tool of the file as a small row: the colour the file asks for beside the colour of its gate (one field, split),
+// the tool, its material (yellow when the gate holds another) and whether they fit.
 component ToolChip inherits Rectangle {
     in property <ToolMatchItem> mapping;
     property <bool> has-gate: root.mapping.gate >= 0;
@@ -19,59 +21,61 @@ component ToolChip inherits Rectangle {
     chip-touch := TouchArea {
         clicked => { root.clicked(); }
     }
-    VerticalLayout {
-        padding: 5px;
-        spacing: Theme.spacing-small;
-        alignment: center;
+    HorizontalLayout {
+        spacing: Theme.spacing-medium;
+        padding-right: Theme.padding;
+        // Wanted and loaded colour side by side, close together so they read as one field.
         HorizontalLayout {
-            Text {
-                horizontal-stretch: 1;
-                text: "T" + root.mapping.tool;
-                color: Theme.accent;
-                font-size: Theme.font-normal;
-                font-weight: 700;
-                vertical-alignment: center;
+            spacing: Theme.spacing-tight;
+            FilamentSwatch {
+                width: 18px;
+                left-edge: true;
+                ground: Theme.surface;
+                colors: root.mapping.wanted-colors;
+                empty: root.mapping.wanted-colors.count == 0;
             }
-            VerdictIcon {
-                cross-axis-self-alignment: center;
-                width: Theme.icon-compact;
-                height: Theme.icon-compact;
-                verdict: root.mapping.verdict;
+            FilamentSwatch {
+                width: 18px;
+                radius: 0px;
+                colors: root.has-gate && !root.mapping.gate-empty ? FilamentColors.generic(root.mapping.loaded-colors) : root.mapping.loaded-colors;
+                empty: !root.has-gate || root.mapping.gate-empty;
+                warn: root.mapping.color-differs;
             }
         }
-        HorizontalLayout {
-            spacing: Theme.spacing-small;
-            height: 12px;
-            if root.mapping.wanted-has-color: WantedColor { mapping: root.mapping; }
-            if root.has-gate: GateColor {
-                width: 24px;
-                height: 12px;
-                vertical: false;
-                border-radius: 3px;
-                gate: Printer.mmu-gates[root.mapping.gate];
-            }
-            Rectangle { }
+        Text {
+            text: "T" + root.mapping.tool;
+            color: Theme.accent;
+            font-size: Theme.font-normal;
+            font-weight: 700;
+            vertical-alignment: center;
         }
         // The material the file asks for; in the warning colour when the gate holds another.
         Text {
+            horizontal-stretch: 1;
             text: root.mapping.wanted-material;
-            color: root.mapping.material-differs ? Theme.warning : Theme.muted;
+            color: root.mapping.material-differs ? Theme.warning : Theme.foreground;
             font-size: Theme.font-small;
+            vertical-alignment: center;
             overflow: elide;
+        }
+        VerdictIcon {
+            cross-axis-self-alignment: center;
+            width: Theme.icon-compact;
+            height: Theme.icon-compact;
+            verdict: root.mapping.verdict;
         }
     }
 }
 
-// Tools of the file as chips, five in a row. The grid takes the free height of the page, at least one row and at most
+// Tools of the file as small rows, two in a row. The grid takes the free height of the page, at least one row and at most
 // all of them; only what still does not fit scrolls. The first `skip` tools are left out.
 component ToolChipGrid inherits ScrollList {
     in property <[ToolMatchItem]> tools;
     in property <int> skip;
-    property <int> columns: 5;
+    property <int> columns: 2;
     property <int> count: max(0, root.tools.length - root.skip);
     property <int> rows: ceil(root.count / root.columns);
-    // Three lines: tool and verdict, colours, material.
-    property <length> chip-height: 68px;
+    property <length> chip-height: 40px;
     property <length> gap: 6px;
     property <length> row-step: root.chip-height + root.gap;
     property <length> chip-width: (root.row-width - (root.columns - 1) * root.gap) / root.columns;
@@ -97,8 +101,8 @@ component ToolChipGrid inherits ScrollList {
     }
 }
 
-// The tools of the file with their gates. A tap leads to the Tools tab, where the map is changed; a tap on a tool with
-// a gate opens its dialog there, which says what to do when it does not fit.
+// The tools of the file with their gates. A tap leads to the Tools tab, where the map is changed; a tap on a tool opens
+// its dialog there, which says what to do when it does not fit. Closing it leaves the Tools tab open.
 component ToolMatchCard inherits Card {
     title: @tr("Tool-to-gate map");
     icon: Icons.mmu-ttg-map;
@@ -139,55 +143,18 @@ component ToolMatchCard inherits Card {
         tools: Printer.prepared-tools;
         clicked(mapping) => {
             root.open-tools();
-            // The rows of the Tools tab are Happy Hare's tools in order, so a tool with a gate is its own row.
-            if (mapping.gate >= 0) {
-                MmuDialogs.tool = mapping.tool;
-            }
+            MmuDialogs.tool = mapping.tools-row;
         }
     }
 }
 
-// One side of the comparison on a printer without MMU: a word, a colour and the filament.
-component FilamentLine inherits HorizontalLayout {
-    in property <string> label;
-    in property <string> title;
-    in property <string> detail;
-    in property <string> value;
-    in property <color> value-color: Theme.muted;
-    spacing: 8px;
-    height: 40px;
-
-    Text {
-        width: 44px;
-        text: root.label;
-        color: Theme.muted;
-        font-size: Theme.font-small;
-        vertical-alignment: center;
-    }
-    @children
-    VerticalLayout {
-        alignment: center;
-        horizontal-stretch: 1;
-        Text {
-            text: root.title;
-            color: Theme.foreground;
-            font-size: Theme.font-normal;
-            font-weight: 600;
-            overflow: elide;
-        }
-        if root.detail != "" || root.value != "": TextWithValue {
-            text: root.detail;
-            value: root.value;
-            color: root.value-color;
-        }
-    }
-}
-
-// What the file asks of the extruder beside the spool in use; a tap opens the spool picker when Spoolman is there.
-// Without MMU only tool 0 can be compared: Spoolman knows one spool in use. Further tools of the file show as chips.
+// What the file asks of the extruder beside the spool in use, as one row "T0 file → spool" like the Tools tab; a tap
+// opens the spool picker when Spoolman is there. Without MMU only tool 0 can be compared: Spoolman knows one spool in
+// use. Further tools of the file show as small rows. Without Spoolman only the file's side is shown.
 component ExtruderMatchCard inherits Card {
     property <ToolMatchItem> first: Printer.prepared-tools[0];
     property <bool> several: Printer.prepared-tools.length > 1;
+    property <bool> has-spool-side: Printer.has-spoolman;
     title: @tr("Filament");
     icon: Icons.filament-spool;
     tappable: Printer.has-spoolman;
@@ -200,29 +167,59 @@ component ExtruderMatchCard inherits Card {
         }
     }
 
-    FilamentLine {
-        label: root.several ? "T" + root.first.tool : @tr("File");
-        title: root.first.wanted-material != "" ? root.first.wanted-material : @tr("No filament named");
-        detail: root.first.wanted-profile;
-        value: root.first.wanted-weight;
-        if root.first.wanted-has-color: WantedColor {
-            cross-axis-self-alignment: center;
-            mapping: root.first;
+    HorizontalLayout {
+        spacing: Theme.spacing-medium;
+        height: 56px;
+        ToolLabel {
+            width: 40px;
+            tool: root.first.tool;
+            horizontal-alignment: center;
+            vertical-alignment: center;
         }
-    }
-    if Printer.has-spoolman: FilamentLine {
-        label: @tr("Spool");
-        title: Printer.has-spool ? Printer.spool-title : @tr("No spool selected");
-        detail: Printer.has-spool ? Printer.spool-material : "";
-        value: Printer.has-spool ? Printer.spool-weight : "";
-        value-color: Printer.spool-low ? Theme.warning : Theme.muted;
-        if Printer.has-spool: ColorBar {
-            cross-axis-self-alignment: center;
-            width: 12px;
-            height: 30px;
-            vertical: true;
-            colors: Printer.spool-colors;
-            generic: true;
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            preferred-width: 0px;
+            spacing: Theme.spacing;
+            FilamentSwatch {
+                width: 28px;
+                colors: root.first.wanted-colors;
+                empty: root.first.wanted-colors.count == 0;
+                gap-color: Theme.surface;
+            }
+            FilamentText {
+                horizontal-stretch: 1;
+                material: root.first.wanted-material != "" ? root.first.wanted-material : @tr("No filament named");
+                material-color: root.first.wanted-material != "" ? Theme.foreground : Theme.muted;
+                name: root.first.wanted-profile;
+                trail: root.first.wanted-weight;
+            }
+        }
+        if root.has-spool-side: Image {
+            width: 18px;
+            source: Icons.ui-chevron-right;
+            colorize: Theme.muted;
+        }
+        if root.has-spool-side: HorizontalLayout {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            preferred-width: 0px;
+            spacing: Theme.spacing;
+            FilamentSwatch {
+                width: 28px;
+                colors: Printer.has-spool ? FilamentColors.generic(Printer.spool-colors) : Printer.spool-colors;
+                empty: !Printer.has-spool;
+                warn: root.first.color-differs;
+                gap-color: Theme.surface;
+            }
+            FilamentText {
+                horizontal-stretch: 1;
+                material: Printer.has-spool ? (Printer.spool-material != "" ? Printer.spool-material : "-") : @tr("No spool selected");
+                material-color: !Printer.has-spool ? Theme.muted : root.first.material-differs ? Theme.warning : Theme.foreground;
+                name: Printer.has-spool ? Printer.spool-title : "";
+                trail: Printer.has-spool ? Printer.spool-weight : "";
+                trail-warn: Printer.has-spool && root.first.weight-differs;
+            }
         }
     }
     if root.first.verdict == "fits" || root.first.verdict == "differs": HorizontalLayout {
@@ -233,7 +230,7 @@ component ExtruderMatchCard inherits Card {
         }
         Text {
             horizontal-stretch: 1;
-            text: root.first.verdict == "fits" ? @tr("The spool fits the file") : root.first.differences;
+            text: root.first.verdict == "fits" ? @tr("The spool fits the file") : @tr("The spool differs from the file");
             color: root.first.verdict == "fits" ? Theme.foreground : Theme.warning;
             font-size: Theme.font-small;
             wrap: word-wrap;

@@ -15,6 +15,8 @@ import { PreparedJob } from "print-prepared.slint";
 component InterruptionBanner inherits Rectangle {
     in property <bool> failed;
     in property <string> details;
+    // Where the print stands, beside the title.
+    in property <string> position;
     property <color> tone: root.failed ? Theme.danger : Theme.warning;
     background: Theme.surface;
     border-radius: Theme.radius;
@@ -23,9 +25,9 @@ component InterruptionBanner inherits Rectangle {
     min-height: Theme.row-height-small;
 
     HorizontalLayout {
-        padding: 6px;
-        padding-left: 8px;
-        spacing: 8px;
+        padding: Theme.spacing-medium;
+        padding-left: Theme.padding;
+        spacing: Theme.spacing;
         Image {
             cross-axis-self-alignment: center;
             source: root.failed ? Icons.ui-error : Icons.print-pause;
@@ -35,12 +37,24 @@ component InterruptionBanner inherits Rectangle {
         }
         VerticalLayout {
             alignment: center;
-            spacing: 2px;
-            Text {
-                text: root.failed ? @tr("Print failed") : @tr("Paused");
-                color: root.tone;
-                font-size: Theme.font-normal;
-                font-weight: 600;
+            spacing: Theme.spacing-tight;
+            HorizontalLayout {
+                spacing: Theme.spacing;
+                Text {
+                    text: root.failed ? @tr("Print failed") : @tr("Paused");
+                    color: root.tone;
+                    font-size: Theme.font-normal;
+                    font-weight: 600;
+                }
+                Text {
+                    horizontal-stretch: 1;
+                    text: root.position;
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
             }
             if root.details != "": Text {
                 text: root.details;
@@ -78,7 +92,7 @@ export component PrintPage inherits Rectangle {
             }
             // Progress of the printer's job; a prepared file has none yet.
             if !root.prepared && root.has-job: HorizontalLayout {
-                spacing: 10px;
+                spacing: Theme.spacing;
                 height: 48px;
                 Text {
                     text: round(Printer.progress * 100) + "%";
@@ -113,7 +127,8 @@ export component PrintPage inherits Rectangle {
                 vertical-alignment: center;
             }
             if root.prepared: PreparedJob { }
-            if !root.prepared: VerticalLayout {
+            // Without a job there is nothing to show (no empty tiles); the file list is the way on.
+            if !root.prepared && root.has-job: VerticalLayout {
                 spacing: Theme.spacing;
                 // Left the times, right the figures of the job. The times are short, the figures need room: 4 to 5.
                 VerticalLayout {
@@ -166,6 +181,7 @@ export component PrintPage inherits Rectangle {
                     if Printer.print-state == "paused" || Printer.print-state == "error": InterruptionBanner {
                         failed: Printer.print-state == "error";
                         details: Printer.interruption-text;
+                        position: Printer.interruption-position;
                     }
                     if Printer.print-state == "printing": HorizontalLayout {
                         spacing: Theme.spacing;
@@ -198,6 +214,7 @@ export component PrintPage inherits Rectangle {
             if !Printer.is-printing: ActionTile {
                 icon: Icons.print-load;
                 text: @tr("Files");
+                kind: !root.prepared && !root.has-job ? ButtonKind.accent : ButtonKind.normal;
                 clicked => {
                     Navigation.files-open = true;
                     Actions.refresh-files();
@@ -207,13 +224,13 @@ export component PrintPage inherits Rectangle {
                 icon: Icons.print-start;
                 text: @tr("Print");
                 kind: ButtonKind.accent;
-                clicked => { Confirm.ask-for-items(@tr("Start print"), Printer.prepared.name, Actions.print-hints(Printer.prepared-path), true, "start-print", Printer.prepared-path, false); }
+                clicked => { Confirm.ask-to-start(Printer.prepared.name, Printer.prepared-path, Actions.start-tools(Printer.prepared-path)); }
             }
             if !Printer.is-printing && !root.prepared && root.has-job: ActionTile {
                 icon: root.finished ? Icons.print-repeat : Icons.print-start;
                 text: root.finished ? @tr("Reprint") : @tr("Start");
                 kind: ButtonKind.accent;
-                clicked => { Confirm.ask-for-items(@tr("Start print"), Printer.job-name, Actions.print-hints(Printer.filename), true, "start-print", Printer.filename, false); }
+                clicked => { Confirm.ask-to-start(Printer.job-name, Printer.filename, Actions.start-tools(Printer.filename)); }
             }
             if Printer.print-state == "printing": ActionTile {
                 icon: Icons.print-pause;

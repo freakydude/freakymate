@@ -47,10 +47,10 @@ export component MacroFormDialog inherits Scrim {
                     border-radius: Theme.radius;
                     HorizontalLayout {
                         padding-left: 14px;
-                        padding-right: 8px;
+                        padding-right: Theme.padding;
                         padding-top: 7px;
                         padding-bottom: 7px;
-                        spacing: 12px;
+                        spacing: Theme.spacing-large;
                         Text {
                             width: min(220px, params-list.row-width * 0.3);
                             text: param.name;
@@ -63,7 +63,7 @@ export component MacroFormDialog inherits Scrim {
                         Rectangle {
                             horizontal-stretch: 1;
                             background: Theme.background;
-                            border-radius: 6px;
+                            border-radius: Theme.radius-small;
                             border-width: 1px;
                             border-color: Theme.border;
                             Text {

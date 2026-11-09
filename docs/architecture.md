@@ -153,15 +153,15 @@ history).
 - `state.slint`: globals `Printer` (read-only), `UiSettings`, `Navigation`, `Confirm` and the other state globals; it re-exports
   `structs.slint` (enums and row structs) and `actions.slint` (`Actions`, callbacks). `state-icons.slint`: `StateIcons`.
 - `components/`: `controls.slint` (IconButton, ToggleRow, StepSelector, TabBar, Card, ValueTile, ProgressBar,
-  ScrollList, TouchSlider, SliderRow, Note, TextWithValue, IconLabel, ColorBar), `dialog.slint` (the look all dialogs
+  ScrollList, TouchSlider, SliderRow, Note, TextWithValue, IconLabel), `filament-swatch.slint` (FilamentSwatch and FilamentText, how every filament looks), `dialog.slint` (the look all dialogs
   share), `confirm-dialog.slint`, `messages-flyout.slint`, `keyboard.slint` (on-screen keyboard and keypad),
   `entry-dialogs.slint` (text and number entry), `macro-form.slint`, `print-dialogs.slint` (exclude objects, layer
   pause), `calibration-dialog.slint`, `spool-dialog.slint`, `mmu-tiles.slint`, `thumbnail.slint`, `chrome.slint` (status bar with what is running and the
   newest message, navigation), `system-tabs.slint`, `history.slint` (temperature chart), `light.slint` (light panel),
   `bed-map.slint` (objects on the bed), `bed-mesh.slint` (mesh map and profiles), `filament-path.slint`,
   `spool-strip.slint`, `busy-wheel.slint`. Messages (errors and informations) are kept in `status_log.rs`, pure logic
-  that `status_view.rs` shows. Colours of filament are one struct, `BarColors` (up to three colours and whether they
-  run along the filament), which `ColorBar` draws.
+  that `status_view.rs` shows. Colours of filament are one struct, `BarColors` (up to six colours and whether they
+  run along the filament), which `FilamentSwatch` draws.
 - `pages/`: print (with the file list in `files.slint` and the prepared file in `print-prepared.slint`), move (with the Calibrate tab in `calibrate.slint`), temperature, tune, filament (with Happy Hare the
   tabs Gates in `mmu.slint` with the dialogs in `mmu-dialogs.slint`, Extruder, Tools in `mmu-tools.slint` and
   Service in `mmu-service.slint`;

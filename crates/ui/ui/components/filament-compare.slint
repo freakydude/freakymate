@@ -1,0 +1,237 @@
+// What a sliced file wants of a tool next to what it would print with: a grid for the tool dialog and a compact row
+// for the start dialog. Only facts are shown and what differs is yellow; no sentence and no advice, the person decides.
+
+import { Theme } from "../theme.slint";
+import { ToolLabel } from "tool-label.slint";
+import { ToolMatchItem } from "../structs.slint";
+import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
+
+// One text cell of the grid; a missing value is just an empty cell.
+component CompareCell inherits VerticalLayout {
+    in property <string> text;
+    in property <bool> warn;
+    // A small muted second line (shared tools, EndlessSpool reserve).
+    in property <string> note;
+    // A column title: muted and small.
+    in property <bool> heading;
+
+    // A preferred width of zero makes the two columns equally wide in every row, whatever their text needs.
+    horizontal-stretch: 1;
+    min-width: 0px;
+    preferred-width: 0px;
+    alignment: center;
+    // `min-width: 0px` lets a long name elide instead of pushing the other column.
+    Text {
+        min-width: 0px;
+        text: root.text;
+        color: root.warn ? Theme.warning : root.heading ? Theme.muted : Theme.foreground;
+        font-size: root.heading ? Theme.font-small : Theme.font-normal;
+        overflow: elide;
+    }
+    if root.note != "": Text {
+        min-width: 0px;
+        text: root.note;
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        overflow: elide;
+    }
+}
+
+// One row of the grid: the label and a cell for each side, at the same height whatever the cells hold.
+component CompareRow inherits HorizontalLayout {
+    in property <string> label;
+
+    spacing: Theme.spacing;
+    min-height: 36px;
+    Text {
+        width: 110px;
+        text: root.label;
+        color: Theme.muted;
+        font-size: Theme.font-normal;
+        vertical-alignment: center;
+    }
+    @children
+}
+
+// Rows Material, Colour, Weight and Name, the file against the source (a gate or the spool in use). A row both sides
+// leave empty is left out.
+export component FilamentCompare inherits VerticalLayout {
+    in property <ToolMatchItem> mapping;
+    // "Gate 3", "Spool".
+    in property <string> source-title;
+
+    property <bool> no-gate: root.mapping.verdict == "no-gate";
+    property <bool> has-material: root.mapping.wanted-material != "" || root.mapping.loaded-material != "" || root.mapping.gate-empty || root.no-gate;
+    property <bool> has-colour: root.mapping.wanted-colors.count > 0 || root.mapping.loaded-colors.count > 0 || root.mapping.gate-empty;
+    property <bool> has-weight: root.mapping.needed-weight != "" || root.mapping.loaded-weight != "";
+    property <bool> has-name: root.mapping.wanted-profile != "" || root.mapping.loaded-name != "";
+    // Wide enough for three colours side by side or a gradient of six, so a multi-colour spool stays readable.
+    property <length> swatch-width: 112px;
+    property <length> swatch-height: 40px;
+
+    spacing: Theme.spacing-small;
+    // The same row type as below, so the titles sit exactly over the columns.
+    CompareRow {
+        min-height: 20px;
+        CompareCell { text: @tr("File"); heading: true; }
+        CompareCell { text: root.source-title; heading: true; }
+    }
+    if root.has-material: CompareRow {
+        label: @tr("Material");
+        CompareCell { text: root.mapping.wanted-material; }
+        CompareCell {
+            text: root.mapping.gate-empty ? @tr("Empty") : root.no-gate ? @tr("No gate") : root.mapping.loaded-material;
+            warn: root.mapping.gate-empty || root.no-gate || root.mapping.material-differs;
+        }
+    }
+    if root.has-colour: CompareRow {
+        label: @tr("Colour");
+        // The frame of the swatch is the only mark: a colour comparison is only an estimate.
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            preferred-width: 0px;
+            alignment: start;
+            FilamentSwatch {
+                width: root.swatch-width;
+                height: root.swatch-height;
+                colors: root.mapping.wanted-colors;
+                empty: root.mapping.wanted-colors.count == 0;
+            }
+        }
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            preferred-width: 0px;
+            alignment: start;
+            FilamentSwatch {
+                width: root.swatch-width;
+                height: root.swatch-height;
+                colors: root.mapping.gate-empty ? root.mapping.loaded-colors : FilamentColors.generic(root.mapping.loaded-colors);
+                empty: root.mapping.gate-empty || root.no-gate;
+                warn: root.mapping.used && root.mapping.color-differs;
+            }
+        }
+    }
+    if root.has-weight: CompareRow {
+        label: @tr("Weight");
+        CompareCell {
+            text: root.mapping.needed-weight;
+            note: root.mapping.shared-tools;
+        }
+        CompareCell {
+            text: root.mapping.loaded-weight;
+            warn: root.mapping.weight-differs;
+            note: root.mapping.reserve-weight != "" ? @tr("{} EndlessSpool", root.mapping.reserve-weight) : "";
+        }
+    }
+    if root.has-name: CompareRow {
+        label: @tr("Name");
+        CompareCell { text: root.mapping.wanted-profile; }
+        CompareCell { text: root.mapping.loaded-name; }
+    }
+}
+
+// A tool of the start dialog in one row: tool, what the file wants, and (G{gate} only with a gate choice) what it would
+// print with. Both sides have the same build: a colour field over the full height (room for several colours), the
+// material, below it the weight.
+export component FilamentCompareRow inherits Rectangle {
+    in property <ToolMatchItem> mapping;
+    in property <bool> with-gates;
+
+    property <bool> no-gate: root.mapping.verdict == "no-gate";
+    property <bool> has-supply: !root.mapping.gate-empty && !root.no-gate;
+    property <length> swatch-width: 36px;
+
+    height: 56px;
+    background: Theme.surface-raised;
+    border-radius: Theme.radius;
+
+    HorizontalLayout {
+        padding: Theme.spacing-medium;
+        padding-left: Theme.padding;
+        padding-right: Theme.padding;
+        spacing: Theme.spacing;
+        ToolLabel {
+            width: 40px;
+            tool: root.mapping.tool;
+            vertical-alignment: center;
+        }
+        // The file's side.
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            preferred-width: 0px;
+            spacing: Theme.spacing;
+            FilamentSwatch {
+                width: root.swatch-width;
+                colors: root.mapping.wanted-colors;
+                empty: root.mapping.wanted-colors.count == 0;
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                min-width: 0px;
+                alignment: center;
+                Text {
+                    text: root.mapping.wanted-material;
+                    color: Theme.foreground;
+                    font-size: Theme.font-normal;
+                    overflow: elide;
+                }
+                Text {
+                    text: root.mapping.shared-tools != "" ? root.mapping.needed-weight + " · " + root.mapping.shared-tools : root.mapping.needed-weight;
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                    overflow: elide;
+                }
+            }
+        }
+        // The side it would print with.
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            preferred-width: 0px;
+            spacing: Theme.spacing;
+            if root.with-gates && root.mapping.gate >= 0: Text {
+                width: 28px;
+                text: "G" + root.mapping.gate;
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                vertical-alignment: center;
+            }
+            // An empty gate keeps its field as a dashed outline; without a gate there is no field.
+            if !root.no-gate: FilamentSwatch {
+                width: root.swatch-width;
+                colors: root.mapping.gate-empty ? root.mapping.loaded-colors : FilamentColors.generic(root.mapping.loaded-colors);
+                empty: root.mapping.gate-empty;
+                warn: root.mapping.used && root.mapping.color-differs;
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                min-width: 0px;
+                alignment: center;
+                Text {
+                    // Without MMU a missing tool is a missing command `T<n>` in Klipper, not a missing gate.
+                    text: root.no-gate ? (root.with-gates ? @tr("No gate") : @tr("No T{}", root.mapping.tool)) : root.mapping.gate-empty ? @tr("Empty") : root.mapping.loaded-material;
+                    color: !root.has-supply || root.mapping.material-differs ? Theme.warning : Theme.foreground;
+                    font-size: Theme.font-normal;
+                    overflow: elide;
+                }
+                if root.has-supply && (root.mapping.loaded-weight != "" || root.mapping.reserve-weight != ""): HorizontalLayout {
+                    spacing: Theme.spacing-medium;
+                    Text {
+                        text: root.mapping.loaded-weight;
+                        color: root.mapping.weight-differs ? Theme.warning : Theme.muted;
+                        font-size: Theme.font-small;
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        min-width: 0px;
+                        text: root.mapping.reserve-weight != "" ? @tr("{} EndlessSpool", root.mapping.reserve-weight) : "";
+                        color: Theme.muted;
+                        font-size: Theme.font-small;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+    }
+}

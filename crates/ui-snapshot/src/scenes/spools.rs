@@ -4,7 +4,7 @@ use super::mmu::filament_path_midway;
 use crate::session::Session;
 use freakymate::{Confirm, Navigation, Page, Printer, SpoolPicker};
 use freakymate_core::Command;
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, ModelRc, VecModel};
 use std::time::Duration;
 
 /// Without Spoolman in Moonraker there is nothing to show and the scene is skipped.
@@ -41,16 +41,11 @@ pub(super) fn spools(session: &mut Session) -> Result<(), String> {
 
     session.presenter.request_files();
     session.settle_replies(Duration::from_secs(2));
-    let hints: Vec<SharedString> =
-        session.presenter.print_hints("long_job.gcode").into_iter().map(Into::into).collect();
-    session.window.global::<Confirm>().invoke_ask_for_items(
-        "Start print".into(),
+    let tools = session.presenter.start_tools("long_job.gcode");
+    session.window.global::<Confirm>().invoke_ask_to_start(
         "long_job".into(),
-        ModelRc::new(VecModel::from(hints)),
-        true,
-        "start-print".into(),
         "long_job.gcode".into(),
-        false,
+        ModelRc::new(VecModel::from(tools)),
     );
     session.pump(Duration::from_millis(300));
     session.capture("confirm-start-hints")?;

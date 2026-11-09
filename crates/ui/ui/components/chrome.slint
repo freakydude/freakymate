@@ -47,7 +47,7 @@ component UnreadCounter inherits Rectangle {
     border-radius: 13px;
     background: Theme.danger-fill;
     counter-row := HorizontalLayout {
-        padding-left: 6px;
+        padding-left: Theme.spacing-medium;
         padding-right: 9px;
         spacing: 3px;
         Image {
@@ -74,15 +74,15 @@ export component StatusBar inherits Rectangle {
         : Printer.mmu-action != "" && Printer.mmu-action != "Idle" ? Printer.mmu-action
         : Network.busy;
     property <Severity> severity: StateIcons.summary-severity();
-    property <bool> shows-progress: Printer.ready && (Printer.print-state == "printing" || Printer.print-state == "paused");
+    property <bool> shows-progress: !StateIcons.print-page-open() && Printer.ready && (Printer.print-state == "printing" || Printer.print-state == "paused");
 
     height: 44px;
     background: Theme.surface;
 
     HorizontalLayout {
-        padding-left: 4px;
-        padding-right: 2px;
-        spacing: 12px;
+        padding-left: Theme.spacing-small;
+        padding-right: Theme.spacing-tight;
+        spacing: Theme.spacing-large;
 
         // State and messages in one field. The state rests here; an event (an error or an information) lies in
         // front of it for a while; a tap opens the message list, or closes it.
@@ -105,13 +105,13 @@ export component StatusBar inherits Rectangle {
             }
 
             HorizontalLayout {
-                padding-left: 6px;
-                padding-right: 6px;
-                spacing: 8px;
+                padding-left: Theme.spacing-medium;
+                padding-right: Theme.spacing-medium;
+                spacing: Theme.spacing;
 
                 if Printer.status-message-visible: HorizontalLayout {
                     horizontal-stretch: 1;
-                    spacing: 8px;
+                    spacing: Theme.spacing;
                     Image {
                         cross-axis-self-alignment: center;
                         source: Printer.status-message-error ? Icons.ui-error : Icons.ui-info;
@@ -150,7 +150,7 @@ export component StatusBar inherits Rectangle {
 
                 if !Printer.status-message-visible && root.activity == "": HorizontalLayout {
                     horizontal-stretch: 1;
-                    spacing: 8px;
+                    spacing: Theme.spacing;
                     Image {
                         cross-axis-self-alignment: center;
                         source: StateIcons.summary();
@@ -161,7 +161,7 @@ export component StatusBar inherits Rectangle {
                     // The progress of a print stays whole when the detail is shortened.
                     HorizontalLayout {
                         horizontal-stretch: 1;
-                        spacing: 8px;
+                        spacing: Theme.spacing;
                         if StateIcons.summary-label() != "": Text {
                             min-width: self.preferred-width;
                             text: StateIcons.summary-label();
@@ -299,7 +299,7 @@ component NavItem inherits Rectangle {
     }
     VerticalLayout {
         alignment: center;
-        spacing: 2px;
+        spacing: Theme.spacing-tight;
         Image {
             cross-axis-self-alignment: center;
             source: root.icon;

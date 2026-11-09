@@ -6,7 +6,8 @@ import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, MmuDialogs, MmuGateItem, Navigation, Printer } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
-import { ButtonKind, Card, ColorBar, IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
+import { ButtonKind, Card, IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
+import { FilamentColors, FilamentSwatch } from "../components/filament-swatch.slint";
 import { FilamentPath } from "../components/filament-path.slint";
 import { BufferGauge, BypassTile, GateTile, MmuTexts, SlotTile } from "../components/mmu-tiles.slint";
 
@@ -18,7 +19,6 @@ component MmuRecoverRow inherits HorizontalLayout {
         icon: Icons.mmu-recover;
         text: @tr("Recover");
         horizontal: true;
-        kind: ButtonKind.accent;
         clicked => { Actions.mmu-recover(); }
     }
     IconButton {
@@ -87,7 +87,7 @@ export component MmuGatesTab inherits Rectangle {
                 spacing: Theme.spacing;
                 VerticalLayout {
                     horizontal-stretch: 1;
-                    spacing: 8px;
+                    spacing: Theme.spacing;
                     // Gate to nozzle with the sensors on the way; further sensors below as chips.
                     FilamentPath { path: Printer.mmu-path; }
                     // Grid with equal columns, so every name gets the same width.
@@ -119,7 +119,7 @@ export component MmuGatesTab inherits Rectangle {
                         }
                         // The ends named beside the gauge, so the card keeps its height with the filament path above.
                         HorizontalLayout {
-                            spacing: 8px;
+                            spacing: Theme.spacing;
                             Text { text: @tr("Tension"); color: Theme.muted; font-size: Theme.font-small; vertical-alignment: center; }
                             gauge := BufferGauge {
                                 horizontal-stretch: 1;
@@ -188,13 +188,12 @@ export component MmuStrip inherits Card {
             }
             Rectangle { horizontal-stretch: 1; }
             // The spool of the gate in use: its colours, its filament and what is left of it.
-            if Printer.has-spool: ColorBar {
+            if Printer.has-spool: FilamentSwatch {
                 cross-axis-self-alignment: center;
                 width: 34px;
                 height: 12px;
-                border-radius: 6px;
-                colors: Printer.spool-colors;
-                generic: true;
+                radius: 6px;
+                colors: FilamentColors.generic(Printer.spool-colors);
             }
             if Printer.has-spool: TextWithValue {
                 alignment: end;

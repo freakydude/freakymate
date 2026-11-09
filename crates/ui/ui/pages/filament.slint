@@ -9,7 +9,7 @@ import { SpoolStrip } from "../components/spool-strip.slint";
 import { MmuGatesTab } from "mmu.slint";
 import { BypassDialog, GateDialog } from "mmu-dialogs.slint";
 import { MmuServiceTab } from "mmu-service.slint";
-import { MmuToolsTab, ToolDialog } from "mmu-tools.slint";
+import { EndlessSpoolDialog, MmuToolsTab, ToolDialog, ToolGateDialog } from "mmu-tools.slint";
 
 component ExtruderTab inherits Rectangle {
     VerticalLayout {
@@ -180,5 +180,7 @@ export component FilamentPage inherits Rectangle {
     if root.tab == FilamentTab.gates: GateDialog { }
     if root.tab == FilamentTab.gates: BypassDialog { }
     if root.tab == FilamentTab.tools: ToolDialog { }
+    if root.tab == FilamentTab.tools: ToolGateDialog { }
+    if root.tab == FilamentTab.tools: EndlessSpoolDialog { }
 }
 

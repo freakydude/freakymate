@@ -62,6 +62,22 @@ pub struct ScrewAdjustment {
     pub turns: String,
 }
 
+/// A screw that needs less than this many clock minutes (`00:10`, a sixth of a turn) counts as level.
+const LEVEL_BELOW_MINUTES: u32 = 10;
+
+impl ScrewAdjustment {
+    /// The turn in clock minutes (`01:15` is 75); `None` if the text is not `HH:MM`.
+    fn turn_minutes(&self) -> Option<u32> {
+        let (hours, minutes) = self.turns.split_once(':')?;
+        Some(hours.parse::<u32>().ok()? * 60 + minutes.parse::<u32>().ok()?)
+    }
+
+    /// Whether the screw needs so little that it counts as done: under `00:10`. The base screw is never turned.
+    pub fn is_level(&self) -> bool {
+        !self.is_base && self.turn_minutes().is_some_and(|minutes| minutes < LEVEL_BELOW_MINUTES)
+    }
+}
+
 /// The bed mesh in use and the saved profiles.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BedMeshState {
@@ -265,6 +281,23 @@ mod tests {
         };
         assert_eq!(mode("adjust", 2), screw("screw 3", false));
         assert_eq!(mode("fine", 0), screw("front left", true));
+    }
+
+    #[test]
+    fn a_screw_under_ten_clock_minutes_is_level_but_the_base_screw_is_not() {
+        let screw = |is_base: bool, turns: &str| ScrewAdjustment {
+            name: "front left".into(),
+            z: 2.5,
+            is_base,
+            clockwise: true,
+            turns: turns.into(),
+        };
+        assert!(screw(false, "00:00").is_level());
+        assert!(screw(false, "00:09").is_level());
+        assert!(!screw(false, "00:10").is_level());
+        assert!(!screw(false, "01:00").is_level());
+        assert!(!screw(false, "").is_level());
+        assert!(!screw(true, "00:00").is_level());
     }
 
     #[test]

@@ -221,9 +221,8 @@ fn bind_spools(actions: &Actions, service: &PrinterService, presenter: &Rc<Prese
 
 /// The file list, the file prepared for the print page and the print itself.
 fn bind_files_and_print(actions: &Actions, service: &PrinterService, presenter: &Rc<Presenter>) {
-    actions.on_print_hints(with_presenter(presenter, |presenter, path: SharedString| {
-        let hints: Vec<SharedString> = presenter.print_hints(&path).into_iter().map(Into::into).collect();
-        ModelRc::new(VecModel::from(hints))
+    actions.on_start_tools(with_presenter(presenter, |presenter, path: SharedString| {
+        ModelRc::new(VecModel::from(presenter.start_tools(&path)))
     }));
     actions.on_refresh_files(run_presenter(presenter, Presenter::request_files));
     actions.on_toggle_file_mark(with_presenter(presenter, |presenter, path: SharedString| {

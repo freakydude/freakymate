@@ -34,7 +34,7 @@ is the BTT HDMI5 (5", 800x480, landscape).
 
 - **Print**: progress, layers, ETA and filament; pause, resume, cancel and exclude objects on a map of the bed; a file
   list with thumbnails, where **Prepare** makes a file the job of the print page and shows how its filament fits the
-  tools, with advice for a tool that does not fit (a hint, never a lock).
+  tools, as a comparison of file and gate (a hint, never a lock).
 - **Move**: jog, home, Quad Gantry Level or Z-Tilt; a **Calibrate** tab for bed screws, Z offset and the bed mesh with
   a coloured map and profiles.
 - **Thermal**: heaters with presets and temperature history, fans with a warning when one stops, sensors.

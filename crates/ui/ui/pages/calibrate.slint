@@ -23,7 +23,7 @@ component CardButton inherits IconButton {
 component ScrewRow inherits HorizontalLayout {
     in property <ScrewItem> screw;
     spacing: Theme.spacing;
-    height: 26px;
+    height: 30px;
     Text {
         horizontal-stretch: 1;
         text: root.screw.name;
@@ -32,18 +32,19 @@ component ScrewRow inherits HorizontalLayout {
         vertical-alignment: center;
         overflow: elide;
     }
+    // A screw that needs under 00:10 is done: a tick in the success colour instead of a direction.
     if !root.screw.is-base: Image {
-        source: root.screw.clockwise ? Icons.calibration-screw-clockwise : Icons.calibration-screw-counterclockwise;
-        colorize: Theme.foreground;
-        width: Theme.icon-medium;
-        height: Theme.icon-medium;
+        source: root.screw.level ? Icons.ui-check : root.screw.clockwise ? Icons.calibration-screw-clockwise : Icons.calibration-screw-counterclockwise;
+        colorize: root.screw.level ? Theme.success : Theme.foreground;
+        width: 28px;
+        height: 28px;
         cross-axis-self-alignment: center;
         accessible-role: image;
-        accessible-label: root.screw.clockwise ? @tr("clockwise") : @tr("counterclockwise");
+        accessible-label: root.screw.level ? @tr("level") : root.screw.clockwise ? @tr("clockwise") : @tr("counterclockwise");
     }
     Text {
         text: root.screw.is-base ? @tr("base") : root.screw.turns;
-        color: root.screw.is-base ? Theme.muted : Theme.foreground;
+        color: root.screw.is-base ? Theme.muted : root.screw.level ? Theme.success : Theme.foreground;
         font-size: Theme.font-normal;
         font-weight: root.screw.is-base ? 400 : 700;
         vertical-alignment: center;
@@ -126,7 +127,7 @@ component BedMeshCard inherits Card {
     if Printer.bed-mesh-map.shown: CardTile {
         clicked => { MeshDialogs.map-open = true; }
         HorizontalLayout {
-            padding: 6px;
+            padding: Theme.spacing-medium;
             spacing: Theme.spacing;
             Rectangle {
                 width: 44px;
@@ -155,8 +156,8 @@ component BedMeshCard inherits Card {
     CardTile {
         clicked => { MeshDialogs.profiles-open = true; }
         HorizontalLayout {
-            padding-left: 12px;
-            padding-right: 8px;
+            padding-left: Theme.dialog-padding;
+            padding-right: Theme.padding;
             spacing: Theme.spacing;
             Text {
                 horizontal-stretch: 1;

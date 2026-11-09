@@ -3,7 +3,7 @@
 
 // `updates`, `network`, `console` and `settings` (the Settings tab) are tabs of the system pages.
 // What a state or a message means; each meaning has one colour (`StateIcons.severity-color`).
-export enum Severity { neutral, fine, running, attention, error, info }
+export enum Severity { neutral, calm, fine, running, attention, error, info }
 
 export enum Page { print, move, temperature, tune, filament, console, system, settings, updates, network }
 
@@ -78,12 +78,16 @@ export struct FilamentSensorItem {
     detected: bool,
 }
 
-// The colours of a filament bar (`ColorBar`): up to three, how many there are (0 to 3), and whether they follow each
-// other along the filament instead of lying side by side (Spoolman's multi-colour filaments).
+// The colours of a filament (`FilamentSwatch`): up to six, how many there are (0 to 6), and whether they
+// follow each other along the filament instead of lying side by side (Spoolman's multi-colour filaments). A bar shows
+// the first three, a swatch all of them (a rainbow along the filament).
 export struct BarColors {
     first: color,
     second: color,
     third: color,
+    fourth: color,
+    fifth: color,
+    sixth: color,
     count: int,
     longitudinal: bool,
 }
@@ -117,26 +121,42 @@ export struct ToolMatchItem {
     gate: int,
     // What the file of the job asks of the tool (see `Printer.mmu-match-file`); empty when it does not use the tool.
     used: bool,
-    wanted-color: color,
-    wanted-has-color: bool,
+    // The slicer's colour with its alpha, one at most (`count` 0 without).
+    wanted-colors: BarColors,
     wanted-material: string,
-    // Planned weight with unit, profile name of the slicer.
+    // Planned weight of the tool, an estimate of the slicer ("~54 g"); profile name of the slicer.
     wanted-weight: string,
     wanted-profile: string,
+    // The planned weight that comes from the spool the tool prints from, compared with `loaded-weight`: with the other
+    // tools of the file that share its gate ("~80 g"), named in `shared-tools` ("T0 + T2", empty when not shared).
+    needed-weight: string,
+    shared-tools: string,
     // "fits", "differs", "gate-empty", "no-gate", or "" when nothing can be compared.
     verdict: string,
-    // What differs, one line each.
-    differences: string,
     // The material in a short line: "PLA → ASA" when the filament differs (`material-differs`), else what the file
     // asks for; empty when the file names none.
     material-line: string,
     material-differs: bool,
-    // What can make the tool fit, one line each; empty when it fits (Tools tab only).
-    advice: string,
-    // The gate whose filament the advice changes, for a button that opens it; -1 for none.
-    gate-to-load: int,
     // Per gate index: the gate's filament fits what the file asks of the tool.
     fitting-gates: [bool],
+    // What the tool prints with (its gate's spool first, else what Happy Hare knows; without MMU the spool in use):
+    // material, colours, the name of spool or filament, the grams left with unit (only with Spoolman) and, with
+    // EndlessSpool, everything the group can still give ("∞ 244 g") and what it adds to the own grams ("+230 g"),
+    // both only when the own grams are known; each empty when unknown. `gate-empty`: Happy Hare reports the gate as
+    // empty.
+    loaded-material: string,
+    loaded-colors: BarColors,
+    loaded-name: string,
+    loaded-weight: string,
+    endless-weight: string,
+    reserve-weight: string,
+    gate-empty: bool,
+    // Which facts of a tool of the file differ from what its gate holds (see `material-differs`).
+    color-differs: bool,
+    weight-differs: bool,
+    // Only in `Printer.prepared-tools`: the tool's row in `Printer.mmu-tools`, so that a tap opens its dialog on the
+    // Tools tab; -1 when it has none there.
+    tools-row: int,
 }
 
 // A label of the temperature chart at `position`, a share from 0 to 1 along its axis.
@@ -147,7 +167,7 @@ export struct ChartLabel {
 
 // The way of the filament of the selected gate (Happy Hare's `filament_pos`, see `FilamentPath`). Sensors: -1 not
 // fitted, 0 free, 1 triggered; in order along the way: gate entry, gate exit, extruder, toolhead. `bowden-progress`
-// is 0 to 1 during a move through the bowden, -1 otherwise. The colours are those of the spool, as for `ColorBar`.
+// is 0 to 1 during a move through the bowden, -1 otherwise. The colours are those of the spool, as for `FilamentSwatch`.
 export struct FilamentPathItem {
     position: int,
     direction: int,
@@ -237,6 +257,8 @@ export struct ScrewItem {
     turns: string,
     clockwise: bool,
     is-base: bool,
+    // Needs under 00:10: done, nothing worth turning.
+    level: bool,
 }
 
 export struct FileItem {

@@ -43,10 +43,10 @@ pub(super) fn mmu_service(session: &mut Session) -> Result<(), String> {
     Ok(())
 }
 
-/// Where taps land in the 800x480 layout: the tile of T3 on the Tools tab, and gate 1 in the choice of gate.
-const TOOL_3_TILE: (f32, f32) = (380.0, 240.0);
-
-const TOOL_DIALOG_GATE_1: (f32, f32) = (300.0, 166.0);
+/// Where taps land in the 800x480 layout: the row of T3 on the Tools tab (without a file only its gate side), and gate 1
+/// in the choice of gate.
+const TOOL_3_GATE_SIDE: (f32, f32) = (600.0, 406.0);
+const GATE_DIALOG_GATE_1: (f32, f32) = (600.0, 206.0);
 
 /// Tools and EndlessSpool groups through the app to the fake, both set on the Tools tab only: T3 moves to gate 1 and
 /// gate 1 into the group of gate 0, with EndlessSpool on. In the 800x480 layout the move of T3 goes through taps:
@@ -62,14 +62,14 @@ pub(super) fn mmu_tools_and_groups(session: &mut Session) -> Result<(), String> 
         session.window.global::<Navigation>().set_page(Page::Filament);
         session.pump(Duration::from_millis(300));
         let before = tool_3_gate(session);
-        let (x, y) = TOOL_3_TILE;
+        let (x, y) = TOOL_3_GATE_SIDE;
         session.tap(x, y);
         session.pump(Duration::from_millis(500));
-        if session.window.global::<MmuDialogs>().get_tool() != 3 || tool_3_gate(session) != before {
-            return Err("a tap on the tile of T3 does not open the choice of gate, or it maps the tool".into());
+        if session.window.global::<MmuDialogs>().get_tool_gate() != 3 || tool_3_gate(session) != before {
+            return Err("a tap on the gate side of the row of T3 does not open the choice of gate, or it maps".into());
         }
-        session.show_page(Page::Filament, "filament-mmu-tool-dialog")?;
-        let (x, y) = TOOL_DIALOG_GATE_1;
+        session.show_page(Page::Filament, "filament-mmu-tool-gate-dialog")?;
+        let (x, y) = GATE_DIALOG_GATE_1;
         session.tap(x, y);
     } else {
         session.window.global::<Actions>().invoke_mmu_map_tool(3, 1);
@@ -77,7 +77,7 @@ pub(super) fn mmu_tools_and_groups(session: &mut Session) -> Result<(), String> 
     session.wait_until("T3 on gate 1", |snapshot| {
         snapshot.status.mmu.as_ref().is_some_and(|mmu| mmu.tool_to_gate.get(3) == Some(&1))
     })?;
-    if session.window.global::<MmuDialogs>().get_tool() != -1 {
+    if session.window.global::<MmuDialogs>().get_tool_gate() != -1 {
         return Err("the choice of gate stays open after a gate was tapped".into());
     }
     session.window.global::<Actions>().invoke_mmu_set_endless_spool_group(1, 0);
@@ -89,6 +89,9 @@ pub(super) fn mmu_tools_and_groups(session: &mut Session) -> Result<(), String> 
             .is_some_and(|mmu| mmu.gates.get(1).and_then(|gate| gate.endless_spool_group) == Some(0))
     })?;
     session.show_page(Page::Filament, "filament-mmu-tools")?;
+    session.window.global::<MmuDialogs>().set_endless_spool_open(true);
+    session.show_page(Page::Filament, "filament-mmu-endless-spool")?;
+    session.window.global::<MmuDialogs>().set_endless_spool_open(false);
     session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
     {
         let actions = session.window.global::<Actions>();

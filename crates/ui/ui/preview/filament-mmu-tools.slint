@@ -11,6 +11,11 @@ export component FilamentMmuToolsPreview inherits AppWindow {
         Navigation.page = Page.filament;
         Navigation.filament-tab = FilamentTab.tools;
         Printer.mmu-endless-spool = true;
-        Printer.mmu-tools = [{ tool: 0, gate: 0 }, { tool: 1, gate: 3 }, { tool: 2, gate: 2 }, { tool: 3, gate: 1 }];
+        Printer.mmu-tools = [
+            { tool: 0, gate: 0, loaded-material: "PLA", loaded-colors: { first: #e03131, count: 1 }, loaded-name: "Red PLA" },
+            { tool: 1, gate: 3, gate-empty: true },
+            { tool: 2, gate: 2, loaded-material: "ABS", loaded-colors: { first: #4dabf7, count: 1 } },
+            { tool: 3, gate: 1, loaded-material: "PETG", loaded-colors: { first: #37b24d, count: 1 }, loaded-name: "Green PETG" },
+        ];
     }
 }

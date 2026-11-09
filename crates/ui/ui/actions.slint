@@ -1,5 +1,7 @@
 // Everything the UI can ask of the app: the UI calls these callbacks, Rust implements them.
 
+import { ToolMatchItem } from "structs.slint";
+
 export global Actions {
     callback home(bool, bool, bool);
     callback jog(string, float);
@@ -127,8 +129,8 @@ export global Actions {
     // Spool id and the gross weight in grams as typed.
     callback measure-spool(int, string);
     callback apply-spool-preset();
-    // What differs between a file and the spools, as lines of text for the confirmation; empty if nothing.
-    pure callback print-hints(string) -> [string];
+    // The tools of a file that do not fit what they would print with, for the question before the start; empty if all fit.
+    pure callback start-tools(string) -> [ToolMatchItem];
     // Klipper would refuse the typed target of a heater (Klipper object, text as typed); false while it is no number.
     pure callback heater-target-outside(string, string) -> bool;
     callback open-macro-form(string);

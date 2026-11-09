@@ -1,6 +1,7 @@
-// Preview: Tools tab compared with the job's file. T0 fits, T1 sits on the empty gate 3, the file does not use T2,
-// T3 takes PETG where the file wants red PLA, and T4 has no gate. Open in the Slint preview or render with
-// scripts/ui-preview.sh.
+// Preview: Tools tab compared with the job's file, one row per tool. T0 fits; T1 wants red, gate 3 holds a red/gold
+// silk (coaxial) with 14 g and EndlessSpool behind it; T2 wants clear PETG, gate 1 holds a translucent blue; T3 wants
+// ASA, gate 2 holds PLA; T4 is not used; T5 has a rainbow along the filament but too little left; T6 sits on an empty
+// gate; T7 has no gate. Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
 import { FilamentTab, Navigation, Page, Printer } from "../state.slint";
@@ -11,30 +12,53 @@ export component FilamentMmuToolsMatchPreview inherits AppWindow {
         Sample.mmu();
         Navigation.page = Page.filament;
         Navigation.filament-tab = FilamentTab.tools;
-        Printer.mmu-match-file = "cube-mc5-all_pla-t0_t1_t3_t4.gcode";
-        Printer.mmu-match-summary = @tr("1 of 4 tools fit");
+        Printer.mmu-endless-spool = true;
+        Printer.mmu-match-file = "cube-mc8-silk_petg_asa-t0_t7.gcode";
+        Printer.mmu-match-summary = @tr("1 of 7 tools fit");
         Printer.mmu-match-verdict = "differs";
         Printer.mmu-tools = [
             {
-                tool: 0, gate: 0, used: true, wanted-color: #e03131, wanted-has-color: true, wanted-material: "PLA",
-                wanted-weight: "10.7 g", wanted-profile: "Elegoo PLA @ECC2", verdict: "fits",
-                fitting-gates: [true, false, false, false],
+                tool: 0, gate: 0, used: true, wanted-colors: { first: #111111, count: 1 }, wanted-material: "PLA",
+                wanted-weight: "~42 g", needed-weight: "~42 g", wanted-profile: "Generic PLA @0.4", verdict: "fits",
+                loaded-material: "PLA", loaded-colors: { first: #111111, count: 1 }, loaded-name: "Sunlu PLA Black",
+                loaded-weight: "812 g",
             },
             {
-                tool: 1, gate: 3, used: true, wanted-color: #f4e2c1, wanted-has-color: true, wanted-material: "PLA",
-                wanted-weight: "11.1 g", wanted-profile: "Elegoo PLA @ECC2", verdict: "gate-empty",
-                differences: "Gate 3 is empty.", fitting-gates: [false, false, false, false],
-            },
-            { tool: 2, gate: 2 },
-            {
-                tool: 3, gate: 1, used: true, wanted-color: #e8590c80, wanted-has-color: true, wanted-material: "PLA",
-                wanted-weight: "7.7 g", wanted-profile: "Elegoo PLA @ECC2", verdict: "differs",
-                differences: "Gate 1 holds PETG.\nGate 1 has another colour.", fitting-gates: [true, false, false, false],
+                tool: 1, gate: 3, used: true, wanted-colors: { first: #d1312a, count: 1 }, wanted-material: "PLA Silk",
+                wanted-weight: "~18 g", needed-weight: "~18 g", wanted-profile: "Eryone Silk Red", verdict: "differs", color-differs: true,
+                loaded-material: "PLA Silk", loaded-colors: { first: #d1312a, second: #d9a72b, count: 2 },
+                loaded-name: "Eryone Silk Dual Red/Gold", loaded-weight: "14 g", endless-weight: "∞ 244 g", reserve-weight: "+230 g",
             },
             {
-                tool: 4, gate: -1, used: true, wanted-color: #ffffff00, wanted-has-color: true, wanted-material: "PETG", wanted-weight: "3.1 g",
-                wanted-profile: "Elegoo PETG @ECC2 - Copy", verdict: "no-gate",
-                differences: "The printer has no gate for T4.",
+                tool: 2, gate: 1, used: true, wanted-colors: { first: #e8f1f733, count: 1 }, wanted-material: "PETG",
+                wanted-weight: "~25 g", needed-weight: "~25 g", wanted-profile: "Generic PETG Clear", verdict: "differs", color-differs: true,
+                loaded-material: "PETG", loaded-colors: { first: #3d8bfd66, count: 1 },
+                loaded-name: "Prusament PETG Clear Blue", loaded-weight: "540 g",
+            },
+            {
+                tool: 3, gate: 2, used: true, wanted-colors: { first: #f4f4f0, count: 1 }, wanted-material: "ASA",
+                wanted-weight: "~60 g", needed-weight: "~80 g", shared-tools: "T0 + T2", wanted-profile: "Generic ASA", verdict: "differs", material-differs: true,
+                loaded-material: "PLA", loaded-colors: { first: #f4f4f0, count: 1 },
+                loaded-name: "Polymaker PolyTerra PLA Cotton White", loaded-weight: "690 g",
+            },
+            {
+                tool: 4, gate: 4, loaded-material: "PEEK-CF", loaded-colors: { first: #3a3a38, count: 1 },
+                loaded-name: "3DXTech CarbonX PEEK-CF Black",
+            },
+            {
+                tool: 5, gate: 5, used: true, wanted-colors: { first: #e03131, count: 1 }, wanted-material: "PLA",
+                wanted-weight: "~40 g", needed-weight: "~40 g", wanted-profile: "Rainbow PLA", verdict: "differs", weight-differs: true,
+                loaded-material: "PLA",
+                loaded-colors: { first: #e03131, second: #f59f00, third: #fcc419, fourth: #37b24d, fifth: #1c7ed6, sixth: #7048e8, count: 6, longitudinal: true },
+                loaded-name: "Sunlu Rainbow PLA", loaded-weight: "25 g",
+            },
+            {
+                tool: 6, gate: 6, used: true, wanted-colors: { first: #1f9e89, count: 1 }, wanted-material: "TPU 95A",
+                wanted-weight: "~8 g", needed-weight: "~8 g", wanted-profile: "Generic TPU", verdict: "gate-empty", gate-empty: true,
+            },
+            {
+                tool: 7, gate: -1, used: true, wanted-colors: { first: #ffffff00, count: 1 }, wanted-material: "PA6-GF30",
+                wanted-weight: "~3.1 g", needed-weight: "~3.1 g", wanted-profile: "Fiberon PA6-GF30", verdict: "no-gate",
             },
         ];
     }

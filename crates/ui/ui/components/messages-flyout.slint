@@ -32,8 +32,8 @@ export component MessagesFlyout inherits Rectangle {
         height: root.height - 58px;
 
         VerticalLayout {
-            padding: 10px;
-            spacing: 8px;
+            padding: Theme.padding;
+            spacing: Theme.spacing;
             DialogHeader {
                 title: @tr("Messages");
                 close => { Navigation.close-messages(); }
@@ -62,8 +62,8 @@ export component MessagesFlyout inherits Rectangle {
                     background: Theme.surface-raised;
                     border-radius: Theme.radius;
                     HorizontalLayout {
-                        padding: 10px;
-                        spacing: 10px;
+                        padding: Theme.padding;
+                        spacing: Theme.spacing;
                         Image {
                             y: 0px;
                             source: message.is-error ? Icons.ui-error : Icons.ui-info;

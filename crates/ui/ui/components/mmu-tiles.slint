@@ -4,8 +4,8 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { MmuGateItem, Printer } from "../state.slint";
-import { StateIcons } from "../state-icons.slint";
-import { ColorBar, IconLabel } from "controls.slint";
+import { IconLabel } from "controls.slint";
+import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
 
 // Texts of the buffer and FlowGuard and the colour of FlowGuard, shared by the Gates tab and the strip on the print page.
 export global MmuTexts {
@@ -22,11 +22,11 @@ export global MmuTexts {
         if (state == "monitoring") { return @tr("FlowGuard monitoring"); }
         return @tr("FlowGuard ready");
     }
-    // Ready and monitoring are fine; tangle prevention is a deviation, triggered an error.
+    // Ready and monitoring are the normal state and stay grey; tangle prevention is a deviation, triggered an error.
     pure public function flowguard-color(state: string) -> color {
         if (state == "triggered") { return Theme.danger; }
         if (state == "boosting") { return Theme.warning; }
-        return Theme.success;
+        return Theme.muted;
     }
     pure public function availability(availability: string) -> string {
         if (availability == "available") { return @tr("Available"); }
@@ -43,7 +43,7 @@ export component GateAvailabilityLabel inherits IconLabel {
 
     icon: root.has-filament ? Icons.mmu-gate-available : root.availability == "empty" ? Icons.mmu-gate-empty : Icons.mmu-gate-unknown;
     text: MmuTexts.availability(root.availability);
-    color: StateIcons.ok-color(root.has-filament, root.availability == "empty" ? Theme.warning : Theme.muted);
+    color: root.availability == "empty" ? Theme.warning : Theme.muted;
     font-size: Theme.font-small;
 }
 
@@ -52,6 +52,9 @@ export component SlotTile inherits Rectangle {
     in property <bool> selected;
     in property <string> label;
     in property <bool> enabled: true;
+    // Room between the border and the content; a tile with a colour edge sets its own.
+    in property <length> content-padding: 10px;
+    out property <bool> pressed: tile-touch.pressed;
     callback clicked;
 
     border-radius: Theme.radius;
@@ -66,7 +69,7 @@ export component SlotTile inherits Rectangle {
         clicked => { root.clicked(); }
     }
     VerticalLayout {
-        padding: 10px;
+        padding: root.content-padding;
         spacing: Theme.spacing-medium;
         @children
     }
@@ -83,69 +86,103 @@ export component VerdictIcon inherits Image {
     colorize: root.verdict == "fits" ? Theme.success : Theme.warning;
 }
 
+// A gate as a tile: the colour of the filament as the left edge over the full height (`FilamentSwatch`), beside it the
+// gate and the tools that take its filament, the material (smaller in steps when long, never cut), the name or spool and
+// what is left of it, and whether the gate has filament.
 export component GateTile inherits SlotTile {
     in property <MmuGateItem> gate;
 
     property <bool> has-filament: root.gate.availability == "available" || root.gate.availability == "buffered";
     property <bool> shows-spool: Printer.has-spoolman && root.has-filament;
+    property <string> material: root.gate.material == "" ? "-" : root.gate.material;
+    // Long materials (PEEK-CF, PA6-GF30) step down instead of being cut.
+    property <length> material-size: root.material.character-count <= 5 ? 19px : root.material.character-count <= 7 ? 16px : 14px;
 
     selected: root.gate.selected;
     label: @tr("Gate {}", root.gate.index);
+    // The selection border takes 3 px; the colour edge sits inside it, otherwise it forms the corner of the tile.
+    content-padding: root.selected ? 3px : 0px;
 
     HorizontalLayout {
-        spacing: Theme.spacing-medium;
-        Text {
-            text: @tr("Gate {}", root.gate.index);
-            color: Theme.foreground;
-            font-size: Theme.font-normal;
-            font-weight: 700;
+        spacing: Theme.spacing;
+        FilamentSwatch {
+            width: 16px;
+            left-edge: true;
+            radius: root.selected ? Theme.radius - 3px : Theme.radius;
+            colors: root.has-filament ? FilamentColors.generic(root.gate.colors) : root.gate.colors;
+            empty: !root.has-filament;
+            gap-color: root.pressed ? Theme.surface-active : Theme.surface-raised;
+            ground: root.selected ? self.gap-color : Theme.background;
         }
-        // The tools that take their filament from this gate; several share it after a remap.
-        Text {
+        VerticalLayout {
             horizontal-stretch: 1;
-            text: root.gate.tools;
-            color: Theme.accent;
-            font-size: Theme.font-normal;
-            font-weight: 700;
-            horizontal-alignment: right;
-            overflow: elide;
-        }
-        if root.gate.file-verdict != "": VerdictIcon {
-            cross-axis-self-alignment: center;
-            verdict: root.gate.file-verdict;
-        }
-    }
-    ColorBar {
-        height: 12px;
-        border-radius: 6px;
-        colors: root.gate.colors;
-        generic: root.has-filament;
-    }
-    Text {
-        text: root.gate.material == "" ? "-" : root.gate.material;
-        color: Theme.foreground;
-        font-size: Theme.font-large;
-        overflow: elide;
-    }
-    // With Spoolman the line of the filament name says what is left of the spool instead (the name repeats the
-    // material and the colour above); a gate without one invites to pick one in the gate's dialog. A spool that Happy
-    // Hare knows but Spoolman does not tell about (not reachable) shows its number.
-    Text {
-        text: !root.shows-spool ? root.gate.name : root.gate.spool-text != "" ? root.gate.spool-text : root.gate.spool-id >= 0 ? @tr("Spool #{}", root.gate.spool-id) : @tr("+ spool");
-        color: root.shows-spool && root.gate.spool-low ? Theme.warning : root.shows-spool && root.gate.spool-text == "" && root.gate.spool-id < 0 ? Theme.accent : Theme.muted;
-        font-size: Theme.font-small;
-        overflow: elide;
-    }
-    Rectangle { vertical-stretch: 1; }
-    HorizontalLayout {
-        GateAvailabilityLabel {
-            availability: root.gate.availability;
-        }
-        if Printer.mmu-endless-spool && root.gate.group >= 0: IconLabel {
-            icon: Icons.mmu-endless-spool;
-            text: root.gate.group;
-            color: Theme.muted;
-            font-size: Theme.font-small;
+            padding-top: Theme.spacing-medium;
+            padding-bottom: Theme.spacing-medium;
+            padding-right: 7px;
+            spacing: Theme.spacing-tight;
+            HorizontalLayout {
+                spacing: Theme.spacing-small;
+                Text {
+                    text: @tr("Gate {}", root.gate.index);
+                    color: Theme.foreground;
+                    font-size: Theme.font-normal;
+                    font-weight: 700;
+                }
+                // The tools that take their filament from this gate; several share it after a remap.
+                Text {
+                    horizontal-stretch: 1;
+                    text: root.gate.tools;
+                    color: Theme.accent;
+                    font-size: Theme.font-small;
+                    font-weight: 700;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+                if root.gate.file-verdict != "": VerdictIcon {
+                    cross-axis-self-alignment: center;
+                    verdict: root.gate.file-verdict;
+                }
+            }
+            Text {
+                min-width: self.preferred-width;
+                text: root.material;
+                color: root.has-filament ? Theme.foreground : Theme.muted;
+                font-size: root.material-size;
+                font-weight: 700;
+            }
+            // With Spoolman the lines say the spool's name and what is left of it; a gate without one invites to pick
+            // one in the gate's dialog. A spool that Happy Hare knows but Spoolman does not tell about (not
+            // reachable) shows its number. The name takes two lines, then `…`.
+            Text {
+                height: Theme.font-small * 2.3;
+                text: root.gate.name;
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                wrap: word-wrap;
+                overflow: elide;
+                vertical-alignment: top;
+            }
+            Text {
+                visible: root.shows-spool;
+                height: root.shows-spool ? self.preferred-height : 0px;
+                text: root.gate.spool-text != "" ? root.gate.spool-text : root.gate.spool-id >= 0 ? @tr("Spool #{}", root.gate.spool-id) : @tr("+ spool");
+                color: root.gate.spool-low ? Theme.warning : root.gate.spool-text == "" && root.gate.spool-id < 0 ? Theme.accent : Theme.muted;
+                font-size: Theme.font-small;
+                overflow: elide;
+            }
+            Rectangle { vertical-stretch: 1; }
+            HorizontalLayout {
+                GateAvailabilityLabel {
+                    availability: root.gate.availability;
+                }
+                if Printer.mmu-endless-spool && root.gate.group >= 0: IconLabel {
+                    icon: Icons.mmu-endless-spool;
+                    text: root.gate.group;
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                }
+            }
         }
     }
 }
@@ -191,7 +228,7 @@ export component BufferGauge inherits Rectangle {
 
     height: 18px;
     Rectangle {
-        border-radius: 4px;
+        border-radius: Theme.radius-small;
         background: Theme.border;
     }
     Rectangle {
@@ -203,7 +240,7 @@ export component BufferGauge inherits Rectangle {
         width: 8px;
         height: parent.height;
         x: clamp((root.bias + 1) / 2, 0, 1) * (parent.width - self.width);
-        border-radius: 4px;
+        border-radius: Theme.radius-small;
         background: root.marker-color;
     }
 }

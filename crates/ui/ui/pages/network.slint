@@ -27,9 +27,9 @@ component WifiRow inherits Rectangle {
         clicked => { root.selected(); }
     }
     HorizontalLayout {
-        padding-left: 10px;
+        padding-left: Theme.padding;
         padding: root.inset;
-        spacing: 8px;
+        spacing: Theme.spacing;
         Image {
             cross-axis-self-alignment: center;
             source: !root.network.in-range ? Icons.network-wifi-saved : root.network.bars >= 3 ? Icons.system-network : root.network.bars == 2 ? Icons.network-wifi-fair : Icons.network-wifi-weak;
@@ -221,7 +221,7 @@ component HostNetworkCard inherits Card {
         }
     }
     for interface in Network.host-interfaces: HorizontalLayout {
-        spacing: 8px;
+        spacing: Theme.spacing;
         height: 44px;
         IconLabel {
             width: 120px;

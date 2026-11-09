@@ -12,7 +12,7 @@ component Key inherits Rectangle {
     callback pressed;
     min-width: 40px;
     horizontal-stretch: 1;
-    border-radius: 6px;
+    border-radius: Theme.radius-small;
     background: root.accent ? (key-touch.pressed ? Theme.accent-pressed : Theme.accent)
         : (key-touch.pressed ? Theme.accent : Theme.surface-raised);
     property <color> content: root.accent || key-touch.pressed ? Theme.on-accent : Theme.foreground;

@@ -99,6 +99,7 @@ fn screw_item(screw: &ScrewAdjustment) -> ScrewItem {
         turns: screw.turns.as_str().into(),
         clockwise: screw.clockwise,
         is_base: screw.is_base,
+        level: screw.is_level(),
     }
 }
 

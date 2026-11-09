@@ -107,7 +107,7 @@ component AxesTab inherits Rectangle {
                 horizontal: true;
                 align-start: true;
                 vertical-stretch: 1;
-                kind: ButtonKind.accent;
+                done: Printer.homed-xy && Printer.homed-z;
                 clicked => { Actions.home(true, true, true); }
             }
             if Printer.can-quad-gantry-level || Printer.can-z-tilt: IconButton {

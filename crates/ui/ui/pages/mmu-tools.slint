@@ -1,118 +1,209 @@
-// Tools tab of the Filament page: which tool takes its filament from which gate (Happy Hare's tool-to-gate map) and
-// EndlessSpool with the groups of the gates. Both are set here only; the Gates tab shows them.
+// Tools tab of the Filament page: which tool takes its filament from which gate (Happy Hare's tool-to-gate map),
+// compared with the job's file, and EndlessSpool with the groups of the gates in a dialog. Both are set here only; the
+// Gates tab shows them.
 
 import { Theme } from "../theme.slint";
+import { ToolLabel } from "../components/tool-label.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, ToolMatchItem, Printer } from "../state.slint";
-import { Card, ColorBar, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
-import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
+import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, SpoolPicker, ToolMatchItem, Printer } from "../state.slint";
+import { BarColors } from "../structs.slint";
+import { ButtonKind, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
+import { FilamentCompare } from "../components/filament-compare.slint";
+import { FilamentColors, FilamentSwatch, FilamentText } from "../components/filament-swatch.slint";
+import { DialogHeader, DialogPanel, DialogTitle, Scrim } from "../components/dialog.slint";
 import { SlotTile, VerdictIcon } from "../components/mmu-tiles.slint";
 
-// The colour of a gate as a vertical bar, the way the tiles of the gates show it.
-export component GateColor inherits ColorBar {
-    in property <MmuGateItem> gate;
+// One side of a tool's row: a tap area with the filament's colour as its left edge over the full height.
+component FilamentHalf inherits Rectangle {
+    in property <BarColors> colors;
+    in property <bool> empty;
+    in property <bool> color-warn;
+    in property <bool> enabled: true;
+    in property <string> label;
+    callback clicked;
 
-    width: 10px;
-    height: 32px;
-    vertical: true;
-    colors: root.gate.colors;
-    generic: root.gate.availability == "available" || root.gate.availability == "buffered";
+    border-radius: Theme.radius-small;
+    background: touch.pressed ? Theme.surface-active : Theme.surface-raised;
+    accessible-role: button;
+    accessible-label: root.label;
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+    HorizontalLayout {
+        padding-right: Theme.padding;
+        spacing: Theme.spacing;
+        FilamentSwatch {
+            width: 44px;
+            left-edge: true;
+            ground: Theme.surface;
+            colors: root.colors;
+            empty: root.empty;
+            warn: root.color-warn;
+        }
+        @children
+    }
 }
 
-// The colour the file asks of a tool, as a dot beside the gate's bar; a clear filament shows the checkerboard.
-export component WantedColor inherits ColorBar {
+// A tool: left what the file asks of it, right the gate it takes its filament from and what that gate holds. Yellow
+// marks only what differs (material, colour as a frame, weight); tools the file does not use fade. Without a file to
+// compare only the gate side shows. The file side opens the tool's dialog, the gate side the choice of gate.
+component ToolRow inherits Rectangle {
     in property <ToolMatchItem> mapping;
+    in property <bool> has-file;
+    in property <bool> can-choose;
+    // The left side opens the tool's dialog, the right side the choice of its gate.
+    callback clicked-file;
+    callback clicked-gate;
 
-    width: 12px;
-    height: 12px;
-    border-radius: 6px;
-    colors: { first: root.mapping.wanted-color, count: 1 };
-}
-
-// A tool with the gate it takes its filament from, in that gate's colour and material; a tap opens the choice of gate.
-// With a file to compare, a dot shows the colour the file asks for and an icon whether the gate fits; tools the file
-// does not use fade.
-component ToolTile inherits SlotTile {
-    in property <ToolMatchItem> mapping;
-    property <MmuGateItem> gate: Printer.mmu-gates[root.mapping.gate];
     property <bool> has-gate: root.mapping.gate >= 0;
+    property <bool> differs: root.mapping.used && root.mapping.material-differs;
+    // Both sides equally wide: padding, tool number, arrow and four gaps take the rest.
+    property <length> half-width: (root.width - 10px - 40px - 18px - 4 * 5px) / 2;
 
-    label: "T" + root.mapping.tool;
-    opacity: Printer.mmu-match-file != "" && !root.mapping.used ? 0.45 : 1.0;
+    border-radius: Theme.radius;
+    background: Theme.surface;
+    opacity: root.has-file && !root.mapping.used ? 0.45 : 1.0;
 
     HorizontalLayout {
-        spacing: 8px;
-        Text {
-            min-width: 28px;
-            text: "T" + root.mapping.tool;
-            color: Theme.accent;
-            font-size: Theme.font-normal;
-            font-weight: 700;
-            vertical-alignment: center;
-        }
-        HorizontalLayout {
-            spacing: Theme.spacing-small;
-            if root.mapping.used && (root.mapping.wanted-has-color): WantedColor {
-                cross-axis-self-alignment: center;
-                mapping: root.mapping;
-            }
-            if root.has-gate: GateColor {
-                cross-axis-self-alignment: center;
-                gate: root.gate;
-            }
-        }
+        padding: 5px;
+        spacing: 5px;
         VerticalLayout {
-            horizontal-stretch: 1;
+            width: 40px;
             alignment: center;
-            Text {
-                text: root.has-gate ? @tr("Gate {}", root.mapping.gate) : @tr("No gate");
-                color: root.has-gate ? Theme.foreground : Theme.warning;
-                font-size: Theme.font-small;
-                overflow: elide;
+            spacing: Theme.spacing-tight;
+            ToolLabel {
+                horizontal-alignment: center;
+                tool: root.mapping.tool;
             }
-            // A tool of the file: what it asks for, both materials when they differ; else what the gate holds.
-            Text {
-                text: root.mapping.used && root.mapping.material-line != "" ? root.mapping.material-line : !root.has-gate ? "" : root.gate.material == "" ? "-" : root.gate.material;
-                color: root.mapping.used && root.mapping.material-differs ? Theme.warning : Theme.muted;
-                font-size: Theme.font-small;
-                overflow: elide;
+            if root.mapping.used && root.mapping.verdict != "": VerdictIcon {
+                x: (parent.width - self.width) / 2;
+                verdict: root.mapping.verdict;
             }
         }
-        VerdictIcon {
-            cross-axis-self-alignment: center;
-            verdict: root.mapping.used ? root.mapping.verdict : "";
+        if root.has-file: FilamentHalf {
+            width: root.half-width;
+            label: @tr("T{} in the file", root.mapping.tool);
+            colors: root.mapping.wanted-colors;
+            empty: !root.mapping.used;
+            enabled: root.mapping.used;
+            clicked => { root.clicked-file(); }
+            if root.mapping.used: FilamentText {
+                horizontal-stretch: 1;
+                material: root.mapping.wanted-material == "" ? "-" : root.mapping.wanted-material;
+                name: root.mapping.wanted-profile;
+                trail: root.mapping.wanted-weight;
+            }
+            if !root.mapping.used: FilamentText {
+                horizontal-stretch: 1;
+                material: @tr("Not used");
+                material-color: Theme.muted;
+            }
+        }
+        if root.has-file: Image {
+            width: 18px;
+            source: Icons.ui-chevron-right;
+            colorize: Theme.muted;
+        }
+        FilamentHalf {
+            horizontal-stretch: 1;
+            min-width: root.has-file ? root.half-width : 0px;
+            label: root.has-gate ? @tr("Gate {}", root.mapping.gate) : @tr("No gate");
+            colors: root.has-gate && !root.mapping.gate-empty ? FilamentColors.generic(root.mapping.loaded-colors) : root.mapping.loaded-colors;
+            empty: !root.has-gate || root.mapping.gate-empty;
+            color-warn: root.mapping.used && root.mapping.color-differs;
+            enabled: root.has-gate && (root.mapping.used || root.can-choose);
+            clicked => { root.clicked-gate(); }
+            if !root.has-gate: FilamentText {
+                horizontal-stretch: 1;
+                material: @tr("No gate");
+                material-warn: true;
+                lead: @tr("The printer has no T{}", root.mapping.tool);
+            }
+            if root.has-gate && root.mapping.gate-empty: FilamentText {
+                horizontal-stretch: 1;
+                material: @tr("Empty");
+                material-warn: root.mapping.used;
+                lead: @tr("Gate {}", root.mapping.gate);
+            }
+            if root.has-gate && !root.mapping.gate-empty: FilamentText {
+                horizontal-stretch: 1;
+                material: root.mapping.loaded-material == "" ? "-" : root.mapping.loaded-material;
+                material-warn: root.differs;
+                lead: @tr("Gate {}", root.mapping.gate);
+                name: root.mapping.loaded-name;
+                trail: root.mapping.loaded-weight;
+                trail-warn: root.mapping.used && root.mapping.weight-differs;
+                extra: root.mapping.endless-weight;
+            }
         }
     }
 }
 
-// The file the tools are compared with and how many of its tools fit.
-component MatchLine inherits HorizontalLayout {
-    spacing: Theme.spacing-medium;
-    height: 20px;
-    Image {
-        cross-axis-self-alignment: center;
-        width: 18px;
-        height: 18px;
-        source: Icons.file-gcode;
-        colorize: Theme.muted;
-    }
-    Text {
+// Above the tools: what they are compared with and how many fit, or only the title without a file; then EndlessSpool
+// and Reset.
+component ToolsHeader inherits HorizontalLayout {
+    spacing: Theme.spacing;
+    height: 40px;
+    if Printer.mmu-match-file == "": Text {
         horizontal-stretch: 1;
-        text: Printer.mmu-match-file;
-        color: Theme.foreground;
+        text: @tr("Tool-to-gate map");
+        color: Theme.muted;
         font-size: Theme.font-small;
         vertical-alignment: center;
-        overflow: elide;
     }
-    VerdictIcon {
-        cross-axis-self-alignment: center;
-        verdict: Printer.mmu-match-verdict;
+    if Printer.mmu-match-file != "": HorizontalLayout {
+        horizontal-stretch: 1;
+        spacing: Theme.spacing-medium;
+        VerdictIcon {
+            y: (parent.height - self.height) / 2;
+            verdict: Printer.mmu-match-verdict;
+        }
+        Text {
+            text: Printer.mmu-match-summary;
+            color: Printer.mmu-match-verdict == "differs" ? Theme.warning : Theme.foreground;
+            font-size: Theme.font-label;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+        Image {
+            y: (parent.height - self.height) / 2;
+            width: 16px;
+            height: 16px;
+            source: Icons.file-gcode;
+            colorize: Theme.muted;
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: Printer.mmu-match-file;
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            vertical-alignment: center;
+            overflow: elide;
+        }
     }
-    Text {
-        text: Printer.mmu-match-summary;
-        color: Printer.mmu-match-verdict == "differs" ? Theme.warning : Theme.foreground;
-        font-size: Theme.font-small;
-        vertical-alignment: center;
+    // Marked while EndlessSpool is on.
+    IconButton {
+        width: 168px;
+        height: 40px;
+        icon: Icons.mmu-endless-spool;
+        icon-size: Theme.icon-small;
+        text: @tr("EndlessSpool");
+        checked: Printer.mmu-endless-spool;
+        horizontal: true;
+        clicked => { MmuDialogs.endless-spool-open = true; }
+    }
+    IconButton {
+        width: 112px;
+        height: 40px;
+        icon: Icons.ui-refresh;
+        icon-size: Theme.icon-small;
+        text: @tr("Reset");
+        horizontal: true;
+        clicked => {
+            Confirm.ask(@tr("Reset tools"), @tr("Every tool takes its filament from the gate configured for it again, usually the gate of its number."), "mmu-reset-tool-map", "", false);
+        }
     }
 }
 
@@ -120,10 +211,14 @@ component MatchLine inherits HorizontalLayout {
 component GroupRow inherits HorizontalLayout {
     in property <MmuGateItem> gate;
 
-    spacing: 8px;
-    GateColor {
+    spacing: Theme.spacing;
+    FilamentSwatch {
         cross-axis-self-alignment: center;
-        gate: root.gate;
+        width: 10px;
+        height: 32px;
+        radius: 3px;
+        colors: !self.empty ? FilamentColors.generic(root.gate.colors) : root.gate.colors;
+        empty: root.gate.availability != "available" && root.gate.availability != "buffered";
     }
     VerticalLayout {
         horizontal-stretch: 1;
@@ -151,53 +246,58 @@ component GroupRow inherits HorizontalLayout {
     }
 }
 
+// The tools in a list, one row each, with the line about the compared file above.
 export component MmuToolsTab inherits Rectangle {
     // With one gate every tool takes its filament from it; there is nothing to choose.
     property <bool> can-choose: Printer.mmu-gates.length > 1;
+    property <bool> has-file: Printer.mmu-match-file != "";
 
-    HorizontalLayout {
+    VerticalLayout {
         padding: Theme.padding;
-        spacing: Theme.spacing;
-
-        // The tool-to-gate map seen from the tools.
-        Card {
-            horizontal-stretch: 1;
-            title: @tr("Tool-to-gate map");
-            icon: Icons.mmu-ttg-map;
-            if Printer.mmu-match-file != "": MatchLine { }
-            tool-list := ScrollList {
-                vertical-stretch: 1;
-                // From the whole width: the rows narrow by the scroll bar once they scroll, which depends on the columns.
-                property <int> columns: max(1, floor(self.width / 140px));
-                property <length> cell-width: (self.row-width - (self.columns - 1) * Theme.spacing) / self.columns;
-                property <length> row-step: Theme.touch + Theme.spacing;
-                content-height: ceil(Printer.mmu-tools.length / self.columns) * self.row-step - Theme.spacing;
-                for mapping[index] in Printer.mmu-tools: ToolTile {
-                    x: mod(index, tool-list.columns) * (tool-list.cell-width + Theme.spacing);
-                    y: floor(index / tool-list.columns) * tool-list.row-step;
-                    width: tool-list.cell-width;
-                    height: Theme.touch;
-                    mapping: mapping;
-                    // A tool of the file opens with what to do; otherwise only to choose another gate.
-                    enabled: mapping.used || (root.can-choose && mapping.gate >= 0);
-                    clicked => { MmuDialogs.tool = index; }
-                }
-            }
-            IconButton {
-                height: 48px;
-                icon: Icons.ui-refresh;
-                text: @tr("Reset");
-                horizontal: true;
-                clicked => {
-                    Confirm.ask(@tr("Reset tools"), @tr("Every tool takes its filament from the gate configured for it again, usually the gate of its number."), "mmu-reset-tool-map", "", false);
-                }
+        padding-top: Theme.spacing-small;
+        spacing: Theme.spacing-small;
+        ToolsHeader { }
+        tool-list := ScrollList {
+            vertical-stretch: 1;
+            property <length> row-height: 66px;
+            property <length> row-step: self.row-height + Theme.spacing-medium;
+            content-height: Printer.mmu-tools.length * self.row-step - Theme.spacing-medium;
+            for mapping[index] in Printer.mmu-tools: ToolRow {
+                y: index * tool-list.row-step;
+                width: tool-list.row-width;
+                height: tool-list.row-height;
+                mapping: mapping;
+                has-file: root.has-file;
+                can-choose: root.can-choose;
+                clicked-file => { MmuDialogs.tool = index; }
+                clicked-gate => { MmuDialogs.tool-gate = index; }
             }
         }
+    }
+}
 
-        Card {
-            width: 300px;
-            title: @tr("EndlessSpool");
-            icon: Icons.mmu-endless-spool;
+// EndlessSpool: on a runout Happy Hare continues with the next gate of the same group instead of pausing; here it is
+// switched and the groups are set.
+export component EndlessSpoolDialog inherits Scrim {
+    visible: MmuDialogs.endless-spool-open;
+
+    function close() {
+        MmuDialogs.endless-spool-open = false;
+    }
+
+    DialogPanel {
+        width: min(parent.width - 16px, 520px);
+        height: parent.height - 16px;
+        x: (parent.width - self.width) / 2;
+        y: 8px;
+
+        VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing;
+            DialogHeader {
+                title: @tr("EndlessSpool");
+                close => { root.close(); }
+            }
             ToggleRow {
                 text: @tr("On a runout continue");
                 checked: Printer.mmu-endless-spool;
@@ -225,81 +325,97 @@ export component MmuToolsTab inherits Rectangle {
     }
 }
 
-// A gate to choose for a tool: number, colour and material; the gate the tool takes its filament from now is marked.
-// With a file to compare, a tick marks a gate whose filament fits what the file asks of the tool.
-component GateOption inherits SlotTile {
-    in property <MmuGateItem> gate;
-    in property <bool> fits;
+// A line of a dialog in the style of the tool rows: the filament's colour as the left edge, material and name beside it.
+component FilamentLine inherits Rectangle {
+    in property <BarColors> colors;
+    in property <bool> empty;
+    in property <bool> color-warn;
+    in property <bool> selected;
+    in property <bool> pressable;
+    in property <string> label;
+    callback clicked;
 
-    label: @tr("Gate {}", root.gate.index);
+    height: 52px;
+    border-radius: Theme.radius-small;
+    background: touch.pressed ? Theme.surface-active : Theme.surface-raised;
+    border-width: root.selected ? 2px : 0px;
+    border-color: Theme.accent;
+    accessible-role: button;
+    accessible-label: root.label;
 
+    touch := TouchArea {
+        enabled: root.pressable;
+        clicked => { root.clicked(); }
+    }
     HorizontalLayout {
-        spacing: Theme.spacing-medium;
-        Text {
-            horizontal-stretch: 1;
-            text: @tr("Gate {}", root.gate.index);
-            color: Theme.foreground;
-            font-size: Theme.font-normal;
-            font-weight: 700;
+        padding-right: Theme.padding;
+        spacing: Theme.spacing;
+        FilamentSwatch {
+            width: 44px;
+            left-edge: true;
+            colors: root.colors;
+            empty: root.empty;
+            warn: root.color-warn;
         }
-        if root.fits: VerdictIcon {
-            verdict: "fits";
-        }
-    }
-    ColorBar {
-        height: 12px;
-        border-radius: 6px;
-        colors: root.gate.colors;
-        generic: root.gate.availability == "available" || root.gate.availability == "buffered";
-    }
-    Text {
-        text: root.gate.material == "" ? "-" : root.gate.material;
-        color: Theme.muted;
-        font-size: Theme.font-small;
-        overflow: elide;
+        @children
     }
 }
 
-// What the file asks of a tool: colour, material, weight and the slicer's profile name.
-component WantedLine inherits HorizontalLayout {
+// What the file asks of a tool.
+component WantedLine inherits FilamentLine {
     in property <ToolMatchItem> mapping;
 
-    spacing: 8px;
-    Text {
-        text: @tr("The file wants");
-        color: Theme.muted;
-        font-size: Theme.font-normal;
-        vertical-alignment: center;
-    }
-    if root.mapping.wanted-has-color: WantedColor {
-        cross-axis-self-alignment: center;
-        mapping: root.mapping;
-    }
-    Text {
-        text: root.mapping.wanted-material;
-        color: Theme.foreground;
-        font-size: Theme.font-normal;
-        font-weight: 700;
-        vertical-alignment: center;
-    }
-    Text {
-        text: root.mapping.wanted-weight;
-        color: Theme.foreground;
-        font-size: Theme.font-normal;
-        vertical-alignment: center;
-    }
-    Text {
+    colors: root.mapping.wanted-colors;
+    label: @tr("The file wants");
+    FilamentText {
         horizontal-stretch: 1;
-        text: root.mapping.wanted-profile;
-        color: Theme.muted;
-        font-size: Theme.font-normal;
-        vertical-alignment: center;
-        overflow: elide;
+        material: root.mapping.wanted-material == "" ? "-" : root.mapping.wanted-material;
+        name: root.mapping.wanted-profile;
+        trail: root.mapping.wanted-weight;
     }
 }
 
-// One tool: what the file asks of it, what to do when it does not fit, and the choice of gate; a tap on a gate maps
-// the tool to it and closes the dialog.
+// What the gate of a tool holds; yellow marks a colour or weight that differs from the file.
+component LoadedLine inherits FilamentLine {
+    in property <ToolMatchItem> mapping;
+
+    colors: root.mapping.gate-empty ? root.mapping.loaded-colors : FilamentColors.generic(root.mapping.loaded-colors);
+    empty: root.mapping.gate-empty;
+    color-warn: root.mapping.used && root.mapping.color-differs;
+    label: @tr("Gate {}", root.mapping.gate);
+    if root.mapping.gate-empty: FilamentText {
+        horizontal-stretch: 1;
+        material: @tr("Empty");
+        material-warn: root.mapping.used;
+        lead: @tr("Gate {}", root.mapping.gate);
+    }
+    if !root.mapping.gate-empty: FilamentText {
+        horizontal-stretch: 1;
+        material: root.mapping.loaded-material == "" ? "-" : root.mapping.loaded-material;
+        material-warn: root.mapping.used && root.mapping.material-differs;
+        name: root.mapping.loaded-name;
+        trail: root.mapping.loaded-weight;
+        trail-warn: root.mapping.used && root.mapping.weight-differs;
+        extra: root.mapping.endless-weight;
+    }
+}
+
+// Opens the gate of a tool on the Gates tab.
+component OpenGateButton inherits IconButton {
+    in property <int> gate;
+    callback opened;
+
+    icon: Icons.mmu-gate-map;
+    text: @tr("Open gate {}", root.gate);
+    horizontal: true;
+    clicked => {
+        MmuDialogs.gate = root.gate;
+        root.opened();
+        Navigation.filament-tab = FilamentTab.gates;
+    }
+}
+
+// One tool, compact: what the file asks of it next to what its gate holds, yellow where they differ.
 export component ToolDialog inherits Scrim {
     property <ToolMatchItem> mapping: Printer.mmu-tools[MmuDialogs.tool];
     visible: MmuDialogs.tool >= 0 && MmuDialogs.tool < Printer.mmu-tools.length;
@@ -318,60 +434,181 @@ export component ToolDialog inherits Scrim {
             padding: Theme.dialog-padding;
             spacing: Theme.spacing;
             DialogHeader {
-                title: Printer.mmu-gates.length > 1 && root.mapping.gate >= 0 ? @tr("Gate for T{}", root.mapping.tool) : @tr("T{}", root.mapping.tool);
+                title: root.mapping.gate >= 0 ? @tr("T{} · Gate {}", root.mapping.tool, root.mapping.gate) : @tr("T{}", root.mapping.tool);
                 close => { root.close(); }
-            }
-            if root.mapping.used: WantedLine {
-                mapping: root.mapping;
-            }
-            if root.mapping.used && root.mapping.differences != "": Text {
-                text: root.mapping.differences;
-                color: Theme.warning;
-                font-size: Theme.font-normal;
-                wrap: word-wrap;
-            }
-            // What to do about it, and the gate to change right away.
-            if root.mapping.used && root.mapping.advice != "": HorizontalLayout {
-                spacing: Theme.spacing;
-                Text {
-                    horizontal-stretch: 1;
-                    text: root.mapping.advice;
-                    color: Theme.foreground;
-                    font-size: Theme.font-normal;
-                    wrap: word-wrap;
-                    vertical-alignment: center;
+                VerdictIcon {
+                    cross-axis-self-alignment: center;
+                    verdict: root.mapping.used ? root.mapping.verdict : "";
                 }
-                if root.mapping.gate-to-load >= 0: IconButton {
+            }
+            FilamentCompare {
+                mapping: root.mapping;
+                source-title: root.mapping.gate >= 0 ? @tr("Gate {}", root.mapping.gate) : "";
+            }
+            // Equal buttons in the default kind: none of them is the recommended one.
+            HorizontalLayout {
+                alignment: end;
+                spacing: Theme.spacing;
+                if root.mapping.gate >= 0: OpenGateButton {
                     width: 200px;
                     height: 48px;
-                    icon: Icons.mmu-gate-map;
-                    text: @tr("Open gate {}", root.mapping.gate-to-load);
+                    gate: root.mapping.gate;
+                    opened => { root.close(); }
+                }
+                if Printer.has-spoolman && root.mapping.gate >= 0: IconButton {
+                    width: 200px;
+                    height: 48px;
+                    icon: Icons.filament-spool;
+                    text: @tr("Change spool");
                     horizontal: true;
                     clicked => {
-                        MmuDialogs.gate = root.mapping.gate-to-load;
                         root.close();
-                        Navigation.filament-tab = FilamentTab.gates;
+                        SpoolPicker.show(root.mapping.gate, Printer.mmu-gates[root.mapping.gate].spool-id);
+                    }
+                }
+                if Printer.mmu-gates.length > 1 && root.mapping.gate >= 0: IconButton {
+                    width: 200px;
+                    height: 48px;
+                    text: @tr("Choose gate");
+                    clicked => {
+                        MmuDialogs.tool-gate = MmuDialogs.tool;
+                        root.close();
                     }
                 }
             }
-            if root.mapping.gate >= 0: gate-grid := Rectangle {
-                property <int> columns: max(1, floor(self.width / 120px));
-                property <length> cell-width: (self.width - (self.columns - 1) * Theme.spacing) / self.columns;
-                property <length> row-step: 84px + Theme.spacing;
-                height: ceil(Printer.mmu-gates.length / self.columns) * self.row-step - Theme.spacing;
-                for gate[index] in Printer.mmu-gates: GateOption {
-                    x: mod(index, gate-grid.columns) * (gate-grid.cell-width + Theme.spacing);
-                    y: floor(index / gate-grid.columns) * gate-grid.row-step;
-                    width: gate-grid.cell-width;
-                    height: 84px;
-                    gate: gate;
-                    fits: root.mapping.used && root.mapping.fitting-gates[gate.index];
-                    selected: gate.index == root.mapping.gate;
-                    clicked => {
-                        if (!self.selected) {
-                            Actions.mmu-map-tool(root.mapping.tool, gate.index);
+        }
+    }
+}
+
+// A gate to choose for a tool: material and name with the gate's colour as the left edge, on the right the tools that
+// take their filament from it ("free" for none) and a tick when it fits what the file asks of the tool.
+component GateChoice inherits FilamentLine {
+    in property <MmuGateItem> gate;
+    in property <bool> fits;
+
+    property <bool> is-empty: root.gate.availability == "empty";
+
+    colors: root.is-empty ? root.gate.colors : FilamentColors.generic(root.gate.colors);
+    empty: root.is-empty;
+    pressable: true;
+    label: @tr("Gate {}", root.gate.index);
+    FilamentText {
+        horizontal-stretch: 1;
+        material: root.is-empty ? @tr("G{} · Empty", root.gate.index) : @tr("G{} · {}", root.gate.index, root.gate.material == "" ? "-" : root.gate.material);
+        name: root.is-empty ? "" : root.gate.name;
+        trail: root.is-empty ? "" : root.gate.spool-text;
+    }
+    HorizontalLayout {
+        alignment: center;
+        spacing: Theme.spacing;
+        if root.fits: VerdictIcon {
+            cross-axis-self-alignment: center;
+            verdict: "fits";
+        }
+        Rectangle {
+            width: tools-text.preferred-width + 16px;
+            height: 24px;
+            cross-axis-self-alignment: center;
+            border-radius: Theme.radius-small;
+            background: root.gate.tools == "" ? transparent : Theme.surface-active;
+            border-width: root.gate.tools == "" ? 1px : 0px;
+            border-color: Theme.muted;
+            tools-text := Text {
+                text: root.gate.tools == "" ? @tr("free") : root.gate.tools;
+                color: root.gate.tools == "" ? Theme.muted : Theme.accent;
+                font-size: Theme.font-small;
+                font-weight: root.gate.tools == "" ? 400 : 700;
+            }
+        }
+    }
+}
+
+// The gate of one tool: left what the file wants and what the gate holds, right all gates to map the tool to; a tap on
+// a gate maps the tool to it and closes the dialog.
+export component ToolGateDialog inherits Scrim {
+    property <ToolMatchItem> mapping: Printer.mmu-tools[MmuDialogs.tool-gate];
+    visible: MmuDialogs.tool-gate >= 0 && MmuDialogs.tool-gate < Printer.mmu-tools.length;
+
+    function close() {
+        MmuDialogs.tool-gate = -1;
+    }
+
+    DialogPanel {
+        width: min(parent.width - 16px, 780px);
+        height: parent.height - 16px;
+        x: (parent.width - self.width) / 2;
+        y: 8px;
+
+        HorizontalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing;
+            VerticalLayout {
+                width: 270px;
+                spacing: Theme.spacing-medium;
+                DialogTitle {
+                    height: Theme.touch;
+                    text: root.mapping.gate >= 0 ? @tr("T{} · Gate {}", root.mapping.tool, root.mapping.gate) : @tr("T{}", root.mapping.tool);
+                }
+                if root.mapping.used: Text {
+                    text: @tr("The file wants");
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                }
+                if root.mapping.used: WantedLine {
+                    mapping: root.mapping;
+                }
+                if root.mapping.gate >= 0: Text {
+                    text: @tr("Gate {} holds", root.mapping.gate);
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                }
+                if root.mapping.gate >= 0: LoadedLine {
+                    mapping: root.mapping;
+                }
+                Rectangle { vertical-stretch: 1; }
+                if root.mapping.gate >= 0: OpenGateButton {
+                    height: 48px;
+                    gate: root.mapping.gate;
+                    opened => { root.close(); }
+                }
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: Theme.spacing-medium;
+                HorizontalLayout {
+                    height: Theme.touch;
+                    spacing: Theme.spacing;
+                    Text {
+                        horizontal-stretch: 1;
+                        text: root.mapping.used ? @tr("Assign a gate to T{} · ✓ fits", root.mapping.tool) : @tr("Assign a gate to T{}", root.mapping.tool);
+                        color: Theme.muted;
+                        font-size: Theme.font-normal;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    IconButton {
+                        width: Theme.touch;
+                        icon: Icons.ui-close;
+                        accessible-label: @tr("Close");
+                        clicked => { root.close(); }
+                    }
+                }
+                choice-list := ScrollList {
+                    vertical-stretch: 1;
+                    property <length> row-step: 52px + 4px;
+                    content-height: Printer.mmu-gates.length * self.row-step - 4px;
+                    for gate[index] in Printer.mmu-gates: GateChoice {
+                        y: index * choice-list.row-step;
+                        width: choice-list.row-width;
+                        gate: gate;
+                        fits: root.mapping.used && root.mapping.fitting-gates[gate.index];
+                        selected: gate.index == root.mapping.gate;
+                        clicked => {
+                            if (!self.selected) {
+                                Actions.mmu-map-tool(root.mapping.tool, gate.index);
+                            }
+                            root.close();
                         }
-                        root.close();
                     }
                 }
             }
