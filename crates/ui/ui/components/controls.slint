@@ -191,9 +191,12 @@ export component StepSelector inherits HorizontalLayout {
     }
     for value in root.values: Rectangle {
         min-width: 52px;
-        height: 44px;
+        height: Theme.row-height-small;
         border-radius: Theme.radius;
-        background: value == root.selected ? Theme.accent : step-touch.pressed ? Theme.surface-active : Theme.surface-raised;
+        // The chosen one is framed like a chosen button (IconButton.checked), not filled like the main action.
+        background: value == root.selected || step-touch.pressed ? Theme.surface-active : Theme.surface-raised;
+        border-width: value == root.selected ? 2px : 0px;
+        border-color: Theme.accent;
         accessible-role: button;
         accessible-label: value + root.unit;
         step-touch := TouchArea {
@@ -205,7 +208,7 @@ export component StepSelector inherits HorizontalLayout {
 
         Text {
             text: value + root.unit;
-            color: value == root.selected ? Theme.on-accent : Theme.foreground;
+            color: Theme.foreground;
             font-size: Theme.font-small;
             font-weight: 600;
             horizontal-alignment: center;

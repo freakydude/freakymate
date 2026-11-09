@@ -4,7 +4,6 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { MmuGateItem, Printer } from "../state.slint";
-import { StateIcons } from "../state-icons.slint";
 import { IconLabel } from "controls.slint";
 import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
 
@@ -23,11 +22,11 @@ export global MmuTexts {
         if (state == "monitoring") { return @tr("FlowGuard monitoring"); }
         return @tr("FlowGuard ready");
     }
-    // Ready and monitoring are fine; tangle prevention is a deviation, triggered an error.
+    // Ready and monitoring are the normal state and stay grey; tangle prevention is a deviation, triggered an error.
     pure public function flowguard-color(state: string) -> color {
         if (state == "triggered") { return Theme.danger; }
         if (state == "boosting") { return Theme.warning; }
-        return Theme.success;
+        return Theme.muted;
     }
     pure public function availability(availability: string) -> string {
         if (availability == "available") { return @tr("Available"); }
@@ -44,7 +43,7 @@ export component GateAvailabilityLabel inherits IconLabel {
 
     icon: root.has-filament ? Icons.mmu-gate-available : root.availability == "empty" ? Icons.mmu-gate-empty : Icons.mmu-gate-unknown;
     text: MmuTexts.availability(root.availability);
-    color: StateIcons.ok-color(root.has-filament, root.availability == "empty" ? Theme.warning : Theme.muted);
+    color: root.availability == "empty" ? Theme.warning : Theme.muted;
     font-size: Theme.font-small;
 }
 

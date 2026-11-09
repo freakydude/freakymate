@@ -127,7 +127,8 @@ export component PrintPage inherits Rectangle {
                 vertical-alignment: center;
             }
             if root.prepared: PreparedJob { }
-            if !root.prepared: VerticalLayout {
+            // Without a job there is nothing to show (no empty tiles); the file list is the way on.
+            if !root.prepared && root.has-job: VerticalLayout {
                 spacing: Theme.spacing;
                 // Left the times, right the figures of the job. The times are short, the figures need room: 4 to 5.
                 VerticalLayout {
@@ -213,6 +214,7 @@ export component PrintPage inherits Rectangle {
             if !Printer.is-printing: ActionTile {
                 icon: Icons.print-load;
                 text: @tr("Files");
+                kind: !root.prepared && !root.has-job ? ButtonKind.accent : ButtonKind.normal;
                 clicked => {
                     Navigation.files-open = true;
                     Actions.refresh-files();

@@ -2,8 +2,8 @@
 
 import { Icons } from "icons.slint";
 import { Theme } from "theme.slint";
-import { Printer } from "state.slint";
-import { Severity } from "structs.slint";
+import { Navigation, Printer } from "state.slint";
+import { Page, Severity } from "structs.slint";
 
 // Icons and texts for the three state levels: connection/Klipper (webhooks), machine activity
 // (idle_timeout) and print job (print_stats). The same state name uses the same icon on every level.
@@ -49,18 +49,23 @@ export global StateIcons {
         return @tr("Klipper: not connected");
     }
 
+    // The print page shows progress, remaining time and bar itself, so the status bar there only names the state.
+    public pure function print-page-open() -> bool {
+        return Navigation.page == Page.print && !Navigation.history-open;
+    }
+
     // Status bar: connection/Klipper while not ready, then a print job if there is one, otherwise the activity.
     // While printing the progress and the remaining time say it all, the file name is on the print page.
     public pure function summary-label() -> string {
         if (!Printer.ready) { return self.klippy-label(Printer.connection, Printer.klippy-state); }
-        if (Printer.print-state == "printing") { return ""; }
+        if (Printer.print-state == "printing") { return self.print-page-open() ? self.print-state-label("printing") : ""; }
         if (Printer.print-state != "standby") { return self.print-state-label(Printer.print-state); }
         return self.activity-label(Printer.activity);
     }
 
     // The value after the summary that must not be cut off: the progress of a print.
     public pure function summary-value() -> string {
-        if (Printer.ready && Printer.is-printing) { return round(Printer.progress * 100) + "%"; }
+        if (Printer.ready && Printer.is-printing && !self.print-page-open()) { return round(Printer.progress * 100) + "%"; }
         return "";
     }
 
@@ -73,7 +78,7 @@ export global StateIcons {
             }
             return "";
         }
-        if (Printer.print-state == "printing") { return Printer.remaining == "-" ? "" : @tr("{} left", Printer.remaining); }
+        if (Printer.print-state == "printing") { return self.print-page-open() || Printer.remaining == "-" ? "" : @tr("{} left", Printer.remaining); }
         if (Printer.print-state == "paused" || Printer.print-state == "error") { return Printer.interruption-headline; }
         return "";
     }
@@ -89,12 +94,14 @@ export global StateIcons {
         if (Printer.print-state == "paused") { return Severity.attention; }
         if (Printer.print-state == "error") { return Severity.error; }
         if (Printer.print-state == "complete") { return Severity.fine; }
-        if (Printer.print-state == "standby" && Printer.activity != "busy") { return Severity.fine; }
+        // Ready is the normal state and stays grey; colour is for a result or a deviation.
+        if (Printer.print-state == "standby" && Printer.activity != "busy") { return Severity.calm; }
         return Severity.neutral;
     }
 
     // One colour per meaning, for a symbol, a word or a line; never a filled area.
     public pure function severity-color(severity: Severity) -> color {
+        if (severity == Severity.calm) { return Theme.muted; }
         if (severity == Severity.fine) { return Theme.success; }
         if (severity == Severity.running) { return Theme.accent; }
         if (severity == Severity.attention) { return Theme.warning; }

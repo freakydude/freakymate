@@ -74,7 +74,7 @@ export component StatusBar inherits Rectangle {
         : Printer.mmu-action != "" && Printer.mmu-action != "Idle" ? Printer.mmu-action
         : Network.busy;
     property <Severity> severity: StateIcons.summary-severity();
-    property <bool> shows-progress: Printer.ready && (Printer.print-state == "printing" || Printer.print-state == "paused");
+    property <bool> shows-progress: !StateIcons.print-page-open() && Printer.ready && (Printer.print-state == "printing" || Printer.print-state == "paused");
 
     height: 44px;
     background: Theme.surface;
