@@ -124,7 +124,9 @@ fi
 report "Installing to $INSTALL_DIR"
 if [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
   mkdir -p "$INSTALL_DIR"
-  cp -a "$SOURCE_DIR"/. "$INSTALL_DIR"/
+  # A running FreakyMate cannot be overwritten ("Text file busy"); replacing the file leaves the old one to the running
+  # process until the restart below.
+  cp -a --remove-destination "$SOURCE_DIR"/. "$INSTALL_DIR"/
 fi
 chmod 0755 "$INSTALL_DIR/$NAME" "$INSTALL_DIR/install.sh" "$INSTALL_DIR/uninstall.sh"
 
