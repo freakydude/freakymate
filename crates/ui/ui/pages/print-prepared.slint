@@ -62,7 +62,8 @@ component ToolChip inherits Rectangle {
     }
 }
 
-// Tools of the file as chips, five in a row; more than one row scrolls. The first `skip` tools are left out.
+// Tools of the file as chips, five in a row. The grid takes the free height of the page, at least one row and at most
+// all of them; only what still does not fit scrolls. The first `skip` tools are left out.
 component ToolChipGrid inherits ScrollList {
     in property <[ToolMatchItem]> tools;
     in property <int> skip;
@@ -75,8 +76,11 @@ component ToolChipGrid inherits ScrollList {
     property <length> row-step: root.chip-height + root.gap;
     property <length> chip-width: (root.row-width - (root.columns - 1) * root.gap) / root.columns;
     callback clicked(mapping: ToolMatchItem);
-    height: min(root.rows, 1) * root.row-step - root.gap;
-    content-height: root.rows * root.row-step - root.gap;
+    content-height: max(0px, root.rows * root.row-step - root.gap);
+    min-height: min(root.content-height, root.chip-height);
+    preferred-height: root.content-height;
+    max-height: root.content-height;
+    vertical-stretch: 1;
 
     for mapping[index] in root.tools: Rectangle {
         property <int> place: index - root.skip;
@@ -99,6 +103,7 @@ component ToolMatchCard inherits Card {
     title: @tr("Tool-to-gate map");
     icon: Icons.mmu-ttg-map;
     tappable: true;
+    vertical-stretch: 1;
     clicked => { root.open-tools(); }
 
     function open-tools() {
@@ -186,6 +191,7 @@ component ExtruderMatchCard inherits Card {
     title: @tr("Filament");
     icon: Icons.filament-spool;
     tappable: Printer.has-spoolman;
+    vertical-stretch: 1;
     clicked => { root.pick-spool(); }
 
     function pick-spool() {
