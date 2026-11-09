@@ -72,9 +72,25 @@ impl MmuView {
         show_state(printer, mmu);
     }
 
-    /// The tools of the prepared file with what each prints with; none without a prepared file.
+    /// The tools of the prepared file with what each prints with; none without a prepared file. Call after `show`, so
+    /// that each tool finds its row on the Tools tab.
     pub fn show_prepared_tools(&self, matches: &[ToolMatch], status: &PrinterStatus, lanes: &[Lane]) {
-        replace_rows(&self.prepared_tools, compared_tool_items(matches, status, lanes, |_| true));
+        let mut items = compared_tool_items(matches, status, lanes, |_| true);
+        for item in &mut items {
+            item.tools_row = self.tools_row(item);
+        }
+        replace_rows(&self.prepared_tools, items);
+    }
+
+    /// The row of the tool on the Tools tab: Happy Hare's tools come first in order, the file's tools without a gate
+    /// after them; -1 when it has none.
+    fn tools_row(&self, item: &ToolMatchItem) -> i32 {
+        let has_gate = item.gate >= 0;
+        self.tools
+            .iter()
+            .position(|row| row.tool == item.tool && (row.gate >= 0) == has_gate)
+            .and_then(|row| i32::try_from(row).ok())
+            .unwrap_or(-1)
     }
 
     /// The tools of Happy Hare with what the job's file asks of them, then the file's tools that have no gate; and the
@@ -168,4 +184,23 @@ fn show_state(printer: &Printer, mmu: &MmuStatus) {
 /// The spool Spoolman knows in a gate.
 fn gate_spool(lanes: &[Lane], gate: usize) -> Option<&Spool> {
     lanes.iter().find(|lane| lane.gate == Some(gate)).and_then(|lane| lane.spool.as_ref())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(tool: i32, gate: i32) -> ToolMatchItem {
+        ToolMatchItem { tool, gate, ..ToolMatchItem::default() }
+    }
+
+    #[test]
+    fn a_tool_finds_its_row_on_the_tools_tab() {
+        let view = MmuView::default();
+        // Happy Hare's tools in order, then a tool of the file without a gate.
+        replace_rows(&view.tools, vec![item(0, 2), item(1, 0), item(5, -1)]);
+        assert_eq!(view.tools_row(&item(1, 0)), 1);
+        assert_eq!(view.tools_row(&item(5, -1)), 2);
+        assert_eq!(view.tools_row(&item(7, -1)), -1);
+    }
 }

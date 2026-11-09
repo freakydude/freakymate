@@ -101,8 +101,8 @@ component ToolChipGrid inherits ScrollList {
     }
 }
 
-// The tools of the file with their gates. A tap leads to the Tools tab, where the map is changed; a tap on a tool with
-// a gate opens its dialog there, which says what to do when it does not fit.
+// The tools of the file with their gates. A tap leads to the Tools tab, where the map is changed; a tap on a tool opens
+// its dialog there, which says what to do when it does not fit. Closing it leaves the Tools tab open.
 component ToolMatchCard inherits Card {
     title: @tr("Tool-to-gate map");
     icon: Icons.mmu-ttg-map;
@@ -143,10 +143,7 @@ component ToolMatchCard inherits Card {
         tools: Printer.prepared-tools;
         clicked(mapping) => {
             root.open-tools();
-            // The rows of the Tools tab are Happy Hare's tools in order, so a tool with a gate is its own row.
-            if (mapping.gate >= 0) {
-                MmuDialogs.tool = mapping.tool;
-            }
+            MmuDialogs.tool = mapping.tools-row;
         }
     }
 }
