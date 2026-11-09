@@ -15,6 +15,8 @@ import { PreparedJob } from "print-prepared.slint";
 component InterruptionBanner inherits Rectangle {
     in property <bool> failed;
     in property <string> details;
+    // Where the print stands, beside the title.
+    in property <string> position;
     property <color> tone: root.failed ? Theme.danger : Theme.warning;
     background: Theme.surface;
     border-radius: Theme.radius;
@@ -36,11 +38,23 @@ component InterruptionBanner inherits Rectangle {
         VerticalLayout {
             alignment: center;
             spacing: 2px;
-            Text {
-                text: root.failed ? @tr("Print failed") : @tr("Paused");
-                color: root.tone;
-                font-size: Theme.font-normal;
-                font-weight: 600;
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: root.failed ? @tr("Print failed") : @tr("Paused");
+                    color: root.tone;
+                    font-size: Theme.font-normal;
+                    font-weight: 600;
+                }
+                Text {
+                    horizontal-stretch: 1;
+                    text: root.position;
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
             }
             if root.details != "": Text {
                 text: root.details;
@@ -166,6 +180,7 @@ export component PrintPage inherits Rectangle {
                     if Printer.print-state == "paused" || Printer.print-state == "error": InterruptionBanner {
                         failed: Printer.print-state == "error";
                         details: Printer.interruption-text;
+                        position: Printer.interruption-position;
                     }
                     if Printer.print-state == "printing": HorizontalLayout {
                         spacing: Theme.spacing;

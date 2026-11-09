@@ -130,10 +130,15 @@ pub fn ended_text(job: &PrintJob, newest: Option<&FinishedJob>, now: DateTime<Lo
         .map_or_else(|| NO_VALUE.to_owned(), |end| format::unix_moment(now, end))
 }
 
-/// What the sources state about a pause or an error, one fact per line, and where the print stands (layer and
-/// height); empty if nothing is known.
-pub fn interruption_text(interruption: &Interruption, job: &PrintJob) -> String {
-    interruption.facts.iter().map(fact_text).chain(stands_at(job)).collect::<Vec<_>>().join("\n")
+/// What the sources state about a pause or an error, one fact per line; empty if nothing is stated.
+pub fn interruption_text(interruption: &Interruption) -> String {
+    interruption.facts.iter().map(fact_text).collect::<Vec<_>>().join("\n")
+}
+
+/// Where the print stands at a pause or an error (`Layer 50 · 10.00 mm`, or the part that is known); empty if unknown.
+/// Kept apart from the facts, so the banner can show it beside its title and long facts have the room.
+pub fn interruption_position(job: &PrintJob) -> String {
+    stands_at(job).unwrap_or_default()
 }
 
 /// The first fact of a pause or an error for the status bar, without where the print stands; empty if none is stated.
@@ -637,12 +642,10 @@ mod tests {
             ],
         };
 
-        assert_eq!(
-            interruption_text(&interruption, &PrintJob::default()),
-            "Filament runout\nToolhead Runout: no filament"
-        );
+        assert_eq!(interruption_text(&interruption), "Filament runout\nToolhead Runout: no filament");
         let job = PrintJob { current_layer: Some(50), height: Some(10.0), ..PrintJob::default() };
-        assert_eq!(interruption_text(&Interruption { failed: false, facts: Vec::new() }, &job), "Layer 50 · 10.00 mm");
+        assert_eq!(interruption_position(&job), "Layer 50 · 10.00 mm");
+        assert_eq!(interruption_position(&PrintJob::default()), "");
     }
 
     #[test]

@@ -253,6 +253,8 @@ export struct ScrewItem {
     turns: string,
     clockwise: bool,
     is-base: bool,
+    // Needs under 00:10: done, nothing worth turning.
+    level: bool,
 }
 
 export struct FileItem {

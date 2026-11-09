@@ -46,6 +46,8 @@ export global Printer {
     in property <string> ended;
     // What the sources state about a pause or an error, one fact per line; empty if nothing is stated.
     in property <string> interruption-text;
+    // Where the print stands at a pause or an error ("Layer 50 · 10.00 mm"); empty if unknown.
+    in property <string> interruption-position;
     // The first fact of it alone, for the status bar.
     in property <string> interruption-headline;
     // A pause at a layer can be planned with Mainsail's macros (only while the slicer reports the layers).

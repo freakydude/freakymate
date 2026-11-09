@@ -9,14 +9,14 @@ export component CalibrateManyScrewsPreview inherits AppWindow {
         Sample.calibration();
         Printer.screw-results = [
             { name: "back left", turns: "00:00", clockwise: true, is-base: true },
-            { name: "back center", turns: "00:05", clockwise: true },
+            { name: "back center", turns: "00:05", clockwise: true, level: true },
             { name: "back right", turns: "00:12", clockwise: false },
             { name: "center left", turns: "00:18", clockwise: true },
-            { name: "center", turns: "00:03", clockwise: false },
+            { name: "center", turns: "00:03", clockwise: false, level: true },
             { name: "center right", turns: "00:40", clockwise: false },
             { name: "front left", turns: "01:05", clockwise: true },
             { name: "front center", turns: "00:22", clockwise: true },
-            { name: "front right", turns: "00:02", clockwise: false },
+            { name: "front right", turns: "00:02", clockwise: false, level: true },
         ];
     }
 }

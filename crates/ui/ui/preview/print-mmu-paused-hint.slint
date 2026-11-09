@@ -1,0 +1,25 @@
+// Preview: print paused by the MMU with reason, hint and where the print stands, reason, a two-line hint and where the print stands. Render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintMmuPausedHintPreview inherits AppWindow {
+    init => {
+        Sample.mmu();
+        Sample.printing();
+        Navigation.page = Page.print;
+        Printer.print-state = "paused";
+        Printer.mmu-gate = 1;
+        Printer.mmu-tool = 1;
+        Printer.mmu-paused = true;
+        Printer.mmu-locked = true;
+        Printer.interruption-text = "Runout on gate 1\nCheck the nozzle and extruder for a clog and remove any filament remains, then RESUME";
+        Printer.interruption-position = "Layer 50 · 10.00 mm";
+        Printer.interruption-headline = "Filament runout detected at the entry sensor of gate 1";
+        Printer.mmu-buffer-state = "tension";
+        Printer.mmu-buffer-bias = -1;
+        Printer.mmu-flowguard-state = "triggered";
+        Printer.mmu-flowguard-detail = "clog";
+    }
+}

@@ -260,8 +260,11 @@ impl Presenter {
         printer.set_interruption_headline(
             interruption.as_ref().map(view::interruption_headline).unwrap_or_default().into(),
         );
-        let interruption_text = interruption.map(|interruption| view::interruption_text(&interruption, &status.job));
+        let is_interrupted = interruption.is_some();
+        let interruption_text = interruption.map(|interruption| view::interruption_text(&interruption));
         printer.set_interruption_text(interruption_text.unwrap_or_default().into());
+        let position = if is_interrupted { view::interruption_position(&status.job) } else { String::new() };
+        printer.set_interruption_position(position.into());
         let layer_pause = pause::layer_pause_offer(&snapshot.sources, status);
         printer.set_layer_pause_next(layer_pause.is_some_and(|offer| offer.next_layer));
         printer.set_layer_pause_at(layer_pause.is_some_and(|offer| offer.at_layer));
