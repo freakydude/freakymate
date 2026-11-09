@@ -12,7 +12,7 @@ use crate::credentials::{Credential, CredentialStore};
 use crate::moonraker::access::{self, AccessError};
 use crate::moonraker::{CallError, Connection, ConnectionState, Endpoint, Notification};
 use crate::sources::happy_hare::stale_gate_map;
-use crate::sources::klipper::{FanWatch, HeightWatch, KlippyState, PendingTargets, PrintState};
+use crate::sources::klipper::{self, FanWatch, HeightWatch, KlippyState, PendingTargets, PrintState};
 use crate::sources::moonraker_server::gcode_store::ConsoleKind;
 use crate::sources::moonraker_server::update_manager;
 use crate::sources::moonraker_server::wled::{self, WledStrip};
@@ -378,6 +378,7 @@ impl<'a> Session<'a> {
         self.log_detected(&sources, &result).await;
         self.wled = self.fetch_wled().await;
         sources.wled_strips = self.wled.iter().map(WledStrip::object).collect();
+        sources.klipper.tool_commands = self.fetch_tool_commands().await;
         self.sources = sources;
         self.store.replace(result.get("status").unwrap_or(&Value::Null));
         // After a restart the configuration or the hardware may have changed: what was learned about the fans is gone.
@@ -397,6 +398,12 @@ impl<'a> Session<'a> {
         let machine = subscription.pointer("/status/mmu_machine");
         log_fact("Happy Hare", &version(machine, "happy_hare_version"));
         log_fact("Detected", &sources.summary());
+    }
+
+    /// The `T<n>` commands Klipper knows, from its command list; `None` when it cannot be asked.
+    async fn fetch_tool_commands(&self) -> Option<Vec<usize>> {
+        let help = self.connection.call("printer.gcode.help", None).await.ok()?;
+        Some(klipper::tool_commands(&help))
     }
 
     /// Moonraker's WLED strips; none without its `wled` component or when it cannot be asked.

@@ -4,7 +4,7 @@ use super::ask;
 use super::temperature::{nozzle_history, temperature_leads_to_heaters};
 use super::STATUS_BAR_LIGHT;
 use crate::session::Session;
-use freakymate::{Confirm, FilamentTab, Navigation, Page, Printer};
+use freakymate::{Actions, Confirm, FilamentTab, MmuDialogs, Navigation, Page, Printer};
 use freakymate_core::sources::klipper::PrintState;
 use freakymate_core::Command;
 use slint::{ComponentHandle, Model};
@@ -35,9 +35,30 @@ pub(super) fn tools_match_the_job(session: &mut Session) -> Result<(), String> {
     }
     session.window.global::<Navigation>().set_filament_tab(FilamentTab::Tools);
     session.show_page(Page::Filament, "filament-mmu-tools-match")?;
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
     if session.window.global::<Printer>().get_mmu_match_file().is_empty() {
+        session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
         return Err("the Tools tab does not compare with the file being printed".into());
+    }
+    tool_advice(session)?;
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
+    Ok(())
+}
+
+/// T0 of the file mapped to the ABS of gate 3 for a moment: its dialog says what to do, then the map is reset.
+fn tool_advice(session: &mut Session) -> Result<(), String> {
+    let tool_0_gate = |snapshot: &freakymate_core::Snapshot| {
+        snapshot.status.mmu.as_ref().and_then(|mmu| mmu.tool_to_gate.first().copied())
+    };
+    session.window.global::<Actions>().invoke_mmu_map_tool(0, 3);
+    session.wait_until("T0 on gate 3", |snapshot| tool_0_gate(snapshot) == Some(3))?;
+    session.window.global::<MmuDialogs>().set_tool(0);
+    session.show_page(Page::Filament, "filament-mmu-tool-advice")?;
+    session.window.global::<MmuDialogs>().set_tool(-1);
+    let tool = session.window.global::<Printer>().get_mmu_tools().row_data(0).unwrap_or_default();
+    session.window.global::<Actions>().invoke_mmu_map_tool(0, 0);
+    session.wait_until("T0 back on gate 0", |snapshot| tool_0_gate(snapshot) == Some(0))?;
+    if tool.advice.is_empty() || tool.gate_to_load != 3 {
+        return Err("T0 on the ABS of gate 3 does not fit, but its dialog says nothing to do".into());
     }
     Ok(())
 }

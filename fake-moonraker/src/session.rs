@@ -182,6 +182,7 @@ impl Session {
             "access.oneshot_token" => Ok(json!(backend.access().oneshot_token())),
             "server.info" => Ok(server_info(backend)),
             "printer.info" => Ok(printer_info(backend)),
+            "printer.gcode.help" => Ok(gcode_help(backend)),
             "server.gcode_store" => Ok(backend.with_host(|host| {
                 host.gcode_store(params.get("count").and_then(Value::as_u64).map(|count| count as usize))
             })),
@@ -351,6 +352,24 @@ fn printer_info(backend: &Backend) -> Value {
         "hostname": "fake-printer",
         "software_version": "v0.13.0-fake",
     })
+}
+
+/// Klipper's command list: a few of its own commands, every macro, and Happy Hare's tool commands (one per gate).
+fn gcode_help(backend: &Backend) -> Value {
+    let status = backend.with_printer(|printer| printer.status());
+    let mut help = serde_json::Map::new();
+    for command in ["G1", "G28", "M104", "M140", "SET_HEATER_TEMPERATURE"] {
+        help.insert(command.to_owned(), json!("Klipper command"));
+    }
+    let macros = status.as_object().into_iter().flat_map(|objects| objects.keys());
+    for name in macros.filter_map(|key| key.strip_prefix("gcode_macro ")) {
+        help.insert(name.to_ascii_uppercase(), json!("G-Code macro"));
+    }
+    let gates = status.pointer("/mmu/num_gates").and_then(Value::as_u64).unwrap_or(0);
+    for tool in 0..gates {
+        help.insert(format!("T{tool}"), json!("Change to tool"));
+    }
+    Value::Object(help)
 }
 
 fn set_power(backend: &Backend, params: &Value) -> Result<Value, RpcError> {

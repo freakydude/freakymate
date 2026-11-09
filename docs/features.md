@@ -18,6 +18,12 @@ probe still counts as the probe).
     compared). The result is a hint on the print page (for example "2 of 3 tools match", a tap leads to Filament →
     Tools), in the tool list and in the gate picker; it never blocks a print or a change. A clear filament (colour with
     full transparency) is not compared by colour.
+    Each tool chip on the print page also shows the material the file asks for, in the warning colour when the gate
+    holds another. A tap on a tool opens a dialog with what to do when it does not fit, in the order to try: map the
+    tool to another gate that holds what the file asks for (with a button to open that gate), load fitting filament or
+    correct what the gate records, or, when the printer has no such tool (no gate mapped by Happy Hare, or without
+    Happy Hare no command `T<n>`), slice the file for the printer's tools. Tools that share a gate share its spool, so
+    their planned weights add up against what the spool has left. These are suggestions only.
 - **Move**: jog X/Y/Z with selectable steps, home (all/XY/Z), motors off, Quad Gantry Level or Z-Tilt when configured.
   Move and Filament are locked while a print runs; the screen leaves them when a print starts.
   - **Calibrate** tab: Klipper's own calibration commands, with their results. Bed screws

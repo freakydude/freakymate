@@ -376,7 +376,7 @@ impl Presenter {
                 .collect(),
         );
         self.cache.borrow_mut().prepared.follow_job(&status.job);
-        self.show_job_matches(printer, status, lanes);
+        self.show_job_matches(printer, snapshot, lanes);
         let spoolman = {
             let cache = self.cache.borrow();
             let configured = snapshot.sources.moonraker.spoolman;
@@ -538,13 +538,14 @@ impl Presenter {
 
     /// How each tool of the job's file (the prepared one, else the printer's) fits the filament it would print with;
     /// empty without file or metadata.
-    fn job_matches(&self, status: &PrinterStatus, lanes: &[Lane]) -> Vec<ToolMatch> {
+    fn job_matches(&self, snapshot: &Snapshot, lanes: &[Lane]) -> Vec<ToolMatch> {
+        let status = &snapshot.status;
         let cache = self.cache.borrow();
         cache
             .prepared
             .job_file(&status.job)
             .and_then(|file| cache.files.catalog.metadata(file))
-            .map(|metadata| filament_match::match_tools(metadata, status, lanes))
+            .map(|metadata| filament_match::match_tools(metadata, status, lanes, &snapshot.sources.klipper))
             .unwrap_or_default()
     }
 
@@ -554,8 +555,9 @@ impl Presenter {
     }
 
     /// The MMU and the prepared file with how the job's file fits; the comparison is made once for both.
-    fn show_job_matches(&self, printer: &Printer, status: &PrinterStatus, lanes: &[Lane]) {
-        let matches = self.job_matches(status, lanes);
+    fn show_job_matches(&self, printer: &Printer, snapshot: &Snapshot, lanes: &[Lane]) {
+        let status = &snapshot.status;
+        let matches = self.job_matches(snapshot, lanes);
         let file = JobFile { name: format::job_name(&self.job_file(status)), matches: &matches };
         self.mmu.show(printer, status, lanes, &file);
         if let Some(mmu) = status.happy_hare() {
@@ -589,7 +591,7 @@ impl Presenter {
         let Some(window) = self.window.upgrade() else { return };
         let snapshot = self.snapshot();
         let lanes = self.lanes(&snapshot);
-        self.show_job_matches(&window.global::<Printer>(), &snapshot.status, &lanes);
+        self.show_job_matches(&window.global::<Printer>(), &snapshot, &lanes);
     }
 
     /// Whether the macro takes parameters, so the form has to come before it runs.
@@ -747,7 +749,7 @@ impl Presenter {
         let cache = self.cache.borrow();
         let Some(metadata) = cache.files.catalog.metadata(path) else { return Vec::new() };
         let show_tool = lanes.iter().any(|lane| lane.gate.is_some());
-        filament_match::print_hints(metadata, &snapshot.status, &lanes)
+        filament_match::print_hints(metadata, &snapshot.status, &lanes, &snapshot.sources.klipper)
             .iter()
             .map(|hint| view::print_hint_text(hint, show_tool))
             .collect()

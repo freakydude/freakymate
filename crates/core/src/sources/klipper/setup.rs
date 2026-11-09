@@ -43,6 +43,9 @@ pub struct Setup {
     /// Parameters of each macro by upper-case name, read once from the configuration. Shared, because every
     /// snapshot carries the setup.
     pub macro_details: Arc<BTreeMap<String, MacroDetails>>,
+    /// The tool numbers Klipper has a `T<n>` command for (macros, Happy Hare, toolchanger plugins alike), from
+    /// `printer.gcode.help`; `None` until asked or when the answer failed.
+    pub tool_commands: Option<Vec<usize>>,
 }
 
 impl Setup {
@@ -95,6 +98,17 @@ impl Setup {
 
     pub fn has_macro(&self, name: &str) -> bool {
         self.macros.iter().any(|candidate| candidate.eq_ignore_ascii_case(name))
+    }
+
+    /// Whether Klipper knows the command `T<tool>`; `None` without its command list.
+    pub fn has_tool_command(&self, tool: usize) -> Option<bool> {
+        self.tool_commands.as_ref().map(|tools| tools.contains(&tool))
+    }
+
+    /// A Klipper with these `T<n>` commands, for tests of the tools of a file.
+    #[cfg(test)]
+    pub(crate) fn with_tool_commands(tools: &[usize]) -> Self {
+        Self { tool_commands: Some(tools.to_vec()), ..Self::default() }
     }
 
     /// A Klipper with nothing but these macros, for tests of the macro conventions.
@@ -168,6 +182,20 @@ fn is_additional_extruder(name: &str) -> bool {
         .is_some_and(|number| !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
+/// The tool numbers of the `T<n>` commands in the answer of `printer.gcode.help` (command → help text), sorted.
+pub fn tool_commands(help: &Value) -> Vec<usize> {
+    let mut tools: Vec<usize> = help
+        .as_object()
+        .into_iter()
+        .flat_map(|commands| commands.keys())
+        .filter_map(|command| command.strip_prefix(['T', 't']))
+        .filter(|number| !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()))
+        .filter_map(|number| number.parse().ok())
+        .collect();
+    tools.sort_unstable();
+    tools
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,5 +259,14 @@ mod tests {
         assert_eq!(leveling(&["z_tilt"]), Some(Leveling::ZTilt));
         assert_eq!(leveling(&["z_tilt", "quad_gantry_level"]), Some(Leveling::QuadGantry));
         assert_eq!(leveling(&["extruder"]), None);
+    }
+
+    #[test]
+    fn tool_commands_are_the_t_commands_of_the_help() {
+        let help =
+            serde_json::json!({"T0": "G-Code macro", "T2": "Change tool", "TURN_OFF_HEATERS": "Off", "G28": "Home"});
+
+        assert_eq!(tool_commands(&help), [0, 2]);
+        assert_eq!(tool_commands(&Value::Null), Vec::<usize>::new());
     }
 }

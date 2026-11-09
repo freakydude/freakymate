@@ -224,7 +224,8 @@ pub(crate) fn id_or_none<T: TryInto<i32>>(id: Option<T>) -> i32 {
 
 /// A tool of Happy Hare (`gate` `None` for a tool of the file without gate) with what the file asks of it.
 pub(crate) fn tool_match_item(tool: usize, gate: Option<usize>, found: Option<&ToolMatch>) -> ToolMatchItem {
-    let mut item = ToolMatchItem { tool: tool as i32, gate: id_or_none(gate), ..ToolMatchItem::default() };
+    let mut item =
+        ToolMatchItem { tool: tool as i32, gate: id_or_none(gate), gate_to_load: -1, ..ToolMatchItem::default() };
     let Some(found) = found else { return item };
     let request = &found.request;
     item.used = true;
@@ -237,6 +238,8 @@ pub(crate) fn tool_match_item(tool: usize, gate: Option<usize>, found: Option<&T
     item.wanted_profile = request.profile.clone().unwrap_or_default().into();
     item.verdict = view::verdict_key(&found.verdict).into();
     item.differences = view::tool_differences(found).into();
+    item.material_differs = view::material_difference(found).is_some();
+    item.material_line = view::material_line(found).into();
     item
 }
 
