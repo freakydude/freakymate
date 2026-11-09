@@ -1,0 +1,204 @@
+// The common pieces that show a filament: a colour field (`FilamentSwatch`) and its text (`FilamentText`). Tools,
+// gates, dialogs and the print page use the same pieces, so a filament looks the same everywhere.
+
+import { Theme } from "../theme.slint";
+import { BarColors } from "../structs.slint";
+
+// The colour or colours of a filament as a field with a fine frame. A see-through colour lies over a checkerboard. Two
+// or three colours side by side (coaxial, Spoolman's default) split the field hard and diagonally; colours along the
+// filament (longitudinal) blend from left to right, up to six for a rainbow. Without a known colour the field is
+// neutral; `empty` (nothing in the gate) draws only a dashed outline, `warn` a yellow frame (the colour differs).
+// Corners are rounded per layer instead of clipping, so the field keeps its shape in every renderer.
+export component FilamentSwatch inherits Rectangle {
+    in property <BarColors> colors;
+    in property <bool> empty;
+    in property <bool> warn;
+    // Only the left corners round, for a field that forms the left edge of a tile.
+    in property <bool> left-edge;
+    in property <length> radius: 6px;
+    // The ground behind a yellow frame: a thin gap keeps the frame apart from the colour.
+    in property <color> gap-color: Theme.surface-raised;
+
+    property <length> tl: root.radius;
+    property <length> bl: root.radius;
+    property <length> tr: root.left-edge ? 0px : root.radius;
+    property <length> br: root.left-edge ? 0px : root.radius;
+    property <int> count: root.empty ? 0 : min(6, root.colors.count);
+    // Coaxial colours have room for three across the filament.
+    property <int> across: min(3, root.count);
+    property <bool> see-through: root.count > 0 && root.translucent();
+    property <length> cell: 6px;
+    property <int> columns: ceil(root.width / root.cell);
+    property <int> rows: ceil(root.height / root.cell);
+
+    pure function nth(index: int) -> color {
+        return index <= 0 ? root.colors.first : index == 1 ? root.colors.second : index == 2 ? root.colors.third : index == 3 ? root.colors.fourth : index == 4 ? root.colors.fifth : root.colors.sixth;
+    }
+    pure function translucent() -> bool {
+        return root.nth(0).alpha < 255 || (root.count > 1 && root.nth(1).alpha < 255) || (root.count > 2 && root.nth(2).alpha < 255) || (root.count > 3 && root.nth(3).alpha < 255) || (root.count > 4 && root.nth(4).alpha < 255) || (root.count > 5 && root.nth(5).alpha < 255);
+    }
+    // The colour at stop `index` of a blend through all colours, and where that stop lies (0 to 1).
+    pure function blend-color(index: int) -> color {
+        return root.nth(min(index, root.count - 1));
+    }
+    pure function blend-at(index: int) -> float {
+        return min(index, root.count - 1) / max(1, root.count - 1);
+    }
+    // A hard split into `across` parts: stop `index` of the pairs (start, end) of each part.
+    pure function split-color(index: int) -> color {
+        return root.nth(min(floor(index / 2), root.across - 1));
+    }
+    pure function split-at(index: int) -> float {
+        return min(1, (floor(index / 2) + mod(index, 2)) / max(1, root.across));
+    }
+
+    border-top-left-radius: root.tl;
+    border-bottom-left-radius: root.bl;
+    border-top-right-radius: root.tr;
+    border-bottom-right-radius: root.br;
+    background: root.empty ? Theme.background : root.count == 0 ? Theme.border : root.see-through ? Theme.checker-light : transparent;
+
+    // The dark fields of the checkerboard; those in a corner round with it.
+    if root.see-through: Rectangle {
+        for field in root.columns * root.rows: Rectangle {
+            property <int> field-column: mod(field, root.columns);
+            property <int> field-row: floor(field / root.columns);
+            visible: mod(self.field-column + self.field-row, 2) == 1;
+            x: self.field-column * root.cell;
+            y: self.field-row * root.cell;
+            width: min(root.cell, root.width - self.x);
+            height: min(root.cell, root.height - self.y);
+            background: Theme.checker-dark;
+            border-top-right-radius: self.field-column == root.columns - 1 && self.field-row == 0 ? min(root.tr, self.width) : 0px;
+            border-bottom-left-radius: self.field-column == 0 && self.field-row == root.rows - 1 ? min(root.bl, self.height) : 0px;
+            border-bottom-right-radius: self.field-column == root.columns - 1 && self.field-row == root.rows - 1 ? min(root.br, self.width) : 0px;
+        }
+    }
+
+    if root.count > 0: Rectangle {
+        border-top-left-radius: root.tl;
+        border-bottom-left-radius: root.bl;
+        border-top-right-radius: root.tr;
+        border-bottom-right-radius: root.br;
+        background: root.count == 1 ? root.nth(0) : root.colors.longitudinal ? @linear-gradient(90deg, root.blend-color(0) root.blend-at(0), root.blend-color(1) root.blend-at(1), root.blend-color(2) root.blend-at(2), root.blend-color(3) root.blend-at(3), root.blend-color(4) root.blend-at(4), root.blend-color(5) root.blend-at(5)) : @linear-gradient(135deg, root.split-color(0) root.split-at(0), root.split-color(1) root.split-at(1), root.split-color(2) root.split-at(2), root.split-color(3) root.split-at(3), root.split-color(4) root.split-at(4), root.split-color(5) root.split-at(5));
+    }
+
+    // The frame: fine and grey, yellow with a gap when the colour differs.
+    if !root.empty: Rectangle {
+        border-top-left-radius: root.tl;
+        border-bottom-left-radius: root.bl;
+        border-top-right-radius: root.tr;
+        border-bottom-right-radius: root.br;
+        border-width: root.warn ? 2px : 1px;
+        border-color: root.warn ? Theme.warning : Theme.flyout-border;
+    }
+    if root.warn && !root.empty: Rectangle {
+        x: 2px;
+        y: 2px;
+        width: parent.width - 4px;
+        height: parent.height - 4px;
+        border-top-left-radius: max(0px, root.tl - 2px);
+        border-bottom-left-radius: max(0px, root.bl - 2px);
+        border-top-right-radius: max(0px, root.tr - 2px);
+        border-bottom-right-radius: max(0px, root.br - 2px);
+        border-width: 2px;
+        border-color: root.gap-color;
+    }
+
+    // An empty place: a dashed outline, the dashes spread evenly along each side.
+    if root.empty: Rectangle {
+        property <length> dash: 5px;
+        property <length> thick: 1.5px;
+        property <int> across-count: max(1, round(root.width / (self.dash * 1.8)));
+        property <int> down-count: max(1, round(root.height / (self.dash * 1.8)));
+        property <length> across-step: root.width / self.across-count;
+        property <length> down-step: root.height / self.down-count;
+        for dash in self.across-count: Rectangle {
+            x: dash * parent.across-step + (parent.across-step - parent.dash) / 2;
+            y: 0px;
+            width: parent.dash;
+            height: parent.thick;
+            background: Theme.disabled-foreground;
+        }
+        for dash in self.across-count: Rectangle {
+            x: dash * parent.across-step + (parent.across-step - parent.dash) / 2;
+            y: root.height - parent.thick;
+            width: parent.dash;
+            height: parent.thick;
+            background: Theme.disabled-foreground;
+        }
+        for dash in self.down-count: Rectangle {
+            x: 0px;
+            y: dash * parent.down-step + (parent.down-step - parent.dash) / 2;
+            width: parent.thick;
+            height: parent.dash;
+            background: Theme.disabled-foreground;
+        }
+        for dash in self.down-count: Rectangle {
+            x: root.width - parent.thick;
+            y: dash * parent.down-step + (parent.down-step - parent.dash) / 2;
+            width: parent.thick;
+            height: parent.dash;
+            background: Theme.disabled-foreground;
+        }
+    }
+}
+
+// What a filament is, in two lines: the material in bold and never cut short (PEEK-CF, PA6-GF30), below it a line of
+// details whose name part is cut short (`…`) while its fixed parts stay whole. `name` sits between `lead` and
+// `trail`; each may be empty. Yellow marks only what differs: the material or the trailing weight.
+export component FilamentText inherits VerticalLayout {
+    in property <string> material;
+    in property <bool> material-warn;
+    in property <color> material-color: root.material-warn ? Theme.warning : Theme.foreground;
+    in property <string> lead;
+    in property <string> name;
+    in property <string> trail;
+    in property <bool> trail-warn;
+    in property <string> extra;
+
+    alignment: center;
+    spacing: 1px;
+    Text {
+        min-width: self.preferred-width;
+        text: root.material;
+        color: root.material-color;
+        font-size: Theme.font-normal;
+        font-weight: 700;
+    }
+    // The name takes what the fixed parts leave and no more, so the weight follows it right away.
+    if root.lead != "" || root.name != "" || root.trail != "" || root.extra != "": HorizontalLayout {
+        property <string> separator: " · ";
+        if root.lead != "": Text {
+            horizontal-stretch: 0;
+            min-width: self.preferred-width;
+            text: root.lead + (root.name != "" || root.trail != "" ? parent.separator : "");
+            color: Theme.muted;
+            font-size: Theme.font-small;
+        }
+        Text {
+            horizontal-stretch: 1;
+            min-width: 16px;
+            max-width: self.preferred-width;
+            text: root.name;
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            overflow: elide;
+        }
+        if root.trail != "": Text {
+            horizontal-stretch: 0;
+            min-width: self.preferred-width;
+            text: (root.name != "" ? parent.separator : "") + root.trail;
+            color: root.trail-warn ? Theme.warning : Theme.muted;
+            font-size: Theme.font-small;
+        }
+        if root.extra != "": Text {
+            horizontal-stretch: 0;
+            min-width: self.preferred-width;
+            text: " (" + root.extra + ")";
+            color: Theme.muted;
+            font-size: Theme.font-small;
+        }
+        Rectangle { horizontal-stretch: 1; }
+    }
+}

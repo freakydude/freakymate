@@ -1,11 +1,13 @@
 //! Happy Hare on the Filament page: the gates, the tools with what the job's file asks of them, the sensors, the way of
 //! the filament and the state of the MMU.
 
-use crate::items::{bar_colors, filament_path_item, id_or_none, replace_rows, reuse_flags, tool_match_item};
+use crate::items::{
+    bar_colors, filament_path_item, fill_loaded, id_or_none, replace_rows, reuse_flags, tool_match_item,
+};
 use crate::{view, MmuGateItem, MmuSensorItem, Printer, ToolMatchItem};
 use freakymate_core::domain::filament_match::{self, ToolMatch, Verdict};
 use freakymate_core::domain::spools::{FilamentColors, Lane};
-use freakymate_core::sources::happy_hare::MmuStatus;
+use freakymate_core::sources::happy_hare::{GateAvailability, MmuStatus};
 use freakymate_core::sources::spoolman::Spool;
 use freakymate_core::sources::PrinterStatus;
 use slint::{Model, ModelRc, VecModel};
@@ -79,6 +81,7 @@ impl MmuView {
     /// line about the file above them.
     fn show_tools(&self, printer: &Printer, mmu: &MmuStatus, status: &PrinterStatus, lanes: &[Lane], file: &JobFile) {
         let matches = file.matches;
+        let busy = filament_match::busy_gates(matches);
         let mapped = mmu
             .tool_to_gate
             .iter()
@@ -93,6 +96,11 @@ impl MmuView {
             .enumerate()
             .map(|(row, (tool, gate, found))| {
                 let mut item = tool_match_item(tool, gate, found);
+                if let Some(state) = gate.and_then(|gate| mmu.gates.iter().find(|state| state.index == gate)) {
+                    let reserve = filament_match::endless_spool_reserve(state.index, &busy, status, lanes);
+                    let empty = state.availability == GateAvailability::Empty;
+                    fill_loaded(&mut item, &filament_match::gate_supply(state, lanes), reserve, empty);
+                }
                 let fitting = found.map(|found| filament_match::fitting_gates(&found.request, status, lanes));
                 if let (Some(found), Some(fitting)) = (found, &fitting) {
                     let remedies = filament_match::remedies(found, fitting);

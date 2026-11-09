@@ -23,7 +23,7 @@ export component PrintPreparedSpoolPreview inherits AppWindow {
             show-thumbnail: true,
         };
         Printer.prepared-tools = [{
-            tool: 0, gate: -1, used: true, wanted-color: #e8590c, wanted-has-color: true, wanted-material: "PLA",
+            tool: 0, gate: -1, used: true, wanted-colors: { first: #e8590c, count: 1 }, wanted-material: "PLA",
             wanted-weight: "52 g", wanted-profile: "Generic PLA @Voron 2.4", verdict: "differs",
             differences: "The spool holds PETG.\nThe spool has 38 g left, the print takes 52 g.",
         }];

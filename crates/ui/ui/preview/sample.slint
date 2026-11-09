@@ -135,7 +135,12 @@ export global Sample {
             { index: 2, availability: "buffered", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", group: 2, selected: false },
             { index: 3, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", group: 3, selected: false },
         ];
-        Printer.mmu-tools = [{ tool: 0, gate: 0 }, { tool: 1, gate: 1 }, { tool: 2, gate: 2 }, { tool: 3, gate: 3 }];
+        Printer.mmu-tools = [
+            { tool: 0, gate: 0, loaded-material: "PLA", loaded-colors: { first: #e03131, count: 1 }, loaded-name: "Red PLA" },
+            { tool: 1, gate: 1, loaded-material: "PETG", loaded-colors: { first: #37b24d, count: 1 }, loaded-name: "Green PETG" },
+            { tool: 2, gate: 2, loaded-material: "ABS", loaded-colors: { first: #4dabf7, count: 1 } },
+            { tool: 3, gate: 3, gate-empty: true },
+        ];
         // Entry, exit, extruder and toolhead are drawn on the filament path, so only the other sensors are chips.
         Printer.mmu-sensors = [
             { label: "Pre gate 0", state: "triggered" },

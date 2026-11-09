@@ -653,9 +653,11 @@ export component ColorBar inherits Rectangle {
     property <length> end: max(0px, root.border-radius - 1px);
     property <length> long: (root.vertical ? root.height : root.width) - 2px;
     property <length> across: (root.vertical ? root.width : root.height) - 2px;
+    // A bar has room for three colours; a fourth and more are left out.
+    property <int> shown: min(3, root.colors.count);
     // Pieces: the colours across the bar (coaxial) or the stripes along it (longitudinal).
-    property <int> pieces: root.colors.count < 1 ? 0 : root.colors.longitudinal && root.colors.count > 1 ? max(1, ceil(root.long / root.stripe)) : root.colors.count;
-    property <bool> shows-generic: root.generic && root.colors.count < 1;
+    property <int> pieces: root.shown < 1 ? 0 : root.colors.longitudinal && root.shown > 1 ? max(1, ceil(root.long / root.stripe)) : root.shown;
+    property <bool> shows-generic: root.generic && root.shown < 1;
     border-radius: 4px;
     border-width: 1px;
     border-color: root.shows-generic ? Theme.accent : Theme.border;
@@ -667,8 +669,8 @@ export component ColorBar inherits Rectangle {
 
     for piece in root.pieces: Rectangle {
         // Along the long side for stripes, across it for coaxial colours.
-        property <bool> along: root.colors.longitudinal && root.colors.count > 1;
-        property <length> size: self.along ? root.stripe : root.across / root.colors.count;
+        property <bool> along: root.colors.longitudinal && root.shown > 1;
+        property <length> size: self.along ? root.stripe : root.across / root.shown;
         property <length> start: piece * self.size;
         property <length> length: self.along ? min(root.stripe, root.long - self.start) : self.size;
         property <bool> head: piece == 0;
@@ -685,7 +687,7 @@ export component ColorBar inherits Rectangle {
         height: root.vertical == self.along ? self.length : (root.vertical ? root.long : root.across);
         // A colour with alpha lies over a checkerboard of 2x2 fields, so it reads as see-through. Rounded corners are set
         // on every layer (no clipping), the dark fields only on their outer corner.
-        property <color> tint: root.nth(mod(piece, root.colors.count));
+        property <color> tint: root.nth(mod(piece, root.shown));
         property <bool> see-through: self.tint.alpha < 255;
         background: self.see-through ? Theme.checker-light : self.tint;
         border-top-left-radius: self.top-round && self.left-round ? root.end : 0px;

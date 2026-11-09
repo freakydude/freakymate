@@ -28,18 +28,18 @@ export component PrintPreparedMmuManyPreview inherits AppWindow {
         Printer.mmu-match-summary = @tr("2 of 12 tools fit");
         Printer.mmu-match-verdict = "differs";
         Printer.prepared-tools = [
-            { tool: 0, gate: 0, used: true, wanted-color: #e03131, wanted-has-color: true, wanted-material: "PLA", verdict: "fits" },
-            { tool: 1, gate: 1, used: true, wanted-color: #f4e2c1, wanted-has-color: true, wanted-material: "PLA", verdict: "differs" },
-            { tool: 2, gate: 2, used: true, wanted-color: #e8590c80, wanted-has-color: true, wanted-material: "PLA", verdict: "fits" },
-            { tool: 3, gate: 3, used: true, wanted-color: #ffffff00, wanted-has-color: true, wanted-material: "PLA", verdict: "differs" },
-            { tool: 4, gate: -1, used: true, wanted-color: #1c7ed6, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
-            { tool: 5, gate: -1, used: true, wanted-color: #2f9e44, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
-            { tool: 6, gate: -1, used: true, wanted-color: #868e96, wanted-has-color: true, wanted-material: "PETG", verdict: "no-gate" },
-            { tool: 7, gate: -1, used: true, wanted-color: #ae3ec9, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
-            { tool: 8, gate: -1, used: true, wanted-color: #fab005, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
-            { tool: 9, gate: -1, used: true, wanted-color: #0ca678, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
-            { tool: 10, gate: -1, used: true, wanted-color: #495057, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
-            { tool: 11, gate: -1, used: true, wanted-color: #ffffff, wanted-has-color: true, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 0, gate: 0, used: true, wanted-colors: { first: #e03131, count: 1 }, wanted-material: "PLA", verdict: "fits" },
+            { tool: 1, gate: 1, used: true, wanted-colors: { first: #f4e2c1, count: 1 }, wanted-material: "PLA", verdict: "differs" },
+            { tool: 2, gate: 2, used: true, wanted-colors: { first: #e8590c80, count: 1 }, wanted-material: "PLA", verdict: "fits" },
+            { tool: 3, gate: 3, used: true, wanted-colors: { first: #ffffff00, count: 1 }, wanted-material: "PLA", verdict: "differs" },
+            { tool: 4, gate: -1, used: true, wanted-colors: { first: #1c7ed6, count: 1 }, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 5, gate: -1, used: true, wanted-colors: { first: #2f9e44, count: 1 }, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 6, gate: -1, used: true, wanted-colors: { first: #868e96, count: 1 }, wanted-material: "PETG", verdict: "no-gate" },
+            { tool: 7, gate: -1, used: true, wanted-colors: { first: #ae3ec9, count: 1 }, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 8, gate: -1, used: true, wanted-colors: { first: #fab005, count: 1 }, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 9, gate: -1, used: true, wanted-colors: { first: #0ca678, count: 1 }, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 10, gate: -1, used: true, wanted-colors: { first: #495057, count: 1 }, wanted-material: "PLA", verdict: "no-gate" },
+            { tool: 11, gate: -1, used: true, wanted-colors: { first: #ffffff, count: 1 }, wanted-material: "PLA", verdict: "no-gate" },
         ];
     }
 }

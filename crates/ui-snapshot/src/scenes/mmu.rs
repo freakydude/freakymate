@@ -43,8 +43,9 @@ pub(super) fn mmu_service(session: &mut Session) -> Result<(), String> {
     Ok(())
 }
 
-/// Where taps land in the 800x480 layout: the tile of T3 on the Tools tab, and gate 1 in the choice of gate.
-const TOOL_3_TILE: (f32, f32) = (380.0, 240.0);
+/// Where taps land in the 800x480 layout: the row of T3 on the Tools tab (its gate side), and gate 1 in the choice of
+/// gate.
+const TOOL_3_ROW: (f32, f32) = (400.0, 406.0);
 
 const TOOL_DIALOG_GATE_1: (f32, f32) = (300.0, 166.0);
 
@@ -62,11 +63,11 @@ pub(super) fn mmu_tools_and_groups(session: &mut Session) -> Result<(), String> 
         session.window.global::<Navigation>().set_page(Page::Filament);
         session.pump(Duration::from_millis(300));
         let before = tool_3_gate(session);
-        let (x, y) = TOOL_3_TILE;
+        let (x, y) = TOOL_3_ROW;
         session.tap(x, y);
         session.pump(Duration::from_millis(500));
         if session.window.global::<MmuDialogs>().get_tool() != 3 || tool_3_gate(session) != before {
-            return Err("a tap on the tile of T3 does not open the choice of gate, or it maps the tool".into());
+            return Err("a tap on the row of T3 does not open the choice of gate, or it maps the tool".into());
         }
         session.show_page(Page::Filament, "filament-mmu-tool-dialog")?;
         let (x, y) = TOOL_DIALOG_GATE_1;
@@ -89,6 +90,9 @@ pub(super) fn mmu_tools_and_groups(session: &mut Session) -> Result<(), String> 
             .is_some_and(|mmu| mmu.gates.get(1).and_then(|gate| gate.endless_spool_group) == Some(0))
     })?;
     session.show_page(Page::Filament, "filament-mmu-tools")?;
+    session.window.global::<MmuDialogs>().set_endless_spool_open(true);
+    session.show_page(Page::Filament, "filament-mmu-endless-spool")?;
+    session.window.global::<MmuDialogs>().set_endless_spool_open(false);
     session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
     {
         let actions = session.window.global::<Actions>();

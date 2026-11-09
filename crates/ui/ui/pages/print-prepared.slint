@@ -42,7 +42,7 @@ component ToolChip inherits Rectangle {
         HorizontalLayout {
             spacing: Theme.spacing-small;
             height: 12px;
-            if root.mapping.wanted-has-color: WantedColor { mapping: root.mapping; }
+            if root.mapping.wanted-colors.count > 0: WantedColor { mapping: root.mapping; }
             if root.has-gate: GateColor {
                 width: 24px;
                 height: 12px;
@@ -205,7 +205,7 @@ component ExtruderMatchCard inherits Card {
         title: root.first.wanted-material != "" ? root.first.wanted-material : @tr("No filament named");
         detail: root.first.wanted-profile;
         value: root.first.wanted-weight;
-        if root.first.wanted-has-color: WantedColor {
+        if root.first.wanted-colors.count > 0: WantedColor {
             cross-axis-self-alignment: center;
             mapping: root.first;
         }

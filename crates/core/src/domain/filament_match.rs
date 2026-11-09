@@ -6,12 +6,16 @@
 //! tool 0 and the active spool of Spoolman. Without either there is nothing to compare. Tools that share a gate share
 //! its spool, so their planned weights add up. Without Happy Hare a tool beyond 0 needs a command `T<n>` in Klipper's
 //! command list (a toolchanger, a blackbox here); a file that calls a missing one stops at an unknown command.
+//!
+//! Slicers know one colour per tool (with alpha), so a multi-colour spool is compared by its first colour. With
+//! EndlessSpool on, the other gates of a gate's group add their weight, except those a tool of the file uses.
 
 use super::spools::Lane;
 use crate::color::{is_clear, parse_hex, rgb, Rgba};
 use crate::sources::happy_hare::{GateAvailability, MmuGate};
 use crate::sources::klipper::Setup;
 use crate::sources::moonraker_server::files::FileMetadata;
+use crate::sources::spoolman::Spool;
 use crate::sources::PrinterStatus;
 use std::collections::HashMap;
 
@@ -136,14 +140,38 @@ fn per_tool(list: &[String], tool: usize) -> Option<&str> {
 pub fn match_tools(metadata: &FileMetadata, status: &PrinterStatus, lanes: &[Lane], klipper: &Setup) -> Vec<ToolMatch> {
     let requests = tool_requests(metadata);
     let needs = needs_per_gate(&requests, status);
+    let busy: Vec<usize> = requests.iter().filter_map(|request| gate_of(request.tool, status)).collect();
     requests
         .into_iter()
         .map(|request| {
-            let shared = gate_of(request.tool, status).and_then(|gate| needs.get(&gate).copied());
-            let needed = shared.or(request.grams);
-            match_tool(request, needed, status, lanes, klipper)
+            let gate = gate_of(request.tool, status);
+            let needed = gate.and_then(|gate| needs.get(&gate).copied()).or(request.grams);
+            let reserve = gate.and_then(|gate| endless_spool_reserve(gate, &busy, status, lanes));
+            match_tool(request, needed, reserve, status, lanes, klipper)
         })
         .collect()
+}
+
+/// The gates the tools of the file print from (with Happy Hare); see [`endless_spool_reserve`].
+pub fn busy_gates(matches: &[ToolMatch]) -> Vec<usize> {
+    matches.iter().filter_map(|found| found.gate).collect()
+}
+
+/// The grams EndlessSpool can continue with once the gate runs out: what Spoolman knows is left in the other gates of
+/// its group. Conservative: a gate that a tool of the file prints from (`busy`) is kept for that tool, and an empty
+/// gate or one without known weight adds nothing. `None` when EndlessSpool is off, the gate has no group or no other
+/// gate of the group adds anything.
+pub fn endless_spool_reserve(gate: usize, busy: &[usize], status: &PrinterStatus, lanes: &[Lane]) -> Option<f64> {
+    let mmu = status.happy_hare().filter(|mmu| mmu.endless_spool)?;
+    let group = mmu.gates.iter().find(|candidate| candidate.index == gate)?.endless_spool_group?;
+    let grams: Vec<f64> = mmu
+        .gates
+        .iter()
+        .filter(|other| other.index != gate && other.endless_spool_group == Some(group))
+        .filter(|other| other.availability != GateAvailability::Empty && !busy.contains(&other.index))
+        .filter_map(|other| gate_supply(other, lanes).left)
+        .collect();
+    (!grams.is_empty()).then(|| grams.iter().sum())
 }
 
 /// The planned weight of all tools that print from the same gate, per gate: they all take from its spool.
@@ -169,19 +197,21 @@ pub fn fitting_gates(request: &ToolRequest, status: &PrinterStatus, lanes: &[Lan
     let Some(mmu) = status.happy_hare() else { return Vec::new() };
     let mut fits = vec![false; mmu.gates.iter().map(|gate| gate.index + 1).max().unwrap_or(0)];
     for gate in mmu.gates.iter().filter(|gate| gate.availability != GateAvailability::Empty) {
-        let lane = lanes.iter().find(|lane| lane.gate == Some(gate.index));
-        let supply = supply(lane, Some(gate));
+        let supply = gate_supply(gate, lanes);
         let knows_material = request.material.is_none() || supply.material.is_some();
         let knows_color = !request.color.is_some_and(|color| !is_clear(color)) || !supply.colors.is_empty();
-        fits[gate.index] = knows_material && knows_color && compare(request, request.grams, &supply) == Verdict::Fits;
+        fits[gate.index] =
+            knows_material && knows_color && compare(request, request.grams, None, &supply) == Verdict::Fits;
     }
     fits
 }
 
-/// One tool against where it prints from; `needed` is the planned weight that comes from that spool.
+/// One tool against where it prints from; `needed` is the planned weight that comes from that spool, `reserve` what
+/// EndlessSpool can continue with.
 fn match_tool(
     request: ToolRequest,
     needed: Option<f64>,
+    reserve: Option<f64>,
     status: &PrinterStatus,
     lanes: &[Lane],
     klipper: &Setup,
@@ -190,48 +220,64 @@ fn match_tool(
         if request.tool > 0 && klipper.has_tool_command(request.tool) == Some(false) {
             return ToolMatch { request, gate: None, verdict: Verdict::NoGate };
         }
-        let lane = lanes.first().filter(|_| request.tool == 0);
-        let verdict = compare(&request, needed, &supply(lane, None));
+        let spool = lanes.first().filter(|_| request.tool == 0).and_then(|lane| lane.spool.as_ref());
+        let verdict = compare(&request, needed, None, &spool.map(Supply::of_spool).unwrap_or_default());
         return ToolMatch { request, gate: None, verdict };
     };
     let Some(gate) = mmu.tool_to_gate.get(request.tool).copied() else {
         return ToolMatch { request, gate: None, verdict: Verdict::NoGate };
     };
     let gate_state = mmu.gates.iter().find(|candidate| candidate.index == gate);
-    let verdict = if gate_state.is_some_and(|state| state.availability == GateAvailability::Empty) {
-        Verdict::GateEmpty
-    } else {
-        let lane = lanes.iter().find(|lane| lane.gate == Some(gate));
-        compare(&request, needed, &supply(lane, gate_state))
+    let verdict = match gate_state {
+        Some(state) if state.availability == GateAvailability::Empty => Verdict::GateEmpty,
+        Some(state) => compare(&request, needed, reserve, &gate_supply(state, lanes)),
+        None => compare(&request, needed, reserve, &Supply::default()),
     };
     ToolMatch { request, gate: Some(gate), verdict }
 }
 
-/// What sits where a tool prints from.
-#[derive(Debug, Default)]
-struct Supply {
-    material: Option<String>,
-    colors: Vec<Rgba>,
-    left: Option<f64>,
+/// The filament where a tool prints from, as far as it is known.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Supply {
+    pub material: Option<String>,
+    /// The colours of the filament with their alpha; several for a multi-colour spool of Spoolman.
+    pub colors: Vec<Rgba>,
+    /// The colours follow each other along the filament instead of lying side by side.
+    pub longitudinal: bool,
+    /// Vendor and name of the spool, or the filament name Happy Hare has for the gate.
+    pub name: Option<String>,
+    /// Grams left on the spool; only Spoolman knows.
+    pub left: Option<f64>,
 }
 
-/// The spool of the lane (Spoolman) first, otherwise what Happy Hare knows of the gate (no weight there).
-fn supply(lane: Option<&Lane>, gate: Option<&MmuGate>) -> Supply {
-    if let Some(spool) = lane.and_then(|lane| lane.spool.as_ref()) {
-        return Supply {
+impl Supply {
+    fn of_spool(spool: &Spool) -> Self {
+        Self {
             material: Some(spool.material.clone()).filter(|material| !material.is_empty()),
             colors: spool.colors.clone(),
+            longitudinal: spool.has_longitudinal_colors(),
+            name: Some(spool.title()).filter(|title| !title.is_empty()),
             left: spool.remaining_weight,
-        };
+        }
     }
-    gate.map_or_else(Supply::default, |gate| Supply {
-        material: Some(gate.material.clone()).filter(|material| !material.is_empty()),
-        colors: gate.color.into_iter().collect(),
-        left: None,
-    })
 }
 
-fn compare(request: &ToolRequest, needed: Option<f64>, supply: &Supply) -> Verdict {
+/// What a gate holds: its spool from Spoolman first, otherwise what Happy Hare knows of the gate (no weight there).
+pub fn gate_supply(gate: &MmuGate, lanes: &[Lane]) -> Supply {
+    let lane = lanes.iter().find(|lane| lane.gate == Some(gate.index));
+    if let Some(spool) = lane.and_then(|lane| lane.spool.as_ref()) {
+        return Supply::of_spool(spool);
+    }
+    Supply {
+        material: Some(gate.material.clone()).filter(|material| !material.is_empty()),
+        colors: gate.color.into_iter().collect(),
+        longitudinal: false,
+        name: Some(gate.name.clone()).filter(|name| !name.is_empty()),
+        left: None,
+    }
+}
+
+fn compare(request: &ToolRequest, needed: Option<f64>, reserve: Option<f64>, supply: &Supply) -> Verdict {
     let mut compared = false;
     let mut differences = Vec::new();
     if let (Some(expected), Some(loaded)) = (&request.material, &supply.material) {
@@ -240,23 +286,19 @@ fn compare(request: &ToolRequest, needed: Option<f64>, supply: &Supply) -> Verdi
             differences.push(Difference::Material { expected: expected.clone(), loaded: loaded.clone() });
         }
     }
-    if let Some(wanted) = request.color.filter(|color| !is_clear(*color)) {
-        // A multi-colour spool fits when one of its colours is close; a clear one is nothing to compare with.
-        let nearest = supply
-            .colors
-            .iter()
-            .filter(|loaded| !is_clear(**loaded))
-            .map(|loaded| color_distance(rgb(wanted), rgb(*loaded)))
-            .min_by(f64::total_cmp);
-        if let Some(distance) = nearest {
-            compared = true;
-            if distance > COLOR_DISTANCE {
-                differences.push(Difference::Color);
-            }
+    // Slicers know one colour per tool, so a multi-colour spool is compared by its first colour; a clear one on either
+    // side is nothing to compare.
+    let wanted = request.color.filter(|color| !is_clear(*color));
+    let loaded = supply.colors.first().copied().filter(|color| !is_clear(*color));
+    if let (Some(wanted), Some(loaded)) = (wanted, loaded) {
+        compared = true;
+        if color_distance(rgb(wanted), rgb(loaded)) > COLOR_DISTANCE {
+            differences.push(Difference::Color);
         }
     }
     if let (Some(needed), Some(left)) = (needed, supply.left) {
         compared = true;
+        let left = left + reserve.unwrap_or(0.0);
         if needed > left {
             differences.push(Difference::Weight { needed, left });
         }
@@ -621,17 +663,83 @@ mod tests {
     }
 
     #[test]
-    fn a_multi_colour_spool_fits_when_one_of_its_colours_is_close() {
+    fn a_multi_colour_spool_is_compared_by_its_first_colour() {
         let mut two_colours = test_spool(5, "PLA", 800.0, [0xFF, 0x00, 0x04]);
         two_colours.colors.push([0x26, 0xA6, 0x9A, 0xFF]);
         let spools = spoolman(&[two_colours], Some(5));
         let status = PrinterStatus::default();
 
-        assert_eq!(verdicts(&file(&[10.0], &["PLA"], &["#26A69A"]), &status, &spools), [(0, Verdict::Fits)]);
+        assert_eq!(verdicts(&file(&[10.0], &["PLA"], &["#FF1010"]), &status, &spools), [(0, Verdict::Fits)]);
         assert_eq!(
-            verdicts(&file(&[10.0], &["PLA"], &["#0000FF"]), &status, &spools),
+            verdicts(&file(&[10.0], &["PLA"], &["#26A69A"]), &status, &spools),
             [(0, Verdict::Differs(vec![Difference::Color]))]
         );
+    }
+
+    /// Happy Hare with EndlessSpool on: gate `n` holds spool `n + 1` and belongs to `groups[n]`.
+    fn endless_spool(groups: &[u32], tool_to_gate: &[usize]) -> PrinterStatus {
+        let gates = groups
+            .iter()
+            .enumerate()
+            .map(|(index, group)| MmuGate {
+                spool_id: Some(index as u32 + 1),
+                endless_spool_group: Some(*group),
+                ..gate("PLA", None)
+            })
+            .collect();
+        let mut status = happy_hare(gates, tool_to_gate);
+        status.mmu.as_mut().unwrap().endless_spool = true;
+        status
+    }
+
+    #[test]
+    fn endless_spool_adds_the_gates_of_the_group_that_no_tool_of_the_file_uses() {
+        // T0 prints from gate 0 (14 g); gates 1 and 2 share its group, but T1 prints from gate 2.
+        let status = endless_spool(&[0, 0, 0, 1], &[0, 2]);
+        let spools = spoolman(
+            &[
+                test_spool(1, "PLA", 14.0, [0, 0, 0]),
+                test_spool(2, "PLA", 230.0, [0, 0, 0]),
+                test_spool(3, "PLA", 500.0, [0, 0, 0]),
+                test_spool(4, "PLA", 900.0, [0, 0, 0]),
+            ],
+            None,
+        );
+        let metadata = FileMetadata { referenced_tools: vec![0, 1], ..file(&[18.0, 10.0], &["PLA", "PLA"], &[]) };
+
+        assert_eq!(verdicts(&metadata, &status, &spools), [(0, Verdict::Fits), (1, Verdict::Fits)]);
+        let lanes = lanes(&status, &spools);
+        assert_eq!(endless_spool_reserve(0, &[0, 2], &status, &lanes), Some(230.0));
+        assert_eq!(endless_spool_reserve(0, &[], &status, &lanes), Some(730.0));
+        assert_eq!(endless_spool_reserve(3, &[], &status, &lanes), None);
+    }
+
+    #[test]
+    fn without_endless_spool_only_the_own_spool_counts() {
+        let mut status = endless_spool(&[0, 0], &[0]);
+        status.mmu.as_mut().unwrap().endless_spool = false;
+        let spools = spoolman(&[test_spool(1, "PLA", 14.0, [0, 0, 0]), test_spool(2, "PLA", 230.0, [0, 0, 0])], None);
+
+        let found = verdicts(&file(&[18.0], &["PLA"], &[]), &status, &spools);
+
+        assert_eq!(found, [(0, Verdict::Differs(vec![Difference::Weight { needed: 18.0, left: 14.0 }]))]);
+    }
+
+    #[test]
+    fn a_gate_knows_its_spool_first_then_what_happy_hare_has() {
+        let mut named = gate("PETG", Some([1, 2, 3]));
+        named.name = "Clear Blue".into();
+        let status = happy_hare(vec![named.clone()], &[0]);
+
+        let without_spool = gate_supply(&named, &lanes(&status, &spoolman(&[], None)));
+        assert_eq!(without_spool.name.as_deref(), Some("Clear Blue"));
+        assert_eq!((without_spool.colors.len(), without_spool.left), (1, None));
+
+        named.spool_id = Some(7);
+        let status = happy_hare(vec![named.clone()], &[0]);
+        let spools = spoolman(&[test_spool(7, "PLA", 300.0, [9, 9, 9])], None);
+        let with_spool = gate_supply(&named, &lanes(&status, &spools));
+        assert_eq!((with_spool.material.as_deref(), with_spool.left), (Some("PLA"), Some(300.0)));
     }
 
     #[test]

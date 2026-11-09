@@ -1,0 +1,11 @@
+// Preview: the EndlessSpool dialog of the Tools tab, switched on, with the groups of the gates. Open in the Slint
+// preview or render with scripts/ui-preview.sh.
+
+import { MmuDialogs } from "../state.slint";
+import { FilamentMmuToolsPreview } from "filament-mmu-tools.slint";
+
+export component FilamentMmuEndlessSpoolPreview inherits FilamentMmuToolsPreview {
+    init => {
+        MmuDialogs.endless-spool-open = true;
+    }
+}

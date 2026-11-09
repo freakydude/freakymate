@@ -6,7 +6,7 @@ use crate::{
     SpoolItem, ToolMatchItem, TuningItem, UpdateItem,
 };
 use freakymate_core::color::Rgba;
-use freakymate_core::domain::filament_match::ToolMatch;
+use freakymate_core::domain::filament_match::{Difference, Supply, ToolMatch, Verdict};
 use freakymate_core::domain::spools::{self, FilamentColors, Lane};
 use freakymate_core::sources::happy_hare::{self, FilamentPath, PathSensor};
 use freakymate_core::sources::klipper::tuning::TuningValue;
@@ -70,14 +70,20 @@ pub(crate) fn color_of([red, green, blue, alpha]: Rgba) -> slint::Color {
     slint::Color::from_argb_u8(alpha, red, green, blue)
 }
 
-/// The colours of a bar: up to three, and how many there are.
+/// Colours a filament shows at most: a rainbow along the filament; a bar shows the first three of them.
+const MAX_COLORS: usize = 6;
+
+/// The colours of a bar or swatch: up to six, and how many there are.
 pub(crate) fn bar_colors(colors: &FilamentColors) -> BarColors {
     let color = |index: usize| colors.colors.get(index).copied().map_or_else(slint::Color::default, color_of);
     BarColors {
         first: color(0),
         second: color(1),
         third: color(2),
-        count: colors.colors.len().min(3) as i32,
+        fourth: color(3),
+        fifth: color(4),
+        sixth: color(5),
+        count: colors.colors.len().min(MAX_COLORS) as i32,
         longitudinal: colors.longitudinal,
     }
 }
@@ -231,10 +237,8 @@ pub(crate) fn tool_match_item(tool: usize, gate: Option<usize>, found: Option<&T
     let Some(found) = found else { return item };
     let request = &found.request;
     item.used = true;
-    if let Some(color) = request.color {
-        item.wanted_color = color_of(color);
-        item.wanted_has_color = true;
-    }
+    item.wanted_colors =
+        bar_colors(&FilamentColors { colors: request.color.into_iter().collect(), longitudinal: false });
     item.wanted_material = request.material.clone().unwrap_or_default().into();
     item.wanted_weight = request.grams.map(format::filament_weight).unwrap_or_default().into();
     item.wanted_profile = request.profile.clone().unwrap_or_default().into();
@@ -242,7 +246,28 @@ pub(crate) fn tool_match_item(tool: usize, gate: Option<usize>, found: Option<&T
     item.differences = view::tool_differences(found).into();
     item.material_differs = view::material_difference(found).is_some();
     item.material_line = view::material_line(found).into();
+    item.color_differs = differs(found, |difference| matches!(difference, Difference::Color));
+    item.weight_differs = differs(found, |difference| matches!(difference, Difference::Weight { .. }));
     item
+}
+
+fn differs(found: &ToolMatch, kind: impl Fn(&Difference) -> bool) -> bool {
+    matches!(&found.verdict, Verdict::Differs(differences) if differences.iter().any(kind))
+}
+
+/// What the gate of a tool holds: material, colours, name and the grams left; with an EndlessSpool `reserve` also all
+/// the group can still give.
+pub(crate) fn fill_loaded(item: &mut ToolMatchItem, supply: &Supply, reserve: Option<f64>, empty: bool) {
+    item.gate_empty = empty;
+    item.loaded_material = supply.material.clone().unwrap_or_default().into();
+    item.loaded_colors =
+        bar_colors(&FilamentColors { colors: supply.colors.clone(), longitudinal: supply.longitudinal });
+    item.loaded_name = supply.name.clone().unwrap_or_default().into();
+    item.loaded_weight = supply.left.map(format::filament_weight).unwrap_or_default().into();
+    item.endless_weight = reserve
+        .map(|reserve| format!("∞ {}", format::filament_weight(supply.left.unwrap_or(0.0) + reserve)))
+        .unwrap_or_default()
+        .into();
 }
 
 /// The flags as a model, the old one while they are unchanged: a new model counts as a changed row and would rebuild
@@ -258,16 +283,16 @@ pub(crate) fn reuse_flags(old: Option<ModelRc<bool>>, flags: Option<Vec<bool>>) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use freakymate_core::domain::filament_match::{ToolRequest, Verdict};
+    use freakymate_core::domain::filament_match::ToolRequest;
 
     #[test]
-    fn a_colour_bar_has_up_to_three_colours() {
+    fn a_colour_bar_has_up_to_six_colours() {
         let red = [255, 0, 0, 255];
         let bar = |colors: Vec<Rgba>, longitudinal| bar_colors(&FilamentColors { colors, longitudinal });
         assert_eq!(bar(vec![], false).count, 0);
         assert_eq!(bar(vec![red], false).count, 1);
         assert_eq!(bar(vec![red, [0, 255, 0, 255]], false).count, 2);
-        assert_eq!(bar(vec![red; 5], false).count, 3);
+        assert_eq!(bar(vec![red; 7], false).count, 6);
         assert_eq!(bar(vec![red, [0, 255, 0, 255]], true).second, slint::Color::from_rgb_u8(0, 255, 0));
         assert!(bar(vec![red], true).longitudinal);
     }
@@ -315,11 +340,38 @@ mod tests {
         let item = tool_match_item(2, Some(1), Some(&found));
 
         assert_eq!((item.tool, item.gate, item.used), (2, 1, true));
-        assert!(item.wanted_has_color);
-        assert_eq!(item.wanted_color, color_of([1, 2, 3, 0xFF]));
+        assert_eq!(item.wanted_colors.count, 1);
+        assert_eq!(item.wanted_colors.first, color_of([1, 2, 3, 0xFF]));
         assert_eq!((item.wanted_material.as_str(), item.wanted_profile.as_str()), ("PETG", "Generic PETG"));
         assert_eq!(item.verdict.as_str(), "gate-empty");
         assert_eq!(item.differences.as_str(), "Gate 1 is empty.");
+    }
+
+    #[test]
+    fn each_difference_has_its_own_flag() {
+        let found = tool_match(Verdict::Differs(vec![Difference::Weight { needed: 18.0, left: 14.0 }]));
+
+        let item = tool_match_item(1, Some(3), Some(&found));
+
+        assert!(item.weight_differs && !item.color_differs && !item.material_differs);
+    }
+
+    #[test]
+    fn the_gate_side_shows_the_spool_and_what_endless_spool_adds() {
+        let supply = Supply {
+            material: Some("PLA".into()),
+            colors: vec![[1, 2, 3, 0xFF], [4, 5, 6, 0xFF]],
+            name: Some("Eryone Silk Dual".into()),
+            left: Some(14.0),
+            ..Supply::default()
+        };
+        let mut item = tool_match_item(1, Some(3), None);
+
+        fill_loaded(&mut item, &supply, Some(230.0), false);
+
+        assert_eq!((item.loaded_material.as_str(), item.loaded_name.as_str()), ("PLA", "Eryone Silk Dual"));
+        assert_eq!((item.loaded_weight.as_str(), item.endless_weight.as_str()), ("14 g", "∞ 244 g"));
+        assert_eq!(item.loaded_colors.count, 2);
     }
 
     #[test]

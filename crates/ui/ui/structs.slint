@@ -78,12 +78,16 @@ export struct FilamentSensorItem {
     detected: bool,
 }
 
-// The colours of a filament bar (`ColorBar`): up to three, how many there are (0 to 3), and whether they follow each
-// other along the filament instead of lying side by side (Spoolman's multi-colour filaments).
+// The colours of a filament (`ColorBar`, `FilamentSwatch`): up to six, how many there are (0 to 6), and whether they
+// follow each other along the filament instead of lying side by side (Spoolman's multi-colour filaments). A bar shows
+// the first three, a swatch all of them (a rainbow along the filament).
 export struct BarColors {
     first: color,
     second: color,
     third: color,
+    fourth: color,
+    fifth: color,
+    sixth: color,
     count: int,
     longitudinal: bool,
 }
@@ -117,8 +121,8 @@ export struct ToolMatchItem {
     gate: int,
     // What the file of the job asks of the tool (see `Printer.mmu-match-file`); empty when it does not use the tool.
     used: bool,
-    wanted-color: color,
-    wanted-has-color: bool,
+    // The slicer's colour with its alpha, one at most (`count` 0 without).
+    wanted-colors: BarColors,
     wanted-material: string,
     // Planned weight with unit, profile name of the slicer.
     wanted-weight: string,
@@ -137,6 +141,18 @@ export struct ToolMatchItem {
     gate-to-load: int,
     // Per gate index: the gate's filament fits what the file asks of the tool.
     fitting-gates: [bool],
+    // What the gate of the tool holds (its spool first, else what Happy Hare knows): material, colours, the name of
+    // spool or filament, the grams left with unit (only with Spoolman) and, with EndlessSpool, everything the group
+    // can still give ("∞ 244 g"); each empty when unknown. `gate-empty`: Happy Hare reports the gate as empty.
+    loaded-material: string,
+    loaded-colors: BarColors,
+    loaded-name: string,
+    loaded-weight: string,
+    endless-weight: string,
+    gate-empty: bool,
+    // Which facts of a tool of the file differ from what its gate holds (see `material-differs`).
+    color-differs: bool,
+    weight-differs: bool,
 }
 
 // A label of the temperature chart at `position`, a share from 0 to 1 along its axis.

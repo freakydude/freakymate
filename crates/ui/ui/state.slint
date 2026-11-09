@@ -360,6 +360,8 @@ export global MmuDialogs {
     in-out property <bool> bypass-open;
     // The choice of gate for a tool on the Tools tab: its index in `Printer.mmu-tools`, -1 for none.
     in-out property <int> tool: -1;
+    // EndlessSpool and its groups, opened from the Tools tab.
+    in-out property <bool> endless-spool-open;
 }
 
 // Tabs of the Filament page; without an MMU it shows the extruder alone.

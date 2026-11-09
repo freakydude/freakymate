@@ -24,9 +24,9 @@ export component PrintPreparedPlainPreview inherits AppWindow {
             show-thumbnail: true,
         };
         Printer.prepared-tools = [
-            { tool: 0, gate: -1, used: true, wanted-color: #1c7ed6, wanted-has-color: true, wanted-material: "PLA", wanted-weight: "9.4 g", wanted-profile: "Prusament PLA Azure Blue" },
-            { tool: 1, gate: -1, used: true, wanted-color: #ffffff, wanted-has-color: true, wanted-material: "PLA", wanted-weight: "2.1 g" },
-            { tool: 2, gate: -1, used: true, wanted-color: #ffffff00, wanted-has-color: true, wanted-material: "PETG", wanted-weight: "1.5 g" },
+            { tool: 0, gate: -1, used: true, wanted-colors: { first: #1c7ed6, count: 1 }, wanted-material: "PLA", wanted-weight: "9.4 g", wanted-profile: "Prusament PLA Azure Blue" },
+            { tool: 1, gate: -1, used: true, wanted-colors: { first: #ffffff, count: 1 }, wanted-material: "PLA", wanted-weight: "2.1 g" },
+            { tool: 2, gate: -1, used: true, wanted-colors: { first: #ffffff00, count: 1 }, wanted-material: "PETG", wanted-weight: "1.5 g" },
         ];
     }
 }

@@ -29,10 +29,10 @@ export component PrintPreparedMmuPreview inherits AppWindow {
         Printer.mmu-match-summary = @tr("1 of 4 tools fit");
         Printer.mmu-match-verdict = "differs";
         Printer.prepared-tools = [
-            { tool: 0, gate: 0, used: true, wanted-color: #e03131, wanted-has-color: true, wanted-material: "PLA", verdict: "fits" },
-            { tool: 1, gate: 3, used: true, wanted-color: #f4e2c1, wanted-has-color: true, wanted-material: "PLA", verdict: "gate-empty" },
-            { tool: 3, gate: 1, used: true, wanted-color: #e8590c80, wanted-has-color: true, wanted-material: "PLA", verdict: "differs" },
-            { tool: 4, gate: -1, used: true, wanted-color: #ffffff00, wanted-has-color: true, wanted-material: "PETG", verdict: "no-gate" },
+            { tool: 0, gate: 0, used: true, wanted-colors: { first: #e03131, count: 1 }, wanted-material: "PLA", verdict: "fits" },
+            { tool: 1, gate: 3, used: true, wanted-colors: { first: #f4e2c1, count: 1 }, wanted-material: "PLA", verdict: "gate-empty" },
+            { tool: 3, gate: 1, used: true, wanted-colors: { first: #e8590c80, count: 1 }, wanted-material: "PLA", verdict: "differs" },
+            { tool: 4, gate: -1, used: true, wanted-colors: { first: #ffffff00, count: 1 }, wanted-material: "PETG", verdict: "no-gate" },
         ];
     }
 }
