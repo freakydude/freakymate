@@ -6,7 +6,7 @@ import { Icons } from "../icons.slint";
 import { MmuGateItem, Printer } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
 import { IconLabel } from "controls.slint";
-import { FilamentSwatch } from "filament-swatch.slint";
+import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
 
 // Texts of the buffer and FlowGuard and the colour of FlowGuard, shared by the Gates tab and the strip on the print page.
 export global MmuTexts {
@@ -110,7 +110,7 @@ export component GateTile inherits SlotTile {
             width: 16px;
             left-edge: true;
             radius: root.selected ? Theme.radius - 3px : Theme.radius;
-            colors: root.gate.colors;
+            colors: root.has-filament ? FilamentColors.generic(root.gate.colors) : root.gate.colors;
             empty: !root.has-filament;
             gap-color: root.pressed ? Theme.surface-active : Theme.surface-raised;
             ground: root.selected ? self.gap-color : Theme.background;

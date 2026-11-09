@@ -6,7 +6,7 @@ import { Icons } from "../icons.slint";
 import { FilamentTab, MmuDialogs, ToolMatchItem, Navigation, Page, Printer, SpoolPicker } from "../state.slint";
 import { Card, ScrollList, ValueTile } from "../components/controls.slint";
 import { VerdictIcon } from "../components/mmu-tiles.slint";
-import { FilamentSwatch, FilamentText } from "../components/filament-swatch.slint";
+import { FilamentColors, FilamentSwatch, FilamentText } from "../components/filament-swatch.slint";
 
 // A tool of the file as a small row: the colour the file asks for beside the colour of its gate (one field, split),
 // the tool, its material (yellow when the gate holds another) and whether they fit.
@@ -36,7 +36,7 @@ component ToolChip inherits Rectangle {
             FilamentSwatch {
                 width: 18px;
                 radius: 0px;
-                colors: root.mapping.loaded-colors;
+                colors: root.has-gate && !root.mapping.gate-empty ? FilamentColors.generic(root.mapping.loaded-colors) : root.mapping.loaded-colors;
                 empty: !root.has-gate || root.mapping.gate-empty;
                 warn: root.mapping.color-differs;
             }
@@ -212,7 +212,7 @@ component ExtruderMatchCard inherits Card {
             spacing: 8px;
             FilamentSwatch {
                 width: 28px;
-                colors: Printer.spool-colors;
+                colors: Printer.has-spool ? FilamentColors.generic(Printer.spool-colors) : Printer.spool-colors;
                 empty: !Printer.has-spool;
                 warn: root.first.color-differs;
                 gap-color: Theme.surface;
@@ -223,7 +223,7 @@ component ExtruderMatchCard inherits Card {
                 material-color: !Printer.has-spool ? Theme.muted : root.first.material-differs ? Theme.warning : Theme.foreground;
                 name: Printer.has-spool ? Printer.spool-title : "";
                 trail: Printer.has-spool ? Printer.spool-weight : "";
-                trail-warn: Printer.has-spool && Printer.spool-low;
+                trail-warn: Printer.has-spool && root.first.weight-differs;
             }
         }
     }

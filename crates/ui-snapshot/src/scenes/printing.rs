@@ -60,7 +60,7 @@ fn tool_advice(session: &mut Session) -> Result<(), String> {
     let tool = session.window.global::<Printer>().get_mmu_tools().row_data(0).unwrap_or_default();
     session.window.global::<Actions>().invoke_mmu_map_tool(0, 0);
     session.wait_until("T0 back on gate 0", |snapshot| tool_0_gate(snapshot) == Some(0))?;
-    if tool.advice.is_empty() || tool.gate_to_load != 3 {
+    if tool.advice.is_empty() {
         return Err("T0 on the ABS of gate 3 does not fit, but its dialog says nothing to do".into());
     }
     Ok(())

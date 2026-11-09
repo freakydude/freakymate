@@ -7,7 +7,7 @@ import { Icons } from "../icons.slint";
 import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, ToolMatchItem, Printer } from "../state.slint";
 import { BarColors } from "../structs.slint";
 import { ButtonKind, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
-import { FilamentSwatch, FilamentText } from "../components/filament-swatch.slint";
+import { FilamentColors, FilamentSwatch, FilamentText } from "../components/filament-swatch.slint";
 import { DialogHeader, DialogPanel, DialogTitle, Scrim } from "../components/dialog.slint";
 import { SlotTile, VerdictIcon } from "../components/mmu-tiles.slint";
 
@@ -111,10 +111,10 @@ component ToolRow inherits Rectangle {
             horizontal-stretch: 1;
             min-width: root.has-file ? root.half-width : 0px;
             label: root.has-gate ? @tr("Gate {}", root.mapping.gate) : @tr("No gate");
-            colors: root.mapping.loaded-colors;
+            colors: root.has-gate && !root.mapping.gate-empty ? FilamentColors.generic(root.mapping.loaded-colors) : root.mapping.loaded-colors;
             empty: !root.has-gate || root.mapping.gate-empty;
             color-warn: root.mapping.used && root.mapping.color-differs;
-            enabled: root.mapping.used || (root.can-choose && root.has-gate);
+            enabled: root.has-gate && (root.mapping.used || root.can-choose);
             clicked => { root.clicked-gate(); }
             if !root.has-gate: FilamentText {
                 horizontal-stretch: 1;
@@ -218,7 +218,7 @@ component GroupRow inherits HorizontalLayout {
         width: 10px;
         height: 32px;
         radius: 3px;
-        colors: root.gate.colors;
+        colors: !self.empty ? FilamentColors.generic(root.gate.colors) : root.gate.colors;
         empty: root.gate.availability != "available" && root.gate.availability != "buffered";
     }
     VerticalLayout {
@@ -380,7 +380,7 @@ component WantedLine inherits FilamentLine {
 component LoadedLine inherits FilamentLine {
     in property <ToolMatchItem> mapping;
 
-    colors: root.mapping.loaded-colors;
+    colors: root.mapping.gate-empty ? root.mapping.loaded-colors : FilamentColors.generic(root.mapping.loaded-colors);
     empty: root.mapping.gate-empty;
     color-warn: root.mapping.used && root.mapping.color-differs;
     label: @tr("Gate {}", root.mapping.gate);
@@ -491,7 +491,7 @@ export component ToolDialog inherits Scrim {
                     kind: ButtonKind.accent;
                     text: @tr("Choose gate");
                     clicked => {
-                        MmuDialogs.tool-gate = root.mapping.tool;
+                        MmuDialogs.tool-gate = MmuDialogs.tool;
                         root.close();
                     }
                 }
@@ -508,7 +508,7 @@ component GateChoice inherits FilamentLine {
 
     property <bool> is-empty: root.gate.availability == "empty";
 
-    colors: root.gate.colors;
+    colors: root.is-empty ? root.gate.colors : FilamentColors.generic(root.gate.colors);
     empty: root.is-empty;
     pressable: true;
     label: @tr("Gate {}", root.gate.index);

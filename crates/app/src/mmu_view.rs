@@ -97,15 +97,17 @@ impl MmuView {
             .map(|(row, (tool, gate, found))| {
                 let mut item = tool_match_item(tool, gate, found);
                 if let Some(state) = gate.and_then(|gate| mmu.gates.iter().find(|state| state.index == gate)) {
-                    let reserve = filament_match::endless_spool_reserve(state.index, &busy, status, lanes);
+                    // A tool of the file shares the reserve with the other tools of its group.
+                    let reserve = found.map_or_else(
+                        || filament_match::endless_spool_reserve(state.index, &busy, status, lanes),
+                        |found| found.reserve,
+                    );
                     let empty = state.availability == GateAvailability::Empty;
                     fill_loaded(&mut item, &filament_match::gate_supply(state, lanes), reserve, empty);
                 }
-                let fitting = found.map(|found| filament_match::fitting_gates(&found.request, status, lanes));
+                let fitting = found.is_some().then(|| filament_match::fitting_gates(matches, tool, status, lanes));
                 if let (Some(found), Some(fitting)) = (found, &fitting) {
-                    let remedies = filament_match::remedies(found, fitting);
-                    item.advice = view::remedy_text(&remedies).into();
-                    item.gate_to_load = id_or_none(view::gate_to_load(&remedies));
+                    item.advice = view::remedy_text(&filament_match::remedies(found, fitting)).into();
                 }
                 item.fitting_gates = reuse_flags(self.tools.row_data(row).map(|old| old.fitting_gates), fitting);
                 item

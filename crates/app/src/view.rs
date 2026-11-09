@@ -192,9 +192,12 @@ fn difference_sentence(source: &str, spool: &str, difference: &Difference) -> St
     match difference {
         Difference::Material { loaded, .. } => format!("{source} holds {loaded}."),
         Difference::Color => format!("{source} has another colour."),
-        Difference::Weight { needed, left } => format!(
-            "{spool} has {} left, the print needs ~{}.",
+        Difference::Weight { needed, left, reserve } => format!(
+            "{spool} has {} left{}, the print needs ~{}.",
             format::filament_weight(*left),
+            reserve
+                .map(|grams| format!(" and EndlessSpool {} more", format::filament_weight(grams)))
+                .unwrap_or_default(),
             format::filament_weight(*needed)
         ),
     }
@@ -276,7 +279,7 @@ pub fn remedy_text(remedies: &[Remedy]) -> String {
 fn remedy_sentence(remedy: &Remedy) -> String {
     match remedy {
         Remedy::UseGate(gates) if gates.len() == 1 => {
-            format!("Gate {} holds what the file wants: choose it below.", gates[0])
+            format!("Gate {} holds what the file wants: choose it.", gates[0])
         }
         Remedy::UseGate(gates) => format!("Gates {} hold what the file wants: choose one of them.", enumeration(gates)),
         Remedy::LoadGate(gate) => format!(
@@ -294,14 +297,6 @@ fn enumeration(numbers: &[usize]) -> String {
         Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
         _ => texts.concat(),
     }
-}
-
-/// The gate whose filament a remedy changes, for a button that opens it.
-pub fn gate_to_load(remedies: &[Remedy]) -> Option<usize> {
-    remedies.iter().find_map(|remedy| match remedy {
-        Remedy::LoadGate(gate) => Some(*gate),
-        _ => None,
-    })
 }
 
 /// What a row of the file list shows; an empty text is a fact the file does not have.
@@ -730,7 +725,7 @@ mod tests {
 
     fn tool_match(tool: usize, gate: Option<usize>, verdict: Verdict) -> ToolMatch {
         let request = filament_match::ToolRequest { tool, ..filament_match::ToolRequest::default() };
-        ToolMatch { request, gate, verdict }
+        ToolMatch { request, gate, reserve: None, verdict }
     }
 
     #[test]
@@ -756,7 +751,7 @@ mod tests {
         let differs = Verdict::Differs(vec![
             Difference::Material { expected: "PLA".into(), loaded: "PETG".into() },
             Difference::Color,
-            Difference::Weight { needed: 30.0, left: 20.0 },
+            Difference::Weight { needed: 30.0, left: 20.0, reserve: None },
         ]);
 
         assert_eq!(
@@ -768,7 +763,7 @@ mod tests {
         assert_eq!(tool_differences(&tool_match(0, Some(0), Verdict::Fits)), "");
         let without_mmu = Verdict::Differs(vec![
             Difference::Material { expected: "PLA".into(), loaded: "ABS".into() },
-            Difference::Weight { needed: 52.0, left: 38.0 },
+            Difference::Weight { needed: 52.0, left: 38.0, reserve: None },
         ]);
         assert_eq!(
             tool_differences(&tool_match(0, None, without_mmu)),
@@ -783,8 +778,12 @@ mod tests {
         assert_eq!(print_hint_text(&material, true), "T1: The spool holds PETG.");
         assert_eq!(print_hint_text(&hint(0, Difference::Color), false), "The spool has another colour.");
         assert_eq!(
-            print_hint_text(&hint(0, Difference::Weight { needed: 52.0, left: 38.0 }), false),
+            print_hint_text(&hint(0, Difference::Weight { needed: 52.0, left: 38.0, reserve: None }), false),
             "The spool has 38 g left, the print needs ~52 g."
+        );
+        assert_eq!(
+            print_hint_text(&hint(0, Difference::Weight { needed: 100.0, left: 14.0, reserve: Some(80.0) }), false),
+            "The spool has 14 g left and EndlessSpool 80 g more, the print needs ~100 g."
         );
     }
 
@@ -813,7 +812,7 @@ mod tests {
     }
 
     #[test]
-    fn remedies_read_as_sentences_and_name_the_gate_to_open() {
+    fn remedies_read_as_sentences() {
         let remedies = [Remedy::UseGate(vec![0, 2, 5]), Remedy::LoadGate(3)];
 
         assert_eq!(
@@ -821,9 +820,7 @@ mod tests {
             "Gates 0, 2 and 5 hold what the file wants: choose one of them.\nLoad fitting filament into gate 3. If it \
              holds it already, correct its spool, material or colour."
         );
-        assert_eq!(remedy_text(&[Remedy::UseGate(vec![1])]), "Gate 1 holds what the file wants: choose it below.");
-        assert_eq!(gate_to_load(&remedies), Some(3));
-        assert_eq!(gate_to_load(&[Remedy::Reslice]), None);
+        assert_eq!(remedy_text(&[Remedy::UseGate(vec![1])]), "Gate 1 holds what the file wants: choose it.");
     }
 
     #[test]
