@@ -1,4 +1,4 @@
-// Preview: the file list with facts as icons. Rows: with thumbnail, with estimates and chamber temperature, without
+// Preview: the file list with facts as icons; two files marked (only Delete), long_job is the prepared one. Rows: with thumbnail, with estimates and chamber temperature, without
 // thumbnail, for several tools with a material per tool, metadata not loaded yet (placeholder). Open in the Slint
 // preview or render with scripts/ui-preview.sh.
 
@@ -11,9 +11,12 @@ export component PrintFilesPreview inherits AppWindow {
         Sample.ready-printer();
         Navigation.page = Page.print;
         Navigation.files-open = true;
+        Printer.prepared-path = "long_job.gcode";
+        Printer.marked-file-count = 2;
         Printer.files = [
             {
                 path: "benchy.gcode",
+                marked: true,
                 name: "benchy",
                 modified: "17.11.2023 06:46",
                 material: "PLA",
@@ -53,9 +56,10 @@ export component PrintFilesPreview inherits AppWindow {
             },
             {
                 path: "multicolor.gcode",
+                marked: true,
                 name: "multicolor",
                 modified: "12.11.2023 09:30",
-                material: "PLA;PLA;PETG;PLA;ABS;PLA;PETG;TPU",
+                material: "PLA, PETG, ABS, TPU",
                 weight: "84 g",
                 nozzle: "0.4",
                 time: "~5h 12m",

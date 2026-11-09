@@ -3,12 +3,12 @@
 use crate::format;
 use chrono::{DateTime, Local};
 use freakymate_core::domain::estimates;
+use freakymate_core::domain::filament_match::{self, Difference, PrintHint, PrintHintKind, ToolMatch, Verdict};
 use freakymate_core::domain::file_catalog::FileInfo;
 use freakymate_core::domain::job_end;
 use freakymate_core::domain::pause::{Interruption, InterruptionFact};
-use freakymate_core::domain::spools::PrintHint;
 use freakymate_core::sources::happy_hare::{
-    path_sensor_names, FlowGuardState, GateAvailability, LoadedFilament, MmuSensor, ServoPosition, SyncFeedbackState,
+    FlowGuardState, GateAvailability, LoadedFilament, ServoPosition, SyncFeedbackState,
 };
 use freakymate_core::sources::klipper::tuning::TuningRange;
 use freakymate_core::sources::klipper::{FanKind, PrintJob, PrintState};
@@ -172,20 +172,77 @@ pub fn spool_preset_text(spool: &Spool) -> Option<String> {
 
 /// A hint before the print as a line of text. `show_tool` names the tool when there are several lanes.
 pub fn print_hint_text(hint: &PrintHint, show_tool: bool) -> String {
-    let tool = |tool: usize| if show_tool { format!("T{tool}: ") } else { String::new() };
-    match hint {
-        PrintHint::Material { tool: number, expected, loaded } => {
-            format!("{}the file is for {expected}, the spool is {loaded}", tool(*number))
-        }
-        PrintHint::Weight { tool: number, needed, left } => {
-            format!(
-                "{}needs ~{}, the spool has {} left",
-                tool(*number),
-                format::filament_weight(*needed),
-                format::filament_weight(*left)
-            )
-        }
-        PrintHint::Color { tool: number } => format!("{}the colour differs from the file", tool(*number)),
+    let tool = if show_tool { format!("T{}: ", hint.tool) } else { String::new() };
+    let spool = "The spool";
+    match &hint.kind {
+        PrintHintKind::Differs(difference) => format!("{tool}{}", difference_sentence(spool, spool, difference)),
+        PrintHintKind::GateEmpty => format!("{tool}{}", empty_gate_sentence("The gate")),
+        PrintHintKind::NoGate => no_gate_sentence(hint.tool),
+    }
+}
+
+/// One difference between the file and the filament as a sentence, for the print page and the question before the
+/// start alike. `source` names where the tool prints from, `spool` the spool for the weight.
+fn difference_sentence(source: &str, spool: &str, difference: &Difference) -> String {
+    match difference {
+        Difference::Material { loaded, .. } => format!("{source} holds {loaded}."),
+        Difference::Color => format!("{source} has another colour."),
+        Difference::Weight { needed, left } => format!(
+            "{spool} has {} left, the print needs ~{}.",
+            format::filament_weight(*left),
+            format::filament_weight(*needed)
+        ),
+    }
+}
+
+fn empty_gate_sentence(source: &str) -> String {
+    format!("{source} is empty.")
+}
+
+fn no_gate_sentence(tool: usize) -> String {
+    format!("The printer has no gate for T{tool}.")
+}
+
+/// The key of a verdict for the UI (`ToolMatchItem.verdict`): "fits", "differs", "gate-empty", "no-gate" or "".
+pub fn verdict_key(verdict: &Verdict) -> &'static str {
+    match verdict {
+        Verdict::Fits => "fits",
+        Verdict::Differs(_) => "differs",
+        Verdict::GateEmpty => "gate-empty",
+        Verdict::NoGate => "no-gate",
+        Verdict::Unknown => "",
+    }
+}
+
+/// Several verdicts as one key, see [`Verdict::combine`]: "fits", "" or "differs" for any that does not fit.
+pub fn combined_verdict<'a>(verdicts: impl IntoIterator<Item = &'a Verdict>) -> &'static str {
+    match Verdict::combine(verdicts) {
+        Verdict::Fits => "fits",
+        Verdict::Unknown => "",
+        Verdict::Differs(_) | Verdict::GateEmpty | Verdict::NoGate => "differs",
+    }
+}
+
+/// How many tools of the file fit, e.g. "3 of 4 tools fit".
+pub fn match_summary(matches: &[ToolMatch]) -> String {
+    let fitting = matches.iter().filter(|found| found.verdict == Verdict::Fits).count();
+    format!("{fitting} of {} tools fit", matches.len())
+}
+
+/// What does not fit for a tool, one sentence per line, naming the gate it prints from.
+pub fn tool_differences(found: &ToolMatch) -> String {
+    // Without a gate (no MMU) the tool prints from the spool in use.
+    let source = found.gate.map_or_else(|| "The spool".to_owned(), |gate| format!("Gate {gate}"));
+    let spool = found.gate.map_or_else(|| "The spool".to_owned(), |gate| format!("The spool in gate {gate}"));
+    match &found.verdict {
+        Verdict::Fits | Verdict::Unknown => String::new(),
+        Verdict::GateEmpty => empty_gate_sentence(&source),
+        Verdict::NoGate => no_gate_sentence(found.request.tool),
+        Verdict::Differs(differences) => differences
+            .iter()
+            .map(|difference| difference_sentence(&source, &spool, difference))
+            .collect::<Vec<_>>()
+            .join("\n"),
     }
 }
 
@@ -193,7 +250,7 @@ pub fn print_hint_text(hint: &PrintHint, show_tool: bool) -> String {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FileFacts {
     pub modified: String,
-    /// The slicer's filament type; files for several tools list one per tool (`PLA;PETG`).
+    /// The slicer's materials of the tools the print uses, each once (`PLA, PETG`).
     pub material: String,
     pub weight: String,
     pub nozzle: String,
@@ -208,7 +265,7 @@ pub struct FileFacts {
 pub fn file_facts(info: &FileInfo) -> FileFacts {
     let mut facts = FileFacts { modified: format::unix_date(info.entry.modified), ..FileFacts::default() };
     if let Some(metadata) = info.metadata {
-        facts.material = metadata.filament_type.clone().unwrap_or_default();
+        facts.material = file_materials(metadata);
         facts.weight = estimates::filament_weight_grams(metadata, info.last_print, info.spool)
             .map_or_else(String::new, |grams| show(grams, format::filament_weight));
         facts.nozzle =
@@ -219,6 +276,17 @@ pub fn file_facts(info: &FileInfo) -> FileFacts {
         facts.chamber_temperature = degrees(metadata.chamber_temp);
     }
     facts
+}
+
+/// Each material of the used tools once, in tool order.
+fn file_materials(metadata: &FileMetadata) -> String {
+    let mut materials: Vec<String> = Vec::new();
+    for material in filament_match::tool_requests(metadata).into_iter().filter_map(|request| request.material) {
+        if !materials.contains(&material) {
+            materials.push(material);
+        }
+    }
+    materials.join(", ")
 }
 
 /// A temperature of 0 means that the slicer sets none.
@@ -266,20 +334,8 @@ pub fn mmu_sensor_label(name: &str) -> String {
     characters.next().map_or_else(String::new, |first| first.to_uppercase().chain(characters).collect())
 }
 
-/// The sensors of the MMU for the chip list. The three buffer sensors are left out when a buffer gauge shows them, and
-/// those that the filament path draws.
-pub fn mmu_chip_sensors(sensors: &[MmuSensor], has_buffer: bool) -> Vec<&MmuSensor> {
-    const BUFFER_SENSORS: [&str; 3] = ["filament_compression", "filament_tension", "filament_proportional"];
-    let on_path = path_sensor_names(sensors);
-    sensors
-        .iter()
-        .filter(|sensor| !(has_buffer && BUFFER_SENSORS.contains(&sensor.name.as_str())))
-        .filter(|sensor| !on_path.contains(&sensor.name.as_str()))
-        .collect()
-}
-
 /// The tools of a gate as the tile shows them, e.g. `T0 T3`; empty without one.
-pub fn mmu_tools(tools: &[usize]) -> String {
+pub fn gate_tools_text(tools: &[usize]) -> String {
     tools.iter().map(|tool| format!("T{tool}")).collect::<Vec<_>>().join(" ")
 }
 
@@ -556,7 +612,7 @@ mod tests {
             estimated_time: Some(3600.0),
             filament_total: Some(10_000.0),
             filament_weight_total: Some(30.0),
-            filament_type: Some("PLA".into()),
+            filament_types: vec!["PLA".into()],
             nozzle_diameter: Some(0.4),
             ..FileMetadata::default()
         }
@@ -605,6 +661,90 @@ mod tests {
     }
 
     #[test]
+    fn a_multicolour_file_names_each_material_of_its_used_tools_once() {
+        let metadata = FileMetadata {
+            filament_types: vec!["PLA".into(), "PLA".into(), "TPU".into(), "PETG".into()],
+            filament_weights: vec![5.0, 5.0, 0.0, 2.0],
+            ..file_metadata()
+        };
+
+        // Tool 2 (TPU) has no weight: the print does not use it.
+        assert_eq!(facts_of(Some(&metadata), None).material, "PLA, PETG");
+    }
+
+    fn tool_match(tool: usize, gate: Option<usize>, verdict: Verdict) -> ToolMatch {
+        let request = filament_match::ToolRequest { tool, ..filament_match::ToolRequest::default() };
+        ToolMatch { request, gate, verdict }
+    }
+
+    #[test]
+    fn tools_that_do_not_fit_win_over_those_without_facts() {
+        let differs = Verdict::Differs(vec![Difference::Color]);
+
+        assert_eq!(combined_verdict([&Verdict::Fits, &Verdict::Fits]), "fits");
+        assert_eq!(combined_verdict([&Verdict::Fits, &Verdict::Unknown]), "");
+        assert_eq!(combined_verdict([&Verdict::Unknown, &differs]), "differs");
+        assert_eq!(combined_verdict([&Verdict::NoGate]), "differs");
+        assert_eq!(combined_verdict([]), "");
+    }
+
+    #[test]
+    fn the_summary_counts_the_fitting_tools() {
+        let matches = [tool_match(0, Some(0), Verdict::Fits), tool_match(1, Some(1), Verdict::GateEmpty)];
+
+        assert_eq!(match_summary(&matches), "1 of 2 tools fit");
+    }
+
+    #[test]
+    fn each_difference_of_a_tool_is_a_sentence_about_its_gate() {
+        let differs = Verdict::Differs(vec![
+            Difference::Material { expected: "PLA".into(), loaded: "PETG".into() },
+            Difference::Color,
+            Difference::Weight { needed: 30.0, left: 20.0 },
+        ]);
+
+        assert_eq!(
+            tool_differences(&tool_match(3, Some(1), differs)),
+            "Gate 1 holds PETG.\nGate 1 has another colour.\nThe spool in gate 1 has 20 g left, the print needs ~30 g."
+        );
+        assert_eq!(tool_differences(&tool_match(1, Some(3), Verdict::GateEmpty)), "Gate 3 is empty.");
+        assert_eq!(tool_differences(&tool_match(4, None, Verdict::NoGate)), "The printer has no gate for T4.");
+        assert_eq!(tool_differences(&tool_match(0, Some(0), Verdict::Fits)), "");
+        let without_mmu = Verdict::Differs(vec![
+            Difference::Material { expected: "PLA".into(), loaded: "ABS".into() },
+            Difference::Weight { needed: 52.0, left: 38.0 },
+        ]);
+        assert_eq!(
+            tool_differences(&tool_match(0, None, without_mmu)),
+            "The spool holds ABS.\nThe spool has 38 g left, the print needs ~52 g."
+        );
+    }
+
+    #[test]
+    fn the_hints_before_the_print_word_differences_like_the_print_page() {
+        let hint = |tool, difference| PrintHint { tool, kind: PrintHintKind::Differs(difference) };
+        let material = hint(1, Difference::Material { expected: "PLA".into(), loaded: "PETG".into() });
+        assert_eq!(print_hint_text(&material, true), "T1: The spool holds PETG.");
+        assert_eq!(print_hint_text(&hint(0, Difference::Color), false), "The spool has another colour.");
+        assert_eq!(
+            print_hint_text(&hint(0, Difference::Weight { needed: 52.0, left: 38.0 }), false),
+            "The spool has 38 g left, the print needs ~52 g."
+        );
+    }
+
+    #[test]
+    fn missing_gates_and_empty_gates_are_hints_before_the_print() {
+        assert_eq!(
+            print_hint_text(&PrintHint { tool: 1, kind: PrintHintKind::GateEmpty }, true),
+            "T1: The gate is empty."
+        );
+        assert_eq!(
+            print_hint_text(&PrintHint { tool: 3, kind: PrintHintKind::NoGate }, false),
+            "The printer has no gate for T3."
+        );
+    }
+
+    #[test]
     fn file_without_metadata_shows_only_its_date() {
         let facts = facts_of(None, None);
 
@@ -641,15 +781,7 @@ mod tests {
     }
 
     #[test]
-    fn buffer_sensors_are_hidden_only_when_the_gauge_shows_them() {
-        let sensors = ["mmu_entry", "mmu_exit", "filament_tension", "filament_proportional", "toolhead"]
-            .map(|name| MmuSensor { name: name.into(), triggered: Some(false) });
-        let names = |has_buffer| -> Vec<String> {
-            mmu_chip_sensors(&sensors, has_buffer).iter().map(|sensor| sensor.name.clone()).collect()
-        };
-
-        assert!(names(true).is_empty(), "entry, exit and toolhead are on the filament path, the buffer has its gauge");
-        assert_eq!(names(false), ["filament_tension", "filament_proportional"]);
+    fn the_path_distance_has_one_decimal() {
         assert_eq!(path_distance(412.63), "412.6 mm");
     }
 

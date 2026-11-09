@@ -1,6 +1,7 @@
 //! User settings as a TOML file with the ending `.conf`, like `moonraker.conf` and the other non-Klipper files in `printer_data/config`. FreakyMate
 //! saves it by changing only the values that changed, so comments written by hand stay.
 
+use crate::atomic_file::write_atomically;
 use crate::backlight::BacklightSettings;
 use crate::toml_merge;
 use serde::{Deserialize, Serialize};
@@ -197,30 +198,6 @@ impl SettingsStore {
     fn format_error(&self, error: impl std::fmt::Display) -> SettingsError {
         SettingsError::Format { path: self.path.clone(), message: error.to_string() }
     }
-}
-
-/// Writes via a temporary file so a power loss never leaves a half-written file. A `private` file can be read by
-/// its owner only (Unix).
-pub(crate) fn write_atomically(path: &Path, text: &str, private: bool) -> std::io::Result<()> {
-    if let Some(directory) = path.parent() {
-        std::fs::create_dir_all(directory)?;
-    }
-    let mut temporary = path.as_os_str().to_owned();
-    temporary.push(".tmp");
-    let temporary = PathBuf::from(temporary);
-    // The mode only applies to a new file; a leftover of an interrupted write keeps its own.
-    let _ = std::fs::remove_file(&temporary);
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    if private {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    #[cfg(not(unix))]
-    let _ = private;
-    std::io::Write::write_all(&mut options.open(&temporary)?, text.as_bytes())?;
-    std::fs::rename(&temporary, path)
 }
 
 #[cfg(test)]

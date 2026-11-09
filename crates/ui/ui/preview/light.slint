@@ -1,0 +1,16 @@
+// Preview: the light panel at the light symbol of the status bar: main light, display brightness, LEDs and an effect.
+// Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Backlight, Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component LightPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.temperature;
+        Backlight.available = true;
+        Backlight.brightness = 70;
+        Navigation.light-open = true;
+    }
+}

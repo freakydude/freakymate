@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs all checks of a work package in one go: formatting, Clippy, tests, app build, UI previews and the
 # skill check. Every step runs even when an earlier one fails; the exit code is 1 if any step failed.
-# WSL2/Linux only. Usage (repo root): scripts/verify.sh [--snapshot[=<scenes>]]
+# Linux only. Usage (repo root): scripts/verify.sh [--snapshot[=<scenes>]]
 #   --snapshot           also renders all UI snapshot scenes against a fake Moonraker (about 1.5 minutes more); once
 #                        before a commit
 #   --snapshot=pages,..  only these scenes, for the part of the UI that changed (names: scripts/ui-snapshot.sh -h)

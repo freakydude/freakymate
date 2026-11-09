@@ -2,12 +2,13 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Navigation, Page, Printer, StateIcons } from "../state.slint";
-import { IconButton } from "../components/controls.slint";
-import { TextEntryDialog } from "../components/overlays.slint";
+import { Actions, Confirm, Navigation, Page, Printer, Severity } from "../state.slint";
+import { StateIcons } from "../state-icons.slint";
+import { ButtonKind, IconButton } from "../components/controls.slint";
+import { TextEntryDialog } from "../components/entry-dialogs.slint";
 
 export component ConnectionPage inherits Rectangle {
-    property <bool> connected: Printer.connection == "connected";
+    property <bool> connected: Printer.is-connected;
     property <bool> login-required: Printer.connection == "login-required";
     // Kept between attempts, so a wrong password needs only the password again.
     property <string> username;
@@ -28,7 +29,7 @@ export component ConnectionPage inherits Rectangle {
                 alignment: start;
                 Image {
                     source: StateIcons.klippy-state(Printer.connection, Printer.klippy-state);
-                    colorize: root.connected && Printer.klippy-state == "startup" ? Theme.info : Theme.warning;
+                    colorize: root.connected && Printer.klippy-state == "startup" ? StateIcons.severity-color(Severity.info) : StateIcons.severity-color(Severity.attention);
                     width: 72px;
                     height: 72px;
                 }
@@ -69,7 +70,7 @@ export component ConnectionPage inherits Rectangle {
                 text: @tr("Log in");
                 horizontal: true;
                 align-start: true;
-                kind: "accent";
+                kind: ButtonKind.accent;
                 clicked => {
                     user-entry.text = root.username;
                     user-entry.open = true;
@@ -87,7 +88,7 @@ export component ConnectionPage inherits Rectangle {
                 text: @tr("Firmware restart");
                 horizontal: true;
                 align-start: true;
-                kind: "accent";
+                kind: ButtonKind.accent;
                 clicked => { Confirm.ask(@tr("Firmware restart"), @tr("Restarts Klipper and all MCUs."), "firmware-restart", "", false); }
             }
             IconButton {

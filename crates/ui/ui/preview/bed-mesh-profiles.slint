@@ -1,0 +1,14 @@
+// Preview: the saved bed mesh profiles with the active one marked.
+// Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { MeshDialogs, Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component BedMeshProfilesPreview inherits AppWindow {
+    init => {
+        Sample.calibration();
+        Navigation.page = Page.move;
+        MeshDialogs.profiles-open = true;
+    }
+}

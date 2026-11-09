@@ -194,8 +194,9 @@ impl GcodeFile {
             "first_layer_height": LAYER_HEIGHT,
             "object_height": f64::from(self.layer_count) * LAYER_HEIGHT,
             "nozzle_diameter": 0.4,
-            "filament_name": "Fake PLA",
-            "filament_type": if self.path == "long_job.gcode" { "PLA;PETG" } else { "PLA" },
+            // Moonraker reports several filaments as a JSON list in text, one as the plain value.
+            "filament_name": if self.path == "long_job.gcode" { r#"["Fake PLA", "Fake PETG"]"# } else { "Fake PLA" },
+            "filament_type": if self.path == "long_job.gcode" { r#"["PLA", "PETG"]"# } else { "PLA" },
             "filament_total": self.filament_total(),
             "filament_weight_total": self.filament_weights().iter().sum::<f64>(),
             "filament_weights": self.filament_weights(),

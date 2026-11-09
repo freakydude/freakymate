@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Renders the UI previews in crates/ui/ui/preview with slint-viewer, without building the app.
-# WSL2/Linux counterpart of ui-preview.ps1.
 # Usage (repo root): scripts/ui-preview.sh [-n print-printing,temperature] [-o <folder>]
 # Uses slint-viewer from PATH; otherwise compiles the version matching Cargo.lock into ~/.local/bin (first run only).
 # Exit code 0 on success; the PNG paths are printed.

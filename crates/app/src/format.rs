@@ -79,6 +79,12 @@ pub fn job_name(path: &str) -> String {
         .to_owned()
 }
 
+/// Display name of a service or update-manager entry (`klipper` → `Klipper`): first letter upper case, the rest as is.
+pub fn service_name(name: &str) -> String {
+    let mut chars = name.chars();
+    chars.next().map_or_else(String::new, |first| first.to_uppercase().chain(chars).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,6 +113,14 @@ mod tests {
 
         assert_eq!(unix_moment(now, earlier_today), "08:15");
         assert_eq!(unix_moment(now, yesterday), "20.10. 23:05");
+    }
+
+    #[test]
+    fn service_names_start_with_a_capital() {
+        assert_eq!(service_name("klipper"), "Klipper");
+        assert_eq!(service_name("crowsnest"), "Crowsnest");
+        assert_eq!(service_name("KlipperScreen"), "KlipperScreen");
+        assert_eq!(service_name(""), "");
     }
 
     #[test]

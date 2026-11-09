@@ -8,6 +8,9 @@ pub const LOAD_FILAMENT_MACRO: &str = "LOAD_FILAMENT";
 /// Unloads filament from the extruder.
 pub const UNLOAD_FILAMENT_MACRO: &str = "UNLOAD_FILAMENT";
 
+/// Starts a print in many configurations; running it while a print is active would start a second one.
+pub const PRINT_START_MACRO: &str = "PRINT_START";
+
 /// Which of the macros `LOAD_FILAMENT` and `UNLOAD_FILAMENT` exist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FilamentMacros {

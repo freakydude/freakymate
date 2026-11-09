@@ -3,14 +3,14 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, FanItem, HeaterItem, HeatTab, Navigation, Printer, SensorItem, UiSettings } from "../state.slint";
-import { NumberEntryDialog } from "../components/overlays.slint";
-import { IconButton, IconLabel, ProgressBar, ScrollList, StepSelector, TabBar, TabButton, TouchSlider } from "../components/controls.slint";
+import { NumberEntryDialog } from "../components/entry-dialogs.slint";
+import { ButtonKind, IconButton, IconLabel, ProgressBar, ScrollList, StepSelector, TabBar, TabButton, TouchSlider } from "../components/controls.slint";
 
 component HeaterRow inherits Rectangle {
     in property <HeaterItem> heater;
     in property <float> step;
     callback edit-target();
-    height: 60px;
+    height: Theme.row-height;
     background: history-touch.pressed ? Theme.surface-raised : Theme.surface;
     border-radius: Theme.radius;
 
@@ -46,8 +46,8 @@ component HeaterRow inherits Rectangle {
                     cross-axis-self-alignment: center;
                     source: Icons.nav-history;
                     colorize: Theme.muted;
-                    width: 14px;
-                    height: 14px;
+                    width: Theme.icon-tiny;
+                    height: Theme.icon-tiny;
                 }
                 // The spool in use recommends another temperature than the target: a quiet note, nothing is changed.
                 if root.heater.spool-hint != "": IconLabel {
@@ -84,7 +84,7 @@ component HeaterRow inherits Rectangle {
                     horizontal-alignment: center;
                 }
                 Text {
-                    text: root.heater.target > 0 ? round(root.heater.target) + " °C" : @tr("off");
+                    text: root.heater.target > 0 ? round(root.heater.target) + " °C" : @tr("Off");
                     color: root.heater.target > 0 ? Theme.accent : Theme.muted;
                     font-size: Theme.font-large;
                     font-weight: 600;
@@ -93,19 +93,19 @@ component HeaterRow inherits Rectangle {
             }
         }
         IconButton {
-            width: 64px;
+            width: Theme.button-narrow;
             icon: Icons.ui-minus;
             enabled: root.heater.target > 0;
             clicked => { Actions.step-heater(root.heater.object, -root.step); }
         }
         IconButton {
-            width: 64px;
+            width: Theme.button-narrow;
             icon: Icons.ui-plus;
             enabled: root.heater.can-raise;
             clicked => { Actions.step-heater(root.heater.object, root.step); }
         }
         IconButton {
-            width: 64px;
+            width: Theme.button-narrow;
             icon: Icons.thermal-off;
             enabled: root.heater.target > 0;
             clicked => { Actions.set-heater(root.heater.object, 0); }
@@ -116,7 +116,7 @@ component HeaterRow inherits Rectangle {
 // Off, slider and 100 % for a fan that can be set; a bar for one that Klipper drives.
 component FanRow inherits Rectangle {
     in property <FanItem> fan;
-    height: 60px;
+    height: Theme.row-height;
     background: Theme.surface;
     border-radius: Theme.radius;
 
@@ -145,7 +145,7 @@ component FanRow inherits Rectangle {
             }
         }
         if root.fan.controllable: IconButton {
-            width: 64px;
+            width: Theme.button-narrow;
             text: @tr("Off");
             checked: root.fan.speed < 1;
             clicked => { Actions.set-fan(root.fan.object, 0); }
@@ -158,7 +158,7 @@ component FanRow inherits Rectangle {
             changed(level) => { Actions.set-fan(root.fan.object, level); }
         }
         if root.fan.controllable: IconButton {
-            width: 64px;
+            width: Theme.button-narrow;
             text: "100%";
             checked: root.fan.speed > 99;
             clicked => { Actions.set-fan(root.fan.object, 100); }
@@ -172,7 +172,7 @@ component FanRow inherits Rectangle {
         }
         if !root.fan.controllable: Text {
             width: 64px;
-            text: @tr("auto");
+            text: @tr("Auto");
             color: Theme.muted;
             font-size: Theme.font-small;
             horizontal-alignment: center;
@@ -228,7 +228,7 @@ component HeatersTab inherits Rectangle {
                 IconButton {
                     icon: Icons.thermal-cooling;
                     text: @tr("Cool down");
-                    kind: "accent";
+                    kind: ButtonKind.accent;
                     clicked => { Actions.cool-down(); }
                 }
                 Rectangle { vertical-stretch: 1; }
@@ -284,8 +284,8 @@ component SensorsTab inherits Rectangle {
                 y: 8px;
                 source: Icons.nav-history;
                 colorize: Theme.muted;
-                width: 16px;
-                height: 16px;
+                width: Theme.icon-compact;
+                height: Theme.icon-compact;
             }
             VerticalLayout {
                 padding-left: 10px;

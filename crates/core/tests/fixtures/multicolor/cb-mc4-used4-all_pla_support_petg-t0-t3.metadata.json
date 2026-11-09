@@ -1,0 +1,78 @@
+{
+    "result": {
+        "size": 4195630,
+        "modified": 1794162611.4308279,
+        "uuid": "b651f8e6-1ede-4f82-ba04-eb214d9c552d",
+        "file_processors": [
+            "klipper_estimator"
+        ],
+        "slicer": "OrcaSlicer",
+        "slicer_version": "2.5.0",
+        "gcode_start_byte": 3907,
+        "gcode_end_byte": 4166733,
+        "layer_count": 178,
+        "object_height": 35.6,
+        "estimated_time": 5351,
+        "nozzle_diameter": 0.4,
+        "layer_height": 0.2,
+        "first_layer_height": 0.2,
+        "first_layer_extr_temp": 210.0,
+        "first_layer_bed_temp": 70.0,
+        "chamber_temp": 0.0,
+        "filament_name": "[\"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PETG @ECC2 - Copy\"]",
+        "filament_type": "[\"PLA\", \"PLA\", \"PLA\", \"PETG\"]",
+        "filament_colors": [
+            "#F76707",
+            "#F4E2C1",
+            "#00FF7F",
+            "#2B06CB"
+        ],
+        "filament_change_count": 288,
+        "extruder_colors": [
+            "#F76707",
+            "#F4E2C1",
+            "#00FF7F",
+            "#2B06CB"
+        ],
+        "filament_temps": [
+            210,
+            210,
+            210,
+            250
+        ],
+        "referenced_tools": [
+            0,
+            1,
+            2,
+            3
+        ],
+        "mmu_print": 1,
+        "filament_total": 11540.96,
+        "filament_weight_total": 34.7,
+        "filament_weights": [
+            10.65,
+            9.85,
+            11.11,
+            3.09
+        ],
+        "printer_model": "Elegoo Centauri Carbon 2",
+        "printer_variant": "0.4",
+        "thumbnails": [
+            {
+                "width": 32,
+                "height": 32,
+                "size": 1341,
+                "relative_path": ".thumbs/cb-mc4-used4-all_pla_support_petg-t0-t3-32x32.png"
+            },
+            {
+                "width": 144,
+                "height": 144,
+                "size": 1657,
+                "relative_path": ".thumbs/cb-mc4-used4-all_pla_support_petg-t0-t3-144x144.png"
+            }
+        ],
+        "print_start_time": null,
+        "job_id": null,
+        "filename": "cb-mc4-used4-all_pla_support_petg-t0-t3.gcode"
+    }
+}

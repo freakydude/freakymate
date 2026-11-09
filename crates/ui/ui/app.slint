@@ -1,9 +1,12 @@
 // Main window: status bar, navigation, current page and overlays.
 
 import { Theme } from "theme.slint";
-import { Actions, Backlight, Confirm, Dialogs, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, StateIcons, UiSettings } from "state.slint";
+import { Actions, Backlight, Confirm, Dialogs, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, UiSettings } from "state.slint";
 import { NavRail, StatusBar } from "components/chrome.slint";
-import { CalibrationDialog, ConfirmDialog, MessagesFlyout, SpoolDialog } from "components/overlays.slint";
+import { CalibrationDialog } from "components/calibration-dialog.slint";
+import { ConfirmDialog } from "components/confirm-dialog.slint";
+import { MessagesFlyout } from "components/messages-flyout.slint";
+import { SpoolDialog } from "components/spool-dialog.slint";
 import { HistoryDialog } from "components/history.slint";
 import { BedMeshDialog, BedMeshProfilesDialog } from "components/bed-mesh.slint";
 import { LightPanel } from "components/light.slint";
@@ -40,7 +43,7 @@ export component AppWindow inherits Window {
     // Pages that are useful even without a ready printer.
     property <bool> page-works-offline: Navigation.page == Page.system || Navigation.page == Page.settings
         || Navigation.page == Page.network
-        || ((Navigation.page == Page.console || Navigation.page == Page.updates) && Printer.connection == "connected");
+        || ((Navigation.page == Page.console || Navigation.page == Page.updates) && Printer.is-connected);
     property <bool> network-visible: Navigation.page == Page.network;
     property <bool> printer-ready: Printer.ready;
     property <bool> motion-locked: Printer.motion-locked;

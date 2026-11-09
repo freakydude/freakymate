@@ -5,7 +5,8 @@ import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, Printer, UiSettings } from "../state.slint";
 import { IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
-import { MacroFormDialog, TextEntryDialog } from "../components/overlays.slint";
+import { MacroFormDialog } from "../components/macro-form.slint";
+import { TextEntryDialog } from "../components/entry-dialogs.slint";
 import { SystemTabs } from "../components/system-tabs.slint";
 
 // The offered macros as tiles; a tap runs one.
@@ -26,7 +27,7 @@ component MacroTiles inherits Rectangle {
             text: macro;
             icon-size: 20px;
             horizontal: true;
-            enabled: !Printer.is-printing || macro != "PRINT_START";
+            enabled: !Printer.is-printing || macro != Printer.print-start-macro;
             clicked => { root.run(macro); }
         }
     }

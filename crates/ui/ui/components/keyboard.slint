@@ -1,0 +1,182 @@
+// On-screen keyboard and numeric keypad; they send their keys to the focused text input.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+
+component Key inherits Rectangle {
+    in property <string> label;
+    in property <image> icon;
+    // Orange like every confirming button (enter).
+    in property <bool> accent;
+    in property <length> font-size: Theme.font-normal;
+    callback pressed;
+    min-width: 40px;
+    horizontal-stretch: 1;
+    border-radius: 6px;
+    background: root.accent ? (key-touch.pressed ? Theme.accent-pressed : Theme.accent)
+        : (key-touch.pressed ? Theme.accent : Theme.surface-raised);
+    property <color> content: root.accent || key-touch.pressed ? Theme.on-accent : Theme.foreground;
+    accessible-role: button;
+    accessible-label: root.label;
+
+    key-touch := TouchArea {
+        clicked => { root.pressed(); }
+    }
+
+    if root.icon.width > 0: Image {
+        source: root.icon;
+        colorize: root.content;
+        width: Theme.icon-medium;
+        height: Theme.icon-medium;
+    }
+    if root.icon.width == 0: Text {
+        text: root.label;
+        color: root.content;
+        font-size: root.font-size;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// On-screen keyboard for devices without a physical keyboard. It only reports the keys; the text field edits itself.
+export component OnScreenKeyboard inherits VerticalLayout {
+    in-out property <bool> upper: true;
+    in-out property <bool> symbols;
+    // A character key (the text on it), backspace and enter.
+    callback typed(string);
+    callback backspace;
+    callback enter;
+
+    property <[[string]]> lower-rows: [
+        ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+        ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+        ["a", "s", "d", "f", "g", "h", "j", "k", "l", "="],
+        ["z", "x", "c", "v", "b", "n", "m", ".", "-", "_"],
+    ];
+    property <[[string]]> upper-rows: [
+        ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+        ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+        ["A", "S", "D", "F", "G", "H", "J", "K", "L", "="],
+        ["Z", "X", "C", "V", "B", "N", "M", ".", "-", "_"],
+    ];
+    property <[[string]]> symbol-rows: [
+        ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"],
+        ["+", "=", "?", "'", "\"", ",", ";", "<", ">", "|"],
+        ["[", "]", "{", "}", "\\", "~", "`", "€", "§", "°"],
+        ["ä", "ö", "ü", "ß", "Ä", "Ö", "Ü", ".", "-", "_"],
+    ];
+
+    spacing: Theme.spacing-small;
+
+    for row in (root.symbols ? root.symbol-rows : root.upper ? root.upper-rows : root.lower-rows): HorizontalLayout {
+        spacing: Theme.spacing-small;
+        // The rows share the height of the dialog, so the keys get as large as the screen allows.
+        min-height: 40px;
+        vertical-stretch: 1;
+        for key in row: Key {
+            label: key;
+            pressed => { root.typed(key); }
+        }
+    }
+    HorizontalLayout {
+        spacing: Theme.spacing-small;
+        // The rows share the height of the dialog, so the keys get as large as the screen allows.
+        min-height: 40px;
+        vertical-stretch: 1;
+        Key {
+            label: root.upper ? "abc" : "ABC";
+            horizontal-stretch: 2;
+            pressed => {
+                root.symbols = false;
+                root.upper = !root.upper;
+            }
+        }
+
+        Key {
+            label: root.symbols ? "abc" : "#+=";
+            horizontal-stretch: 2;
+            pressed => { root.symbols = !root.symbols; }
+        }
+
+        Key {
+            label: ":";
+            pressed => { root.typed(":"); }
+        }
+
+        Key {
+            label: "/";
+            pressed => { root.typed("/"); }
+        }
+
+        Key {
+            label: @tr("space");
+            horizontal-stretch: 3;
+            pressed => { root.typed(" "); }
+        }
+
+        Key {
+            label: @tr("backspace");
+            icon: Icons.ui-chevron-left;
+            horizontal-stretch: 2;
+            pressed => { root.backspace(); }
+        }
+
+        Key {
+            label: @tr("enter");
+            icon: Icons.ui-check;
+            accent: true;
+            horizontal-stretch: 2;
+            pressed => { root.enter(); }
+        }
+    }
+}
+
+// Keys for numbers, 7 8 9 on top as on a calculator; enter wide at the bottom right like on the full keyboard.
+export component NumericKeypad inherits VerticalLayout {
+    callback typed(string);
+    callback backspace;
+    callback enter;
+
+    property <[[string]]> rows: [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]];
+    // The key at the right end of each of the rows above.
+    property <[string]> row-ends: ["", "-", "."];
+
+    spacing: Theme.spacing-medium;
+
+    for row[index] in root.rows: HorizontalLayout {
+        spacing: Theme.spacing-medium;
+        vertical-stretch: 1;
+        for key in row: Key {
+            label: key;
+            font-size: Theme.font-large;
+            pressed => { root.typed(key); }
+        }
+        if index == 0: Key {
+            label: @tr("backspace");
+            icon: Icons.ui-chevron-left;
+            pressed => { root.backspace(); }
+        }
+        if index > 0: Key {
+            label: root.row-ends[index];
+            font-size: Theme.font-large;
+            pressed => { root.typed(self.label); }
+        }
+    }
+    HorizontalLayout {
+        spacing: Theme.spacing-medium;
+        vertical-stretch: 1;
+        Key {
+            label: "0";
+            font-size: Theme.font-large;
+            horizontal-stretch: 2;
+            pressed => { root.typed("0"); }
+        }
+        Key {
+            label: @tr("enter");
+            icon: Icons.ui-check;
+            accent: true;
+            horizontal-stretch: 2;
+            pressed => { root.enter(); }
+        }
+    }
+}

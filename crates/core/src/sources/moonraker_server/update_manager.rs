@@ -3,6 +3,9 @@
 use crate::moonraker::Call;
 use serde_json::{json, Value};
 
+/// The entry of the system packages (apt), next to the software repositories.
+const SYSTEM: &str = "system";
+
 /// State of a software package in the update manager.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct UpdateInfo {
@@ -15,6 +18,11 @@ pub struct UpdateInfo {
 }
 
 impl UpdateInfo {
+    /// The system packages: `pending` counts packages, there is no version.
+    pub fn is_system(&self) -> bool {
+        self.name == SYSTEM
+    }
+
     pub fn has_update(&self) -> bool {
         self.pending > 0
     }
@@ -25,8 +33,13 @@ impl UpdateInfo {
         if self.has_update() || !self.valid {
             return false;
         }
-        self.name == "system" || (!self.remote_version.is_empty() && self.remote_version != "?")
+        self.is_system() || (!self.remote_version.is_empty() && self.remote_version != "?")
     }
+}
+
+/// `machine.update.status`.
+pub fn status_call() -> Call {
+    Call::new("machine.update.status")
 }
 
 pub fn parse_update_status(result: &Value) -> Vec<UpdateInfo> {
@@ -34,7 +47,7 @@ pub fn parse_update_status(result: &Value) -> Vec<UpdateInfo> {
         return Vec::new();
     };
     let mut updates: Vec<UpdateInfo> = version_info.iter().map(|(name, info)| update_info(name, info)).collect();
-    updates.sort_by(|left, right| (left.name != "system", &left.name).cmp(&(right.name != "system", &right.name)));
+    updates.sort_by(|left, right| (!left.is_system(), &left.name).cmp(&(!right.is_system(), &right.name)));
     updates
 }
 
@@ -59,7 +72,7 @@ pub fn upgrade(name: &str) -> Call {
 
 fn update_info(name: &str, info: &Value) -> UpdateInfo {
     let text = |field: &str| info.get(field).and_then(Value::as_str).unwrap_or_default().to_owned();
-    if name == "system" {
+    if name == SYSTEM {
         let count = info.get("package_count").and_then(Value::as_u64).unwrap_or_default();
         return UpdateInfo {
             name: name.to_owned(),
@@ -97,6 +110,7 @@ mod tests {
 
         let names: Vec<&str> = updates.iter().map(|update| update.name.as_str()).collect();
         assert_eq!(names, ["system", "klipper", "moonraker"]);
+        assert_eq!(updates.iter().map(UpdateInfo::is_system).collect::<Vec<_>>(), [true, false, false]);
         assert_eq!(updates[0].pending, 4);
         assert!(updates[1].has_update());
         assert!(!updates[2].has_update());

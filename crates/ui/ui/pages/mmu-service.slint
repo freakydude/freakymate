@@ -3,7 +3,7 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, Printer } from "../state.slint";
-import { IconButton } from "../components/controls.slint";
+import { ButtonKind, IconButton } from "../components/controls.slint";
 import { GateCheck } from "mmu-dialogs.slint";
 
 export component MmuServiceTab inherits Rectangle {
@@ -21,7 +21,7 @@ export component MmuServiceTab inherits Rectangle {
                 icon-size: root.tile-icon;
                 icon: Icons.mmu-home;
                 text: @tr("Home");
-                kind: Printer.mmu-homed ? "normal" : "accent";
+                kind: Printer.mmu-homed ? ButtonKind.normal : ButtonKind.accent;
                 done: Printer.mmu-homed;
                 clicked => { Actions.mmu-home(); }
             }
@@ -29,14 +29,14 @@ export component MmuServiceTab inherits Rectangle {
                 icon-size: root.tile-icon;
                 icon: Icons.mmu-recover;
                 text: @tr("Recover");
-                kind: Printer.mmu-paused ? "accent" : "normal";
+                kind: Printer.mmu-paused ? ButtonKind.accent : ButtonKind.normal;
                 clicked => { Actions.mmu-recover(); }
             }
             IconButton {
                 icon-size: root.tile-icon;
                 icon: Icons.ui-unlock;
                 text: @tr("Unlock");
-                kind: Printer.mmu-locked ? "accent" : "normal";
+                kind: Printer.mmu-locked ? ButtonKind.accent : ButtonKind.normal;
                 clicked => { Actions.mmu-unlock(); }
             }
             IconButton {

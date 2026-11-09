@@ -4,106 +4,36 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Backlight, LedItem, Navigation, Printer } from "../state.slint";
-import { FlyoutPanel, IconButton, ScrollList, ToggleRow, TouchSlider } from "controls.slint";
+import { FlyoutPanel, IconButton, ScrollList, SliderRow, ToggleRow } from "controls.slint";
 
 // On and off, and the brightness: white light on a Klipper LED, the brightness of a WLED strip.
-component LedRow inherits Rectangle {
+component LedRow inherits SliderRow {
     in property <LedItem> led;
-    height: 60px;
-    background: Theme.surface;
-    border-radius: Theme.radius;
-
-    HorizontalLayout {
-        padding: 4px;
-        padding-left: 10px;
-        spacing: Theme.spacing;
-        Image {
-            cross-axis-self-alignment: center;
-            source: Icons.accessory-light;
-            colorize: root.led.on ? Theme.accent : Theme.muted;
-            width: 28px;
-            height: 28px;
-        }
-        VerticalLayout {
-            alignment: center;
-            width: 170px;
-            Text { text: root.led.label; color: Theme.muted; font-size: Theme.font-small; overflow: elide; }
-            Text {
-                // Moonraker does not know a WLED strip's brightness after a preset; then only "on" is certain.
-                text: !root.led.on ? @tr("off") : root.led.level-known ? round(light-slider.shown) + " %" : @tr("on");
-                color: Theme.foreground;
-                font-size: Theme.font-normal;
-                font-weight: 600;
-            }
-        }
-        IconButton {
-            width: 64px;
-            text: @tr("Off");
-            checked: !root.led.on;
-            clicked => { Actions.set-light(root.led.object, 0); }
-        }
-        light-slider := TouchSlider {
-            cross-axis-self-alignment: center;
-            horizontal-stretch: 1;
-            value: root.led.level;
-            changed(level) => { Actions.set-light(root.led.object, level); }
-        }
-        IconButton {
-            width: 64px;
-            text: "100%";
-            checked: root.led.on && root.led.level > 99;
-            clicked => { Actions.set-light(root.led.object, 100); }
-        }
-    }
+    icon: Icons.accessory-light;
+    icon-color: root.led.on ? Theme.accent : Theme.muted;
+    label: root.led.label;
+    // Moonraker does not know a WLED strip's brightness after a preset; then only "on" is certain.
+    value-text: !root.led.on ? @tr("Off") : root.led.level-known ? round(root.shown) + " %" : @tr("On");
+    off-checked: !root.led.on;
+    full-checked: root.led.on && root.led.level > 99;
+    value: root.led.level;
+    off-clicked => { Actions.set-light(root.led.object, 0); }
+    full-clicked => { Actions.set-light(root.led.object, 100); }
+    changed(level) => { Actions.set-light(root.led.object, level); }
 }
 
 // The backlight of this display, like a light: Off is the standby, the lowest step keeps the screen usable.
-component DisplayRow inherits Rectangle {
-    height: 60px;
-    background: Theme.surface;
-    border-radius: Theme.radius;
-
-    HorizontalLayout {
-        padding: 4px;
-        padding-left: 10px;
-        spacing: Theme.spacing;
-        Image {
-            cross-axis-self-alignment: center;
-            source: Icons.system-brightness;
-            colorize: Theme.accent;
-            width: 28px;
-            height: 28px;
-        }
-        VerticalLayout {
-            alignment: center;
-            width: 170px;
-            Text { text: @tr("Display"); color: Theme.muted; font-size: Theme.font-small; overflow: elide; }
-            Text {
-                text: round(display-slider.shown) + " %";
-                color: Theme.foreground;
-                font-size: Theme.font-normal;
-                font-weight: 600;
-            }
-        }
-        IconButton {
-            width: 64px;
-            text: @tr("Off");
-            clicked => { Backlight.sleep(); }
-        }
-        display-slider := TouchSlider {
-            cross-axis-self-alignment: center;
-            horizontal-stretch: 1;
-            minimum: 10;
-            value: Backlight.brightness;
-            changed(level) => { Backlight.brightness-chosen(level); }
-        }
-        IconButton {
-            width: 64px;
-            text: "100%";
-            checked: Backlight.brightness > 99;
-            clicked => { Backlight.brightness-chosen(100); }
-        }
-    }
+component DisplayRow inherits SliderRow {
+    icon: Icons.system-brightness;
+    icon-color: Theme.accent;
+    label: @tr("Display");
+    value-text: round(root.shown) + " %";
+    full-checked: Backlight.brightness > 99;
+    minimum: 10;
+    value: Backlight.brightness;
+    off-clicked => { Backlight.sleep(); }
+    full-clicked => { Backlight.brightness-chosen(100); }
+    changed(level) => { Backlight.brightness-chosen(level); }
 }
 
 export component LightPanel inherits Rectangle {

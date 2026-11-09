@@ -7,6 +7,6 @@ mod endpoint;
 mod rpc;
 
 pub use call::Call;
-pub use connection::{CallError, Connection, Notification, PendingCall};
+pub use connection::{CallError, Connection, ConnectionState, Notification, PendingCall};
 pub use endpoint::{Endpoint, InvalidEndpoint};
 pub use rpc::RpcError;

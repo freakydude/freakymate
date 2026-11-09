@@ -13,10 +13,10 @@ export component FilamentMmuGateNoSpoolPreview inherits AppWindow {
         Navigation.filament-tab = FilamentTab.gates;
         Printer.has-spoolman = true;
         Printer.mmu-gates = [
-            { index: 0, availability: "available", name: "Red", material: "ABS+", color: #e31f2b, has-color: true, color-count: 1, tools: "T0", selected: true, spool-text: "613 g", spool-low: false, spool-id: 18 },
-            { index: 1, availability: "available", name: "", material: "", color: #000000, has-color: false, color-count: 0, tools: "T1", selected: false, spool-text: "", spool-low: false, spool-id: -1 },
-            { index: 2, availability: "available", name: "", material: "PETG", color: #26a69a, has-color: true, color-count: 1, tools: "T2", selected: false, spool-text: "", spool-low: false, spool-id: -1 },
-            { index: 3, availability: "empty", name: "", material: "", color: #000000, has-color: false, color-count: 0, tools: "T3", selected: false, spool-text: "", spool-low: false, spool-id: -1 },
+            { index: 0, availability: "available", name: "Red", material: "ABS+", colors: { first: #e31f2b, count: 1 }, has-color: true, tools: "T0", selected: true, spool-text: "613 g", spool-low: false, spool-id: 18 },
+            { index: 1, availability: "available", name: "", material: "", colors: { first: #000000, count: 0 }, has-color: false, tools: "T1", selected: false, spool-text: "", spool-low: false, spool-id: -1 },
+            { index: 2, availability: "available", name: "", material: "PETG", colors: { first: #26a69a, count: 1 }, has-color: true, tools: "T2", selected: false, spool-text: "", spool-low: false, spool-id: -1 },
+            { index: 3, availability: "empty", name: "", material: "", colors: { first: #000000, count: 0 }, has-color: false, tools: "T3", selected: false, spool-text: "", spool-low: false, spool-id: -1 },
         ];
         MmuDialogs.gate = 1;
     }

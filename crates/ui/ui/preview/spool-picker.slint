@@ -11,12 +11,12 @@ export component SpoolPickerPreview inherits AppWindow {
         Navigation.page = Page.print;
         Printer.has-spoolman = true;
         Printer.spools = [
-            { id: 18, title: "Geeetech Red", material: "ABS+", remaining: "613 g", color: #e31f2b, color-count: 1, place: "Gate 0", low: false },
-            { id: 21, title: "Sunlu HS Matte PETG", material: "PETG", remaining: "38 g", color: #2e7d32, color-count: 1, place: "Gate 1", low: true },
-            { id: 19, title: "Silk Red+Gold+Black", material: "PLA", remaining: "802 g", color: #ff0004, color-2: #ffa424, color-3: #000000, color-count: 3, place: "", low: false },
-            { id: 20, title: "Red+Green", material: "PLA", remaining: "540 g", color: #e31f2b, color-2: #2e7d32, color-count: 2, place: "", low: false },
-            { id: 7, title: "Sunlu ASA", material: "ASA", remaining: "266 g", color: #1a1a1a, color-count: 1, place: "", low: false },
-            { id: 3, title: "Unknown", material: "PLA", color: #000000, color-count: 0, place: "", low: false },
+            { id: 18, title: "Geeetech Red", material: "ABS+", remaining: "613 g", colors: { first: #e31f2b, count: 1 }, place: "Gate 0", low: false },
+            { id: 21, title: "Sunlu HS Matte PETG", material: "PETG", remaining: "38 g", colors: { first: #2e7d32, count: 1 }, place: "Gate 1", low: true },
+            { id: 19, title: "Silk Red+Gold+Black", material: "PLA", remaining: "802 g", colors: { first: #ff0004, second: #ffa424, third: #000000, count: 3 }, place: "", low: false },
+            { id: 20, title: "Red+Green", material: "PLA", remaining: "540 g", colors: { first: #e31f2b, second: #2e7d32, count: 2 }, place: "", low: false },
+            { id: 7, title: "Sunlu ASA", material: "ASA", remaining: "266 g", colors: { first: #1a1a1a, count: 1 }, place: "", low: false },
+            { id: 3, title: "Unknown", material: "PLA", colors: { first: #000000, count: 0 }, place: "", low: false },
         ];
         SpoolPicker.show(1, 21);
     }

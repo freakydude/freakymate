@@ -2,8 +2,9 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, FilamentTab, Navigation, Printer, UiSettings } from "../state.slint";
-import { Card, IconButton, IconLabel, StepSelector, TabBar, TabButton } from "../components/controls.slint";
+import { Actions, FilamentTab, Navigation, Printer, Severity, UiSettings } from "../state.slint";
+import { StateIcons } from "../state-icons.slint";
+import { ButtonKind, Card, IconButton, IconLabel, StepSelector, TabBar, TabButton } from "../components/controls.slint";
 import { SpoolStrip } from "../components/spool-strip.slint";
 import { MmuGatesTab } from "mmu.slint";
 import { BypassDialog, GateDialog } from "mmu-dialogs.slint";
@@ -66,7 +67,7 @@ component ExtruderTab inherits Rectangle {
                         icon: Icons.filament-extrude;
                         text: @tr("Extrude {} mm", UiSettings.extrude-length);
                         icon-size: 40px;
-                        kind: "accent";
+                        kind: ButtonKind.accent;
                         enabled: Printer.can-extrude;
                         clicked => { Actions.extrude(UiSettings.extrude-length, UiSettings.extrude-speed); }
                     }
@@ -87,7 +88,7 @@ component ExtruderTab inherits Rectangle {
                             height: sensor-grid.row-height;
                             icon: !sensor.enabled ? Icons.ui-minus : sensor.detected ? Icons.ui-check : Icons.filament-runout;
                             text: sensor.label;
-                            color: !sensor.enabled ? Theme.muted : sensor.detected ? Theme.success : Theme.warning;
+                            color: !sensor.enabled ? Theme.muted : StateIcons.ok-color(sensor.detected, StateIcons.severity-color(Severity.attention));
                             font-size: Theme.font-small;
                         }
                     }

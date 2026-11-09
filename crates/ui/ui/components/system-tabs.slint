@@ -24,14 +24,14 @@ export component SystemTabs inherits TabBar {
         icon: Icons.system-update;
         label: @tr("Updates");
         count: Printer.updates-available;
-        enabled: Printer.connection == "connected";
+        enabled: Printer.is-connected;
     }
     SystemTab { page: Page.network; icon: Icons.system-network; label: @tr("Network"); }
     SystemTab {
         page: Page.console;
         icon: Icons.nav-console;
         label: @tr("Console");
-        enabled: Printer.connection == "connected";
+        enabled: Printer.is-connected;
     }
     SystemTab { page: Page.settings; icon: Icons.nav-settings; label: @tr("Settings"); }
 }

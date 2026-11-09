@@ -1,0 +1,11 @@
+// Preview: the choice of gate for T3 compared with the job's file: what the file wants, what differs, and gate 0
+// marked as fitting. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { MmuDialogs } from "../state.slint";
+import { FilamentMmuToolsMatchPreview } from "filament-mmu-tools-match.slint";
+
+export component FilamentMmuToolDialogMatchPreview inherits FilamentMmuToolsMatchPreview {
+    init => {
+        MmuDialogs.tool = 3;
+    }
+}

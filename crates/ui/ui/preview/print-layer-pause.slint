@@ -1,0 +1,22 @@
+// Preview: the dialog that plans a pause at a layer while a print runs.
+// Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { LayerPauseDialog } from "../components/print-dialogs.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintLayerPausePreview inherits AppWindow {
+    dialog := LayerPauseDialog { }
+
+    init => {
+        Sample.printing();
+        Navigation.page = Page.print;
+        Printer.layer-pause-next = true;
+        Printer.layer-pause-at = true;
+        Printer.current-layer = 12;
+        Printer.total-layers = 120;
+        Printer.layers = "12 / 120";
+        dialog.open();
+    }
+}

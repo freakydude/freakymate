@@ -4,6 +4,12 @@ use crate::calibration::{CalibrationCommand, TestZ};
 use crate::layer_pause::LayerPauseCommand;
 use std::fmt;
 
+mod calibration;
+mod happy_hare;
+mod heating;
+mod macros;
+mod motion;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Axis {
     X,
@@ -280,187 +286,13 @@ fn parse_line(line: &str) -> Result<Command, CommandError> {
     let name = words.next().unwrap_or_default().to_ascii_uppercase();
     let args: Vec<&str> = words.collect();
 
-    if let Some(tool) = tool_number(&name) {
-        return Ok(Command::Mmu(MmuCommand::ChangeTool { tool }));
+    let groups = [motion::parse, heating::parse, macros::parse, calibration::parse, happy_hare::parse];
+    for parse in groups {
+        if let Some(command) = parse(&name, &args)? {
+            return Ok(command);
+        }
     }
-
-    match name.as_str() {
-        "G28" => Ok(Command::Home(parse_axes(&args))),
-        "G4" => Ok(Command::Dwell(std::time::Duration::from_millis(
-            letter_value(&args, 'P')?.unwrap_or(0.0).max(0.0) as u64
-        ))),
-        "M104" => Ok(Command::SetExtruderTarget(letter_value(&args, 'S')?.unwrap_or(0.0))),
-        "M140" => Ok(Command::SetBedTarget(letter_value(&args, 'S')?.unwrap_or(0.0))),
-        "M106" => Ok(Command::SetFanSpeed(fan_speed(&args)?)),
-        "M107" => Ok(Command::SetFanSpeed(0.0)),
-        "M84" | "M18" => Ok(Command::DisableSteppers),
-        "G90" => Ok(Command::AbsolutePositioning),
-        "G91" => Ok(Command::RelativePositioning),
-        "G0" | "G1" => Ok(Command::Move(parse_move(&args)?)),
-        "SET_GCODE_OFFSET" => {
-            Ok(Command::SetGcodeOffset { z: named_value(&args, "Z")?, z_adjust: named_value(&args, "Z_ADJUST")? })
-        }
-        "M82" => Ok(Command::AbsoluteExtrusion),
-        "M83" => Ok(Command::RelativeExtrusion),
-        "M220" => Ok(Command::SetSpeedFactor(letter_value(&args, 'S')?.unwrap_or(100.0) / 100.0)),
-        "M221" => Ok(Command::SetExtrudeFactor(letter_value(&args, 'S')?.unwrap_or(100.0) / 100.0)),
-        "SET_PRESSURE_ADVANCE" => Ok(Command::SetPressureAdvance {
-            advance: named_value(&args, "ADVANCE")?,
-            smooth_time: named_value(&args, "SMOOTH_TIME")?,
-        }),
-        "SET_VELOCITY_LIMIT" => Ok(Command::SetVelocityLimit(VelocityLimit {
-            velocity: named_value(&args, "VELOCITY")?,
-            accel: named_value(&args, "ACCEL")?,
-            square_corner_velocity: named_value(&args, "SQUARE_CORNER_VELOCITY")?,
-            minimum_cruise_ratio: named_value(&args, "MINIMUM_CRUISE_RATIO")?,
-        })),
-        "SET_RETRACTION" => Ok(Command::SetRetraction(RetractionChange {
-            retract_length: named_value(&args, "RETRACT_LENGTH")?,
-            retract_speed: named_value(&args, "RETRACT_SPEED")?,
-            unretract_extra_length: named_value(&args, "UNRETRACT_EXTRA_LENGTH")?,
-            unretract_speed: named_value(&args, "UNRETRACT_SPEED")?,
-        })),
-        "SET_FAN_SPEED" => Ok(Command::Device(DeviceCommand::SetFanSpeed {
-            fan: required_text(&args, "FAN")?,
-            speed: named_value(&args, "SPEED")?.ok_or_else(|| CommandError::new("SET_FAN_SPEED must specify SPEED"))?,
-        })),
-        "SET_LED" => {
-            let channel = |name| named_value(&args, name).map(|value| value.unwrap_or(0.0).clamp(0.0, 1.0));
-            Ok(Command::Device(DeviceCommand::SetLed {
-                led: required_text(&args, "LED")?,
-                color: [channel("RED")?, channel("GREEN")?, channel("BLUE")?, channel("WHITE")?],
-            }))
-        }
-        "SET_LED_EFFECT" => Ok(Command::Device(DeviceCommand::SetLedEffect {
-            effect: required_text(&args, "EFFECT")?,
-            stop: named_index(&args, "STOP")?.is_some_and(|stop| stop >= 1),
-        })),
-        "STOP_LED_EFFECTS" => Ok(Command::Device(DeviceCommand::StopLedEffects)),
-        "FAKE_FAN_STALL" => Ok(Command::Device(DeviceCommand::FakeFanStall {
-            fan: required_text(&args, "FAN")?,
-            stall: named_index(&args, "STALL")?.is_none_or(|stall| stall != 0),
-        })),
-        "SET_HEATER_TEMPERATURE" => Ok(Command::SetHeaterTemperature {
-            heater: named_text(&args, "HEATER").ok_or_else(|| CommandError::new("Missing parameter HEATER"))?,
-            target: named_value(&args, "TARGET")?.unwrap_or(0.0),
-        }),
-        "EXCLUDE_OBJECT" => Ok(Command::ExcludeObject { name: named_text(&args, "NAME").unwrap_or_default() }),
-        "SAVE_CONFIG" => Ok(Command::SaveConfig),
-        "QUAD_GANTRY_LEVEL" => Ok(Command::QuadGantryLevel),
-        "HELP" => Ok(Command::Help),
-        "SET_PAUSE_NEXT_LAYER" => Ok(Command::LayerPause(LayerPauseCommand::NextLayer {
-            enable: named_index(&args, "ENABLE")?.is_none_or(|enable| enable != 0),
-        })),
-        "SET_PAUSE_AT_LAYER" => Ok(Command::LayerPause(LayerPauseCommand::AtLayer {
-            enable: named_index(&args, "ENABLE")?.map(|enable| enable != 0),
-            layer: named_index(&args, "LAYER")?.map(|layer| layer as u32),
-        })),
-        "FAKE_PRINT_ERROR" => Ok(Command::FakePrintError),
-        "PROBE_CALIBRATE" => Ok(Command::Calibration(CalibrationCommand::ProbeCalibrate)),
-        "MANUAL_PROBE" => Ok(Command::Calibration(CalibrationCommand::ManualProbe)),
-        "TESTZ" => Ok(Command::Calibration(CalibrationCommand::TestZ(TestZ::parse(&required_text(&args, "Z")?)?))),
-        "ACCEPT" => Ok(Command::Calibration(CalibrationCommand::Accept)),
-        "ADJUSTED" => Ok(Command::Calibration(CalibrationCommand::Adjusted)),
-        "ABORT" => Ok(Command::Calibration(CalibrationCommand::Abort)),
-        "BED_SCREWS_ADJUST" => Ok(Command::Calibration(CalibrationCommand::BedScrewsAdjust)),
-        "SCREWS_TILT_CALCULATE" => Ok(Command::Calibration(CalibrationCommand::ScrewsTiltCalculate)),
-        "BED_MESH_CALIBRATE" => {
-            Ok(Command::Calibration(CalibrationCommand::BedMeshCalibrate { profile: named_text(&args, "PROFILE") }))
-        }
-        // Klipper takes the first of `LOAD`, `SAVE` and `REMOVE` (`bed_mesh.py`).
-        "BED_MESH_PROFILE" => Ok(bed_mesh_profile(&args).map_or(Command::Ignored, Command::Calibration)),
-        "BED_MESH_CLEAR" => Ok(Command::Calibration(CalibrationCommand::BedMeshClear)),
-        "MMU_HOME" => Ok(Command::Mmu(MmuCommand::Home)),
-        "MMU_SELECT" if named_index(&args, "BYPASS")?.is_some_and(|value| value != 0) => {
-            Ok(Command::Mmu(MmuCommand::SelectBypass))
-        }
-        "MMU_SELECT" => Ok(Command::Mmu(MmuCommand::Select { gate: required_index(&args, "GATE")? })),
-        "MMU_SELECT_BYPASS" => Ok(Command::Mmu(MmuCommand::SelectBypass)),
-        // Without `RESET` or `TOOL` and `GATE` Happy Hare only shows the map.
-        "MMU_TTG_MAP" if named_index(&args, "RESET")?.is_some_and(|value| value != 0) => {
-            Ok(Command::Mmu(MmuCommand::ResetToolMap))
-        }
-        "MMU_TTG_MAP" => match (named_index(&args, "TOOL")?, named_index(&args, "GATE")?) {
-            (Some(tool), Some(gate)) => Ok(Command::Mmu(MmuCommand::MapTool { tool, gate })),
-            _ => Ok(Command::Ignored),
-        },
-        "MMU_ENDLESS_SPOOL" => Ok(Command::Mmu(MmuCommand::EndlessSpool {
-            enabled: named_index(&args, "ENABLE")?.map(|value| value != 0),
-            groups: named_text(&args, "GROUPS").map(|groups| parse_groups(&groups)).transpose()?,
-        })),
-        "MMU_CHANGE_TOOL" => Ok(Command::Mmu(MmuCommand::ChangeTool { tool: required_index(&args, "TOOL")? })),
-        "MMU_LOAD" => Ok(Command::Mmu(MmuCommand::Load)),
-        "MMU_UNLOAD" => Ok(Command::Mmu(MmuCommand::Unload)),
-        "MMU_GATE_MAP" => Ok(Command::Mmu(MmuCommand::GateMap {
-            gate: required_index(&args, "GATE")?,
-            spool_id: named_value(&args, "SPOOLID")?.map(|id| id as i64),
-            material: named_text(&args, "MATERIAL").map(|material| material.to_ascii_uppercase()),
-            color: named_text(&args, "COLOR").map(|color| color.to_ascii_lowercase()),
-            temperature: named_value(&args, "TEMP")?.map(|degrees| degrees.round() as i32),
-        })),
-        "FAKE_MMU_FILAMENT" => Ok(Command::Mmu(MmuCommand::FakeFilament {
-            position: named_value(&args, "POS")?
-                .ok_or_else(|| CommandError::new("Missing parameter POS"))?
-                .clamp(-1.0, 10.0) as i32,
-            direction: named_value(&args, "DIRECTION")?.unwrap_or(0.0).signum() as i32,
-        })),
-        "FAKE_MMU_TANGLE" => {
-            Ok(Command::Mmu(MmuCommand::FakeTangle { boosting: required_index(&args, "BOOST")? != 0 }))
-        }
-        "MMU_MOTORS_OFF" => Ok(Command::Mmu(MmuCommand::MotorsOff)),
-        "MMU_CHECK_GATE" => Ok(Command::Mmu(MmuCommand::CheckGate {
-            gate: named_index(&args, "GATE")?,
-            all: named_index(&args, "ALL")?.is_some_and(|value| value != 0),
-        })),
-        "MMU_PRELOAD" => Ok(Command::Mmu(MmuCommand::Preload { gate: named_index(&args, "GATE")? })),
-        "MMU_SERVO" => Ok(Command::Mmu(MmuCommand::Servo {
-            position: named_text(&args, "POS").as_deref().map(ServoPosition::parse).transpose()?,
-        })),
-        "MMU_EJECT" => Ok(Command::Mmu(MmuCommand::Eject {
-            gate: named_index(&args, "GATE")?,
-            force: named_index(&args, "FORCE")?.is_some_and(|value| value != 0),
-        })),
-        _ => Ok(Command::Ignored),
-    }
-}
-
-/// `GROUPS=0,1,0`: non-negative whole numbers, as Happy Hare demands (`mmu_endless_spool.py`).
-fn parse_groups(groups: &str) -> Result<Vec<u32>, CommandError> {
-    groups
-        .split(',')
-        .map(|group| group.trim().parse().map_err(|_| CommandError::new(format!("Invalid GROUPS value: {groups}"))))
-        .collect()
-}
-
-fn tool_number(name: &str) -> Option<usize> {
-    name.strip_prefix('T')
-        .filter(|digits| !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit()))
-        .and_then(|digits| digits.parse().ok())
-}
-
-fn parse_move(args: &[&str]) -> Result<Move, CommandError> {
-    Ok(Move {
-        x: letter_value(args, 'X')?,
-        y: letter_value(args, 'Y')?,
-        z: letter_value(args, 'Z')?,
-        e: letter_value(args, 'E')?,
-    })
-}
-
-fn fan_speed(args: &[&str]) -> Result<f64, CommandError> {
-    let raw = letter_value(args, 'S')?.unwrap_or(255.0);
-    Ok(raw.clamp(0.0, 255.0) / 255.0)
-}
-
-fn parse_axes(args: &[&str]) -> Vec<Axis> {
-    args.iter()
-        .filter_map(|arg| match arg.to_ascii_uppercase().as_str() {
-            "X" => Some(Axis::X),
-            "Y" => Some(Axis::Y),
-            "Z" => Some(Axis::Z),
-            _ => None,
-        })
-        .collect()
+    Ok(Command::Ignored)
 }
 
 fn letter_value(args: &[&str], letter: char) -> Result<Option<f64>, CommandError> {
@@ -481,16 +313,6 @@ fn named_value(args: &[&str], name: &str) -> Result<Option<f64>, CommandError> {
 
 fn required_text(args: &[&str], name: &str) -> Result<String, CommandError> {
     named_text(args, name).ok_or_else(|| CommandError::new(format!("Missing parameter {name}")))
-}
-
-fn bed_mesh_profile(args: &[&str]) -> Option<CalibrationCommand> {
-    if let Some(profile) = named_text(args, "LOAD") {
-        return Some(CalibrationCommand::BedMeshLoad { profile });
-    }
-    if let Some(profile) = named_text(args, "SAVE") {
-        return Some(CalibrationCommand::BedMeshSave { profile });
-    }
-    named_text(args, "REMOVE").map(|profile| CalibrationCommand::BedMeshRemove { profile })
 }
 
 fn named_text(args: &[&str], name: &str) -> Option<String> {

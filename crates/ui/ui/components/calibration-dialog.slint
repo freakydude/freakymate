@@ -1,0 +1,136 @@
+// Dialog of Klipper's calibration modes.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, Dialogs, Printer } from "../state.slint";
+import { ButtonKind, IconButton } from "controls.slint";
+import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
+
+// The mode Klipper waits in during a calibration (manual probe or bed screws), started here or elsewhere. It opens
+// by itself and closes when Klipper leaves the mode; closing it here leaves the mode with ABORT (Frank, 2026-10-28).
+export component CalibrationDialog inherits Scrim {
+    property <string> mode: Printer.calibration-mode;
+    property <bool> probing: root.mode == "manual-probe";
+    // Closed here; stays hidden until Klipper reports the end of the mode or the printer is back.
+    property <bool> closing;
+    property <bool> ready: Printer.ready;
+    property <int> dismissals: Dialogs.dismissals;
+    visible: root.mode != "" && !root.closing;
+
+    changed dismissals => {
+        if (root.mode != "") { root.closing = true; }
+    }
+    changed mode => {
+        if (root.mode == "") { root.closing = false; }
+    }
+    changed ready => {
+        root.closing = false;
+    }
+
+    DialogPanel {
+        width: min(parent.width - 16px, 640px);
+        height: content.preferred-height;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+
+        content := VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing;
+            DialogHeader {
+                title: root.probing ? @tr("Paper test: Z height") : @tr("Paper test: bed screws");
+                close => { Dialogs.dismiss(); }
+            }
+            Text {
+                text: root.probing
+                    ? @tr("Move the nozzle until a sheet of paper between nozzle and bed drags slightly, then accept.")
+                    : @tr("Turn the screw until a sheet of paper drags slightly. Accept if it needed no turn, Adjusted if you turned it.");
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                wrap: word-wrap;
+            }
+
+            if root.probing: HorizontalLayout {
+                spacing: Theme.spacing;
+                Text {
+                    text: @tr("Z {} mm", Printer.probe-z);
+                    color: Theme.foreground;
+                    font-size: Theme.font-huge;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+                Text {
+                    horizontal-stretch: 1;
+                    text: (Printer.probe-z-lower != "" ? @tr("tried below: {}", Printer.probe-z-lower) : "")
+                        + (Printer.probe-z-lower != "" && Printer.probe-z-upper != "" ? "\n" : "")
+                        + (Printer.probe-z-upper != "" ? @tr("tried above: {}", Printer.probe-z-upper) : "");
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+            if root.probing: HorizontalLayout {
+                spacing: Theme.spacing;
+                for distance in [-1, -0.1, -0.05, -0.01, 0.01, 0.05, 0.1, 1]: IconButton {
+                    horizontal-stretch: 1;
+                    text: (distance > 0 ? "+" : "−") + abs(distance);
+                    clicked => { Actions.test-z(distance); }
+                }
+            }
+            if root.probing: HorizontalLayout {
+                spacing: Theme.spacing;
+                IconButton {
+                    horizontal-stretch: 1;
+                    horizontal: true;
+                    icon: Icons.ui-chevron-down;
+                    text: @tr("Halfway down");
+                    enabled: Printer.probe-z-lower != "";
+                    clicked => { Actions.bisect-z(-1); }
+                }
+                IconButton {
+                    horizontal-stretch: 1;
+                    horizontal: true;
+                    icon: Icons.ui-chevron-up;
+                    text: @tr("Halfway up");
+                    enabled: Printer.probe-z-upper != "";
+                    clicked => { Actions.bisect-z(1); }
+                }
+            }
+
+            if !root.probing: Text {
+                text: Printer.bed-screw;
+                color: Theme.foreground;
+                font-size: Theme.font-huge;
+                font-weight: 600;
+                overflow: elide;
+            }
+            if !root.probing: Text {
+                text: (Printer.bed-screw-fine ? @tr("Fine adjustment") + " · " : "")
+                    + @tr("accepted in a row: {} of {}", Printer.bed-screws-accepted, Printer.bed-screws-count);
+                color: Theme.muted;
+                font-size: Theme.font-small;
+            }
+
+            HorizontalLayout {
+                spacing: Theme.spacing;
+                if !root.probing: IconButton {
+                    height: Theme.touch;
+                    horizontal-stretch: 1;
+                    horizontal: true;
+                    icon: Icons.calibration-bed-screws;
+                    text: @tr("Adjusted");
+                    clicked => { Actions.screw-adjusted(); }
+                }
+                IconButton {
+                    height: Theme.touch;
+                    horizontal-stretch: 1;
+                    horizontal: true;
+                    icon: Icons.ui-check;
+                    text: @tr("Accept");
+                    kind: ButtonKind.accent;
+                    clicked => { Actions.accept-calibration(); }
+                }
+            }
+        }
+    }
+}

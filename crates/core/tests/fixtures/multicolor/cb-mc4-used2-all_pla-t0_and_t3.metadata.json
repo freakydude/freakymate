@@ -1,0 +1,68 @@
+{
+    "result": {
+        "size": 2588042,
+        "modified": 1794162605.3028731,
+        "uuid": "7f03f336-988a-468e-8e99-89236c90e0a8",
+        "file_processors": [
+            "klipper_estimator"
+        ],
+        "slicer": "OrcaSlicer",
+        "slicer_version": "2.5.0",
+        "gcode_start_byte": 3740,
+        "gcode_end_byte": 2561254,
+        "layer_count": 110,
+        "object_height": 22.0,
+        "estimated_time": 2858,
+        "nozzle_diameter": 0.4,
+        "layer_height": 0.2,
+        "first_layer_height": 0.2,
+        "first_layer_extr_temp": 210.0,
+        "first_layer_bed_temp": 60.0,
+        "chamber_temp": 0.0,
+        "filament_name": "[\"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\"]",
+        "filament_type": "[\"PLA\", \"PLA\"]",
+        "filament_colors": [
+            "#F76707",
+            "#F4E2C1"
+        ],
+        "filament_change_count": 110,
+        "extruder_colors": [
+            "#F76707",
+            "#F4E2C1"
+        ],
+        "filament_temps": [
+            210,
+            210
+        ],
+        "referenced_tools": [
+            0,
+            1
+        ],
+        "mmu_print": 1,
+        "filament_total": 7975.28,
+        "filament_weight_total": 23.98,
+        "filament_weights": [
+            16.4,
+            7.58
+        ],
+        "printer_model": "Elegoo Centauri Carbon 2",
+        "printer_variant": "0.4",
+        "thumbnails": [
+            {
+                "width": 32,
+                "height": 32,
+                "size": 1624,
+                "relative_path": ".thumbs/cb-mc4-used2-all_pla-t0_and_t3-32x32.png"
+            },
+            {
+                "width": 144,
+                "height": 144,
+                "size": 1749,
+                "relative_path": ".thumbs/cb-mc4-used2-all_pla-t0_and_t3-144x144.png"
+            }
+        ],
+        "print_start_time": null,
+        "job_id": null,
+        "filename": "cb-mc4-used2-all_pla-t0_and_t3.gcode"
+    }
+}

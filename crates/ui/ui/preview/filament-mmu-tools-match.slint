@@ -1,0 +1,41 @@
+// Preview: Tools tab compared with the job's file. T0 fits, T1 sits on the empty gate 3, the file does not use T2,
+// T3 takes PETG where the file wants red PLA, and T4 has no gate. Open in the Slint preview or render with
+// scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { FilamentTab, Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component FilamentMmuToolsMatchPreview inherits AppWindow {
+    init => {
+        Sample.mmu();
+        Navigation.page = Page.filament;
+        Navigation.filament-tab = FilamentTab.tools;
+        Printer.mmu-match-file = "cube-mc5-all_pla-t0_t1_t3_t4.gcode";
+        Printer.mmu-match-summary = @tr("1 of 4 tools fit");
+        Printer.mmu-match-verdict = "differs";
+        Printer.mmu-tools = [
+            {
+                tool: 0, gate: 0, used: true, wanted-color: #e03131, wanted-has-color: true, wanted-material: "PLA",
+                wanted-weight: "10.7 g", wanted-profile: "Elegoo PLA @ECC2", verdict: "fits",
+                fitting-gates: [true, false, false, false],
+            },
+            {
+                tool: 1, gate: 3, used: true, wanted-color: #f4e2c1, wanted-has-color: true, wanted-material: "PLA",
+                wanted-weight: "11.1 g", wanted-profile: "Elegoo PLA @ECC2", verdict: "gate-empty",
+                differences: "Gate 3 is empty.", fitting-gates: [false, false, false, false],
+            },
+            { tool: 2, gate: 2 },
+            {
+                tool: 3, gate: 1, used: true, wanted-color: #e8590c80, wanted-has-color: true, wanted-material: "PLA",
+                wanted-weight: "7.7 g", wanted-profile: "Elegoo PLA @ECC2", verdict: "differs",
+                differences: "Gate 1 holds PETG.\nGate 1 has another colour.", fitting-gates: [true, false, false, false],
+            },
+            {
+                tool: 4, gate: -1, used: true, wanted-color: #ffffff00, wanted-has-color: true, wanted-material: "PETG", wanted-weight: "3.1 g",
+                wanted-profile: "Elegoo PETG @ECC2 - Copy", verdict: "no-gate",
+                differences: "The printer has no gate for T4.",
+            },
+        ];
+    }
+}

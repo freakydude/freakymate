@@ -5,7 +5,7 @@ import { Icons } from "../icons.slint";
 import { Actions, Confirm, MmuDialogs, MmuGateItem, Printer, SpoolPicker } from "../state.slint";
 import { ColorBar, IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
 import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
-import { GateAvailabilityLabel } from "mmu.slint";
+import { GateAvailabilityLabel } from "../components/mmu-tiles.slint";
 
 // Happy Hare unloads loaded filament before it checks another gate, and loads it again afterwards outside a print.
 export global GateCheck {
@@ -35,11 +35,19 @@ component ColorSwatch inherits Rectangle {
 
     min-height: Theme.touch;
     border-radius: Theme.radius;
-    background: root.swatch;
-    border-width: root.checked ? 3px : 1px;
-    border-color: root.checked ? Theme.accent : Theme.border;
+    border-width: root.checked ? 3px : 0px;
+    border-color: Theme.accent;
     accessible-role: button;
     accessible-checked: root.checked;
+
+    // The bar draws a colour with alpha over a checkerboard.
+    ColorBar {
+        x: root.checked ? 3px : 0px;
+        y: self.x;
+        width: parent.width - 2 * self.x;
+        height: parent.height - 2 * self.x;
+        colors: { first: root.swatch, count: 1 };
+    }
 
     TouchArea {
         clicked => { root.clicked(); }
@@ -88,11 +96,7 @@ export component GateDialog inherits Scrim {
                     width: 14px;
                     height: 36px;
                     vertical: true;
-                    first: root.item.color;
-                    second: root.item.color-2;
-                    third: root.item.color-3;
-                    count: root.item.color-count;
-                    longitudinal: root.item.longitudinal;
+                    colors: root.item.colors;
                     generic: root.item.availability == "available" || root.item.availability == "buffered";
                 }
                 VerticalLayout {
@@ -191,7 +195,7 @@ export component GateDialog inherits Scrim {
                 for swatch in GateFilaments.colors: ColorSwatch {
                     horizontal-stretch: 1;
                     swatch: swatch;
-                    checked: root.item.has-color && root.item.color == swatch;
+                    checked: root.item.has-color && root.item.colors.first == swatch;
                     clicked => { Actions.set-gate-color(root.item.index, swatch); }
                 }
             }

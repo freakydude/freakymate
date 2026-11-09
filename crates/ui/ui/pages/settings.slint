@@ -5,7 +5,7 @@ import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Backlight, Confirm, Printer, UiSettings } from "../state.slint";
 import { Card, IconButton, ToggleRow } from "../components/controls.slint";
-import { TextEntryDialog } from "../components/overlays.slint";
+import { TextEntryDialog } from "../components/entry-dialogs.slint";
 import { SystemTabs } from "../components/system-tabs.slint";
 
 // One row of minute choices for the standby; 0 is never.
@@ -19,7 +19,7 @@ component MinutesRow inherits VerticalLayout {
     HorizontalLayout {
         spacing: Theme.spacing;
         for minutes in root.choices: IconButton {
-            height: 52px;
+            height: Theme.row-height-small;
             text: minutes == 0 ? @tr("Never") : minutes + " min";
             checked: root.current == minutes;
             clicked => { root.chosen(minutes); }
@@ -48,14 +48,14 @@ component ConnectionCard inherits Card {
     HorizontalLayout {
         spacing: Theme.spacing;
         IconButton {
-            height: 52px;
+            height: Theme.row-height-small;
             icon: Icons.ui-edit;
             text: @tr("Change");
             horizontal: true;
             clicked => { root.change(); }
         }
         if Printer.login-user != "": IconButton {
-            height: 52px;
+            height: Theme.row-height-small;
             icon: Icons.ui-lock;
             text: @tr("Log out");
             horizontal: true;
@@ -125,7 +125,7 @@ export component SettingsPage inherits Rectangle {
                 }
                 Rectangle { vertical-stretch: 1; }
                 Text {
-                    text: "FreakyMate " + UiSettings.version + "\n" + @tr("Saved in {}", UiSettings.settings-file);
+                    text: @tr("FreakyMate {}\nSaved in {}", UiSettings.version, UiSettings.settings-file);
                     color: Theme.disabled-foreground;
                     font-size: Theme.font-small;
                     wrap: word-wrap;

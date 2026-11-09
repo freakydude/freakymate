@@ -5,6 +5,7 @@
 //! Nothing can be switched off: what is detected is used. Happy Hare is detected from the state it reports (see
 //! [`PrinterStatus::happy_hare`]), Spoolman from Moonraker's components.
 
+mod fields;
 pub mod happy_hare;
 pub mod klipper;
 pub mod led_effect;

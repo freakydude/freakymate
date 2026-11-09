@@ -1,6 +1,6 @@
 //! Firmware retraction (`[firmware_retraction]`), as `G10`/`G11` use it.
 
-use super::fields::number;
+use crate::sources::fields::number;
 use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

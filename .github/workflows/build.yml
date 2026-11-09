@@ -21,18 +21,20 @@ jobs:
     name: Format, Clippy, Tests (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: System libraries for Slint
         run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libinput-dev libudev-dev
-      - uses: Swatinem/rust-cache@v2
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Clippy for the release configuration (without dev-mode)
         run: cargo clippy -p freakymate --no-default-features -- -D warnings
       - run: cargo test --workspace
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2
         with:
-          tool: cargo-deny
+          tool: cargo-deny@0.20.2
       - name: Licenses of dependencies (allow list in deny.toml)
         run: cargo deny check licenses
 
@@ -41,34 +43,38 @@ jobs:
     name: Windows tests
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - run: cargo test --workspace
 
   windows:
     name: Windows build
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - run: cargo build --release -p freakymate --no-default-features --bin freakymate
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2
         with:
-          tool: cargo-about
+          tool: cargo-about@0.9.2
       - name: Collect
         shell: bash
         run: |
           mkdir -p dist
           cp target/release/freakymate.exe dist/
           bash .github/scripts/license-files.sh x86_64-pc-windows-msvc dist
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: freakymate-x86_64-pc-windows-msvc
           path: dist/
 
   linux:
     name: Linux ${{ matrix.target }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     # Ubuntu 22.04: the oldest maintained system that has everything the kiosk needs (cage, seatd), with glibc 2.35;
     # the binary runs on Ubuntu 22.04/24.04 and Debian Bookworm/Trixie (Armbian included). Debian Bullseye has no cage
     # or seatd. Keep MIN_GLIBC in scripts/install.sh and libc6 in build-deb.sh in step; move on when jammy ends (04/2027).
@@ -116,18 +122,20 @@ jobs:
           apt_get install -y --no-install-recommends curl ca-certificates git pkg-config build-essential \
             ${{ matrix.compiler }} libfontconfig1-dev:${{ matrix.arch }} libxkbcommon-dev:${{ matrix.arch }} \
             libinput-dev:${{ matrix.arch }} libudev-dev:${{ matrix.arch }}
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Rust
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - uses: Swatinem/rust-cache@v2
+          # Version, profile and components come from rust-toolchain.toml.
+          "$HOME/.cargo/bin/rustup" toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           # Named after the container: build scripts in the cache are linked against its glibc.
           key: ${{ matrix.target }}-ubuntu-22.04
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2
         with:
-          tool: cargo-about
+          tool: cargo-about@0.9.2
       - name: Build
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
@@ -141,7 +149,7 @@ jobs:
           cp target/${{ matrix.target }}/release/freakymate dist/
           cp scripts/install.sh scripts/uninstall.sh scripts/system-dependencies.json scripts/polkit/50-freakymate.rules scripts/udev/70-freakymate-backlight.rules dist/
           bash .github/scripts/license-files.sh ${{ matrix.target }} dist
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: freakymate-${{ matrix.target }}
           path: dist/

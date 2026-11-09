@@ -1,7 +1,8 @@
 //! Spoolman, through Moonraker's `spoolman` component: the spools, the active spool and the connection state. Where
 //! the spools sit in the printer is answered in [`crate::domain::spools`].
 
-use crate::moonraker::Call;
+use crate::color::{parse_hex, Rgba};
+use crate::moonraker::{Call, Connection};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
@@ -17,7 +18,7 @@ pub struct Spool {
     pub filament_name: String,
     pub material: String,
     /// One to three colours: Spoolman's multi-colour filaments (`multi_color_hexes`) have up to three; empty if unknown.
-    pub colors: Vec<[u8; 3]>,
+    pub colors: Vec<Rgba>,
     /// The colours follow each other along the filament (`multi_color_direction` longitudinal); otherwise a
     /// multi-colour filament has them side by side (coaxial), which is also the common case without the field.
     pub longitudinal: bool,
@@ -68,7 +69,7 @@ impl Spool {
     }
 
     /// The first colour, for places that show one.
-    pub fn color(&self) -> Option<[u8; 3]> {
+    pub fn color(&self) -> Option<Rgba> {
         self.colors.first().copied()
     }
 
@@ -91,29 +92,29 @@ impl Spool {
         self.remaining_share().is_some_and(|share| share < LOW_SHARE)
     }
 
+    /// A filament with several colours (Spoolman's multi-colour filament).
+    pub fn is_multi_color(&self) -> bool {
+        self.colors.len() > 1
+    }
+
+    /// Several colours that follow each other along the filament; a single colour has no direction.
+    pub fn has_longitudinal_colors(&self) -> bool {
+        self.longitudinal && self.is_multi_color()
+    }
+
     /// Weight in grams of a length of this filament; `None` without diameter and density.
     pub fn weight_of_length(&self, millimeters: f64) -> Option<f64> {
         let (diameter, density) = (self.diameter.filter(|d| *d > 0.0)?, self.density.filter(|d| *d > 0.0)?);
         let cubic_millimeters = std::f64::consts::PI * (diameter / 2.0).powi(2) * millimeters.max(0.0);
-        Some(cubic_millimeters / 1000.0 * density)
+        Some(cubic_millimeters / CUBIC_MILLIMETERS_PER_CUBIC_CENTIMETER * density)
     }
 }
 
 /// The colours of a filament: `multi_color_hexes` (comma separated) for a multi-colour filament, else `color_hex`.
-fn filament_colors(filament: &Value) -> Vec<[u8; 3]> {
+fn filament_colors(filament: &Value) -> Vec<Rgba> {
     let text = |field: &str| filament.get(field).and_then(Value::as_str).filter(|text| !text.trim().is_empty());
     let hexes = text("multi_color_hexes").or_else(|| text("color_hex")).unwrap_or_default();
-    hexes.split(',').filter_map(parse_color).take(MAX_COLORS).collect()
-}
-
-/// `E31F2B` or `#E31F2B`; an alpha channel at the end is ignored.
-pub fn parse_color(text: &str) -> Option<[u8; 3]> {
-    let hex = text.trim().trim_start_matches('#');
-    if hex.len() < 6 || !hex.is_char_boundary(6) {
-        return None;
-    }
-    let channel = |range: std::ops::Range<usize>| u8::from_str_radix(&hex[range], 16).ok();
-    Some([channel(0..2)?, channel(2..4)?, channel(4..6)?])
+    hexes.split(',').filter_map(parse_hex).take(MAX_COLORS).collect()
 }
 
 /// What Moonraker knows about Spoolman, and the spools the printer needs now.
@@ -128,6 +129,30 @@ pub struct SpoolmanState {
     pub spools: HashMap<u32, Spool>,
 }
 
+/// Spoolman gives the density in g/cm³, the filament is measured in mm.
+const CUBIC_MILLIMETERS_PER_CUBIC_CENTIMETER: f64 = 1000.0;
+/// Spools the spool list asks for, newest used first.
+const SPOOL_LIST_LIMIT: u32 = 100;
+
+/// `server.spoolman.status`.
+pub fn status_call() -> Call {
+    Call::new("server.spoolman.status")
+}
+
+/// A request to Spoolman through Moonraker's proxy; Spoolman has no API of its own for the touch screen.
+fn proxy_call(path: &str, query: Option<&str>) -> Call {
+    Call::with(
+        "server.spoolman.proxy",
+        json!({ "request_method": "GET", "path": path, "query": query, "use_v2_response": true }),
+    )
+}
+
+async fn proxy_get(connection: &Connection, path: &str, query: Option<&str>) -> Result<Value, String> {
+    let call = proxy_call(path, query);
+    let result = connection.call(call.method, call.params).await.map_err(|error| error.to_string())?;
+    proxy_response(&result)
+}
+
 /// `server.spoolman.status`.
 pub fn parse_status(result: &Value) -> (bool, usize, Option<u32>) {
     (
@@ -139,7 +164,7 @@ pub fn parse_status(result: &Value) -> (bool, usize, Option<u32>) {
 
 /// The answer of `server.spoolman.proxy`: the version 2 response has `response` and `error`, the old one is the
 /// answer of Spoolman itself.
-pub fn proxy_response(result: &Value) -> Result<Value, String> {
+fn proxy_response(result: &Value) -> Result<Value, String> {
     if result.get("response").is_some() || result.get("error").is_some() {
         return match result.get("error").filter(|error| !error.is_null()) {
             Some(error) => Err(error.get("message").and_then(Value::as_str).unwrap_or("Spoolman error").to_owned()),
@@ -149,7 +174,37 @@ pub fn proxy_response(result: &Value) -> Result<Value, String> {
     Ok(result.clone())
 }
 
-pub fn parse_spool_list(value: &Value) -> Vec<Spool> {
+/// The spools to choose from, the most recently used first.
+pub async fn fetch_spool_list(connection: &Connection) -> Result<Vec<Spool>, String> {
+    let query = format!("sort=last_used%3Adesc&limit={SPOOL_LIST_LIMIT}&allow_archived=false");
+    let spools = proxy_get(connection, "/v1/spool", Some(&query)).await?;
+    Ok(parse_spool_list(&spools))
+}
+
+/// The state of Spoolman and the spools the printer needs now: those of the gates and the active one. A spool that
+/// cannot be read is left out; the rest still arrives.
+pub async fn fetch_state(connection: &Connection, gate_spools: &[u32]) -> Result<SpoolmanState, String> {
+    let call = status_call();
+    let status = connection.call(call.method, call.params).await.map_err(|error| error.to_string())?;
+    let (connected, pending_reports, active_spool_id) = parse_status(&status);
+    let mut state = SpoolmanState { connected, pending_reports, active_spool_id, ..SpoolmanState::default() };
+    if !connected {
+        return Ok(state);
+    }
+    let mut ids = gate_spools.to_vec();
+    ids.extend(active_spool_id);
+    ids.sort_unstable();
+    ids.dedup();
+    for id in ids {
+        match proxy_get(connection, &format!("/v1/spool/{id}"), None).await {
+            Ok(spool) => state.spools.extend(Spool::from_json(&spool).map(|spool| (id, spool))),
+            Err(error) => log::info!("spool {id} cannot be read: {error}"),
+        }
+    }
+    Ok(state)
+}
+
+fn parse_spool_list(value: &Value) -> Vec<Spool> {
     value.as_array().map(|spools| spools.iter().filter_map(Spool::from_json).collect()).unwrap_or_default()
 }
 
@@ -169,6 +224,19 @@ pub fn measure_spool(spool_id: u32, weight: f64) -> Call {
             "use_v2_response": true
         }),
     )
+}
+
+/// A spool with the weights and colour a test needs, for the tests of every module.
+#[cfg(test)]
+pub(crate) fn test_spool(id: u32, material: &str, left: f64, color: [u8; 3]) -> Spool {
+    Spool {
+        id,
+        material: material.into(),
+        remaining_weight: Some(left),
+        initial_weight: Some(1000.0),
+        colors: vec![[color[0], color[1], color[2], 0xff]],
+        ..Spool::default()
+    }
 }
 
 #[cfg(test)]
@@ -192,24 +260,13 @@ mod tests {
         })
     }
 
-    fn spool(id: u32, material: &str, left: f64, color: [u8; 3]) -> Spool {
-        Spool {
-            id,
-            material: material.into(),
-            remaining_weight: Some(left),
-            initial_weight: Some(1000.0),
-            colors: vec![color],
-            ..Spool::default()
-        }
-    }
-
     #[test]
     fn reads_a_spool_as_spoolman_returns_it() {
         let spool = Spool::from_json(&spool_18()).unwrap();
 
         assert_eq!((spool.id, spool.title().as_str(), spool.material.as_str()), (18, "Geeetech Red", "ABS+"));
-        assert_eq!(spool.colors, [[0xE3, 0x1F, 0x2B]]);
-        assert_eq!(spool.color(), Some([0xE3, 0x1F, 0x2B]));
+        assert_eq!(spool.colors, [[0xE3, 0x1F, 0x2B, 0xFF]]);
+        assert_eq!(spool.color(), Some([0xE3, 0x1F, 0x2B, 0xFF]));
         assert_eq!((spool.extruder_temp, spool.bed_temp), (Some(240.0), Some(120.0)));
         assert_eq!((spool.density, spool.diameter, spool.spool_weight), (Some(1.04), Some(1.75), Some(180.0)));
         assert_eq!(spool.location, "voron @ MMU Gate:0");
@@ -227,8 +284,8 @@ mod tests {
 
     #[test]
     fn a_spool_under_15_percent_is_low_and_without_start_weight_it_is_not() {
-        assert!(spool(1, "PLA", 120.0, [0; 3]).is_low());
-        assert!(!spool(1, "PLA", 150.0, [0; 3]).is_low());
+        assert!(test_spool(1, "PLA", 120.0, [0; 3]).is_low());
+        assert!(!test_spool(1, "PLA", 150.0, [0; 3]).is_low());
         assert!(!Spool { remaining_weight: Some(1.0), ..Spool::default() }.is_low());
     }
 
@@ -245,7 +302,10 @@ mod tests {
         value["filament"]["multi_color_hexes"] = json!("FF0004,FFA424,000000");
         value["filament"]["multi_color_direction"] = json!("coaxial");
 
-        assert_eq!(Spool::from_json(&value).unwrap().colors, [[0xFF, 0x00, 0x04], [0xFF, 0xA4, 0x24], [0, 0, 0]]);
+        assert_eq!(
+            Spool::from_json(&value).unwrap().colors,
+            [[0xFF, 0x00, 0x04, 0xFF], [0xFF, 0xA4, 0x24, 0xFF], [0, 0, 0, 0xFF]]
+        );
         assert!(!Spool::from_json(&value).unwrap().longitudinal);
         value["filament"]["multi_color_direction"] = json!("longitudinal");
         assert!(Spool::from_json(&value).unwrap().longitudinal);
@@ -253,15 +313,18 @@ mod tests {
         assert_eq!(Spool::from_json(&value).unwrap().colors.len(), 3);
         value["filament"]["multi_color_hexes"] = json!("");
         value["filament"]["color_hex"] = json!("E31F2B80");
-        assert_eq!(Spool::from_json(&value).unwrap().colors, [[0xE3, 0x1F, 0x2B]]);
+        assert_eq!(Spool::from_json(&value).unwrap().colors, [[0xE3, 0x1F, 0x2B, 0x80]]);
     }
 
     #[test]
-    fn colours_come_with_or_without_hash() {
-        assert_eq!(parse_color("#26A69A"), Some([0x26, 0xA6, 0x9A]));
-        assert_eq!(parse_color("26a69a"), Some([0x26, 0xA6, 0x9A]));
-        assert_eq!(parse_color("12"), None);
-        assert_eq!(parse_color("zzzzzz"), None);
+    fn only_several_colours_can_follow_each_other_along_the_filament() {
+        let red = [0xff, 0, 0, 0xff];
+        let spool = |colors: Vec<Rgba>, longitudinal| Spool { colors, longitudinal, ..Spool::default() };
+
+        assert!(spool(vec![red, red], true).has_longitudinal_colors());
+        assert!(!spool(vec![red, red], false).has_longitudinal_colors());
+        assert!(!spool(vec![red], true).has_longitudinal_colors());
+        assert!(!spool(Vec::new(), true).has_longitudinal_colors());
     }
 
     #[test]

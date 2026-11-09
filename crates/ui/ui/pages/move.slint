@@ -4,17 +4,18 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, MoveTab, Navigation, Printer, UiSettings } from "../state.slint";
-import { Card, IconButton, StepSelector, TabBar, TabButton } from "../components/controls.slint";
+import { StateIcons } from "../state-icons.slint";
+import { ButtonKind, Card, IconButton, StepSelector, TabBar, TabButton } from "../components/controls.slint";
 import { CalibrateTab } from "calibrate.slint";
 
 component AxisValue inherits HorizontalLayout {
     in property <string> axis;
     in property <float> value;
     in property <bool> homed;
-    spacing: 4px;
+    spacing: Theme.spacing-small;
     Text {
         text: root.axis;
-        color: root.homed ? Theme.success : Theme.muted;
+        color: StateIcons.ok-color(root.homed, Theme.muted);
         font-size: Theme.font-normal;
         font-weight: 700;
         vertical-alignment: center;
@@ -106,7 +107,7 @@ component AxesTab inherits Rectangle {
                 horizontal: true;
                 align-start: true;
                 vertical-stretch: 1;
-                kind: "accent";
+                kind: ButtonKind.accent;
                 clicked => { Actions.home(true, true, true); }
             }
             if Printer.can-quad-gantry-level || Printer.can-z-tilt: IconButton {

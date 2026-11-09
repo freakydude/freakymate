@@ -3,7 +3,7 @@
 //! what `SAVE_CONFIG` would write. Commands and fields follow Klipper's G-Codes.md and Status_Reference.md.
 
 use super::bed_mesh::{self, BedMesh};
-use super::fields::{count, number, text};
+use crate::sources::fields::{count, number, text};
 use crate::sources::objects::ObjectStore;
 use serde_json::Value;
 
@@ -114,7 +114,7 @@ fn read_manual_probe(object: Option<&Value>) -> Option<CalibrationMode> {
 fn read_bed_screws(object: Option<&Value>, settings: Option<&Value>) -> Option<CalibrationMode> {
     let object = object.filter(|object| is_active(object))?;
     let fine = text(object, "state") == "fine";
-    let current = count(object, "current_screw").unwrap_or_default() as usize;
+    let current = count::<usize>(object, "current_screw").unwrap_or_default();
     let screws = configured_screws(settings);
     // Like `bed_screws.py`: the fine round only visits the screws with a fine adjust point.
     let round: Vec<&Screw> = screws.iter().filter(|screw| !fine || screw.fine_adjust).collect();

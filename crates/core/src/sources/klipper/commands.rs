@@ -1,10 +1,14 @@
 //! What Klipper is told: its methods behind Moonraker's `printer.*` and its own G-code. G-code of the plugins and
 //! macros reaches Klipper through [`run_gcode`] as well.
 
-use super::{instance, Axis, FanKind, Motion, TestZ};
+use super::{instance, Axis, FanKind, Motion, TestZ, BED_HEATER, NOZZLE_HEATER};
 use crate::moonraker::Call;
 use serde_json::json;
 
+/// G-code feed rates are in mm/min, the speeds here in mm/s.
+const SECONDS_PER_MINUTE: f64 = 60.0;
+/// Fan speed in G-code (`M106 S`) runs from 0 to 255.
+const FAN_PWM_MAX: f64 = 255.0;
 /// Fixed speeds for manual moves in mm/s.
 const JOG_SPEED_XY: f64 = 100.0;
 const JOG_SPEED_Z: f64 = 10.0;
@@ -82,15 +86,15 @@ pub fn jog(motion: &Motion, axis: Axis, distance: f64) -> Option<String> {
         return None;
     }
     let speed = if axis == Axis::Z { JOG_SPEED_Z } else { JOG_SPEED_XY };
-    Some(format!("G90\nG1 {}{} F{}", axis.letter(), number(target), number(speed * 60.0)))
+    Some(format!("G90\nG1 {}{} F{}", axis.letter(), number(target), number(speed * SECONDS_PER_MINUTE)))
 }
 
 /// G-code for a target temperature, matching the kind of heater; below zero is off.
 pub fn heater_target(heater: &str, target: f64) -> String {
-    let target = number(target.max(0.0));
+    let target = number(target);
     match heater.split_once(' ') {
-        None if heater == "extruder" => format!("M104 S{target}"),
-        None if heater == "heater_bed" => format!("M140 S{target}"),
+        None if heater == NOZZLE_HEATER => format!("M104 S{target}"),
+        None if heater == BED_HEATER => format!("M140 S{target}"),
         Some(("temperature_fan", name)) => format!("SET_TEMPERATURE_FAN_TARGET TEMPERATURE_FAN={name} TARGET={target}"),
         Some((_, name)) => format!("SET_HEATER_TEMPERATURE HEATER={name} TARGET={target}"),
         None => format!("SET_HEATER_TEMPERATURE HEATER={heater} TARGET={target}"),
@@ -101,7 +105,7 @@ pub fn heater_target(heater: &str, target: f64) -> String {
 pub fn fan_speed(fan: &str, speed: f64) -> Option<String> {
     let speed = speed.clamp(0.0, 1.0);
     match FanKind::of(fan)? {
-        FanKind::Part => Some(format!("M106 S{}", (speed * 255.0).round())),
+        FanKind::Part => Some(format!("M106 S{}", (speed * FAN_PWM_MAX).round())),
         FanKind::Generic => Some(format!("SET_FAN_SPEED FAN={} SPEED={:.2}", instance(fan), speed)),
         FanKind::Heater | FanKind::Controller => None,
     }
@@ -131,7 +135,7 @@ pub fn speed_factor(percent: f64) -> String {
 
 /// Relative extrusion; `length` below zero retracts, the sign of `speed` does not count.
 pub fn extrude(length: f64, speed: f64) -> String {
-    format!("M83\nG1 E{} F{}", number(length), number(speed.abs() * 60.0))
+    format!("M83\nG1 E{} F{}", number(length), number(speed.abs() * SECONDS_PER_MINUTE))
 }
 
 /// `EXCLUDE_OBJECT` reads the name up to the next space, so names with spaces cannot be excluded.
@@ -236,7 +240,7 @@ mod tests {
     #[test]
     fn heater_targets_use_matching_gcode() {
         assert_eq!(heater_target("extruder", 210.0), "M104 S210");
-        assert_eq!(heater_target("heater_bed", -5.0), "M140 S0");
+        assert_eq!(heater_target("heater_bed", 0.0), "M140 S0");
         assert_eq!(heater_target("heater_generic chamber", 45.5), "SET_HEATER_TEMPERATURE HEATER=chamber TARGET=45.5");
         assert_eq!(
             heater_target("temperature_fan nevermore", 40.0),

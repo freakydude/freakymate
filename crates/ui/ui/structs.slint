@@ -1,0 +1,330 @@
+// Data types shared between Rust and the UI: what a state means, pages and the rows of every list.
+
+
+// `updates`, `network`, `console` and `settings` (the Settings tab) are tabs of the system pages.
+// What a state or a message means; each meaning has one colour (`StateIcons.severity-color`).
+export enum Severity { neutral, fine, running, attention, error, info }
+
+export enum Page { print, move, temperature, tune, filament, console, system, settings, updates, network }
+
+export struct HeaterItem {
+    object: string,
+    label: string,
+    temperature: float,
+    target: float,
+    power: float,
+    // Target is below Klipper's max_temp.
+    can-raise: bool,
+    // The targets Klipper takes (min_temp to max_temp), as a note for typing one; empty without max_temp.
+    target-range: string,
+    // The temperature the spool in use recommends, when the target is off from it; empty otherwise.
+    spool-hint: string,
+    // Moonraker keeps its temperature history, so a tap can show it.
+    has-history: bool,
+}
+
+export struct SensorItem {
+    object: string,
+    label: string,
+    temperature: float,
+    // false while the sensor has no value, e.g. a stepper driver that is switched off.
+    known: bool,
+    // Moonraker keeps its temperature history, so a tap can show it.
+    has-history: bool,
+}
+
+// A fan. `kind`: part | generic | heater | controller; only part and generic fans can be set.
+export struct FanItem {
+    object: string,
+    label: string,
+    kind: string,
+    controllable: bool,
+    // 0 to 100.
+    speed: float,
+    // Measured speed as text ("2800 rpm"), empty without a tachometer.
+    rpm: string,
+    // Should turn, but the tachometer has reported 0 rpm since the spin-up time.
+    stalled: bool,
+}
+
+export struct LedItem {
+    object: string,
+    label: string,
+    on: bool,
+    // Brightness from 0 to 100, of a Klipper LED its brightest channel; unknown for a WLED strip after a preset.
+    level-known: bool,
+    level: float,
+}
+
+// An effect of the led_effect plugin.
+export struct LedEffectItem {
+    name: string,
+    label: string,
+    enabled: bool,
+}
+
+// A motion or extrusion value of the expert tab; `id` names it (e.g. max_accel), the texts are formatted.
+export struct TuningItem {
+    id: string,
+    value: string,
+    configured: string,
+    changed: bool,
+    can-reset: bool,
+}
+
+export struct FilamentSensorItem {
+    label: string,
+    enabled: bool,
+    detected: bool,
+}
+
+// The colours of a filament bar (`ColorBar`): up to three, how many there are (0 to 3), and whether they follow each
+// other along the filament instead of lying side by side (Spoolman's multi-colour filaments).
+export struct BarColors {
+    first: color,
+    second: color,
+    third: color,
+    count: int,
+    longitudinal: bool,
+}
+
+// One gate of the MMU. `availability`: unknown | empty | available | buffered.
+export struct MmuGateItem {
+    index: int,
+    availability: string,
+    name: string,
+    material: string,
+    colors: BarColors,
+    has-color: bool,
+    // Tools that take their filament from this gate, as "T0 T3"; empty without one.
+    tools: string,
+    // How the tools of the compared file that print from this gate fit (`ToolMatchItem.verdict`, the worst of them).
+    file-verdict: string,
+    // EndlessSpool group of the gate, -1 if Happy Hare reports none.
+    group: int,
+    selected: bool,
+    // Remaining filament of the spool in the gate (for example "613 g"), empty without Spoolman or spool.
+    spool-text: string,
+    spool-low: bool,
+    // Spoolman id of the spool in the gate, -1 for none.
+    spool-id: int,
+}
+
+// A tool of the MMU and the gate it takes its filament from (Happy Hare's tool-to-gate map).
+export struct ToolMatchItem {
+    tool: int,
+    // -1: Happy Hare maps no gate to the tool (a tool of the file beyond the printer's tools).
+    gate: int,
+    // What the file of the job asks of the tool (see `Printer.mmu-match-file`); empty when it does not use the tool.
+    used: bool,
+    wanted-color: color,
+    wanted-has-color: bool,
+    wanted-material: string,
+    // Planned weight with unit, profile name of the slicer.
+    wanted-weight: string,
+    wanted-profile: string,
+    // "fits", "differs", "gate-empty", "no-gate", or "" when nothing can be compared.
+    verdict: string,
+    // What differs, one line each.
+    differences: string,
+    // Per gate index: the gate's filament fits what the file asks of the tool.
+    fitting-gates: [bool],
+}
+
+// A label of the temperature chart at `position`, a share from 0 to 1 along its axis.
+export struct ChartLabel {
+    text: string,
+    position: float,
+}
+
+// The way of the filament of the selected gate (Happy Hare's `filament_pos`, see `FilamentPath`). Sensors: -1 not
+// fitted, 0 free, 1 triggered; in order along the way: gate entry, gate exit, extruder, toolhead. `bowden-progress`
+// is 0 to 1 during a move through the bowden, -1 otherwise. The colours are those of the spool, as for `ColorBar`.
+export struct FilamentPathItem {
+    position: int,
+    direction: int,
+    distance: string,
+    gate-label: string,
+    bowden-progress: float,
+    gate-entry-sensor: int,
+    gate-sensor: int,
+    extruder-sensor: int,
+    toolhead-sensor: int,
+    colors: BarColors,
+}
+
+// A spool of Spoolman in the picker. `place`: where it sits ("Gate 2", "In use") or empty.
+export struct SpoolItem {
+    id: int,
+    title: string,
+    material: string,
+    // What is left, e.g. "613 g"; empty if Spoolman does not know.
+    remaining: string,
+    colors: BarColors,
+    place: string,
+    low: bool,
+}
+
+// A sensor of the MMU. `state`: disabled | open | triggered.
+export struct MmuSensorItem {
+    label: string,
+    state: string,
+}
+
+export struct PrintObjectItem {
+    name: string,
+    excluded: bool,
+    // Klipper prints it right now.
+    printing: bool,
+    // Outline on the bed map as path commands in the view box of `BedMapItem`; empty without the map.
+    outline: string,
+}
+
+// View box of the bed map: the bed in mm, Y upwards; `grid` as path commands.
+export struct BedMapItem {
+    shown: bool,
+    width: float,
+    depth: float,
+    grid: string,
+}
+
+// The active bed mesh, back at the top: a dense mesh as a picture of one pixel per probed point, a small one as cells. `aspect` is width to depth of the
+// measured area; `limit` the end of the colour scale on both sides of 0; `filled`: corners of a round bed, not probed.
+export struct BedMeshMap {
+    shown: bool,
+    image: image,
+    columns: int,
+    rows: int,
+    aspect: float,
+    range: string,
+    lowest: string,
+    highest: string,
+    limit: string,
+    averaged: int,
+    filled: bool,
+}
+
+// A cell of a small mesh map with its value, counted from the top left; `dark` text on a light cell.
+export struct MeshCellItem {
+    column: int,
+    row: int,
+    text: string,
+    colour: color,
+    dark: bool,
+}
+
+// The points a faulty region replaced with the average around it, counted from the top left.
+export struct MeshFrameItem {
+    column: int,
+    row: int,
+    columns: int,
+    rows: int,
+}
+
+// Texts of a file row; an empty text is a fact the file does not have.
+// One screw from the last SCREWS_TILT_CALCULATE.
+export struct ScrewItem {
+    name: string,
+    // Turns as Klipper reports them ("01:15" = one and a quarter turns); empty for the base screw.
+    turns: string,
+    clockwise: bool,
+    is-base: bool,
+}
+
+export struct FileItem {
+    path: string,
+    name: string,
+    modified: string,
+    // The slicer's filament type, one per tool for files with several (`PLA;PETG`).
+    material: string,
+    // Filament the print takes, e.g. "52 g" or "~270 g".
+    weight: string,
+    nozzle: string,
+    time: string,
+    extruder-temperature: string,
+    bed-temperature: string,
+    chamber-temperature: string,
+    thumbnail: image,
+    has-thumbnail: bool,
+    // False for a file that has no thumbnail: its row then starts with the text.
+    show-thumbnail: bool,
+    // Marked for printing (a single one) or deleting.
+    marked: bool,
+}
+
+export struct ConsoleItem {
+    text: string,
+    time: string,
+    is-command: bool,
+    is-error: bool,
+}
+
+export struct MessageItem {
+    text: string,
+    time: string,
+    is-error: bool,
+    // Came after the list was closed last: stands under "New", the rest under "Earlier".
+    new: bool,
+    top: length,
+    height: length,
+}
+
+export struct MacroItem {
+    name: string,
+    visible: bool,
+}
+
+// One parameter of a macro in the run form; `placeholder` is the Klipper default, used when `value` stays empty.
+export struct MacroParamItem {
+    name: string,
+    placeholder: string,
+    value: string,
+    // The default is a number: the field opens the numeric keypad.
+    numeric: bool,
+}
+
+export struct PowerItem {
+    name: string,
+    on: bool,
+    locked: bool,
+}
+
+export struct UpdateItem {
+    name: string,
+    version: string,
+    detail: string,
+    has-update: bool,
+    up-to-date: bool,
+}
+
+export struct PresetItem {
+    name: string,
+    extruder: float,
+    bed: float,
+}
+
+export struct WifiItem {
+    ssid: string,
+    // Signal strength as bars 1..3.
+    bars: int,
+    secured: bool,
+    supported: bool,
+    known: bool,
+    active: bool,
+    // false: saved network that is currently not received.
+    in-range: bool,
+}
+
+export struct WiredItem {
+    interface: string,
+    cable: bool,
+    connected: bool,
+    address: string,
+}
+
+export struct HostInterfaceItem {
+    name: string,
+    wireless: bool,
+    addresses: string,
+    mac: string,
+}

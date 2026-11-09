@@ -1,10 +1,15 @@
 //! Heaters with a target (`extruder`, `heater_bed`, `heater_generic`, `temperature_fan`, additional extruders) and
 //! temperatures without one (`temperature_sensor`, drivers that measure their own).
 
-use super::fields::number;
 use super::status::label;
+use crate::sources::fields::number;
 use crate::sources::objects::ObjectStore;
 use serde_json::Value;
+
+/// The Klipper object of the nozzle heater.
+pub const NOZZLE_HEATER: &str = "extruder";
+/// The Klipper object of the bed heater.
+pub const BED_HEATER: &str = "heater_bed";
 
 /// Heater with a target temperature; `object` is the Klipper object name, e.g. `heater_generic chamber`.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -54,7 +59,7 @@ pub struct TemperatureSensor {
 pub(super) fn read_heaters(store: &ObjectStore) -> Vec<Heater> {
     let settings = store.object("configfile").and_then(|configfile| configfile.get("settings"));
     let heater = |name: &str, value: &Value| heater(name, value, settings.and_then(|settings| settings.get(name)));
-    let mut heaters: Vec<Heater> = ["extruder", "heater_bed"]
+    let mut heaters: Vec<Heater> = [NOZZLE_HEATER, BED_HEATER]
         .into_iter()
         .filter_map(|name| store.object(name).map(|value| heater(name, value)))
         .collect();

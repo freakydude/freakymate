@@ -2,21 +2,22 @@
 
 use crate::{format, view};
 use crate::{
-    ConsoleItem, FanItem, FilamentPathItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, PowerItem,
-    SensorItem, SpoolItem, TuningItem, UpdateItem,
+    BarColors, FanItem, FilamentPathItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, PowerItem, SensorItem,
+    SpoolItem, ToolMatchItem, TuningItem, UpdateItem,
 };
-use freakymate_core::domain::spools::{self, Lane};
-use freakymate_core::sources::happy_hare::{FilamentPath, PathSensor};
+use freakymate_core::color::Rgba;
+use freakymate_core::domain::filament_match::ToolMatch;
+use freakymate_core::domain::spools::{self, FilamentColors, Lane};
+use freakymate_core::sources::happy_hare::{self, FilamentPath, PathSensor};
 use freakymate_core::sources::klipper::tuning::TuningValue;
-use freakymate_core::sources::klipper::{Fan, Heater, Led, TemperatureSensor};
+use freakymate_core::sources::klipper::{Fan, Heater, Led, TemperatureSensor, BED_HEATER, NOZZLE_HEATER};
 use freakymate_core::sources::led_effect::LedEffect;
-use freakymate_core::sources::moonraker_server::gcode_store::{ConsoleKind, ConsoleLine};
 use freakymate_core::sources::moonraker_server::machine::HostInterface;
 use freakymate_core::sources::moonraker_server::power::PowerDevice;
 use freakymate_core::sources::moonraker_server::update_manager::UpdateInfo;
 use freakymate_core::sources::spoolman::Spool;
 use freakymate_core::ConnectionState;
-use slint::{Model, SharedString, VecModel};
+use slint::{Model, ModelRc, SharedString, VecModel};
 
 pub(crate) fn connection_name(state: ConnectionState) -> &'static str {
     match state {
@@ -52,17 +53,12 @@ pub(crate) fn spool_rows(spools: &[Spool], lanes: &[Lane]) -> Vec<SpoolItem> {
                 Some(lane) => lane.gate.map_or_else(|| "In use".to_owned(), |gate| format!("Gate {gate}")),
                 None => String::new(),
             };
-            let bar = color_bar(&spool.colors);
             SpoolItem {
                 id: spool.id as i32,
                 title: spool.title().into(),
                 material: spool.material.as_str().into(),
                 remaining: view::spool_remaining(spool).into(),
-                color: bar.0,
-                color_2: bar.1,
-                color_3: bar.2,
-                color_count: bar.3,
-                longitudinal: spool.longitudinal && spool.colors.len() > 1,
+                colors: spool_colors(spool),
                 place: place.into(),
                 low: spool.is_low(),
             }
@@ -70,21 +66,32 @@ pub(crate) fn spool_rows(spools: &[Spool], lanes: &[Lane]) -> Vec<SpoolItem> {
         .collect()
 }
 
-pub(crate) fn color_of([red, green, blue]: [u8; 3]) -> slint::Color {
-    slint::Color::from_rgb_u8(red, green, blue)
+pub(crate) fn color_of([red, green, blue, alpha]: Rgba) -> slint::Color {
+    slint::Color::from_argb_u8(alpha, red, green, blue)
 }
 
 /// The colours of a bar: up to three, and how many there are.
-pub(crate) fn color_bar(colors: &[[u8; 3]]) -> (slint::Color, slint::Color, slint::Color, i32) {
-    let color = |index: usize| colors.get(index).copied().map_or_else(slint::Color::default, color_of);
-    (color(0), color(1), color(2), colors.len().min(3) as i32)
+pub(crate) fn bar_colors(colors: &FilamentColors) -> BarColors {
+    let color = |index: usize| colors.colors.get(index).copied().map_or_else(slint::Color::default, color_of);
+    BarColors {
+        first: color(0),
+        second: color(1),
+        third: color(2),
+        count: colors.colors.len().min(3) as i32,
+        longitudinal: colors.longitudinal,
+    }
+}
+
+/// The colours of a spool's bar; none without a spool.
+pub(crate) fn spool_colors(spool: &Spool) -> BarColors {
+    bar_colors(&FilamentColors { colors: spool.colors.clone(), longitudinal: spool.has_longitudinal_colors() })
 }
 
 /// The row of a heater; the hint says that the target is off from what the spool in use recommends.
 pub(crate) fn heater_item(heater: &Heater, spool: Option<&Spool>, has_history: bool) -> HeaterItem {
     let recommended = spool.and_then(|spool| match heater.object.as_str() {
-        "extruder" => spool.extruder_temp,
-        "heater_bed" => spool.bed_temp,
+        NOZZLE_HEATER => spool.extruder_temp,
+        BED_HEATER => spool.bed_temp,
         _ => None,
     });
     let spool_hint = spools::temperature_hint(heater.target, recommended)
@@ -104,28 +111,6 @@ pub(crate) fn heater_item(heater: &Heater, spool: Option<&Spool>, has_history: b
     }
 }
 
-/// One row per message line: the console list has fixed row heights, so a line break inside a row would overlap its neighbours.
-/// Only the first row of a message shows the time.
-pub(crate) fn console_items(line: &ConsoleLine) -> Vec<ConsoleItem> {
-    let time = format::unix_clock(line.time);
-    let is_command = line.kind == ConsoleKind::Command;
-    let is_error = line.is_error();
-    let text = line.text();
-    let mut rows: Vec<&str> = text.lines().collect();
-    if rows.is_empty() {
-        rows.push("");
-    }
-    rows.into_iter()
-        .enumerate()
-        .map(|(index, text)| ConsoleItem {
-            text: text.into(),
-            time: if index == 0 { time.as_str().into() } else { "".into() },
-            is_command,
-            is_error,
-        })
-        .collect()
-}
-
 pub(crate) fn power_item(device: &PowerDevice) -> PowerItem {
     PowerItem { name: device.device.as_str().into(), on: device.is_on(), locked: device.locked_while_printing }
 }
@@ -140,7 +125,7 @@ pub(crate) fn host_interface_item(interface: &HostInterface) -> HostInterfaceIte
 }
 
 pub(crate) fn update_item(update: &UpdateInfo) -> UpdateItem {
-    let detail = if update.name == "system" {
+    let detail = if update.is_system() {
         format!("{} packages", update.pending)
     } else if update.has_update() {
         format!("{} → {}", update.version, update.remote_version)
@@ -148,7 +133,7 @@ pub(crate) fn update_item(update: &UpdateInfo) -> UpdateItem {
         update.version.clone()
     };
     UpdateItem {
-        name: update.name.as_str().into(),
+        name: format::service_name(&update.name).into(),
         version: update.version.as_str().into(),
         detail: detail.into(),
         has_update: update.has_update(),
@@ -208,24 +193,18 @@ pub(crate) fn tuning_item(value: &TuningValue) -> TuningItem {
 }
 
 /// The way of the filament of the selected gate, in the colours of what is in it (see `gate_colors`).
-pub(crate) fn filament_path_item(
-    path: &FilamentPath,
-    gate: i32,
-    colors: &[[u8; 3]],
-    longitudinal: bool,
-) -> FilamentPathItem {
+pub(crate) fn filament_path_item(path: &FilamentPath, gate: i32, colors: &FilamentColors) -> FilamentPathItem {
     let sensor = |sensor: PathSensor| match sensor {
         PathSensor::Absent => -1,
         PathSensor::Free => 0,
         PathSensor::Triggered => 1,
     };
-    let bar = color_bar(colors);
     FilamentPathItem {
         position: path.position,
         direction: path.direction,
         distance: view::path_distance(path.distance).into(),
         gate_label: match gate {
-            -2 => "Bypass".into(),
+            happy_hare::BYPASS => "Bypass".into(),
             gate if gate >= 0 => format!("Gate {gate}").into(),
             _ => SharedString::new(),
         },
@@ -234,61 +213,119 @@ pub(crate) fn filament_path_item(
         gate_sensor: sensor(path.gate_exit_sensor),
         extruder_sensor: sensor(path.extruder_sensor),
         toolhead_sensor: sensor(path.toolhead_sensor),
-        color: bar.0,
-        color_2: bar.1,
-        color_3: bar.2,
-        color_count: bar.3,
-        longitudinal,
+        colors: bar_colors(colors),
+    }
+}
+
+/// An id, index or group number for a Slint model: -1 when there is none or it does not fit.
+pub(crate) fn id_or_none<T: TryInto<i32>>(id: Option<T>) -> i32 {
+    id.and_then(|id| id.try_into().ok()).unwrap_or(-1)
+}
+
+/// A tool of Happy Hare (`gate` `None` for a tool of the file without gate) with what the file asks of it.
+pub(crate) fn tool_match_item(tool: usize, gate: Option<usize>, found: Option<&ToolMatch>) -> ToolMatchItem {
+    let mut item = ToolMatchItem { tool: tool as i32, gate: id_or_none(gate), ..ToolMatchItem::default() };
+    let Some(found) = found else { return item };
+    let request = &found.request;
+    item.used = true;
+    if let Some(color) = request.color {
+        item.wanted_color = color_of(color);
+        item.wanted_has_color = true;
+    }
+    item.wanted_material = request.material.clone().unwrap_or_default().into();
+    item.wanted_weight = request.grams.map(format::filament_weight).unwrap_or_default().into();
+    item.wanted_profile = request.profile.clone().unwrap_or_default().into();
+    item.verdict = view::verdict_key(&found.verdict).into();
+    item.differences = view::tool_differences(found).into();
+    item
+}
+
+/// The flags as a model, the old one while they are unchanged: a new model counts as a changed row and would rebuild
+/// the tiles on every status update.
+pub(crate) fn reuse_flags(old: Option<ModelRc<bool>>, flags: Option<Vec<bool>>) -> ModelRc<bool> {
+    let flags = flags.unwrap_or_default();
+    match old {
+        Some(old) if old.iter().eq(flags.iter().copied()) => old,
+        _ => ModelRc::new(VecModel::from(flags)),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn line(kind: ConsoleKind, message: &str) -> ConsoleLine {
-        ConsoleLine { kind, message: message.to_owned(), time: 0.0 }
-    }
+    use freakymate_core::domain::filament_match::{ToolRequest, Verdict};
 
     #[test]
     fn a_colour_bar_has_up_to_three_colours() {
-        let red = [255, 0, 0];
-        assert_eq!(color_bar(&[]).3, 0);
-        assert_eq!(color_bar(&[red]).3, 1);
-        assert_eq!(color_bar(&[red, [0, 255, 0]]).3, 2);
-        assert_eq!(color_bar(&[red; 5]).3, 3);
-        assert_eq!(color_bar(&[red, [0, 255, 0]]).1, slint::Color::from_rgb_u8(0, 255, 0));
+        let red = [255, 0, 0, 255];
+        let bar = |colors: Vec<Rgba>, longitudinal| bar_colors(&FilamentColors { colors, longitudinal });
+        assert_eq!(bar(vec![], false).count, 0);
+        assert_eq!(bar(vec![red], false).count, 1);
+        assert_eq!(bar(vec![red, [0, 255, 0, 255]], false).count, 2);
+        assert_eq!(bar(vec![red; 5], false).count, 3);
+        assert_eq!(bar(vec![red, [0, 255, 0, 255]], true).second, slint::Color::from_rgb_u8(0, 255, 0));
+        assert!(bar(vec![red], true).longitudinal);
     }
 
     #[test]
-    fn multi_line_message_becomes_one_row_per_line() {
-        let rows = console_items(&line(ConsoleKind::Response, "first\nsecond\r\nthird"));
-        let texts: Vec<&str> = rows.iter().map(|row| row.text.as_str()).collect();
-        assert_eq!(texts, ["first", "second", "third"]);
-        assert!(rows[1].time.is_empty() && rows[2].time.is_empty());
+    fn the_alpha_of_a_colour_reaches_the_ui() {
+        assert_eq!(color_of([255, 0, 0, 0x80]), slint::Color::from_argb_u8(0x80, 255, 0, 0));
     }
 
     #[test]
-    fn empty_message_keeps_one_row() {
-        let rows = console_items(&line(ConsoleKind::Response, ""));
-        assert_eq!(rows.len(), 1);
-        assert!(rows[0].text.is_empty());
+    fn a_missing_or_too_large_id_becomes_minus_one() {
+        assert_eq!(id_or_none(Some(7_u32)), 7);
+        assert_eq!(id_or_none(Some(3_usize)), 3);
+        assert_eq!(id_or_none(None::<u32>), -1);
+        assert_eq!(id_or_none(Some(u32::MAX)), -1);
+    }
+
+    fn tool_match(verdict: Verdict) -> ToolMatch {
+        ToolMatch {
+            request: ToolRequest {
+                tool: 2,
+                material: Some("PETG".into()),
+                profile: Some("Generic PETG".into()),
+                color: Some([1, 2, 3, 0xFF]),
+                grams: Some(12.0),
+                temperature: None,
+            },
+            gate: Some(1),
+            verdict,
+        }
     }
 
     #[test]
-    fn plugin_markup_does_not_reach_the_console() {
-        let rows = console_items(&line(
-            ConsoleKind::Response,
-            r#"// <b><span style="color:#87CEEB">EMPTY</span></b>&nbsp;gate"#,
-        ));
-        assert_eq!(rows[0].text, "EMPTY gate");
+    fn a_tool_without_a_match_is_unused_and_a_tool_without_gate_has_minus_one() {
+        let item = tool_match_item(4, None, None);
+
+        assert_eq!((item.tool, item.gate, item.used), (4, -1, false));
+        assert!(item.wanted_material.is_empty() && item.verdict.is_empty());
     }
 
     #[test]
-    fn error_flag_applies_to_every_row() {
-        let rows = console_items(&line(ConsoleKind::Response, "!! Lost connection\nsee log"));
-        assert_eq!(rows[0].text, "Lost connection");
-        assert!(rows.iter().all(|row| row.is_error));
-        assert!(!rows.iter().any(|row| row.is_command));
+    fn a_matched_tool_carries_what_the_file_asks_and_the_verdict() {
+        let found = tool_match(Verdict::GateEmpty);
+
+        let item = tool_match_item(2, Some(1), Some(&found));
+
+        assert_eq!((item.tool, item.gate, item.used), (2, 1, true));
+        assert!(item.wanted_has_color);
+        assert_eq!(item.wanted_color, color_of([1, 2, 3, 0xFF]));
+        assert_eq!((item.wanted_material.as_str(), item.wanted_profile.as_str()), ("PETG", "Generic PETG"));
+        assert_eq!(item.verdict.as_str(), "gate-empty");
+        assert_eq!(item.differences.as_str(), "Gate 1 is empty.");
+    }
+
+    #[test]
+    fn unchanged_flags_keep_their_model_and_changed_ones_get_a_new_one() {
+        let first = reuse_flags(None, Some(vec![true, false]));
+        let kept = reuse_flags(Some(first.clone()), Some(vec![true, false]));
+        let changed = reuse_flags(Some(first.clone()), Some(vec![true, true]));
+
+        assert!(std::ptr::addr_eq(first.as_any(), kept.as_any()));
+        assert!(!std::ptr::addr_eq(first.as_any(), changed.as_any()));
+        assert_eq!(changed.iter().collect::<Vec<_>>(), [true, true]);
+        assert_eq!(reuse_flags(None, None).row_count(), 0);
     }
 }

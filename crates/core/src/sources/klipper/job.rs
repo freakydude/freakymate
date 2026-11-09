@@ -1,6 +1,6 @@
 //! The print job: `print_stats`, with the progress of `display_status` or `virtual_sdcard`.
 
-use super::fields::{count, number, text};
+use crate::sources::fields::{count, number, text};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

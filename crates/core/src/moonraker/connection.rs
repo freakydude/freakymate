@@ -22,6 +22,16 @@ const KEEPALIVE: Keepalive = Keepalive {
     idle_timeout: Duration::from_secs(15),
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ConnectionState {
+    #[default]
+    Connecting,
+    Connected,
+    Disconnected,
+    /// Connected, but Moonraker answers only after a login ([`PrinterService::log_in`]).
+    LoginRequired,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct Keepalive {
     connect_timeout: Duration,

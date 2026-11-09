@@ -1,0 +1,78 @@
+{
+    "result": {
+        "size": 3924887,
+        "modified": 1794162608.318851,
+        "uuid": "40011266-3cf8-4e20-aea7-67f1f779730f",
+        "file_processors": [
+            "klipper_estimator"
+        ],
+        "slicer": "OrcaSlicer",
+        "slicer_version": "2.5.0",
+        "gcode_start_byte": 4560,
+        "gcode_end_byte": 3895548,
+        "layer_count": 128,
+        "object_height": 25.6,
+        "estimated_time": 6677,
+        "nozzle_diameter": 0.4,
+        "layer_height": 0.2,
+        "first_layer_height": 0.2,
+        "first_layer_extr_temp": 210.0,
+        "first_layer_bed_temp": 60.0,
+        "chamber_temp": 0.0,
+        "filament_name": "[\"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\"]",
+        "filament_type": "[\"PETG\", \"PETG\", \"PETG\", \"PETG\"]",
+        "filament_colors": [
+            "#636363",
+            "#B4B4B4",
+            "#000000",
+            "#FFFFFF00"
+        ],
+        "filament_change_count": 384,
+        "extruder_colors": [
+            "#636363",
+            "#B4B4B4",
+            "#000000",
+            "#FFFFFF00"
+        ],
+        "filament_temps": [
+            210,
+            210,
+            210,
+            210
+        ],
+        "referenced_tools": [
+            0,
+            1,
+            2,
+            3
+        ],
+        "mmu_print": 1,
+        "filament_total": 16180.909999999998,
+        "filament_weight_total": 48.65,
+        "filament_weights": [
+            13.8,
+            14.21,
+            10.35,
+            10.29
+        ],
+        "printer_model": "Elegoo Centauri Carbon 2",
+        "printer_variant": "0.4",
+        "thumbnails": [
+            {
+                "width": 32,
+                "height": 32,
+                "size": 1456,
+                "relative_path": ".thumbs/cb-mc4-used4_1-is-transparent-all_pla-t0_and_t3-32x32.png"
+            },
+            {
+                "width": 144,
+                "height": 144,
+                "size": 1936,
+                "relative_path": ".thumbs/cb-mc4-used4_1-is-transparent-all_pla-t0_and_t3-144x144.png"
+            }
+        ],
+        "print_start_time": null,
+        "job_id": null,
+        "filename": "cb-mc4-used4_1-is-transparent-all_pla-t0_and_t3.gcode"
+    }
+}

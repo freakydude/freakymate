@@ -1,0 +1,74 @@
+{
+    "result": {
+        "size": 828469,
+        "modified": 1794162615.6747966,
+        "uuid": "07e42022-1406-458c-8369-796938f45043",
+        "file_processors": [
+            "klipper_estimator"
+        ],
+        "slicer": "OrcaSlicer",
+        "slicer_version": "2.5.0",
+        "gcode_start_byte": 3600,
+        "gcode_end_byte": 799352,
+        "layer_count": 110,
+        "object_height": 22.0,
+        "estimated_time": 1674,
+        "nozzle_diameter": 0.4,
+        "layer_height": 0.2,
+        "first_layer_height": 0.2,
+        "first_layer_extr_temp": 210.0,
+        "first_layer_bed_temp": 60.0,
+        "chamber_temp": 0.0,
+        "filament_name": "[\"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\", \"Elegoo PLA @ECC2\"]",
+        "filament_type": "[\"PLA\", \"PLA\", \"PLA\", \"PLA\"]",
+        "filament_colors": [
+            "#F76707",
+            "#F4E2C1",
+            "#00FF7F",
+            "#CC0C1B"
+        ],
+        "extruder_colors": [
+            "#F76707",
+            "#F4E2C1",
+            "#00FF7F",
+            "#CC0C1B"
+        ],
+        "filament_temps": [
+            210,
+            210,
+            210,
+            210
+        ],
+        "referenced_tools": [
+            2
+        ],
+        "mmu_print": 1,
+        "filament_total": 5907.27,
+        "filament_weight_total": 17.76,
+        "filament_weights": [
+            0.0,
+            0.0,
+            17.76,
+            0.0
+        ],
+        "printer_model": "Elegoo Centauri Carbon 2",
+        "printer_variant": "0.4",
+        "thumbnails": [
+            {
+                "width": 32,
+                "height": 32,
+                "size": 1373,
+                "relative_path": ".thumbs/cb-mc4-used4-all_pla-t2-32x32.png"
+            },
+            {
+                "width": 144,
+                "height": 144,
+                "size": 1634,
+                "relative_path": ".thumbs/cb-mc4-used4-all_pla-t2-144x144.png"
+            }
+        ],
+        "print_start_time": null,
+        "job_id": null,
+        "filename": "cb-mc4-used4-all_pla-t2.gcode"
+    }
+}

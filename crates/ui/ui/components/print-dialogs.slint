@@ -1,0 +1,225 @@
+// Dialogs of a running print: exclude objects and pause at a layer.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, Dialogs, PrintObjectItem, Printer } from "../state.slint";
+import { ButtonKind, IconButton, ScrollList } from "controls.slint";
+import { BedMap, BedMapLegend } from "bed-map.slint";
+import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
+
+// Objects of the running print: on a map of the bed if the slicer told where they lie, and always as a list (the way
+// to objects that overlap or have no place). Tapping only selects; "Exclude" then skips the object for the rest of
+// the print, which replaces a confirmation. Names are shown as Klipper reports them and may wrap.
+export component ExcludeObjectsDialog inherits Scrim {
+    in-out property <bool> open;
+    in-out property <int> selected: -1;
+    property <bool> has-selection: root.selected >= 0 && root.selected < Printer.print-objects.length;
+    property <PrintObjectItem> chosen: Printer.print-objects[root.selected];
+    // Room for the map: the dialog without its margin, padding, title and buttons; the list keeps the rest.
+    property <length> map-room-height: root.height - 16px - 2 * Theme.dialog-padding - 2 * Theme.touch - 2 * Theme.spacing;
+    property <length> map-width: min(root.map-room-height * Printer.bed-map.width / Printer.bed-map.depth, (root.width - 16px - 2 * Theme.dialog-padding) * 0.55);
+    // A tap on the status bar or the navigation closes the dialog without excluding anything.
+    property <int> dismissals: Dialogs.dismissals;
+    visible: root.open;
+    changed open => {
+        root.selected = -1;
+    }
+    changed dismissals => {
+        root.open = false;
+    }
+
+    DialogPanel {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: parent.height - 16px;
+
+        VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing;
+            DialogHeader {
+                title: @tr("Exclude objects");
+                close => { root.open = false; }
+            }
+            HorizontalLayout {
+                vertical-stretch: 1;
+                spacing: Theme.spacing;
+                // Wrapper: the map keeps the bed's shape at the top of the column.
+                if Printer.bed-map.shown: Rectangle {
+                    width: root.map-width;
+                    BedMap {
+                        y: 0;
+                        width: parent.width;
+                        height: parent.width * Printer.bed-map.depth / Printer.bed-map.width;
+                        selected <=> root.selected;
+                    }
+                }
+                objects-list := ScrollList {
+                    vertical-stretch: 1;
+                    content-height: Printer.print-objects.length * (Theme.touch + Theme.spacing);
+                    for item[index] in Printer.print-objects: Rectangle {
+                        x: 8px;
+                        y: index * (Theme.touch + Theme.spacing);
+                        width: objects-list.row-width - 16px;
+                        height: Theme.touch;
+                        background: item.excluded ? Theme.background : Theme.surface-raised;
+                        border-radius: Theme.radius;
+                        border-width: index == root.selected ? 2px : 0px;
+                        border-color: Theme.foreground;
+                        HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            spacing: 12px;
+                            // Long names wrap onto a second line instead of being cut short.
+                            Text {
+                                horizontal-stretch: 1;
+                                text: item.name;
+                                color: item.excluded ? Theme.disabled-foreground : Theme.foreground;
+                                font-size: Theme.font-normal;
+                                vertical-alignment: center;
+                                wrap: char-wrap;
+                                overflow: elide;
+                            }
+                            Text {
+                                text: item.excluded ? @tr("Excluded") : item.printing ? @tr("Printing") : "";
+                                color: item.printing && !item.excluded ? Theme.accent : Theme.muted;
+                                font-size: Theme.font-small;
+                                vertical-alignment: center;
+                            }
+                        }
+                        TouchArea {
+                            clicked => { root.selected = index; }
+                        }
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: Theme.spacing;
+                height: Theme.touch;
+                if Printer.bed-map.shown: BedMapLegend {
+                    width: root.map-width;
+                }
+                IconButton {
+                    text: @tr("Exclude");
+                    icon: Icons.print-exclude-object;
+                    horizontal: true;
+                    kind: ButtonKind.danger;
+                    enabled: Printer.is-printing && root.has-selection && !root.chosen.excluded;
+                    clicked => { Actions.exclude-object(root.chosen.name); }
+                }
+            }
+        }
+    }
+}
+
+// Plans a pause at a layer with Mainsail's macros: one counter from the next layer on, the core picks the macro.
+// What is planned shows if the macros' variables tell it; otherwise "Clear" is always offered.
+export component LayerPauseDialog inherits Scrim {
+    property <bool> shown;
+    property <int> layer;
+    property <int> first-layer: Printer.current-layer + 1;
+    // Only the next layer without SET_PAUSE_AT_LAYER; without a reported total the layer has no upper limit.
+    property <int> last-layer: !Printer.layer-pause-at ? root.first-layer : Printer.total-layers > 0 ? Printer.total-layers : 999999;
+    // The chosen layer, never one the print has reached meanwhile.
+    property <int> target: max(root.first-layer, min(root.last-layer, root.layer));
+    property <bool> next-layer: root.target == root.first-layer;
+    property <string> target-height: Actions.height-at-layer(root.target);
+    // A tap on the status bar or the navigation closes the dialog without planning a pause.
+    property <int> dismissals: Dialogs.dismissals;
+    visible: root.shown && (Printer.layer-pause-next || Printer.layer-pause-at);
+
+    changed dismissals => {
+        root.shown = false;
+    }
+
+    public function open() {
+        root.layer = root.first-layer;
+        root.shown = true;
+    }
+
+    function step(delta: int) {
+        root.layer = max(root.first-layer, min(root.last-layer, root.target + delta));
+    }
+
+    DialogPanel {
+        width: min(parent.width - 16px, 520px);
+        height: content.preferred-height;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+
+        content := VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing;
+            DialogHeader {
+                title: @tr("Pause at a layer");
+                close => { root.shown = false; }
+            }
+            Text {
+                text: (Printer.total-layers > 0 ? @tr("Now at layer {} of {}", Printer.current-layer, Printer.total-layers) : @tr("Now at layer {}", Printer.current-layer)) + (Printer.print-heights != "" ? " · " + Printer.print-heights : "");
+                color: Theme.muted;
+                font-size: Theme.font-small;
+            }
+            if Printer.layer-pause-planned != "": Text {
+                text: Printer.layer-pause-planned == "next" ? @tr("Planned: pause at the next layer") : @tr("Planned: pause at layer {}", Printer.layer-pause-planned);
+                color: Theme.accent;
+                font-size: Theme.font-small;
+            }
+            if Printer.layer-pause-at: HorizontalLayout {
+                spacing: Theme.spacing;
+                IconButton {
+                    text: "−10";
+                    clicked => { root.step(-10); }
+                }
+                IconButton {
+                    icon: Icons.ui-minus;
+                    clicked => { root.step(-1); }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    Text {
+                        text: root.target;
+                        color: Theme.foreground;
+                        font-size: Theme.font-large;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                    }
+                    // A layer ahead has a predicted height; the next layer also says so.
+                    Text {
+                        text: root.next-layer ? (root.target-height != "" ? @tr("next layer · {}", root.target-height) : @tr("next layer")) : root.target-height;
+                        color: Theme.muted;
+                        font-size: Theme.font-small;
+                        horizontal-alignment: center;
+                    }
+                }
+                IconButton {
+                    icon: Icons.ui-plus;
+                    clicked => { root.step(1); }
+                }
+                IconButton {
+                    text: "+10";
+                    clicked => { root.step(10); }
+                }
+            }
+            IconButton {
+                icon: Icons.print-pause;
+                text: root.next-layer ? @tr("Pause at the next layer") : @tr("Pause at layer {}", root.target);
+                horizontal: true;
+                kind: ButtonKind.accent;
+                clicked => {
+                    Actions.pause-at-layer(root.target);
+                    root.shown = false;
+                }
+            }
+            if !Printer.layer-pause-plan-known || Printer.layer-pause-planned != "": IconButton {
+                icon: Icons.ui-delete;
+                text: @tr("Clear planned pause");
+                horizontal: true;
+                clicked => {
+                    Actions.clear-layer-pause();
+                    root.shown = false;
+                }
+            }
+        }
+    }
+}

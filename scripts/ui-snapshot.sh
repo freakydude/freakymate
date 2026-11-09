@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Renders the pages of the Slint UI headless as PNG against a freshly started fake Moonraker.
-# WSL2/Linux counterpart of ui-snapshot.ps1.
 # Usage (repo root): scripts/ui-snapshot.sh [-o <folder>] [-p voron] [-s 800x480] [-F] [-S pages,network] [-P 7126]
 # -P: port of its own fake; 7126 by default, so a fake on Moonraker's 7125 (the debug setup) is left alone.
 # -F: no fit; the window of the given size without scaling the layout to 800x480 (as a desktop window; at least

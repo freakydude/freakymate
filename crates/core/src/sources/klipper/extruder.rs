@@ -1,6 +1,6 @@
 //! The extruder beside its heater: pressure advance, whether it may move, and its limits from the configuration.
 
-use super::fields::{flag, number};
+use crate::sources::fields::{flag, number};
 use serde_json::Value;
 
 /// Lengths in mm the Filament page offers for extruding by hand.

@@ -1,0 +1,21 @@
+// Preview: the on-screen keyboard in the text entry dialog, as it opens for a Wi-Fi password.
+// Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { TextEntryDialog } from "../components/entry-dialogs.slint";
+import { Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component TextEntryPreview inherits AppWindow {
+    TextEntryDialog {
+        open: true;
+        title: "Password";
+        secret: true;
+        text: "hunter2";
+    }
+
+    init => {
+        Sample.managed-network();
+        Navigation.page = Page.network;
+    }
+}

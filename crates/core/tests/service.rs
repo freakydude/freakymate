@@ -203,7 +203,7 @@ async fn sets_the_filament_of_a_gate_and_loads_it() {
     })
     .await;
     let gate = &snapshot.status.mmu.unwrap().gates[1];
-    assert_eq!((gate.material.as_str(), gate.color), ("PETG", Some([0xff, 0x80, 0x00])));
+    assert_eq!((gate.material.as_str(), gate.color), ("PETG", Some([0xff, 0x80, 0x00, 0xff])));
     assert_eq!(gate.temperature, temperature);
 }
 
@@ -270,8 +270,8 @@ async fn intents_the_printer_cannot_carry_out_are_reported() {
     service.send(Command::Level);
     let refused = next_event(&mut channels, |event| matches!(event, Event::CommandFailed { .. })).await;
 
-    assert!(matches!(refused, Event::CommandFailed { command, message }
-        if command == "Level" && message.contains("neither quad gantry level nor Z tilt")));
+    assert!(matches!(refused, Event::CommandFailed { command: Command::Level, error }
+        if error.to_string().contains("neither quad gantry level nor Z tilt")));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -288,8 +288,10 @@ async fn a_command_that_waits_long_for_its_answer_is_reported_as_running_until_i
         matches!(event, Event::CommandRunning { .. } | Event::CommandFinished { .. })
     })
     .await;
-    let Event::CommandRunning { id, command } = running else { panic!("expected a running command, got {running:?}") };
-    assert_eq!(command, "G4 P1500");
+    let Event::CommandRunning { id, script_line, .. } = running else {
+        panic!("expected a running command, got {running:?}")
+    };
+    assert_eq!(script_line.as_deref(), Some("G4 P1500"));
 
     let finished = next_event(&mut channels, |event| matches!(event, Event::CommandFinished { .. })).await;
     assert_eq!(finished, Event::CommandFinished { id });
@@ -450,10 +452,10 @@ async fn runs_print_job_and_loads_file_details() {
 
     service.send(Command::RestartService { service: "klipper".into() });
     let refused = next_event(&mut channels, |event| matches!(event, Event::CommandFailed { .. })).await;
-    assert!(matches!(refused, Event::CommandFailed { message, .. } if message.contains("print is running")));
+    assert!(matches!(refused, Event::CommandFailed { error, .. } if error.to_string().contains("print is running")));
     service.send(Command::Jog { axis: Axis::X, distance: 10.0 });
     let refused = next_event(&mut channels, |event| matches!(event, Event::CommandFailed { .. })).await;
-    assert!(matches!(refused, Event::CommandFailed { message, .. } if message.contains("moving the machine")));
+    assert!(matches!(refused, Event::CommandFailed { error, .. } if error.to_string().contains("moving the machine")));
 
     service.send(Command::CancelPrint);
     wait_for(&mut channels, |snapshot| snapshot.status.job.state == PrintState::Cancelled).await;
@@ -517,7 +519,7 @@ async fn reports_errors_and_recovers_from_emergency_stop() {
 
     service.send(Command::RunGcode { script: "G1 X10".into() });
     let failure = next_event(&mut channels, |event| matches!(event, Event::CommandFailed { .. })).await;
-    assert!(matches!(failure, Event::CommandFailed { message, .. } if message == "Must home axis first"));
+    assert!(matches!(failure, Event::CommandFailed { error, .. } if error.to_string() == "Must home axis first"));
 
     service.send(Command::EmergencyStop);
     let snapshot = wait_for(&mut channels, |snapshot| snapshot.status.klippy_state == KlippyState::Shutdown).await;

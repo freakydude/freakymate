@@ -5,7 +5,9 @@
 //! [`domain`] answers questions that need several sources; [`service`] only collects. The entry point is
 //! [`PrinterService`]; the UI reads [`Snapshot`]s and [`Event`]s and sends [`Command`]s.
 
+pub mod atomic_file;
 pub mod backlight;
+pub mod color;
 pub mod commands;
 pub mod credentials;
 pub mod domain;

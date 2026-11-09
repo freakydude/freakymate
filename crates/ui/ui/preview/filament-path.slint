@@ -19,31 +19,31 @@ export component FilamentPathPreview inherits Window {
         spacing: Theme.spacing;
         State {
             caption: "Unloaded, parked in gate 0 (filament_pos 0)";
-            FilamentPath { path: { bowden-progress: -1, position: 0, color: #e31f2b, gate-label: "Gate 0", gate-entry-sensor: 1, gate-sensor: 1, extruder-sensor: 0, toolhead-sensor: 0, distance: "0.0 mm", color-count: 1 }; }
+            FilamentPath { path: { bowden-progress: -1, position: 0, colors: { first: #e31f2b, count: 1 }, gate-label: "Gate 0", gate-entry-sensor: 1, gate-sensor: 1, extruder-sensor: 0, toolhead-sensor: 0, distance: "0.0 mm" }; }
         }
         State {
             caption: "Loading through the bowden (filament_pos 3, direction 1)";
-            FilamentPath { path: { bowden-progress: -1, position: 3, direction: 1, color: #2f9e44, gate-label: "Gate 1", gate-entry-sensor: 1, gate-sensor: 1, extruder-sensor: 0, toolhead-sensor: 0, distance: "412.6 mm", color-count: 1 }; }
+            FilamentPath { path: { bowden-progress: -1, position: 3, direction: 1, colors: { first: #2f9e44, count: 1 }, gate-label: "Gate 1", gate-entry-sensor: 1, gate-sensor: 1, extruder-sensor: 0, toolhead-sensor: 0, distance: "412.6 mm" }; }
         }
         State {
             caption: "Coaxial three colours, at the toolhead sensor (filament_pos 8)";
-            FilamentPath { path: { bowden-progress: -1, position: 8, direction: 1, color: #ff0004, color-2: #ffa424, color-3: #000000, color-count: 3, gate-label: "Gate 2", gate-entry-sensor: 1, gate-sensor: 1, extruder-sensor: 1, toolhead-sensor: 1, distance: "1712.4 mm" }; }
+            FilamentPath { path: { bowden-progress: -1, position: 8, direction: 1, colors: { first: #ff0004, second: #ffa424, third: #000000, count: 3 }, gate-label: "Gate 2", gate-entry-sensor: 1, gate-sensor: 1, extruder-sensor: 1, toolhead-sensor: 1, distance: "1712.4 mm" }; }
         }
         State {
             caption: "Longitudinal two colours, in the extruder (filament_pos 7)";
-            FilamentPath { path: { bowden-progress: -1, position: 7, direction: 1, color: #7048e8, color-2: #15aabf, color-count: 2, longitudinal: true, gate-label: "Gate 3", gate-entry-sensor: 1, gate-sensor: 1, extruder-sensor: 1, toolhead-sensor: 0, distance: "1690.0 mm" }; }
+            FilamentPath { path: { bowden-progress: -1, position: 7, direction: 1, colors: { first: #7048e8, second: #15aabf, count: 2, longitudinal: true }, gate-label: "Gate 3", gate-entry-sensor: 1, gate-sensor: 1, extruder-sensor: 1, toolhead-sensor: 0, distance: "1690.0 mm" }; }
         }
         State {
             caption: "Loaded, unloading starts (filament_pos 10, direction -1)";
-            FilamentPath { path: { bowden-progress: -1, position: 10, direction: -1, color: #e31f2b, gate-label: "Gate 0", gate-entry-sensor: 1, gate-sensor: 1, extruder-sensor: 1, toolhead-sensor: 1, distance: "-12.0 mm", color-count: 1 }; }
+            FilamentPath { path: { bowden-progress: -1, position: 10, direction: -1, colors: { first: #e31f2b, count: 1 }, gate-label: "Gate 0", gate-entry-sensor: 1, gate-sensor: 1, extruder-sensor: 1, toolhead-sensor: 1, distance: "-12.0 mm" }; }
         }
         State {
             caption: "No sensors fitted (all are optional), loaded";
-            FilamentPath { path: { bowden-progress: -1, position: 10, color: #e31f2b, gate-label: "Gate 0", gate-entry-sensor: -1, gate-sensor: -1, extruder-sensor: -1, toolhead-sensor: -1, distance: "1712.4 mm", color-count: 1 }; }
+            FilamentPath { path: { bowden-progress: -1, position: 10, colors: { first: #e31f2b, count: 1 }, gate-label: "Gate 0", gate-entry-sensor: -1, gate-sensor: -1, extruder-sensor: -1, toolhead-sensor: -1, distance: "1712.4 mm" }; }
         }
         State {
             caption: "Only a toolhead sensor, in the bowden";
-            FilamentPath { path: { position: 3, direction: 1, bowden-progress: 0.7, color: #2f9e44, gate-label: "Gate 1", gate-entry-sensor: -1, gate-sensor: -1, extruder-sensor: -1, toolhead-sensor: 0, distance: "1202.0 mm", color-count: 1 }; }
+            FilamentPath { path: { position: 3, direction: 1, bowden-progress: 0.7, colors: { first: #2f9e44, count: 1 }, gate-label: "Gate 1", gate-entry-sensor: -1, gate-sensor: -1, extruder-sensor: -1, toolhead-sensor: 0, distance: "1202.0 mm" }; }
         }
         Rectangle { vertical-stretch: 1; }
     }

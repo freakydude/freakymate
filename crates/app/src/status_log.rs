@@ -19,9 +19,9 @@ const INFO_PER_CHARACTER: Duration = Duration::from_millis(70);
 const MAX_INFO_DISPLAY: Duration = Duration::from_secs(15);
 
 /// Layout of the flyout list, in logical pixels: a message row has the symbol before and the time after its text.
-pub const ROW_GAP: f32 = 6.0;
+const ROW_GAP: f32 = 6.0;
 /// Height of a section heading ("New", "Earlier") including the gap below it.
-pub const SECTION_HEIGHT: f32 = 24.0;
+const SECTION_HEIGHT: f32 = 24.0;
 const LINE_HEIGHT: f32 = 22.0;
 const ROW_PADDING: f32 = 20.0;
 /// Roughly what fits into the width of the flyout at the normal font size, beside the symbol and the time.
@@ -58,6 +58,8 @@ pub struct StatusLog {
     last_failure: Option<(String, f64)>,
     /// The last `!!` response (id, text, time): it may arrive before the rejection it repeats.
     last_error_response: Option<(u64, String, f64)>,
+    /// What the status bar's summary showed last (connection, Klipper and print state), to notice a change.
+    state: Option<String>,
 }
 
 impl StatusLog {
@@ -153,6 +155,21 @@ impl StatusLog {
         }
     }
 
+    /// Tells the log the state the summary shows. When it changes, an information in the status bar ends at once,
+    /// as the state speaks for itself; it stays in the list. An error keeps its display time. Returns whether the
+    /// event was ended.
+    pub fn note_state(&mut self, state: &str) -> bool {
+        let changed = self.state.as_deref().is_some_and(|last| last != state);
+        if self.state.as_deref() != Some(state) {
+            self.state = Some(state.to_owned());
+        }
+        let information_shown = self.event().is_some_and(|message| !message.is_error);
+        if changed && information_shown {
+            self.event = None;
+        }
+        changed && information_shown
+    }
+
     pub fn clear(&mut self) {
         self.messages.clear();
         self.event = None;
@@ -164,6 +181,52 @@ impl StatusLog {
 pub fn row_height(text: &str) -> f32 {
     let lines: usize = text.lines().map(|line| line.chars().count().div_ceil(CHARACTERS_PER_LINE).max(1)).sum();
     lines.clamp(1, MAX_LINES) as f32 * LINE_HEIGHT + ROW_PADDING
+}
+
+/// A message of the flyout list with its place: rows are laid out by hand, as the list scrolls and sections vary.
+#[derive(Debug, PartialEq)]
+pub struct Placed<'a> {
+    pub message: &'a Message,
+    pub new: bool,
+    /// Distance from the top of the list, in logical pixels.
+    pub top: f32,
+    pub height: f32,
+}
+
+/// The flyout list: newest first, a heading for "New" and one for "Earlier" when there are such messages.
+#[derive(Debug, PartialEq)]
+pub struct Layout<'a> {
+    pub rows: Vec<Placed<'a>>,
+    /// Height of the whole list.
+    pub height: f32,
+    pub has_new: bool,
+    pub has_earlier: bool,
+    /// Where the "Earlier" heading sits; zero without earlier messages.
+    pub earlier_top: f32,
+}
+
+impl StatusLog {
+    pub fn layout(&self) -> Layout<'_> {
+        let has_new = self.messages().any(|message| self.is_new(message));
+        let has_earlier = self.messages().any(|message| !self.is_new(message));
+        let mut top = if has_new { SECTION_HEIGHT } else { 0.0 };
+        let mut earlier_top = -1.0;
+        let rows = self
+            .messages()
+            .map(|message| {
+                let new = self.is_new(message);
+                if !new && earlier_top < 0.0 {
+                    earlier_top = top;
+                    top += SECTION_HEIGHT;
+                }
+                let height = row_height(&message.text);
+                let placed = Placed { message, new, top, height };
+                top += height + ROW_GAP;
+                placed
+            })
+            .collect();
+        Layout { rows, height: top, has_new, has_earlier, earlier_top: earlier_top.max(0.0) }
+    }
 }
 
 /// How long a message stays in the status bar as an event.
@@ -284,6 +347,35 @@ mod tests {
     }
 
     #[test]
+    fn the_layout_puts_new_messages_first_and_a_heading_before_the_earlier_ones() {
+        let mut log = StatusLog::default();
+        log.add("old", false, 1.0);
+        log.open_list();
+        log.close_list();
+        log.add("fresh", false, 2.0);
+
+        let layout = log.layout();
+
+        let row = row_height("fresh");
+        assert!(layout.has_new && layout.has_earlier);
+        let tops: Vec<f32> = layout.rows.iter().map(|placed| placed.top).collect();
+        assert_eq!(tops, [SECTION_HEIGHT, SECTION_HEIGHT + row + ROW_GAP + SECTION_HEIGHT]);
+        assert_eq!(layout.earlier_top, SECTION_HEIGHT + row + ROW_GAP);
+        assert_eq!(layout.height, 2.0 * SECTION_HEIGHT + 2.0 * (row + ROW_GAP));
+        assert_eq!(layout.rows.iter().map(|placed| placed.new).collect::<Vec<_>>(), [true, false]);
+    }
+
+    #[test]
+    fn the_layout_of_an_empty_log_is_empty() {
+        let log = StatusLog::default();
+
+        let layout = log.layout();
+
+        assert!(layout.rows.is_empty() && !layout.has_new && !layout.has_earlier);
+        assert_eq!((layout.height, layout.earlier_top), (0.0, 0.0));
+    }
+
+    #[test]
     fn row_height_grows_with_wrapped_lines_up_to_a_limit() {
         let frame = ROW_PADDING;
         assert_eq!(row_height("short"), 22.0 + frame);
@@ -336,6 +428,21 @@ mod tests {
         assert_eq!(log.event().map(Message::headline), Some("fault"));
         log.hide_event(error);
         assert!(log.event().is_none());
+    }
+
+    #[test]
+    fn a_state_change_ends_an_information_but_not_an_error() {
+        let mut log = StatusLog::default();
+        assert!(!log.note_state("ready printing"), "the first state is only remembered");
+        log.add("Pause at the next layer sent", false, 1.0);
+        assert!(!log.note_state("ready printing"), "no change, the information stays");
+        assert!(log.event().is_some());
+        assert!(log.note_state("ready cancelled"));
+        assert!(log.event().is_none());
+        assert_eq!(log.messages().count(), 1, "the message stays in the list");
+        log.add("Move out of range", true, 2.0);
+        assert!(!log.note_state("ready standby"));
+        assert!(log.event().is_some_and(|message| message.is_error));
     }
 
     #[test]

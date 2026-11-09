@@ -1,6 +1,7 @@
 //! The console: Moonraker's `gcode_store` of earlier lines and the responses Klipper sends as they come.
 
-use serde_json::Value;
+use crate::moonraker::Call;
+use serde_json::{json, Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConsoleKind {
@@ -87,6 +88,14 @@ pub fn strip_markup(text: &str) -> String {
     }
     plain.push_str(rest);
     plain.replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&amp;", "&")
+}
+
+/// Lines of the console history the display asks for.
+const CONSOLE_HISTORY: u32 = 100;
+
+/// `server.gcode_store`.
+pub fn history_call() -> Call {
+    Call::with("server.gcode_store", json!({ "count": CONSOLE_HISTORY }))
 }
 
 pub fn parse_gcode_store(result: &Value) -> Vec<ConsoleLine> {

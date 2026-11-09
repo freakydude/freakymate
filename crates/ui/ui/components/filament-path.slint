@@ -4,7 +4,7 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { ColorBar } from "controls.slint";
-import { FilamentPathItem } from "../state.slint";
+import { BarColors, FilamentPathItem } from "../state.slint";
 
 // A sensor on the way: -1 not fitted (not drawn), 0 free (dim), 1 triggered (bright). The symbol, not a coloured dot,
 // so it stands out from any filament colour.
@@ -19,11 +19,7 @@ component SensorMark inherits Image {
 // One piece of tube, filled to `fill` (0 to 1) from the left in the colours of the filament (see `ColorBar`).
 component Tube inherits Rectangle {
     in property <float> fill;
-    in property <color> filament;
-    in property <color> filament-2;
-    in property <color> filament-3;
-    in property <int> colors: 1;
-    in property <bool> longitudinal;
+    in property <BarColors> filament;
     height: 10px;
     border-radius: 5px;
     background: Theme.surface-raised;
@@ -34,11 +30,7 @@ component Tube inherits Rectangle {
         width: max(root.height, parent.width * clamp(root.fill, 0, 1));
         height: parent.height;
         border-radius: parent.border-radius;
-        first: root.filament;
-        second: root.filament-2;
-        third: root.filament-3;
-        count: root.colors;
-        longitudinal: root.longitudinal;
+        colors: root.filament;
         generic: true;
     }
 }
@@ -61,8 +53,16 @@ export component FilamentPath inherits VerticalLayout {
     property <int> direction: root.path.direction;
     property <string> distance: root.compact ? "" : root.path.distance;
     // Unknown position, or a gate without colour: a neutral filament.
-    property <bool> neutral: root.position < 0 || root.path.color-count < 1;
-    property <color> line-color: root.neutral ? Theme.muted : root.path.color;
+    property <bool> neutral: root.position < 0 || root.path.colors.count < 1;
+    // The colours of the tubes: the neutral line colour, or the filament's own colours.
+    property <BarColors> tube-colors: {
+        first: root.line-color,
+        second: root.path.colors.second,
+        third: root.path.colors.third,
+        count: root.neutral ? 1 : root.path.colors.count,
+        longitudinal: root.path.colors.longitudinal,
+    };
+    property <color> line-color: root.neutral ? Theme.muted : root.path.colors.first;
 
     // How far each piece is filled at the current position.
     pure function fill(piece: int) -> float {
@@ -80,11 +80,11 @@ export component FilamentPath inherits VerticalLayout {
         return root.position >= 10 ? 1 : root.position == 9 ? 0.5 : 0;
     }
 
-    spacing: 4px;
+    spacing: Theme.spacing-small;
 
     // Symbols, tubes and distance all sit on the middle line of the row.
     HorizontalLayout {
-        spacing: 4px;
+        spacing: Theme.spacing-small;
         alignment: stretch;
         cross-axis-alignment: center;
         // Direction of movement at the left: the gate pushes or pulls.
@@ -98,24 +98,24 @@ export component FilamentPath inherits VerticalLayout {
         }
         // Where the filament enters the gate from the spool.
         SensorMark { state: root.path.gate-entry-sensor; }
-        Tube { horizontal-stretch: 1; fill: root.fill(0); filament: root.line-color; filament-2: root.path.color-2; filament-3: root.path.color-3; colors: root.neutral ? 1 : root.path.color-count; longitudinal: root.path.longitudinal; }
+        Tube { horizontal-stretch: 1; fill: root.fill(0); filament: root.tube-colors; }
         SensorMark { state: root.path.gate-sensor; }
-        Tube { horizontal-stretch: 5; fill: root.fill(1); filament: root.line-color; filament-2: root.path.color-2; filament-3: root.path.color-3; colors: root.neutral ? 1 : root.path.color-count; longitudinal: root.path.longitudinal; }
-        Tube { horizontal-stretch: 1; fill: root.fill(2); filament: root.line-color; filament-2: root.path.color-2; filament-3: root.path.color-3; colors: root.neutral ? 1 : root.path.color-count; longitudinal: root.path.longitudinal; }
+        Tube { horizontal-stretch: 5; fill: root.fill(1); filament: root.tube-colors; }
+        Tube { horizontal-stretch: 1; fill: root.fill(2); filament: root.tube-colors; }
         SensorMark { state: root.path.extruder-sensor; }
         // The extruder gears: lit once the filament has reached them (6) or they have it (7 and on).
         Image {
-            width: 22px;
-            height: 22px;
+            width: Theme.icon-medium;
+            height: Theme.icon-medium;
             source: Icons.filament-extruder-gears;
             colorize: root.position >= 6 ? root.line-color : Theme.muted;
         }
-        Tube { horizontal-stretch: 1; fill: root.fill(3); filament: root.line-color; filament-2: root.path.color-2; filament-3: root.path.color-3; colors: root.neutral ? 1 : root.path.color-count; longitudinal: root.path.longitudinal; }
+        Tube { horizontal-stretch: 1; fill: root.fill(3); filament: root.tube-colors; }
         SensorMark { state: root.path.toolhead-sensor; }
-        Tube { horizontal-stretch: 1; fill: root.fill(4); filament: root.line-color; filament-2: root.path.color-2; filament-3: root.path.color-3; colors: root.neutral ? 1 : root.path.color-count; longitudinal: root.path.longitudinal; }
+        Tube { horizontal-stretch: 1; fill: root.fill(4); filament: root.tube-colors; }
         Image {
-            width: 22px;
-            height: 22px;
+            width: Theme.icon-medium;
+            height: Theme.icon-medium;
             source: Icons.thermal-nozzle;
             colorize: root.position >= 10 ? root.line-color : Theme.muted;
         }

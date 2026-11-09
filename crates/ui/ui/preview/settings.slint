@@ -1,0 +1,12 @@
+// Preview: the Settings page. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component SettingsPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.settings;
+    }
+}

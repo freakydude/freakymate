@@ -5,9 +5,9 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, MeshDialogs, Printer } from "../state.slint";
-import { IconButton, ScrollList } from "controls.slint";
+import { ButtonKind, IconButton, Note, ScrollList } from "controls.slint";
 import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
-import { TextEntryDialog } from "overlays.slint";
+import { TextEntryDialog } from "entry-dialogs.slint";
 
 // Width of the legend beside the map in the dialog.
 global MeshLayout {
@@ -57,12 +57,6 @@ export component MeshMap inherits Rectangle {
         border-width: root.large ? 2px : 1px;
         border-color: Theme.foreground;
     }
-}
-
-component Note inherits Text {
-    color: Theme.muted;
-    font-size: Theme.font-small;
-    wrap: word-wrap;
 }
 
 // The range, the colour scale with its ends and what the marks in the map mean.
@@ -230,7 +224,7 @@ export component BedMeshProfilesDialog inherits Scrim {
                 IconButton {
                     width: 180px;
                     horizontal: true;
-                    kind: "accent";
+                    kind: ButtonKind.accent;
                     icon: Icons.ui-save;
                     text: @tr("Save as…");
                     enabled: Printer.bed-mesh-map.shown;

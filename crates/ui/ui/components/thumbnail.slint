@@ -1,0 +1,25 @@
+// Preview image of a G-code file, with a placeholder icon while there is none.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+
+export component Thumbnail inherits Rectangle {
+    in property <image> source;
+    in property <bool> available;
+    background: Theme.surface-raised;
+    border-radius: Theme.radius;
+    clip: true;
+
+    if root.available: Image {
+        width: parent.width;
+        height: parent.height;
+        source: root.source;
+        image-fit: contain;
+    }
+    if !root.available: Image {
+        source: Icons.file-gcode;
+        colorize: Theme.disabled-foreground;
+        width: parent.width / 3;
+        height: parent.width / 3;
+    }
+}
