@@ -298,7 +298,10 @@ export struct PowerItem {
 }
 
 export struct UpdateItem {
+    // Section name in Moonraker's update manager, the key for `machine.update.upgrade`.
     name: string,
+    // Shown name (`klipper` → `Klipper`).
+    label: string,
     version: string,
     detail: string,
     has-update: bool,

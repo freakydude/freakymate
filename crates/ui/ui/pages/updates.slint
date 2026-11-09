@@ -37,7 +37,7 @@ export component UpdatesPage inherits Rectangle {
                     VerticalLayout {
                         horizontal-stretch: 1;
                         alignment: center;
-                        Text { text: update.name; color: Theme.foreground; font-size: Theme.font-normal; overflow: elide; }
+                        Text { text: update.label; color: Theme.foreground; font-size: Theme.font-normal; overflow: elide; }
                         if update.up-to-date: IconLabel { icon: Icons.ui-check; text: update.detail; color: Theme.success; font-size: Theme.font-small; icon-size: 14px; }
                         if !update.up-to-date: Text { text: update.detail; color: update.has-update ? Theme.warning : Theme.muted; font-size: Theme.font-small; overflow: elide; }
                     }
@@ -50,7 +50,7 @@ export component UpdatesPage inherits Rectangle {
                         horizontal: true;
                         text: @tr("Update");
                         enabled: update.has-update && !Printer.host-actions-locked;
-                        clicked => { Confirm.ask(@tr("Update {}", update.name), update.detail, "upgrade", update.name, false); }
+                        clicked => { Confirm.ask(@tr("Update {}", update.label), update.detail, "upgrade", update.name, false); }
                     }
                 }
             }

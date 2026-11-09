@@ -80,10 +80,18 @@ impl Host {
         })
     }
 
-    pub fn upgrade(&mut self, name: Option<&str>) {
+    /// `machine.update.upgrade`: like Moonraker, refuses a name that is not exactly a section of the update manager
+    /// (`Freakymate` for `freakymate` fails); without a name everything is updated.
+    pub fn upgrade(&mut self, name: Option<&str>) -> Result<(), String> {
+        if let Some(name) = name {
+            if self.update_status()["version_info"].get(name).is_none() {
+                return Err(format!("Updater {name} not available"));
+            }
+        }
         if matches!(name, None | Some("klipper")) {
             self.klipper_updated = true;
         }
+        Ok(())
     }
 
     /// Subset of `machine.system_info`: distribution and network interfaces.
@@ -145,9 +153,17 @@ mod tests {
         let mut host = Host::default();
         assert_eq!(host.update_status()["version_info"]["klipper"]["commits_behind_count"], 20);
 
-        host.upgrade(Some("klipper"));
+        host.upgrade(Some("klipper")).unwrap();
 
         assert_eq!(host.update_status()["version_info"]["klipper"]["version"], "v0.13.0-120");
+    }
+
+    #[test]
+    fn upgrade_refuses_a_name_that_is_not_exactly_a_section() {
+        let mut host = Host::default();
+
+        assert_eq!(host.upgrade(Some("Freakymate")), Err("Updater Freakymate not available".to_owned()));
+        assert_eq!(host.upgrade(Some("freakymate")), Ok(()));
     }
 
     #[test]

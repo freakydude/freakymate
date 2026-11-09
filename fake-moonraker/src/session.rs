@@ -189,10 +189,10 @@ impl Session {
             "machine.device_power.devices" => Ok(backend.with_host(|host| host.power_devices())),
             "machine.device_power.post_device" => set_power(backend, params),
             "machine.update.status" | "machine.update.refresh" => Ok(backend.with_host(|host| host.update_status())),
-            "machine.update.upgrade" => {
-                backend.with_host(|host| host.upgrade(params.get("name").and_then(Value::as_str)));
-                Ok(ok())
-            }
+            "machine.update.upgrade" => backend
+                .with_host(|host| host.upgrade(params.get("name").and_then(Value::as_str)))
+                .map(|()| ok())
+                .map_err(|message| RpcError::new(METHOD_NOT_FOUND, message)),
             "machine.services.restart" | "machine.reboot" | "machine.shutdown" => Ok(ok()),
             "machine.system_info" => Ok(backend.with_host(|host| host.system_info())),
             "server.temperature_store" => Ok(backend.with_printer(|printer| printer.temperature_store())),
