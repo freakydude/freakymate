@@ -273,7 +273,7 @@ fn remedy_sentence(remedy: &Remedy) -> String {
         Remedy::UseGate(gates) if gates.len() == 1 => {
             format!("Gate {} holds what the file wants: choose it below.", gates[0])
         }
-        Remedy::UseGate(gates) => format!("Gates {} hold what the file wants: choose one below.", enumeration(gates)),
+        Remedy::UseGate(gates) => format!("Gates {} hold what the file wants: choose one of them.", enumeration(gates)),
         Remedy::LoadGate(gate) => format!(
             "Load fitting filament into gate {gate}. If it holds it already, correct its spool, material or colour."
         ),
@@ -815,7 +815,7 @@ mod tests {
 
         assert_eq!(
             remedy_text(&remedies),
-            "Gates 0, 2 and 5 hold what the file wants: choose one below.\nLoad fitting filament into gate 3. If it \
+            "Gates 0, 2 and 5 hold what the file wants: choose one of them.\nLoad fitting filament into gate 3. If it \
              holds it already, correct its spool, material or colour."
         );
         assert_eq!(remedy_text(&[Remedy::UseGate(vec![1])]), "Gate 1 holds what the file wants: choose it below.");

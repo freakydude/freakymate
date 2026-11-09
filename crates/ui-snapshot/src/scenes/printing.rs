@@ -54,6 +54,9 @@ fn tool_advice(session: &mut Session) -> Result<(), String> {
     session.window.global::<MmuDialogs>().set_tool(0);
     session.show_page(Page::Filament, "filament-mmu-tool-advice")?;
     session.window.global::<MmuDialogs>().set_tool(-1);
+    session.window.global::<MmuDialogs>().set_tool_gate(0);
+    session.show_page(Page::Filament, "filament-mmu-tool-gate-advice")?;
+    session.window.global::<MmuDialogs>().set_tool_gate(-1);
     let tool = session.window.global::<Printer>().get_mmu_tools().row_data(0).unwrap_or_default();
     session.window.global::<Actions>().invoke_mmu_map_tool(0, 0);
     session.wait_until("T0 back on gate 0", |snapshot| tool_0_gate(snapshot) == Some(0))?;
