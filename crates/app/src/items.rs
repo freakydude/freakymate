@@ -133,7 +133,9 @@ pub(crate) fn update_item(update: &UpdateInfo) -> UpdateItem {
         update.version.clone()
     };
     UpdateItem {
-        name: format::service_name(&update.name).into(),
+        // Moonraker looks the section up by its exact name; only the label is capitalised.
+        name: update.name.as_str().into(),
+        label: format::service_name(&update.name).into(),
         version: update.version.as_str().into(),
         detail: detail.into(),
         has_update: update.has_update(),
@@ -330,5 +332,15 @@ mod tests {
         assert!(!std::ptr::addr_eq(first.as_any(), changed.as_any()));
         assert_eq!(changed.iter().collect::<Vec<_>>(), [true, true]);
         assert_eq!(reuse_flags(None, None).row_count(), 0);
+    }
+
+    #[test]
+    fn update_items_keep_the_section_name_for_the_upgrade_and_capitalise_only_the_label() {
+        let update = UpdateInfo { name: "freakymate".into(), version: "0.4.5".into(), ..UpdateInfo::default() };
+
+        let item = update_item(&update);
+
+        assert_eq!(item.name, "freakymate");
+        assert_eq!(item.label, "Freakymate");
     }
 }
