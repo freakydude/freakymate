@@ -49,9 +49,9 @@ export component ConfirmDialog inherits Scrim {
                     background: Theme.surface-raised;
                     border-radius: Theme.radius;
                     HorizontalLayout {
-                        padding-left: 8px;
-                        padding-right: 8px;
-                        spacing: 8px;
+                        padding-left: Theme.padding;
+                        padding-right: Theme.padding;
+                        spacing: Theme.spacing;
                         Image {
                             cross-axis-self-alignment: center;
                             source: Icons.file-gcode;
@@ -76,8 +76,8 @@ export component ConfirmDialog inherits Scrim {
             // Column titles over the rows of the tools, aligned to FilamentCompareRow (padding, tool number, gaps).
             if Confirm.tools.length > 0: HorizontalLayout {
                 padding-left: 60px;
-                padding-right: 10px;
-                spacing: 10px;
+                padding-right: Theme.dialog-padding;
+                spacing: Theme.spacing;
                 Text {
                     horizontal-stretch: 1;
                     text: @tr("File");

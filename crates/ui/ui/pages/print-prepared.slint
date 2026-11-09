@@ -2,6 +2,7 @@
 // nothing here keeps the print from starting.
 
 import { Theme } from "../theme.slint";
+import { ToolLabel } from "../components/tool-label.slint";
 import { Icons } from "../icons.slint";
 import { FilamentTab, MmuDialogs, ToolMatchItem, Navigation, Page, Printer, SpoolPicker } from "../state.slint";
 import { Card, ScrollList, ValueTile } from "../components/controls.slint";
@@ -21,11 +22,11 @@ component ToolChip inherits Rectangle {
         clicked => { root.clicked(); }
     }
     HorizontalLayout {
-        spacing: 6px;
-        padding-right: 8px;
+        spacing: Theme.spacing-medium;
+        padding-right: Theme.padding;
         // Wanted and loaded colour side by side, close together so they read as one field.
         HorizontalLayout {
-            spacing: 2px;
+            spacing: Theme.spacing-tight;
             FilamentSwatch {
                 width: 18px;
                 left-edge: true;
@@ -170,14 +171,11 @@ component ExtruderMatchCard inherits Card {
     }
 
     HorizontalLayout {
-        spacing: 6px;
+        spacing: Theme.spacing-medium;
         height: 56px;
-        Text {
+        ToolLabel {
             width: 40px;
-            text: "T" + root.first.tool;
-            color: Theme.accent;
-            font-size: 19px;
-            font-weight: 700;
+            tool: root.first.tool;
             horizontal-alignment: center;
             vertical-alignment: center;
         }
@@ -185,7 +183,7 @@ component ExtruderMatchCard inherits Card {
             horizontal-stretch: 1;
             min-width: 0px;
             preferred-width: 0px;
-            spacing: 8px;
+            spacing: Theme.spacing;
             FilamentSwatch {
                 width: 28px;
                 colors: root.first.wanted-colors;
@@ -209,7 +207,7 @@ component ExtruderMatchCard inherits Card {
             horizontal-stretch: 1;
             min-width: 0px;
             preferred-width: 0px;
-            spacing: 8px;
+            spacing: Theme.spacing;
             FilamentSwatch {
                 width: 28px;
                 colors: Printer.has-spool ? FilamentColors.generic(Printer.spool-colors) : Printer.spool-colors;

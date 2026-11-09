@@ -87,7 +87,7 @@ export component MmuGatesTab inherits Rectangle {
                 spacing: Theme.spacing;
                 VerticalLayout {
                     horizontal-stretch: 1;
-                    spacing: 8px;
+                    spacing: Theme.spacing;
                     // Gate to nozzle with the sensors on the way; further sensors below as chips.
                     FilamentPath { path: Printer.mmu-path; }
                     // Grid with equal columns, so every name gets the same width.
@@ -119,7 +119,7 @@ export component MmuGatesTab inherits Rectangle {
                         }
                         // The ends named beside the gauge, so the card keeps its height with the filament path above.
                         HorizontalLayout {
-                            spacing: 8px;
+                            spacing: Theme.spacing;
                             Text { text: @tr("Tension"); color: Theme.muted; font-size: Theme.font-small; vertical-alignment: center; }
                             gauge := BufferGauge {
                                 horizontal-stretch: 1;

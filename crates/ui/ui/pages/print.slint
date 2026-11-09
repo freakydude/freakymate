@@ -25,9 +25,9 @@ component InterruptionBanner inherits Rectangle {
     min-height: Theme.row-height-small;
 
     HorizontalLayout {
-        padding: 6px;
-        padding-left: 8px;
-        spacing: 8px;
+        padding: Theme.spacing-medium;
+        padding-left: Theme.padding;
+        spacing: Theme.spacing;
         Image {
             cross-axis-self-alignment: center;
             source: root.failed ? Icons.ui-error : Icons.print-pause;
@@ -37,9 +37,9 @@ component InterruptionBanner inherits Rectangle {
         }
         VerticalLayout {
             alignment: center;
-            spacing: 2px;
+            spacing: Theme.spacing-tight;
             HorizontalLayout {
-                spacing: 8px;
+                spacing: Theme.spacing;
                 Text {
                     text: root.failed ? @tr("Print failed") : @tr("Paused");
                     color: root.tone;
@@ -92,7 +92,7 @@ export component PrintPage inherits Rectangle {
             }
             // Progress of the printer's job; a prepared file has none yet.
             if !root.prepared && root.has-job: HorizontalLayout {
-                spacing: 10px;
+                spacing: Theme.spacing;
                 height: 48px;
                 Text {
                     text: round(Printer.progress * 100) + "%";

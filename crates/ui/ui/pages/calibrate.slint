@@ -127,7 +127,7 @@ component BedMeshCard inherits Card {
     if Printer.bed-mesh-map.shown: CardTile {
         clicked => { MeshDialogs.map-open = true; }
         HorizontalLayout {
-            padding: 6px;
+            padding: Theme.spacing-medium;
             spacing: Theme.spacing;
             Rectangle {
                 width: 44px;
@@ -156,8 +156,8 @@ component BedMeshCard inherits Card {
     CardTile {
         clicked => { MeshDialogs.profiles-open = true; }
         HorizontalLayout {
-            padding-left: 12px;
-            padding-right: 8px;
+            padding-left: Theme.dialog-padding;
+            padding-right: Theme.padding;
             spacing: Theme.spacing;
             Text {
                 horizontal-stretch: 1;

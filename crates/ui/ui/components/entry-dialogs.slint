@@ -75,7 +75,7 @@ export component TextEntryDialog inherits Scrim {
                     Rectangle {
                         horizontal-stretch: 1;
                         background: Theme.background;
-                        border-radius: 6px;
+                        border-radius: Theme.radius-small;
                         border-width: 1px;
                         border-color: Theme.accent;
                         clip: true;
@@ -188,14 +188,14 @@ export component NumberEntryDialog inherits Scrim {
                 Rectangle {
                     height: Theme.touch;
                     background: Theme.background;
-                    border-radius: 6px;
+                    border-radius: Theme.radius-small;
                     border-width: 1px;
                     border-color: Theme.accent;
                     clip: true;
                     forward-focus: field;
                     HorizontalLayout {
-                        padding-left: 12px;
-                        padding-right: 12px;
+                        padding-left: Theme.dialog-padding;
+                        padding-right: Theme.dialog-padding;
                         spacing: Theme.spacing-medium;
                         field := TextInput {
                             horizontal-stretch: 1;

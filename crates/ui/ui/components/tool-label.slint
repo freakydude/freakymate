@@ -1,0 +1,12 @@
+// The "T{n}" label of a tool in accent colour; the file's tools, the gates and the start dialog show it the same way.
+
+import { Theme } from "../theme.slint";
+
+export component ToolLabel inherits Text {
+    in property <int> tool;
+
+    text: "T" + root.tool;
+    color: Theme.accent;
+    font-size: Theme.font-tool;
+    font-weight: 700;
+}

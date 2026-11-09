@@ -42,9 +42,9 @@ component FileRow inherits Rectangle {
         clicked => { root.clicked(); }
     }
     HorizontalLayout {
-        padding: 4px;
+        padding: Theme.spacing-small;
         padding-left: root.show-thumbnail ? 4px : 14px;
-        spacing: 10px;
+        spacing: Theme.spacing;
         if root.show-thumbnail: Thumbnail {
             width: 64px;
             source: root.thumbnail;
@@ -54,7 +54,7 @@ component FileRow inherits Rectangle {
             alignment: center;
             spacing: Theme.spacing-small;
             HorizontalLayout {
-                spacing: 10px;
+                spacing: Theme.spacing;
                 Text {
                     text: root.name;
                     color: Theme.foreground;

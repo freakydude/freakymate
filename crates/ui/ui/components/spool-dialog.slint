@@ -50,9 +50,9 @@ export component SpoolDialog inherits Scrim {
                     border-width: spool.id == root.selected ? 2px : 0px;
                     border-color: Theme.accent;
                     HorizontalLayout {
-                        padding-left: 10px;
-                        padding-right: 12px;
-                        spacing: 10px;
+                        padding-left: Theme.dialog-padding;
+                        padding-right: Theme.dialog-padding;
+                        spacing: Theme.spacing;
                         FilamentSwatch {
                             cross-axis-self-alignment: center;
                             width: 14px;

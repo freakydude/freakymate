@@ -52,8 +52,8 @@ export component IconButton inherits Rectangle {
     }
 
     if !root.horizontal: VerticalLayout {
-        padding: 4px;
-        spacing: 2px;
+        padding: Theme.spacing-small;
+        spacing: Theme.spacing-tight;
         alignment: center;
         if root.has-icon: Image {
             cross-axis-self-alignment: center;
@@ -74,8 +74,8 @@ export component IconButton inherits Rectangle {
 
     if root.horizontal: HorizontalLayout {
         padding-left: root.align-start ? 12px : 10px;
-        padding-right: 10px;
-        spacing: 8px;
+        padding-right: Theme.padding;
+        spacing: Theme.spacing;
         alignment: root.align-start ? LayoutAlignment.start : LayoutAlignment.center;
         if root.has-icon: Image {
             cross-axis-self-alignment: center;
@@ -117,8 +117,8 @@ export component ToggleRow inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: 12px;
-        padding-right: 10px;
+        padding-left: Theme.dialog-padding;
+        padding-right: Theme.padding;
         spacing: Theme.spacing;
         if root.icon.width > 0: Image {
             cross-axis-self-alignment: center;
@@ -245,10 +245,10 @@ export component TabButton inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
+        padding-left: Theme.padding;
+        padding-right: Theme.padding;
         padding-bottom: 3px;
-        spacing: 8px;
+        spacing: Theme.spacing;
         alignment: center;
         if root.icon.width > 0: Image {
             cross-axis-self-alignment: center;
@@ -382,8 +382,8 @@ export component ValueTile inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding: 6px;
-        spacing: 8px;
+        padding: Theme.spacing-medium;
+        spacing: Theme.spacing;
         if root.icon.width > 0: Image {
             cross-axis-self-alignment: center;
             source: root.icon;
@@ -539,7 +539,7 @@ export component TouchSlider inherits Rectangle {
         y: (root.height - self.height) / 2;
         width: root.width - root.knob;
         height: 8px;
-        border-radius: 4px;
+        border-radius: Theme.radius-small;
         background: Theme.surface-raised;
     }
 
@@ -548,7 +548,7 @@ export component TouchSlider inherits Rectangle {
         y: (root.height - self.height) / 2;
         width: (root.width - root.knob) * root.ratio;
         height: 8px;
-        border-radius: 4px;
+        border-radius: Theme.radius-small;
         background: root.enabled ? Theme.accent : Theme.disabled-foreground;
     }
 
@@ -658,8 +658,8 @@ export component SliderRow inherits Rectangle {
     border-radius: Theme.radius;
 
     HorizontalLayout {
-        padding: 4px;
-        padding-left: 10px;
+        padding: Theme.spacing-small;
+        padding-left: Theme.padding;
         spacing: Theme.spacing;
         Image {
             cross-axis-self-alignment: center;

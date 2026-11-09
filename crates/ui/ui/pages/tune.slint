@@ -60,15 +60,15 @@ component TuningRow inherits Rectangle {
     border-radius: Theme.radius;
 
     HorizontalLayout {
-        padding: 4px;
-        padding-left: 12px;
+        padding: Theme.spacing-small;
+        padding-left: Theme.dialog-padding;
         spacing: Theme.spacing;
         VerticalLayout {
             alignment: center;
             horizontal-stretch: 1;
             Text { text: TuningTexts.label(root.item.id); color: Theme.muted; font-size: Theme.font-small; overflow: elide; }
             HorizontalLayout {
-                spacing: 10px;
+                spacing: Theme.spacing;
                 Text {
                     text: root.item.value;
                     color: root.item.changed ? Theme.warning : Theme.foreground;

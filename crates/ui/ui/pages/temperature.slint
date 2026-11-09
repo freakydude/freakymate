@@ -21,8 +21,8 @@ component HeaterRow inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding: 4px;
-        padding-left: 10px;
+        padding: Theme.spacing-small;
+        padding-left: Theme.padding;
         spacing: Theme.spacing;
         Image {
             cross-axis-self-alignment: center;
@@ -35,7 +35,7 @@ component HeaterRow inherits Rectangle {
             alignment: center;
             horizontal-stretch: 1;
             HorizontalLayout {
-                spacing: 8px;
+                spacing: Theme.spacing;
                 Text {
                     text: root.heater.label;
                     color: Theme.muted;
@@ -121,8 +121,8 @@ component FanRow inherits Rectangle {
     border-radius: Theme.radius;
 
     HorizontalLayout {
-        padding: 4px;
-        padding-left: 10px;
+        padding: Theme.spacing-small;
+        padding-left: Theme.padding;
         spacing: Theme.spacing;
         Image {
             cross-axis-self-alignment: center;
@@ -288,7 +288,7 @@ component SensorsTab inherits Rectangle {
                 height: Theme.icon-compact;
             }
             VerticalLayout {
-                padding-left: 10px;
+                padding-left: Theme.padding;
                 alignment: center;
                 Text { text: sensor.label; color: Theme.muted; font-size: Theme.font-small; overflow: elide; }
                 Text {
