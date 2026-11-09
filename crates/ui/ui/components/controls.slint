@@ -1,6 +1,5 @@
 // Basic building blocks for touch input: buttons, step selection, cards, progress.
 
-import { BarColors } from "../state.slint";
 import { Theme } from "../theme.slint";
 
 // Small explanatory text in the muted colour.
@@ -633,89 +632,6 @@ export component IconLabel inherits HorizontalLayout {
         font-size: root.font-size;
         vertical-alignment: center;
         overflow: elide;
-    }
-}
-
-// The colour or colours of a filament as one bar, in one, two or three equal parts (Spoolman has up to three colours).
-// The colours of a filament, one to three. The bar stands for a piece of filament along its long side (`vertical`
-// turns it upright): the colours of a coaxial filament run side by side along the whole length, those of a
-// longitudinal one take turns along it (Spoolman's `multi_color_direction`). Without colour (`count` 0) the bar is
-// neutral, or the accent colour with `generic`. Only the outer pieces are rounded, each on its outer corners, so the bar keeps its shape in every renderer.
-export component ColorBar inherits Rectangle {
-    in property <BarColors> colors: { count: 1 };
-    in property <bool> vertical;
-    // Filament whose colour is not known (`count` 0): the bar is drawn in the accent colour as a generic filament,
-    // purely as a look, instead of neutral. Leave it off where there may be no filament at all (an empty gate).
-    in property <bool> generic;
-    // Length of one colour of a longitudinal filament.
-    in property <length> stripe: 6px;
-    // The ends are as round as the outline minus its width.
-    property <length> end: max(0px, root.border-radius - 1px);
-    property <length> long: (root.vertical ? root.height : root.width) - 2px;
-    property <length> across: (root.vertical ? root.width : root.height) - 2px;
-    // A bar has room for three colours; a fourth and more are left out.
-    property <int> shown: min(3, root.colors.count);
-    // Pieces: the colours across the bar (coaxial) or the stripes along it (longitudinal).
-    property <int> pieces: root.shown < 1 ? 0 : root.colors.longitudinal && root.shown > 1 ? max(1, ceil(root.long / root.stripe)) : root.shown;
-    property <bool> shows-generic: root.generic && root.shown < 1;
-    border-radius: 4px;
-    border-width: 1px;
-    border-color: root.shows-generic ? Theme.accent : Theme.border;
-    background: root.shows-generic ? Theme.accent : Theme.border;
-
-    pure function nth(index: int) -> color {
-        return index == 1 ? root.colors.second : index == 2 ? root.colors.third : root.colors.first;
-    }
-
-    for piece in root.pieces: Rectangle {
-        // Along the long side for stripes, across it for coaxial colours.
-        property <bool> along: root.colors.longitudinal && root.shown > 1;
-        property <length> size: self.along ? root.stripe : root.across / root.shown;
-        property <length> start: piece * self.size;
-        property <length> length: self.along ? min(root.stripe, root.long - self.start) : self.size;
-        property <bool> head: piece == 0;
-        property <bool> tail: piece == root.pieces - 1;
-        // Which outer corners this piece rounds: the head and tail of a stripe sequence round the ends of the bar;
-        // the outer bands of coaxial colours round their long edge, and every band rounds both ends.
-        property <bool> left-round: self.along ? (root.vertical ? true : self.head) : (root.vertical ? self.head : true);
-        property <bool> right-round: self.along ? (root.vertical ? true : self.tail) : (root.vertical ? self.tail : true);
-        property <bool> top-round: self.along ? (root.vertical ? self.head : true) : (root.vertical ? true : self.head);
-        property <bool> bottom-round: self.along ? (root.vertical ? self.tail : true) : (root.vertical ? true : self.tail);
-        x: 1px + (root.vertical != self.along ? self.start : 0px);
-        y: 1px + (root.vertical == self.along ? self.start : 0px);
-        width: root.vertical != self.along ? self.length : (root.vertical ? root.across : root.long);
-        height: root.vertical == self.along ? self.length : (root.vertical ? root.long : root.across);
-        // A colour with alpha lies over a checkerboard of 2x2 fields, so it reads as see-through. Rounded corners are set
-        // on every layer (no clipping), the dark fields only on their outer corner.
-        property <color> tint: root.nth(mod(piece, root.shown));
-        property <bool> see-through: self.tint.alpha < 255;
-        background: self.see-through ? Theme.checker-light : self.tint;
-        border-top-left-radius: self.top-round && self.left-round ? root.end : 0px;
-        border-top-right-radius: self.top-round && self.right-round ? root.end : 0px;
-        border-bottom-left-radius: self.bottom-round && self.left-round ? root.end : 0px;
-        border-bottom-right-radius: self.bottom-round && self.right-round ? root.end : 0px;
-
-        if self.see-through: Rectangle {
-            x: parent.width / 2;
-            width: parent.width / 2;
-            height: parent.height / 2;
-            background: Theme.checker-dark;
-            border-top-right-radius: parent.border-top-right-radius;
-        }
-        if self.see-through: Rectangle {
-            y: parent.height / 2;
-            width: parent.width / 2;
-            height: parent.height / 2;
-            background: Theme.checker-dark;
-            border-bottom-left-radius: parent.border-bottom-left-radius;
-        }
-        if self.see-through: Rectangle {
-            background: parent.tint;
-            border-top-left-radius: parent.border-top-left-radius;
-            border-top-right-radius: parent.border-top-right-radius;
-            border-bottom-left-radius: parent.border-bottom-left-radius;
-            border-bottom-right-radius: parent.border-bottom-right-radius;
-        }
     }
 }
 

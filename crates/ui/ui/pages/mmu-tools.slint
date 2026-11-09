@@ -6,31 +6,10 @@ import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, ToolMatchItem, Printer } from "../state.slint";
 import { BarColors } from "../structs.slint";
-import { ButtonKind, ColorBar, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
+import { ButtonKind, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
 import { FilamentSwatch, FilamentText } from "../components/filament-swatch.slint";
 import { DialogHeader, DialogPanel, DialogTitle, Scrim } from "../components/dialog.slint";
 import { SlotTile, VerdictIcon } from "../components/mmu-tiles.slint";
-
-// The colour of a gate as a vertical bar, the way the tiles of the gates show it.
-export component GateColor inherits ColorBar {
-    in property <MmuGateItem> gate;
-
-    width: 10px;
-    height: 32px;
-    vertical: true;
-    colors: root.gate.colors;
-    generic: root.gate.availability == "available" || root.gate.availability == "buffered";
-}
-
-// The colour the file asks of a tool, as a dot beside the gate's bar; a clear filament shows the checkerboard.
-export component WantedColor inherits ColorBar {
-    in property <ToolMatchItem> mapping;
-
-    width: 12px;
-    height: 12px;
-    border-radius: 6px;
-    colors: root.mapping.wanted-colors;
-}
 
 // One side of a tool's row: a tap area with the filament's colour as its left edge over the full height.
 component FilamentHalf inherits Rectangle {
@@ -56,6 +35,7 @@ component FilamentHalf inherits Rectangle {
         FilamentSwatch {
             width: 44px;
             left-edge: true;
+            ground: Theme.surface;
             colors: root.colors;
             empty: root.empty;
             warn: root.color-warn;
@@ -233,9 +213,13 @@ component GroupRow inherits HorizontalLayout {
     in property <MmuGateItem> gate;
 
     spacing: 8px;
-    GateColor {
+    FilamentSwatch {
         cross-axis-self-alignment: center;
-        gate: root.gate;
+        width: 10px;
+        height: 32px;
+        radius: 3px;
+        colors: root.gate.colors;
+        empty: root.gate.availability != "available" && root.gate.availability != "buffered";
     }
     VerticalLayout {
         horizontal-stretch: 1;

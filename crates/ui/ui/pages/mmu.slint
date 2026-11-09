@@ -6,7 +6,8 @@ import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, MmuDialogs, MmuGateItem, Navigation, Printer } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
-import { ButtonKind, Card, ColorBar, IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
+import { ButtonKind, Card, IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
+import { FilamentColors, FilamentSwatch } from "../components/filament-swatch.slint";
 import { FilamentPath } from "../components/filament-path.slint";
 import { BufferGauge, BypassTile, GateTile, MmuTexts, SlotTile } from "../components/mmu-tiles.slint";
 
@@ -188,13 +189,12 @@ export component MmuStrip inherits Card {
             }
             Rectangle { horizontal-stretch: 1; }
             // The spool of the gate in use: its colours, its filament and what is left of it.
-            if Printer.has-spool: ColorBar {
+            if Printer.has-spool: FilamentSwatch {
                 cross-axis-self-alignment: center;
                 width: 34px;
                 height: 12px;
-                border-radius: 6px;
-                colors: Printer.spool-colors;
-                generic: true;
+                radius: 6px;
+                colors: FilamentColors.generic(Printer.spool-colors);
             }
             if Printer.has-spool: TextWithValue {
                 alignment: end;

@@ -3,7 +3,8 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Printer, SpoolPicker } from "../state.slint";
-import { ColorBar, TextWithValue } from "controls.slint";
+import { TextWithValue } from "controls.slint";
+import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
 
 export component SpoolStrip inherits Rectangle {
     height: Theme.row-height-small;
@@ -16,13 +17,12 @@ export component SpoolStrip inherits Rectangle {
         padding: 6px;
         padding-left: 10px;
         spacing: 10px;
-        ColorBar {
+        FilamentSwatch {
             cross-axis-self-alignment: center;
             width: 14px;
             height: 34px;
-            vertical: true;
-            colors: Printer.spool-colors;
-            generic: true;
+            radius: 4px;
+            colors: FilamentColors.generic(Printer.spool-colors);
         }
         VerticalLayout {
             alignment: center;

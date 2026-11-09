@@ -3,7 +3,8 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, MmuDialogs, MmuGateItem, Printer, SpoolPicker } from "../state.slint";
-import { ColorBar, IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
+import { IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
+import { FilamentColors, FilamentSwatch } from "../components/filament-swatch.slint";
 import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
 import { GateAvailabilityLabel } from "../components/mmu-tiles.slint";
 
@@ -40,12 +41,13 @@ component ColorSwatch inherits Rectangle {
     accessible-role: button;
     accessible-checked: root.checked;
 
-    // The bar draws a colour with alpha over a checkerboard.
-    ColorBar {
+    // The field draws a colour with alpha over a checkerboard.
+    FilamentSwatch {
         x: root.checked ? 3px : 0px;
         y: self.x;
         width: parent.width - 2 * self.x;
         height: parent.height - 2 * self.x;
+        radius: Theme.radius;
         colors: { first: root.swatch, count: 1 };
     }
 
@@ -91,13 +93,13 @@ export component GateDialog inherits Scrim {
             HorizontalLayout {
                 spacing: 10px;
                 height: Theme.touch;
-                ColorBar {
+                FilamentSwatch {
                     cross-axis-self-alignment: center;
                     width: 14px;
                     height: 36px;
-                    vertical: true;
-                    colors: root.item.colors;
-                    generic: root.item.availability == "available" || root.item.availability == "buffered";
+                    radius: 4px;
+                    colors: root.item.availability == "available" || root.item.availability == "buffered" ? FilamentColors.generic(root.item.colors) : root.item.colors;
+                    empty: root.item.availability == "empty";
                 }
                 VerticalLayout {
                     horizontal-stretch: 1;

@@ -78,7 +78,7 @@ export struct FilamentSensorItem {
     detected: bool,
 }
 
-// The colours of a filament (`ColorBar`, `FilamentSwatch`): up to six, how many there are (0 to 6), and whether they
+// The colours of a filament (`FilamentSwatch`): up to six, how many there are (0 to 6), and whether they
 // follow each other along the filament instead of lying side by side (Spoolman's multi-colour filaments). A bar shows
 // the first three, a swatch all of them (a rainbow along the filament).
 export struct BarColors {
@@ -163,7 +163,7 @@ export struct ChartLabel {
 
 // The way of the filament of the selected gate (Happy Hare's `filament_pos`, see `FilamentPath`). Sensors: -1 not
 // fitted, 0 free, 1 triggered; in order along the way: gate entry, gate exit, extruder, toolhead. `bowden-progress`
-// is 0 to 1 during a move through the bowden, -1 otherwise. The colours are those of the spool, as for `ColorBar`.
+// is 0 to 1 during a move through the bowden, -1 otherwise. The colours are those of the spool, as for `FilamentSwatch`.
 export struct FilamentPathItem {
     position: int,
     direction: int,

@@ -3,7 +3,8 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Printer, SpoolPicker } from "../state.slint";
-import { ButtonKind, ColorBar, IconButton, IconLabel, ScrollList, TextWithValue } from "controls.slint";
+import { ButtonKind, IconButton, IconLabel, ScrollList, TextWithValue } from "controls.slint";
+import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
 import { NumberEntryDialog } from "entry-dialogs.slint";
 import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
 
@@ -52,13 +53,12 @@ export component SpoolDialog inherits Scrim {
                         padding-left: 10px;
                         padding-right: 12px;
                         spacing: 10px;
-                        ColorBar {
+                        FilamentSwatch {
                             cross-axis-self-alignment: center;
                             width: 14px;
                             height: 34px;
-                            vertical: true;
-                            colors: spool.colors;
-                            generic: true;
+                            radius: 4px;
+                            colors: FilamentColors.generic(spool.colors);
                         }
                         VerticalLayout {
                             alignment: center;
