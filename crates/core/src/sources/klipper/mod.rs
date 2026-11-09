@@ -41,6 +41,6 @@ pub use macros::{
 };
 pub use motion::{Axis, Bed, BedPoint, HomedAxes, Motion};
 pub use pending::PendingTargets;
-pub use setup::Setup;
+pub use setup::{tool_commands, Setup};
 pub(in crate::sources) use status::KlipperParts;
 pub use status::{label, Activity, KlippyState};

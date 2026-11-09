@@ -3,7 +3,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, MmuDialogs, MmuGateItem, ToolMatchItem, Printer } from "../state.slint";
+import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, ToolMatchItem, Printer } from "../state.slint";
 import { Card, ColorBar, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
 import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
 import { SlotTile, VerdictIcon } from "../components/mmu-tiles.slint";
@@ -70,9 +70,10 @@ component ToolTile inherits SlotTile {
                 font-size: Theme.font-small;
                 overflow: elide;
             }
+            // A tool of the file: what it asks for, both materials when they differ; else what the gate holds.
             Text {
-                text: !root.has-gate ? root.mapping.wanted-material : root.gate.material == "" ? "-" : root.gate.material;
-                color: Theme.muted;
+                text: root.mapping.used && root.mapping.material-line != "" ? root.mapping.material-line : !root.has-gate ? "" : root.gate.material == "" ? "-" : root.gate.material;
+                color: root.mapping.used && root.mapping.material-differs ? Theme.warning : Theme.muted;
                 font-size: Theme.font-small;
                 overflow: elide;
             }
@@ -177,7 +178,8 @@ export component MmuToolsTab inherits Rectangle {
                     width: tool-list.cell-width;
                     height: Theme.touch;
                     mapping: mapping;
-                    enabled: root.can-choose && mapping.gate >= 0;
+                    // A tool of the file opens with what to do; otherwise only to choose another gate.
+                    enabled: mapping.used || (root.can-choose && mapping.gate >= 0);
                     clicked => { MmuDialogs.tool = index; }
                 }
             }
@@ -296,7 +298,8 @@ component WantedLine inherits HorizontalLayout {
     }
 }
 
-// The choice of gate for one tool; a tap on a gate maps the tool to it and closes the dialog.
+// One tool: what the file asks of it, what to do when it does not fit, and the choice of gate; a tap on a gate maps
+// the tool to it and closes the dialog.
 export component ToolDialog inherits Scrim {
     property <ToolMatchItem> mapping: Printer.mmu-tools[MmuDialogs.tool];
     visible: MmuDialogs.tool >= 0 && MmuDialogs.tool < Printer.mmu-tools.length;
@@ -315,7 +318,7 @@ export component ToolDialog inherits Scrim {
             padding: Theme.dialog-padding;
             spacing: Theme.spacing;
             DialogHeader {
-                title: @tr("Gate for T{}", root.mapping.tool);
+                title: Printer.mmu-gates.length > 1 && root.mapping.gate >= 0 ? @tr("Gate for T{}", root.mapping.tool) : @tr("T{}", root.mapping.tool);
                 close => { root.close(); }
             }
             if root.mapping.used: WantedLine {
@@ -327,7 +330,31 @@ export component ToolDialog inherits Scrim {
                 font-size: Theme.font-normal;
                 wrap: word-wrap;
             }
-            gate-grid := Rectangle {
+            // What to do about it, and the gate to change right away.
+            if root.mapping.used && root.mapping.advice != "": HorizontalLayout {
+                spacing: Theme.spacing;
+                Text {
+                    horizontal-stretch: 1;
+                    text: root.mapping.advice;
+                    color: Theme.foreground;
+                    font-size: Theme.font-normal;
+                    wrap: word-wrap;
+                    vertical-alignment: center;
+                }
+                if root.mapping.gate-to-load >= 0: IconButton {
+                    width: 200px;
+                    height: 48px;
+                    icon: Icons.mmu-gate-map;
+                    text: @tr("Open gate {}", root.mapping.gate-to-load);
+                    horizontal: true;
+                    clicked => {
+                        MmuDialogs.gate = root.mapping.gate-to-load;
+                        root.close();
+                        Navigation.filament-tab = FilamentTab.gates;
+                    }
+                }
+            }
+            if root.mapping.gate >= 0: gate-grid := Rectangle {
                 property <int> columns: max(1, floor(self.width / 120px));
                 property <length> cell-width: (self.width - (self.columns - 1) * Theme.spacing) / self.columns;
                 property <length> row-step: 84px + Theme.spacing;

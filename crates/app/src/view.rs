@@ -3,7 +3,7 @@
 use crate::format;
 use chrono::{DateTime, Local};
 use freakymate_core::domain::estimates;
-use freakymate_core::domain::filament_match::{self, Difference, PrintHint, PrintHintKind, ToolMatch, Verdict};
+use freakymate_core::domain::filament_match::{self, Difference, PrintHint, PrintHintKind, Remedy, ToolMatch, Verdict};
 use freakymate_core::domain::file_catalog::FileInfo;
 use freakymate_core::domain::job_end;
 use freakymate_core::domain::pause::{Interruption, InterruptionFact};
@@ -200,7 +200,7 @@ fn empty_gate_sentence(source: &str) -> String {
 }
 
 fn no_gate_sentence(tool: usize) -> String {
-    format!("The printer has no gate for T{tool}.")
+    format!("The printer has no T{tool}.")
 }
 
 /// The key of a verdict for the UI (`ToolMatchItem.verdict`): "fits", "differs", "gate-empty", "no-gate" or "".
@@ -244,6 +244,59 @@ pub fn tool_differences(found: &ToolMatch) -> String {
             .collect::<Vec<_>>()
             .join("\n"),
     }
+}
+
+/// The material the file asks of the tool and the one where it prints from, when they differ.
+pub fn material_difference(found: &ToolMatch) -> Option<(&str, &str)> {
+    let Verdict::Differs(differences) = &found.verdict else { return None };
+    differences.iter().find_map(|difference| match difference {
+        Difference::Material { expected, loaded } => Some((expected.as_str(), loaded.as_str())),
+        _ => None,
+    })
+}
+
+/// The material of a tool in a short line: `PLA → ASA` when the filament differs, else what the file asks for.
+pub fn material_line(found: &ToolMatch) -> String {
+    match material_difference(found) {
+        Some((expected, loaded)) => format!("{expected} → {loaded}"),
+        None => found.request.material.clone().unwrap_or_default(),
+    }
+}
+
+/// What can make a tool fit, one sentence per remedy and line.
+pub fn remedy_text(remedies: &[Remedy]) -> String {
+    remedies.iter().map(remedy_sentence).collect::<Vec<_>>().join("\n")
+}
+
+fn remedy_sentence(remedy: &Remedy) -> String {
+    match remedy {
+        Remedy::UseGate(gates) if gates.len() == 1 => {
+            format!("Gate {} holds what the file wants: choose it below.", gates[0])
+        }
+        Remedy::UseGate(gates) => format!("Gates {} hold what the file wants: choose one below.", enumeration(gates)),
+        Remedy::LoadGate(gate) => format!(
+            "Load fitting filament into gate {gate}. If it holds it already, correct its spool, material or colour."
+        ),
+        Remedy::LoadSpool => "Load fitting filament, or choose the spool that holds it.".to_owned(),
+        Remedy::Reslice => "Slice the file for the tools of this printer.".to_owned(),
+    }
+}
+
+/// Numbers as an enumeration: `0, 2 and 5`.
+fn enumeration(numbers: &[usize]) -> String {
+    let texts: Vec<String> = numbers.iter().map(ToString::to_string).collect();
+    match texts.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
+        _ => texts.concat(),
+    }
+}
+
+/// The gate whose filament a remedy changes, for a button that opens it.
+pub fn gate_to_load(remedies: &[Remedy]) -> Option<usize> {
+    remedies.iter().find_map(|remedy| match remedy {
+        Remedy::LoadGate(gate) => Some(*gate),
+        _ => None,
+    })
 }
 
 /// What a row of the file list shows; an empty text is a fact the file does not have.
@@ -708,7 +761,7 @@ mod tests {
             "Gate 1 holds PETG.\nGate 1 has another colour.\nThe spool in gate 1 has 20 g left, the print needs ~30 g."
         );
         assert_eq!(tool_differences(&tool_match(1, Some(3), Verdict::GateEmpty)), "Gate 3 is empty.");
-        assert_eq!(tool_differences(&tool_match(4, None, Verdict::NoGate)), "The printer has no gate for T4.");
+        assert_eq!(tool_differences(&tool_match(4, None, Verdict::NoGate)), "The printer has no T4.");
         assert_eq!(tool_differences(&tool_match(0, Some(0), Verdict::Fits)), "");
         let without_mmu = Verdict::Differs(vec![
             Difference::Material { expected: "PLA".into(), loaded: "ABS".into() },
@@ -740,8 +793,34 @@ mod tests {
         );
         assert_eq!(
             print_hint_text(&PrintHint { tool: 3, kind: PrintHintKind::NoGate }, false),
-            "The printer has no gate for T3."
+            "The printer has no T3."
         );
+    }
+
+    #[test]
+    fn the_material_line_names_both_materials_when_they_differ() {
+        let differs = Verdict::Differs(vec![Difference::Material { expected: "PLA".into(), loaded: "ASA".into() }]);
+        let mut found = tool_match(0, Some(0), differs);
+        found.request.material = Some("PLA".into());
+
+        assert_eq!(material_line(&found), "PLA → ASA");
+        found.verdict = Verdict::Differs(vec![Difference::Color]);
+        assert_eq!(material_line(&found), "PLA");
+        assert_eq!(material_difference(&found), None);
+    }
+
+    #[test]
+    fn remedies_read_as_sentences_and_name_the_gate_to_open() {
+        let remedies = [Remedy::UseGate(vec![0, 2, 5]), Remedy::LoadGate(3)];
+
+        assert_eq!(
+            remedy_text(&remedies),
+            "Gates 0, 2 and 5 hold what the file wants: choose one below.\nLoad fitting filament into gate 3. If it \
+             holds it already, correct its spool, material or colour."
+        );
+        assert_eq!(remedy_text(&[Remedy::UseGate(vec![1])]), "Gate 1 holds what the file wants: choose it below.");
+        assert_eq!(gate_to_load(&remedies), Some(3));
+        assert_eq!(gate_to_load(&[Remedy::Reslice]), None);
     }
 
     #[test]

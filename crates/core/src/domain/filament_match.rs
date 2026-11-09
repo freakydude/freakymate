@@ -3,13 +3,17 @@
 //!
 //! Where the filament of a tool comes from depends on what the printer has: with Happy Hare the gate of the tool
 //! (`ttg_map`), its spool from Spoolman first, otherwise what Happy Hare knows of the gate; without Happy Hare only
-//! tool 0 and the active spool of Spoolman. Without either there is nothing to compare.
+//! tool 0 and the active spool of Spoolman. Without either there is nothing to compare. Tools that share a gate share
+//! its spool, so their planned weights add up. Without Happy Hare a tool beyond 0 needs a command `T<n>` in Klipper's
+//! command list (a toolchanger, a blackbox here); a file that calls a missing one stops at an unknown command.
 
 use super::spools::Lane;
 use crate::color::{is_clear, parse_hex, rgb, Rgba};
 use crate::sources::happy_hare::{GateAvailability, MmuGate};
+use crate::sources::klipper::Setup;
 use crate::sources::moonraker_server::files::FileMetadata;
 use crate::sources::PrinterStatus;
+use std::collections::HashMap;
 
 /// Colours further apart than this (distance in RGB, at most 441) count as different. Wide enough for "the same red
 /// from another maker", too wide to tell close colours apart (orange and red are 81 apart).
@@ -36,7 +40,7 @@ pub enum Difference {
         loaded: String,
     },
     Color,
-    /// Planned grams against what the spool has left.
+    /// Planned grams against what the spool has left; tools that share the spool add up.
     Weight {
         needed: f64,
         left: f64,
@@ -51,7 +55,7 @@ pub enum Verdict {
     Differs(Vec<Difference>),
     /// Happy Hare reports the gate of the tool as empty; its gate check at print start pauses then.
     GateEmpty,
-    /// Happy Hare maps no gate to the tool: the file asks for more tools than the printer has.
+    /// The printer has no such tool: Happy Hare maps no gate to it, or without Happy Hare Klipper has no command `T<n>`.
     NoGate,
     /// Nothing to compare: one side has no facts.
     Unknown,
@@ -128,9 +132,34 @@ fn per_tool(list: &[String], tool: usize) -> Option<&str> {
     entry.map(String::as_str).filter(|text| !text.is_empty())
 }
 
-/// Compares every tool the file uses with the filament it would print with.
-pub fn match_tools(metadata: &FileMetadata, status: &PrinterStatus, lanes: &[Lane]) -> Vec<ToolMatch> {
-    tool_requests(metadata).into_iter().map(|request| match_tool(request, status, lanes)).collect()
+/// Compares every tool the file uses with the filament it would print with; `klipper` tells which tool commands exist.
+pub fn match_tools(metadata: &FileMetadata, status: &PrinterStatus, lanes: &[Lane], klipper: &Setup) -> Vec<ToolMatch> {
+    let requests = tool_requests(metadata);
+    let needs = needs_per_gate(&requests, status);
+    requests
+        .into_iter()
+        .map(|request| {
+            let shared = gate_of(request.tool, status).and_then(|gate| needs.get(&gate).copied());
+            let needed = shared.or(request.grams);
+            match_tool(request, needed, status, lanes, klipper)
+        })
+        .collect()
+}
+
+/// The planned weight of all tools that print from the same gate, per gate: they all take from its spool.
+fn needs_per_gate(requests: &[ToolRequest], status: &PrinterStatus) -> HashMap<usize, f64> {
+    let mut needs = HashMap::new();
+    for request in requests {
+        if let (Some(gate), Some(grams)) = (gate_of(request.tool, status), request.grams) {
+            *needs.entry(gate).or_insert(0.0) += grams;
+        }
+    }
+    needs
+}
+
+/// The gate Happy Hare maps the tool to; `None` without Happy Hare or for a tool it does not have.
+fn gate_of(tool: usize, status: &PrinterStatus) -> Option<usize> {
+    status.happy_hare().filter(|mmu| !mmu.gates.is_empty()).and_then(|mmu| mmu.tool_to_gate.get(tool).copied())
 }
 
 /// Per gate index of Happy Hare: whether the gate is a good choice for the tool. Stricter than the verdict of a tool:
@@ -144,15 +173,25 @@ pub fn fitting_gates(request: &ToolRequest, status: &PrinterStatus, lanes: &[Lan
         let supply = supply(lane, Some(gate));
         let knows_material = request.material.is_none() || supply.material.is_some();
         let knows_color = !request.color.is_some_and(|color| !is_clear(color)) || !supply.colors.is_empty();
-        fits[gate.index] = knows_material && knows_color && compare(request, &supply) == Verdict::Fits;
+        fits[gate.index] = knows_material && knows_color && compare(request, request.grams, &supply) == Verdict::Fits;
     }
     fits
 }
 
-fn match_tool(request: ToolRequest, status: &PrinterStatus, lanes: &[Lane]) -> ToolMatch {
+/// One tool against where it prints from; `needed` is the planned weight that comes from that spool.
+fn match_tool(
+    request: ToolRequest,
+    needed: Option<f64>,
+    status: &PrinterStatus,
+    lanes: &[Lane],
+    klipper: &Setup,
+) -> ToolMatch {
     let Some(mmu) = status.happy_hare().filter(|mmu| !mmu.gates.is_empty()) else {
+        if request.tool > 0 && klipper.has_tool_command(request.tool) == Some(false) {
+            return ToolMatch { request, gate: None, verdict: Verdict::NoGate };
+        }
         let lane = lanes.first().filter(|_| request.tool == 0);
-        let verdict = compare(&request, &supply(lane, None));
+        let verdict = compare(&request, needed, &supply(lane, None));
         return ToolMatch { request, gate: None, verdict };
     };
     let Some(gate) = mmu.tool_to_gate.get(request.tool).copied() else {
@@ -163,7 +202,7 @@ fn match_tool(request: ToolRequest, status: &PrinterStatus, lanes: &[Lane]) -> T
         Verdict::GateEmpty
     } else {
         let lane = lanes.iter().find(|lane| lane.gate == Some(gate));
-        compare(&request, &supply(lane, gate_state))
+        compare(&request, needed, &supply(lane, gate_state))
     };
     ToolMatch { request, gate: Some(gate), verdict }
 }
@@ -192,7 +231,7 @@ fn supply(lane: Option<&Lane>, gate: Option<&MmuGate>) -> Supply {
     })
 }
 
-fn compare(request: &ToolRequest, supply: &Supply) -> Verdict {
+fn compare(request: &ToolRequest, needed: Option<f64>, supply: &Supply) -> Verdict {
     let mut compared = false;
     let mut differences = Vec::new();
     if let (Some(expected), Some(loaded)) = (&request.material, &supply.material) {
@@ -216,7 +255,7 @@ fn compare(request: &ToolRequest, supply: &Supply) -> Verdict {
             }
         }
     }
-    if let (Some(needed), Some(left)) = (request.grams, supply.left) {
+    if let (Some(needed), Some(left)) = (needed, supply.left) {
         compared = true;
         if needed > left {
             differences.push(Difference::Weight { needed, left });
@@ -255,8 +294,8 @@ pub enum PrintHintKind {
 }
 
 /// The hints for the start dialog: every difference, empty gate and missing tool, in tool order.
-pub fn print_hints(metadata: &FileMetadata, status: &PrinterStatus, lanes: &[Lane]) -> Vec<PrintHint> {
-    match_tools(metadata, status, lanes)
+pub fn print_hints(metadata: &FileMetadata, status: &PrinterStatus, lanes: &[Lane], klipper: &Setup) -> Vec<PrintHint> {
+    match_tools(metadata, status, lanes, klipper)
         .into_iter()
         .flat_map(|found| hints_of(found.request.tool, found.verdict))
         .collect()
@@ -270,6 +309,38 @@ fn hints_of(tool: usize, verdict: Verdict) -> Vec<PrintHint> {
         Verdict::NoGate => vec![hint(PrintHintKind::NoGate)],
         Verdict::Differs(differences) => {
             differences.into_iter().map(|difference| hint(PrintHintKind::Differs(difference))).collect()
+        }
+    }
+}
+
+/// What can make a tool fit what the file asks for. Only suggestions, in the order to try.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Remedy {
+    /// Other gates hold what the file asks for: map the tool to one of them.
+    UseGate(Vec<usize>),
+    /// Load fitting filament into the tool's gate, or correct what the gate records (spool, material, colour).
+    LoadGate(usize),
+    /// Without MMU: load fitting filament, or choose the spool in use that holds it.
+    LoadSpool,
+    /// The printer has no such tool: slice the file for the printer's tools.
+    Reslice,
+}
+
+/// The remedies for a tool that does not fit; `fitting` is [`fitting_gates`] of its request. Empty when it fits or
+/// nothing can be compared.
+pub fn remedies(found: &ToolMatch, fitting: &[bool]) -> Vec<Remedy> {
+    match found.verdict {
+        Verdict::Fits | Verdict::Unknown => Vec::new(),
+        Verdict::NoGate => vec![Remedy::Reslice],
+        Verdict::GateEmpty | Verdict::Differs(_) => {
+            let others: Vec<usize> =
+                (0..fitting.len()).filter(|gate| fitting[*gate] && found.gate != Some(*gate)).collect();
+            let load = found.gate.map_or(Remedy::LoadSpool, Remedy::LoadGate);
+            if others.is_empty() {
+                vec![load]
+            } else {
+                vec![Remedy::UseGate(others), load]
+            }
         }
     }
 }
@@ -341,7 +412,7 @@ mod tests {
     }
 
     fn verdicts(metadata: &FileMetadata, status: &PrinterStatus, spools: &SpoolmanState) -> Vec<(usize, Verdict)> {
-        match_tools(metadata, status, &lanes(status, spools))
+        match_tools(metadata, status, &lanes(status, spools), &Setup::default())
             .into_iter()
             .map(|found| (found.request.tool, found.verdict))
             .collect()
@@ -494,23 +565,50 @@ mod tests {
             ..file(&[5.0, 5.0], &["PLA", "PLA"], &["#26A69A", "#000000"])
         };
 
-        let found = verdicts(&metadata, &PrinterStatus::default(), &spools);
+        let status = PrinterStatus::default();
+        let found = match_tools(&metadata, &status, &lanes(&status, &spools), &Setup::with_tool_commands(&[0, 1]));
 
-        // A second tool without MMU is a second extruder nobody reports on.
-        assert_eq!(found, [(0, Verdict::Fits), (1, Verdict::Unknown)]);
+        // A second tool without MMU is a toolchanger's macro nobody reports on.
+        assert_eq!(found.iter().map(|found| &found.verdict).collect::<Vec<_>>(), [&Verdict::Fits, &Verdict::Unknown]);
     }
 
     #[test]
     fn without_happy_hare_and_spoolman_nothing_is_compared() {
-        let found = verdicts(&fixture("4 tools"), &PrinterStatus::default(), &SpoolmanState::default());
+        let toolchanger = Setup::with_tool_commands(&[0, 1, 2, 3]);
+        let found = match_tools(&fixture("4 tools"), &PrinterStatus::default(), &[], &toolchanger);
 
-        assert!(found.iter().all(|(_, verdict)| *verdict == Verdict::Unknown));
-        assert!(print_hints(
-            &fixture("4 tools"),
-            &PrinterStatus::default(),
-            &lanes(&PrinterStatus::default(), &SpoolmanState::default())
-        )
-        .is_empty());
+        assert!(found.iter().all(|found| found.verdict == Verdict::Unknown));
+        assert!(print_hints(&fixture("4 tools"), &PrinterStatus::default(), &[], &toolchanger).is_empty());
+    }
+
+    #[test]
+    fn without_happy_hare_a_tool_needs_its_command() {
+        let verdicts_with = |klipper: &Setup| {
+            match_tools(&fixture("4 tools"), &PrinterStatus::default(), &[], klipper)
+                .into_iter()
+                .map(|found| found.verdict)
+                .collect::<Vec<_>>()
+        };
+
+        let missing = [Verdict::Unknown, Verdict::NoGate, Verdict::NoGate, Verdict::NoGate];
+        assert_eq!(verdicts_with(&Setup::with_tool_commands(&[0])), missing);
+        // Without Klipper's command list nothing is claimed.
+        assert!(verdicts_with(&Setup::default()).iter().all(|verdict| *verdict == Verdict::Unknown));
+    }
+
+    #[test]
+    fn tools_on_one_gate_add_up_their_weight() {
+        let mut with_spool = gate("PLA", None);
+        with_spool.spool_id = Some(7);
+        let status = happy_hare(vec![with_spool, gate("PLA", None)], &[0, 0]);
+        let spools = spoolman(&[test_spool(7, "PLA", 25.0, [0, 0, 0])], None);
+        let metadata = FileMetadata { referenced_tools: vec![0, 1], ..file(&[15.0, 15.0], &["PLA", "PLA"], &[]) };
+
+        let found = verdicts(&metadata, &status, &spools);
+
+        // Each tool alone fits the 25 g left; both together from gate 0 need 30 g.
+        let short = Verdict::Differs(vec![Difference::Weight { needed: 30.0, left: 25.0 }]);
+        assert_eq!(found, [(0, short.clone()), (1, short)]);
     }
 
     #[test]
@@ -547,7 +645,7 @@ mod tests {
         let metadata =
             FileMetadata { referenced_tools: vec![0, 1, 2], ..file(&[30.0, 5.0, 5.0], &["PLA", "PLA", "PLA"], &[]) };
 
-        let hints = print_hints(&metadata, &status, &lanes(&status, &spools));
+        let hints = print_hints(&metadata, &status, &lanes(&status, &spools), &Setup::default());
 
         assert_eq!(
             hints,
@@ -607,5 +705,21 @@ mod tests {
         assert_eq!(Verdict::combine([&Verdict::Unknown, &differs, &Verdict::NoGate]), differs);
         assert_eq!(Verdict::combine([&Verdict::Fits, &Verdict::GateEmpty]), Verdict::GateEmpty);
         assert_eq!(Verdict::combine([]), Verdict::Unknown);
+    }
+
+    #[test]
+    fn remedies_name_other_fitting_gates_before_loading_the_own() {
+        let found = |gate, verdict| ToolMatch { request: ToolRequest::default(), gate, verdict };
+        let differs = Verdict::Differs(vec![Difference::Material { expected: "PLA".into(), loaded: "ASA".into() }]);
+
+        assert!(remedies(&found(Some(0), Verdict::Fits), &[true]).is_empty());
+        assert!(remedies(&found(Some(0), Verdict::Unknown), &[false]).is_empty());
+        assert_eq!(remedies(&found(Some(0), differs.clone()), &[false]), [Remedy::LoadGate(0)]);
+        assert_eq!(
+            remedies(&found(Some(1), Verdict::GateEmpty), &[true, false, true]),
+            [Remedy::UseGate(vec![0, 2]), Remedy::LoadGate(1)]
+        );
+        assert_eq!(remedies(&found(None, differs), &[]), [Remedy::LoadSpool]);
+        assert_eq!(remedies(&found(None, Verdict::NoGate), &[true]), [Remedy::Reslice]);
     }
 }

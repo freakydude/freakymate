@@ -127,6 +127,14 @@ export struct ToolMatchItem {
     verdict: string,
     // What differs, one line each.
     differences: string,
+    // The material in a short line: "PLA → ASA" when the filament differs (`material-differs`), else what the file
+    // asks for; empty when the file names none.
+    material-line: string,
+    material-differs: bool,
+    // What can make the tool fit, one line each; empty when it fits (Tools tab only).
+    advice: string,
+    // The gate whose filament the advice changes, for a button that opens it; -1 for none.
+    gate-to-load: int,
     // Per gate index: the gate's filament fits what the file asks of the tool.
     fitting-gates: [bool],
 }

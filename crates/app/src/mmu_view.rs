@@ -94,6 +94,11 @@ impl MmuView {
             .map(|(row, (tool, gate, found))| {
                 let mut item = tool_match_item(tool, gate, found);
                 let fitting = found.map(|found| filament_match::fitting_gates(&found.request, status, lanes));
+                if let (Some(found), Some(fitting)) = (found, &fitting) {
+                    let remedies = filament_match::remedies(found, fitting);
+                    item.advice = view::remedy_text(&remedies).into();
+                    item.gate_to_load = id_or_none(view::gate_to_load(&remedies));
+                }
                 item.fitting_gates = reuse_flags(self.tools.row_data(row).map(|old| old.fitting_gates), fitting);
                 item
             })

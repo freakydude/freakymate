@@ -3,12 +3,12 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { FilamentTab, ToolMatchItem, Navigation, Page, Printer, SpoolPicker } from "../state.slint";
+import { FilamentTab, MmuDialogs, ToolMatchItem, Navigation, Page, Printer, SpoolPicker } from "../state.slint";
 import { Card, ColorBar, ScrollList, TextWithValue, ValueTile } from "../components/controls.slint";
 import { VerdictIcon } from "../components/mmu-tiles.slint";
 import { GateColor, WantedColor } from "mmu-tools.slint";
 
-// A tool of the file: the colour it asks for beside the colour of its gate, and whether they fit.
+// A tool of the file: the colour it asks for beside the colour of its gate, its material, and whether they fit.
 component ToolChip inherits Rectangle {
     in property <ToolMatchItem> mapping;
     property <bool> has-gate: root.mapping.gate >= 0;
@@ -50,34 +50,37 @@ component ToolChip inherits Rectangle {
                 border-radius: 3px;
                 gate: Printer.mmu-gates[root.mapping.gate];
             }
-            // Without a gate to draw, the material the file asks for.
-            if !root.has-gate: Text {
-                horizontal-stretch: 1;
-                text: root.mapping.wanted-material;
-                color: Theme.muted;
-                font-size: Theme.font-small;
-                vertical-alignment: center;
-                overflow: elide;
-            }
             Rectangle { }
+        }
+        // The material the file asks for; in the warning colour when the gate holds another.
+        Text {
+            text: root.mapping.wanted-material;
+            color: root.mapping.material-differs ? Theme.warning : Theme.muted;
+            font-size: Theme.font-small;
+            overflow: elide;
         }
     }
 }
 
-// Tools of the file as chips, five in a row; more than two rows scroll. The first `skip` tools are left out.
+// Tools of the file as chips, five in a row. The grid takes the free height of the page, at least one row and at most
+// all of them; only what still does not fit scrolls. The first `skip` tools are left out.
 component ToolChipGrid inherits ScrollList {
     in property <[ToolMatchItem]> tools;
     in property <int> skip;
     property <int> columns: 5;
     property <int> count: max(0, root.tools.length - root.skip);
     property <int> rows: ceil(root.count / root.columns);
-    property <length> chip-height: Theme.row-height-small;
+    // Three lines: tool and verdict, colours, material.
+    property <length> chip-height: 68px;
     property <length> gap: 6px;
     property <length> row-step: root.chip-height + root.gap;
     property <length> chip-width: (root.row-width - (root.columns - 1) * root.gap) / root.columns;
-    callback clicked;
-    height: min(root.rows, 2) * root.row-step - root.gap;
-    content-height: root.rows * root.row-step - root.gap;
+    callback clicked(mapping: ToolMatchItem);
+    content-height: max(0px, root.rows * root.row-step - root.gap);
+    min-height: min(root.content-height, root.chip-height);
+    preferred-height: root.content-height;
+    max-height: root.content-height;
+    vertical-stretch: 1;
 
     for mapping[index] in root.tools: Rectangle {
         property <int> place: index - root.skip;
@@ -89,16 +92,18 @@ component ToolChipGrid inherits ScrollList {
             width: parent.width;
             height: parent.height;
             mapping: mapping;
-            clicked => { root.clicked(); }
+            clicked => { root.clicked(mapping); }
         }
     }
 }
 
-// The tools of the file with their gates. A tap leads to the Tools tab, where the map is changed.
+// The tools of the file with their gates. A tap leads to the Tools tab, where the map is changed; a tap on a tool with
+// a gate opens its dialog there, which says what to do when it does not fit.
 component ToolMatchCard inherits Card {
     title: @tr("Tool-to-gate map");
     icon: Icons.mmu-ttg-map;
     tappable: true;
+    vertical-stretch: 1;
     clicked => { root.open-tools(); }
 
     function open-tools() {
@@ -132,7 +137,13 @@ component ToolMatchCard inherits Card {
     }
     ToolChipGrid {
         tools: Printer.prepared-tools;
-        clicked => { root.open-tools(); }
+        clicked(mapping) => {
+            root.open-tools();
+            // The rows of the Tools tab are Happy Hare's tools in order, so a tool with a gate is its own row.
+            if (mapping.gate >= 0) {
+                MmuDialogs.tool = mapping.tool;
+            }
+        }
     }
 }
 
@@ -180,6 +191,7 @@ component ExtruderMatchCard inherits Card {
     title: @tr("Filament");
     icon: Icons.filament-spool;
     tappable: Printer.has-spoolman;
+    vertical-stretch: 1;
     clicked => { root.pick-spool(); }
 
     function pick-spool() {
@@ -230,7 +242,7 @@ component ExtruderMatchCard inherits Card {
     if root.several: ToolChipGrid {
         tools: Printer.prepared-tools;
         skip: 1;
-        clicked => { root.pick-spool(); }
+        clicked(mapping) => { root.pick-spool(); }
     }
 }
 
