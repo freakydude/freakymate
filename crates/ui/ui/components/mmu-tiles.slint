@@ -1,0 +1,209 @@
+// Tiles of the Filament page and the print page strip: a gate or the bypass as a slot, availability, buffer gauge and
+// the texts of buffer and FlowGuard.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { MmuGateItem, Printer } from "../state.slint";
+import { StateIcons } from "../state-icons.slint";
+import { ColorBar, IconLabel } from "controls.slint";
+
+// Texts of the buffer and FlowGuard and the colour of FlowGuard, shared by the Gates tab and the strip on the print page.
+export global MmuTexts {
+    pure public function buffer(state: string) -> string {
+        if (state == "neutral") { return @tr("Neutral"); }
+        if (state == "tension") { return @tr("Tension"); }
+        if (state == "compressed") { return @tr("Compression"); }
+        if (state == "inactive") { return @tr("Inactive"); }
+        return @tr("Off");
+    }
+    pure public function flowguard(state: string, detail: string) -> string {
+        if (state == "triggered") { return @tr("FlowGuard triggered") + (detail == "" ? "" : ": " + detail); }
+        if (state == "boosting") { return @tr("FlowGuard: tangle prevention"); }
+        if (state == "monitoring") { return @tr("FlowGuard monitoring"); }
+        return @tr("FlowGuard ready");
+    }
+    // Ready and monitoring are fine; tangle prevention is a deviation, triggered an error.
+    pure public function flowguard-color(state: string) -> color {
+        if (state == "triggered") { return Theme.danger; }
+        if (state == "boosting") { return Theme.warning; }
+        return Theme.success;
+    }
+    pure public function availability(availability: string) -> string {
+        if (availability == "available") { return @tr("Available"); }
+        if (availability == "buffered") { return @tr("Buffered"); }
+        if (availability == "empty") { return @tr("Empty"); }
+        return @tr("Unknown");
+    }
+}
+
+// Whether a gate has filament, as an icon with a word; shared by the Gates tab and the gate dialog.
+export component GateAvailabilityLabel inherits IconLabel {
+    in property <string> availability;
+    property <bool> has-filament: root.availability == "available" || root.availability == "buffered";
+
+    icon: root.has-filament ? Icons.mmu-gate-available : root.availability == "empty" ? Icons.mmu-gate-empty : Icons.mmu-gate-unknown;
+    text: MmuTexts.availability(root.availability);
+    color: StateIcons.ok-color(root.has-filament, root.availability == "empty" ? Theme.warning : Theme.muted);
+    font-size: Theme.font-small;
+}
+
+// The frame of a gate, the bypass or a tool: a tile to tap, with an accent border while selected.
+export component SlotTile inherits Rectangle {
+    in property <bool> selected;
+    in property <string> label;
+    in property <bool> enabled: true;
+    callback clicked;
+
+    border-radius: Theme.radius;
+    background: tile-touch.pressed ? Theme.surface-active : Theme.surface-raised;
+    border-width: root.selected ? 3px : 0px;
+    border-color: Theme.accent;
+    accessible-role: button;
+    accessible-label: root.label;
+
+    tile-touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+    VerticalLayout {
+        padding: 10px;
+        spacing: Theme.spacing-medium;
+        @children
+    }
+}
+
+// How a tool of the compared file fits its gate: a tick when it fits, a warning when not; nothing to say otherwise.
+export component VerdictIcon inherits Image {
+    in property <string> verdict;
+
+    width: 18px;
+    height: 18px;
+    visible: root.verdict != "";
+    source: root.verdict == "fits" ? Icons.ui-check : Icons.ui-warning;
+    colorize: root.verdict == "fits" ? Theme.success : Theme.warning;
+}
+
+export component GateTile inherits SlotTile {
+    in property <MmuGateItem> gate;
+
+    property <bool> has-filament: root.gate.availability == "available" || root.gate.availability == "buffered";
+    property <bool> shows-spool: Printer.has-spoolman && root.has-filament;
+
+    selected: root.gate.selected;
+    label: @tr("Gate {}", root.gate.index);
+
+    HorizontalLayout {
+        spacing: Theme.spacing-medium;
+        Text {
+            text: @tr("Gate {}", root.gate.index);
+            color: Theme.foreground;
+            font-size: Theme.font-normal;
+            font-weight: 700;
+        }
+        // The tools that take their filament from this gate; several share it after a remap.
+        Text {
+            horizontal-stretch: 1;
+            text: root.gate.tools;
+            color: Theme.accent;
+            font-size: Theme.font-normal;
+            font-weight: 700;
+            horizontal-alignment: right;
+            overflow: elide;
+        }
+        if root.gate.file-verdict != "": VerdictIcon {
+            cross-axis-self-alignment: center;
+            verdict: root.gate.file-verdict;
+        }
+    }
+    ColorBar {
+        height: 12px;
+        border-radius: 6px;
+        colors: root.gate.colors;
+        generic: root.has-filament;
+    }
+    Text {
+        text: root.gate.material == "" ? "-" : root.gate.material;
+        color: Theme.foreground;
+        font-size: Theme.font-large;
+        overflow: elide;
+    }
+    // With Spoolman the line of the filament name says what is left of the spool instead (the name repeats the
+    // material and the colour above); a gate without one invites to pick one in the gate's dialog. A spool that Happy
+    // Hare knows but Spoolman does not tell about (not reachable) shows its number.
+    Text {
+        text: !root.shows-spool ? root.gate.name : root.gate.spool-text != "" ? root.gate.spool-text : root.gate.spool-id >= 0 ? @tr("Spool #{}", root.gate.spool-id) : @tr("+ spool");
+        color: root.shows-spool && root.gate.spool-low ? Theme.warning : root.shows-spool && root.gate.spool-text == "" && root.gate.spool-id < 0 ? Theme.accent : Theme.muted;
+        font-size: Theme.font-small;
+        overflow: elide;
+    }
+    Rectangle { vertical-stretch: 1; }
+    HorizontalLayout {
+        GateAvailabilityLabel {
+            availability: root.gate.availability;
+        }
+        if Printer.mmu-endless-spool && root.gate.group >= 0: IconLabel {
+            icon: Icons.mmu-endless-spool;
+            text: root.gate.group;
+            color: Theme.muted;
+            font-size: Theme.font-small;
+        }
+    }
+}
+
+// Happy Hare offers the bypass on every MMU: filament fed by hand past the gates. Material and colour of the bypass
+// are not in its status, so the tile only names it.
+export component BypassTile inherits SlotTile {
+    selected: Printer.mmu-bypass;
+    label: @tr("Bypass");
+
+    Text {
+        text: @tr("Bypass");
+        color: Theme.foreground;
+        font-size: Theme.font-normal;
+        font-weight: 700;
+    }
+    Rectangle { vertical-stretch: 1; }
+    HorizontalLayout {
+        alignment: center;
+        Image {
+            source: Icons.mmu-bypass;
+            colorize: Printer.mmu-bypass ? Theme.accent : Theme.muted;
+            width: 40px;
+            height: 40px;
+        }
+    }
+    Rectangle { vertical-stretch: 1; }
+    Text {
+        text: @tr("Fed by hand");
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        overflow: elide;
+    }
+}
+
+// Position of the filament in the buffer: tension on the left, compression on the right, the neutral zone in the middle.
+export component BufferGauge inherits Rectangle {
+    in property <float> bias;
+    in property <string> state;
+    // Only a measuring buffer marks its neutral zone as the place where all is fine.
+    property <bool> measuring: root.state == "neutral" || root.state == "tension" || root.state == "compressed";
+    out property <color> marker-color: root.state == "neutral" ? Theme.success : root.state == "tension" || root.state == "compressed" ? Theme.warning : Theme.muted;
+
+    height: 18px;
+    Rectangle {
+        border-radius: 4px;
+        background: Theme.border;
+    }
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        width: parent.width * 0.1;
+        background: root.measuring ? Theme.success.with-alpha(0.35) : Theme.surface-active;
+    }
+    Rectangle {
+        width: 8px;
+        height: parent.height;
+        x: clamp((root.bias + 1) / 2, 0, 1) * (parent.width - self.width);
+        border-radius: 4px;
+        background: root.marker-color;
+    }
+}

@@ -1,0 +1,41 @@
+// Preview: the bed mesh dialog with a 5 x 4 map drawn from cells, the legend and a faulty region.
+// Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { MeshDialogs, Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component BedMeshPreview inherits AppWindow {
+    init => {
+        Sample.calibration();
+        Navigation.page = Page.move;
+        MeshDialogs.map-open = true;
+        Printer.bed-mesh-map = {
+            shown: true, columns: 5, rows: 4, aspect: 1.25, range: "0.182 mm", lowest: "-0.071", highest: "0.111",
+            limit: "0.111", averaged: 0, filled: false,
+        };
+        Printer.bed-mesh-cells = [
+            { column: 0, row: 0, text: "0.02", colour: #b8c4d8, dark: true },
+            { column: 1, row: 0, text: "0.00", colour: #d8d8d8, dark: true },
+            { column: 2, row: 0, text: "-0.03", colour: #4a78b8, dark: false },
+            { column: 3, row: 0, text: "0.05", colour: #e0a070, dark: true },
+            { column: 4, row: 0, text: "0.11", colour: #d05030, dark: false },
+            { column: 0, row: 1, text: "0.01", colour: #c8d0dc, dark: true },
+            { column: 1, row: 1, text: "-0.02", colour: #6890c8, dark: false },
+            { column: 2, row: 1, text: "-0.07", colour: #2858a0, dark: false },
+            { column: 3, row: 1, text: "0.03", colour: #e8c0a0, dark: true },
+            { column: 4, row: 1, text: "0.08", colour: #d86040, dark: false },
+            { column: 0, row: 2, text: "0.00", colour: #d8d8d8, dark: true },
+            { column: 1, row: 2, text: "-0.01", colour: #a8b8d0, dark: true },
+            { column: 2, row: 2, text: "-0.04", colour: #4a78b8, dark: false },
+            { column: 3, row: 2, text: "0.02", colour: #ecd0b8, dark: true },
+            { column: 4, row: 2, text: "0.06", colour: #e0a070, dark: true },
+            { column: 0, row: 3, text: "0.03", colour: #e8c0a0, dark: true },
+            { column: 1, row: 3, text: "0.01", colour: #c8d0dc, dark: true },
+            { column: 2, row: 3, text: "-0.02", colour: #6890c8, dark: false },
+            { column: 3, row: 3, text: "0.04", colour: #e0a070, dark: true },
+            { column: 4, row: 3, text: "0.07", colour: #d86040, dark: false },
+        ];
+        Printer.bed-mesh-frames = [{ column: 2, row: 1, columns: 1, rows: 1 }];
+    }
+}

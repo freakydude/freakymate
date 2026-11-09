@@ -24,7 +24,7 @@ export component SystemPage inherits Rectangle {
                 title: @tr("Klipper");
                 icon: Icons.system-firmware-restart;
                 IconLabel {
-                    icon: Printer.connection == "connected" ? Icons.system-connected : Icons.system-disconnected;
+                    icon: Printer.is-connected ? Icons.system-connected : Icons.system-disconnected;
                     text: Printer.endpoint;
                     font-size: Theme.font-small;
                     color: Theme.muted;
@@ -35,13 +35,13 @@ export component SystemPage inherits Rectangle {
                     IconButton {
                         icon: Icons.system-restart;
                         text: @tr("Restart");
-                        enabled: Printer.connection == "connected" && !Printer.host-actions-locked;
+                        enabled: Printer.is-connected && !Printer.host-actions-locked;
                         clicked => { Confirm.ask(@tr("Restart Klipper"), @tr("Reloads the configuration."), "restart-klipper", "", false); }
                     }
                     IconButton {
                         icon: Icons.system-firmware-restart;
                         text: @tr("Firmware");
-                        enabled: Printer.connection == "connected" && !Printer.host-actions-locked;
+                        enabled: Printer.is-connected && !Printer.host-actions-locked;
                         clicked => { Confirm.ask(@tr("Firmware restart"), @tr("Restarts Klipper and all MCUs."), "firmware-restart", "", false); }
                     }
                 }
@@ -55,13 +55,13 @@ export component SystemPage inherits Rectangle {
                     IconButton {
                         icon: Icons.system-restart;
                         text: @tr("Reboot");
-                        enabled: Printer.connection == "connected" && !Printer.host-actions-locked;
+                        enabled: Printer.is-connected && !Printer.host-actions-locked;
                         clicked => { Confirm.ask(@tr("Reboot host"), @tr("The printer host restarts. The connection is lost for a while."), "reboot-host", "", true); }
                     }
                     IconButton {
                         icon: Icons.system-shutdown;
                         text: @tr("Shutdown");
-                        enabled: Printer.connection == "connected" && !Printer.host-actions-locked;
+                        enabled: Printer.is-connected && !Printer.host-actions-locked;
                         clicked => { Confirm.ask(@tr("Shut down host"), @tr("The printer host powers off and must be switched on by hand."), "shutdown-host", "", true); }
                     }
                 }
@@ -72,7 +72,7 @@ export component SystemPage inherits Rectangle {
                         text: service.name;
                         icon: Icons.system-restart;
                         icon-size: 20px;
-                        enabled: Printer.connection == "connected" && !Printer.host-actions-locked;
+                        enabled: Printer.is-connected && !Printer.host-actions-locked;
                         clicked => { Confirm.ask(@tr("Restart service"), service.name, "restart-service", service.id, false); }
                     }
                 }
@@ -94,7 +94,7 @@ export component SystemPage inherits Rectangle {
                 title: @tr("Power devices");
                 icon: Icons.accessory-power-device;
                 for device in Printer.power-devices: ToggleRow {
-                    height: 52px;
+                    height: Theme.row-height-small;
                     text: device.name;
                     checked: device.on;
                     enabled: !(device.locked && Printer.is-printing);

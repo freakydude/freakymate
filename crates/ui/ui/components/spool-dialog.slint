@@ -1,0 +1,145 @@
+// Spool picker.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, Printer, SpoolPicker } from "../state.slint";
+import { ButtonKind, ColorBar, IconButton, IconLabel, ScrollList, TextWithValue } from "controls.slint";
+import { NumberEntryDialog } from "entry-dialogs.slint";
+import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
+
+// Picks a spool of Spoolman for the gate (or, without MMU, as the active spool), weighs it, or takes it out of the gate.
+// The list shows the spools in a lane first, then the most recently used ones.
+export component SpoolDialog inherits Scrim {
+    property <int> selected: -1;
+    visible: SpoolPicker.open;
+
+    changed visible => {
+        root.selected = self.visible ? SpoolPicker.current : -1;
+    }
+
+    DialogPanel {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: parent.height - 16px;
+
+        VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing;
+            DialogHeader {
+                title: SpoolPicker.gate >= 0 ? @tr("Spool for gate {}", SpoolPicker.gate) : @tr("Spool in use");
+                close => { SpoolPicker.open = false; }
+                if Printer.spoolman-offline: IconLabel {
+                    icon: Icons.ui-warning;
+                    text: Printer.spoolman-pending > 0 ? @tr("Spoolman offline, {} reports waiting", Printer.spoolman-pending) : @tr("Spoolman offline");
+                    color: Theme.warning;
+                    font-size: Theme.font-small;
+                }
+            }
+            spools-list := ScrollList {
+                vertical-stretch: 1;
+                content-height: Printer.spools.length * (Theme.touch + Theme.spacing);
+                for spool[index] in Printer.spools: Rectangle {
+                    x: 8px;
+                    y: index * (Theme.touch + Theme.spacing);
+                    width: spools-list.row-width - 16px;
+                    height: Theme.touch;
+                    background: spool.id == root.selected ? Theme.surface-active : Theme.surface-raised;
+                    border-radius: Theme.radius;
+                    border-width: spool.id == root.selected ? 2px : 0px;
+                    border-color: Theme.accent;
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 12px;
+                        spacing: 10px;
+                        ColorBar {
+                            cross-axis-self-alignment: center;
+                            width: 14px;
+                            height: 34px;
+                            vertical: true;
+                            colors: spool.colors;
+                            generic: true;
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 1;
+                            Text {
+                                text: spool.title;
+                                color: Theme.foreground;
+                                font-size: Theme.font-normal;
+                                font-weight: 600;
+                                overflow: elide;
+                            }
+                            TextWithValue {
+                                text: spool.material;
+                                value: spool.remaining;
+                                color: spool.low ? Theme.warning : Theme.muted;
+                            }
+                        }
+                        Text {
+                            text: spool.place;
+                            color: Theme.accent;
+                            font-size: Theme.font-small;
+                            vertical-alignment: center;
+                        }
+                    }
+                    TouchArea {
+                        clicked => { root.selected = spool.id; }
+                    }
+                }
+            }
+            if Printer.spools.length == 0: Text {
+                text: Printer.spools-loading ? @tr("Loading") : @tr("No spools");
+                color: Theme.muted;
+                font-size: Theme.font-normal;
+                horizontal-alignment: center;
+            }
+            HorizontalLayout {
+                spacing: Theme.spacing;
+                height: Theme.touch;
+                // Takes only the link to Spoolman away; Happy Hare keeps material and colour of the gate.
+                if SpoolPicker.gate >= 0: IconButton {
+                    text: @tr("Unlink");
+                    horizontal: true;
+                    enabled: SpoolPicker.current >= 0;
+                    clicked => {
+                        Actions.assign-gate-spool(SpoolPicker.gate, -1);
+                        SpoolPicker.open = false;
+                    }
+                }
+                IconButton {
+                    icon: Icons.filament-spool;
+                    text: @tr("Weigh");
+                    horizontal: true;
+                    enabled: root.selected >= 0;
+                    clicked => {
+                        weigh.text = "";
+                        weigh.open = true;
+                    }
+                }
+                IconButton {
+                    icon: Icons.ui-check;
+                    text: SpoolPicker.gate >= 0 ? @tr("Assign") : @tr("Use");
+                    horizontal: true;
+                    kind: ButtonKind.accent;
+                    enabled: root.selected >= 0;
+                    clicked => {
+                        if (SpoolPicker.gate >= 0) {
+                            Actions.assign-gate-spool(SpoolPicker.gate, root.selected);
+                        } else {
+                            Actions.set-active-spool(root.selected);
+                        }
+                        SpoolPicker.open = false;
+                    }
+                }
+            }
+        }
+    }
+
+    // The weight of the spool with its core, as the scale shows it; Spoolman subtracts the empty spool.
+    weigh := NumberEntryDialog {
+        title: @tr("Weight with the empty spool");
+        unit: "g";
+        accepted(text) => { Actions.measure-spool(root.selected, text); }
+    }
+}

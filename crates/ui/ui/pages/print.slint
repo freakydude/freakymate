@@ -3,32 +3,13 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, Navigation, Printer } from "../state.slint";
-import { IconButton, IconLabel, ProgressBar, ScrollList, ValueTile } from "../components/controls.slint";
-import { ExcludeObjectsDialog, LayerPauseDialog } from "../components/overlays.slint";
+import { ButtonKind, IconButton, ProgressBar, ValueTile } from "../components/controls.slint";
+import { ExcludeObjectsDialog, LayerPauseDialog } from "../components/print-dialogs.slint";
+import { Thumbnail } from "../components/thumbnail.slint";
 import { SpoolStrip } from "../components/spool-strip.slint";
 import { MmuStrip } from "mmu.slint";
+import { FileBrowser } from "files.slint";
 import { PreparedJob } from "print-prepared.slint";
-
-component Thumbnail inherits Rectangle {
-    in property <image> source;
-    in property <bool> available;
-    background: Theme.surface-raised;
-    border-radius: Theme.radius;
-    clip: true;
-
-    if root.available: Image {
-        width: parent.width;
-        height: parent.height;
-        source: root.source;
-        image-fit: contain;
-    }
-    if !root.available: Image {
-        source: Icons.file-gcode;
-        colorize: Theme.disabled-foreground;
-        width: parent.width / 3;
-        height: parent.width / 3;
-    }
-}
 
 // A paused or failed print and what the sources state about it; the reason is never guessed.
 component InterruptionBanner inherits Rectangle {
@@ -39,7 +20,7 @@ component InterruptionBanner inherits Rectangle {
     border-radius: Theme.radius;
     border-width: 1px;
     border-color: root.tone;
-    min-height: 52px;
+    min-height: Theme.row-height-small;
 
     HorizontalLayout {
         padding: 6px;
@@ -49,8 +30,8 @@ component InterruptionBanner inherits Rectangle {
             cross-axis-self-alignment: center;
             source: root.failed ? Icons.ui-error : Icons.print-pause;
             colorize: root.tone;
-            width: 22px;
-            height: 22px;
+            width: Theme.icon-medium;
+            height: Theme.icon-medium;
         }
         VerticalLayout {
             alignment: center;
@@ -71,194 +52,9 @@ component InterruptionBanner inherits Rectangle {
     }
 }
 
-// A fact of a file keeps its whole width; only the material gives way (see FileRow).
-component FileChip inherits IconLabel {
-    color: Theme.muted;
-    font-size: Theme.font-small;
-    icon-size: 16px;
-    min-width: self.preferred-width;
-}
-
-component FileRow inherits Rectangle {
-    in property <string> name;
-    in property <string> modified;
-    in property <string> material;
-    in property <string> weight;
-    in property <string> nozzle;
-    in property <string> time;
-    in property <string> extruder-temperature;
-    in property <string> bed-temperature;
-    in property <string> chamber-temperature;
-    in property <image> thumbnail;
-    in property <bool> has-thumbnail;
-    in property <bool> show-thumbnail;
-    // Marked for preparing (a single one) or deleting.
-    in property <bool> selected;
-    // The job of the print page.
-    in property <bool> prepared;
-    callback clicked;
-    height: 72px;
-    border-radius: Theme.radius;
-    background: root.selected ? Theme.surface-active : row-touch.pressed ? Theme.surface-raised : Theme.surface;
-    border-width: root.selected ? 2px : 0px;
-    border-color: Theme.accent;
-
-    row-touch := TouchArea {
-        clicked => { root.clicked(); }
-    }
-    HorizontalLayout {
-        padding: 4px;
-        padding-left: root.show-thumbnail ? 4px : 14px;
-        spacing: 10px;
-        if root.show-thumbnail: Thumbnail {
-            width: 64px;
-            source: root.thumbnail;
-            available: root.has-thumbnail;
-        }
-        VerticalLayout {
-            alignment: center;
-            spacing: 4px;
-            HorizontalLayout {
-                spacing: 10px;
-                Text {
-                    text: root.name;
-                    color: Theme.foreground;
-                    font-size: Theme.font-normal;
-                    overflow: elide;
-                    horizontal-stretch: 1;
-                }
-                if root.prepared: FileChip {
-                    icon: Icons.print-load;
-                    text: @tr("Prepared");
-                    color: Theme.foreground;
-                }
-                Text {
-                    text: root.modified;
-                    color: Theme.muted;
-                    font-size: Theme.font-small;
-                    horizontal-alignment: right;
-                    vertical-alignment: center;
-                }
-            }
-            HorizontalLayout {
-                spacing: 14px;
-                // Files for several tools list a material per tool; the list is cut so the weight and the other facts
-                // stay readable.
-                if root.material != "" || root.weight != "": HorizontalLayout {
-                    spacing: 6px;
-                    FileChip {
-                        icon: Icons.filament-spool;
-                        text: root.material;
-                        min-width: min(self.preferred-width, 72px);
-                    }
-                    if root.weight != "": Text {
-                        text: root.weight;
-                        color: Theme.muted;
-                        font-size: Theme.font-small;
-                        vertical-alignment: center;
-                        min-width: self.preferred-width;
-                    }
-                }
-                if root.nozzle != "": FileChip { icon: Icons.print-nozzle-diameter; text: root.nozzle; }
-                if root.time != "": FileChip { icon: Icons.print-duration; text: root.time; }
-                if root.extruder-temperature != "": FileChip {
-                    icon: Icons.thermal-nozzle;
-                    text: root.extruder-temperature;
-                }
-                if root.bed-temperature != "": FileChip {
-                    icon: Icons.thermal-bed;
-                    text: root.bed-temperature;
-                }
-                if root.chamber-temperature != "": FileChip {
-                    icon: Icons.thermal-chamber;
-                    text: root.chamber-temperature;
-                }
-                Rectangle { }
-            }
-        }
-    }
-}
-
-// File list over the print page; scroll by swiping or with the bar at the right edge.
-export component FileBrowser inherits Rectangle {
-    property <length> row-step: 76px;
-    property <bool> print-running: Printer.is-printing;
-    background: Theme.background;
-    visible: Navigation.files-open;
-
-    TouchArea { }
-
-    // A print started elsewhere (another client, a macro) leaves nothing to choose here.
-    changed print-running => {
-        if (self.print-running) {
-            Actions.clear-file-marks();
-            Navigation.files-open = false;
-        }
-    }
-
-    HorizontalLayout {
-        padding: Theme.padding;
-        spacing: Theme.spacing;
-
-        list := ScrollList {
-            horizontal-stretch: 1;
-            content-height: Printer.files.length * root.row-step;
-            for file[index] in Printer.files: FileRow {
-                y: index * root.row-step;
-                width: list.row-width;
-                name: file.name;
-                modified: file.modified;
-                material: file.material;
-                weight: file.weight;
-                nozzle: file.nozzle;
-                time: file.time;
-                extruder-temperature: file.extruder-temperature;
-                bed-temperature: file.bed-temperature;
-                chamber-temperature: file.chamber-temperature;
-                thumbnail: file.thumbnail;
-                has-thumbnail: file.has-thumbnail;
-                show-thumbnail: file.show-thumbnail;
-                selected: file.marked;
-                prepared: file.path == Printer.prepared-path;
-                clicked => { Actions.toggle-file-mark(file.path); }
-            }
-        }
-
-        VerticalLayout {
-            width: 96px;
-            spacing: Theme.spacing;
-            IconButton {
-                icon: Icons.ui-close;
-                text: @tr("Close");
-                clicked => {
-                    Actions.clear-file-marks();
-                    Navigation.files-open = false;
-                }
-            }
-            // One marked file can be prepared or deleted, several only deleted.
-            IconButton {
-                icon: Icons.ui-delete;
-                text: Printer.marked-file-count > 1 ? @tr("Delete {}", Printer.marked-file-count) : @tr("Delete");
-                enabled: Printer.marked-file-count > 0;
-                clicked => {
-                    Confirm.ask-for-items(@tr("Delete files"), "", Printer.marked-file-names, false, "delete-files", "", true);
-                }
-            }
-            // Preparing changes nothing at the printer, so it asks nothing; the print page then shows the file.
-            IconButton {
-                icon: Icons.print-prepare;
-                text: @tr("Prepare");
-                kind: "accent";
-                vertical-stretch: 1;
-                enabled: Printer.marked-file-path != "";
-                clicked => {
-                    Actions.prepare-file(Printer.marked-file-path);
-                    Actions.clear-file-marks();
-                    Navigation.files-open = false;
-                }
-            }
-        }
-    }
+// A tall button of the action column beside the job.
+component ActionTile inherits IconButton {
+    height: 96px;
 }
 
 export component PrintPage inherits Rectangle {
@@ -399,8 +195,7 @@ export component PrintPage inherits Rectangle {
         VerticalLayout {
             width: 104px;
             spacing: Theme.spacing;
-            if !Printer.is-printing: IconButton {
-                height: 96px;
+            if !Printer.is-printing: ActionTile {
                 icon: Icons.print-load;
                 text: @tr("Files");
                 clicked => {
@@ -408,44 +203,38 @@ export component PrintPage inherits Rectangle {
                     Actions.refresh-files();
                 }
             }
-            if root.prepared: IconButton {
-                height: 96px;
+            if root.prepared: ActionTile {
                 icon: Icons.print-start;
                 text: @tr("Print");
-                kind: "accent";
+                kind: ButtonKind.accent;
                 clicked => { Confirm.ask-for-items(@tr("Start print"), Printer.prepared.name, Actions.print-hints(Printer.prepared-path), true, "start-print", Printer.prepared-path, false); }
             }
-            if !Printer.is-printing && !root.prepared && root.has-job: IconButton {
-                height: 96px;
+            if !Printer.is-printing && !root.prepared && root.has-job: ActionTile {
                 icon: root.finished ? Icons.print-repeat : Icons.print-start;
                 text: root.finished ? @tr("Reprint") : @tr("Start");
-                kind: "accent";
+                kind: ButtonKind.accent;
                 clicked => { Confirm.ask-for-items(@tr("Start print"), Printer.job-name, Actions.print-hints(Printer.filename), true, "start-print", Printer.filename, false); }
             }
-            if Printer.print-state == "printing": IconButton {
-                height: 96px;
+            if Printer.print-state == "printing": ActionTile {
                 icon: Icons.print-pause;
                 text: @tr("Pause");
                 clicked => { Actions.pause-print(); }
             }
-            if Printer.print-state == "paused": IconButton {
-                height: 96px;
+            if Printer.print-state == "paused": ActionTile {
                 icon: Icons.print-resume;
                 text: @tr("Resume");
-                kind: "accent";
+                kind: ButtonKind.accent;
                 clicked => { Actions.resume-print(); }
             }
-            if Printer.is-printing && Printer.print-objects.length > 0: IconButton {
-                height: 96px;
+            if Printer.is-printing && Printer.print-objects.length > 0: ActionTile {
                 icon: Icons.print-exclude-object;
                 text: @tr("Objects");
                 clicked => { objects-dialog.open = true; }
             }
-            if Printer.is-printing: IconButton {
-                height: 96px;
+            if Printer.is-printing: ActionTile {
                 icon: Icons.print-cancel;
                 text: @tr("Cancel");
-                kind: "danger";
+                kind: ButtonKind.danger;
                 clicked => { Confirm.ask(@tr("Cancel print"), @tr("The current print will be stopped and cannot be resumed."), "cancel-print", "", true); }
             }
             Rectangle { vertical-stretch: 1; }

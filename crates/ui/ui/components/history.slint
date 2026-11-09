@@ -16,7 +16,7 @@ component ChartLine inherits Path {
 component Legend inherits HorizontalLayout {
     in property <color> color;
     in property <string> text;
-    spacing: 6px;
+    spacing: Theme.spacing-medium;
     Rectangle { cross-axis-self-alignment: center; width: 16px; height: 3px; background: root.color; }
     Text { text: root.text; color: Theme.muted; font-size: Theme.font-small; vertical-alignment: center; }
 }

@@ -26,14 +26,15 @@ is the BTT HDMI5 (5", 800x480, landscape).
 
 |                                      |                                        |                                                            |
 | ------------------------------------ | -------------------------------------- | ---------------------------------------------------------- |
-| ![Files](docs/screenshots/files.png) | ![Move](docs/screenshots/move.png)     | ![Temperature](docs/screenshots/temperature.png)           |
+| ![Files](docs/screenshots/files.png) | ![Move](docs/screenshots/move.png)     | ![Thermal](docs/screenshots/temperature.png)           |
 | ![Tune](docs/screenshots/tune.png)   | ![System](docs/screenshots/system.png) | ![Klipper shut down](docs/screenshots/klippy-shutdown.png) |
 | ![Console](docs/screenshots/console.png) | ![Filament](docs/screenshots/filament.png) | ![MMU (Happy Hare)](docs/screenshots/mmu.png)       |
 
 ## Features
 
 - **Print**: progress, layers, ETA and filament; pause, resume, cancel and exclude objects on a map of the bed; a file
-  list with thumbnails.
+  list with thumbnails, where **Prepare** makes a file the job of the print page and shows how its filament fits the
+  tools (a hint, never a lock).
 - **Move**: jog, home, Quad Gantry Level or Z-Tilt; a **Calibrate** tab for bed screws, Z offset and the bed mesh with
   a coloured map and profiles.
 - **Thermal**: heaters with presets and temperature history, fans with a warning when one stops, sensors.
@@ -43,7 +44,7 @@ is the BTT HDMI5 (5", 800x480, landscape).
 - **System**: restarts and power devices, updates, Wi-Fi and Ethernet, a full console with macros and forms for their
   parameters, display settings.
 - **Happy Hare (MMU)**, 4.1 or newer: gates, filament path, buffer, FlowGuard and flow rate; select, load and eject
-  gates, tool-to-gate map, EndlessSpool.
+  gates, tool-to-gate map, EndlessSpool; filament colours with transparency over a checkerboard.
 - **Spoolman**: the spool in use on the print page and at each gate, a spool picker with weighing, a preset from the
   spool and hints before a print.
 

@@ -6,7 +6,7 @@ import { Icons } from "../icons.slint";
 import { Actions, Confirm, MmuDialogs, MmuGateItem, ToolMatchItem, Printer } from "../state.slint";
 import { Card, ColorBar, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
 import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
-import { SlotTile, VerdictIcon } from "mmu.slint";
+import { SlotTile, VerdictIcon } from "../components/mmu-tiles.slint";
 
 // The colour of a gate as a vertical bar, the way the tiles of the gates show it.
 export component GateColor inherits ColorBar {
@@ -51,7 +51,7 @@ component ToolTile inherits SlotTile {
             vertical-alignment: center;
         }
         HorizontalLayout {
-            spacing: 4px;
+            spacing: Theme.spacing-small;
             if root.mapping.used && (root.mapping.wanted-has-color): WantedColor {
                 cross-axis-self-alignment: center;
                 mapping: root.mapping;
@@ -86,7 +86,7 @@ component ToolTile inherits SlotTile {
 
 // The file the tools are compared with and how many of its tools fit.
 component MatchLine inherits HorizontalLayout {
-    spacing: 6px;
+    spacing: Theme.spacing-medium;
     height: 20px;
     Image {
         cross-axis-self-alignment: center;
@@ -232,7 +232,7 @@ component GateOption inherits SlotTile {
     label: @tr("Gate {}", root.gate.index);
 
     HorizontalLayout {
-        spacing: 6px;
+        spacing: Theme.spacing-medium;
         Text {
             horizontal-stretch: 1;
             text: @tr("Gate {}", root.gate.index);

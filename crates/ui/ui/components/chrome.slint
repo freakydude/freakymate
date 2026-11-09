@@ -2,7 +2,8 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, Severity, StateIcons, TuneTab } from "../state.slint";
+import { Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, Severity, TuneTab } from "../state.slint";
+import { StateIcons } from "../state-icons.slint";
 import { BusyWheel } from "busy-wheel.slint";
 
 // A temperature of the status bar; a tap leads to the heaters without looking like a button.
@@ -21,7 +22,7 @@ component TemperatureReading inherits Rectangle {
     }
 
     reading := HorizontalLayout {
-        spacing: 4px;
+        spacing: Theme.spacing-small;
         Image {
             cross-axis-self-alignment: center;
             source: root.icon;
@@ -53,8 +54,8 @@ component UnreadCounter inherits Rectangle {
             cross-axis-self-alignment: center;
             source: Icons.ui-error;
             colorize: Theme.foreground;
-            width: 16px;
-            height: 16px;
+            width: Theme.icon-compact;
+            height: Theme.icon-compact;
         }
         Text {
             text: root.count;
@@ -115,8 +116,8 @@ export component StatusBar inherits Rectangle {
                         cross-axis-self-alignment: center;
                         source: Printer.status-message-error ? Icons.ui-error : Icons.ui-info;
                         colorize: Printer.status-message-error ? Theme.danger : Theme.info;
-                        width: 22px;
-                        height: 22px;
+                        width: Theme.icon-medium;
+                        height: Theme.icon-medium;
                     }
                     Text {
                         horizontal-stretch: 1;
@@ -131,7 +132,7 @@ export component StatusBar inherits Rectangle {
                 // While something runs, the turning wheel and its name replace the state.
                 if !Printer.status-message-visible && root.activity != "": HorizontalLayout {
                     horizontal-stretch: 1;
-                    spacing: 6px;
+                    spacing: Theme.spacing-medium;
                     BusyWheel {
                         cross-axis-self-alignment: center;
                         width: 40px;
@@ -154,8 +155,8 @@ export component StatusBar inherits Rectangle {
                         cross-axis-self-alignment: center;
                         source: StateIcons.summary();
                         colorize: StateIcons.severity-color(root.severity);
-                        width: 24px;
-                        height: 24px;
+                        width: Theme.icon-large;
+                        height: Theme.icon-large;
                     }
                     // The progress of a print stays whole when the detail is shortened.
                     HorizontalLayout {
@@ -240,8 +241,8 @@ export component StatusBar inherits Rectangle {
             Image {
                 source: Icons.accessory-light;
                 colorize: Printer.light-on ? Theme.accent : Theme.muted;
-                width: 24px;
-                height: 24px;
+                width: Theme.icon-large;
+                height: Theme.icon-large;
             }
         }
         VerticalLayout {

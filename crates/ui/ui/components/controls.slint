@@ -3,7 +3,17 @@
 import { BarColors } from "../state.slint";
 import { Theme } from "../theme.slint";
 
-// Button with icon and optional text. `kind`: normal | accent | danger.
+// Small explanatory text in the muted colour.
+export component Note inherits Text {
+    color: Theme.muted;
+    font-size: Theme.font-small;
+    wrap: word-wrap;
+}
+
+// What a button stands for: a plain action, the confirming action (accent) or a dangerous one.
+export enum ButtonKind { normal, accent, danger }
+
+// Button with icon and optional text.
 export component IconButton inherits Rectangle {
     in property <image> icon;
     in property <string> text;
@@ -11,7 +21,7 @@ export component IconButton inherits Rectangle {
     in property <bool> checked;
     // What the button does has taken effect and is fine (homed, levelled): marked like `checked`, but in `success`.
     in property <bool> done;
-    in property <string> kind: "normal";
+    in property <ButtonKind> kind: ButtonKind.normal;
     in property <length> icon-size: Theme.icon;
     // Icon left of the text instead of above it.
     in property <bool> horizontal;
@@ -22,15 +32,15 @@ export component IconButton inherits Rectangle {
 
     property <bool> has-icon: root.icon.width > 0;
     property <bool> marked: root.checked || root.done;
-    property <color> base: root.kind == "accent" ? Theme.accent : root.kind == "danger" ? Theme.danger-fill : root.marked ? Theme.surface-active : Theme.surface-raised;
-    property <color> pressed: root.kind == "accent" ? Theme.accent-pressed : root.kind == "danger" ? Theme.danger-fill-pressed : Theme.surface-active;
-    property <color> content: !root.enabled ? Theme.disabled-foreground : root.kind == "accent" ? Theme.on-accent : Theme.foreground;
+    property <color> base: root.kind == ButtonKind.accent ? Theme.accent : root.kind == ButtonKind.danger ? Theme.danger-fill : root.marked ? Theme.surface-active : Theme.surface-raised;
+    property <color> pressed: root.kind == ButtonKind.accent ? Theme.accent-pressed : root.kind == ButtonKind.danger ? Theme.danger-fill-pressed : Theme.surface-active;
+    property <color> content: !root.enabled ? Theme.disabled-foreground : root.kind == ButtonKind.accent ? Theme.on-accent : Theme.foreground;
 
     min-width: Theme.touch;
     min-height: Theme.touch;
     border-radius: Theme.radius;
     background: !root.enabled ? Theme.surface : touch.pressed ? root.pressed : root.base;
-    border-width: root.marked && root.kind == "normal" ? 2px : 0px;
+    border-width: root.marked && root.kind == ButtonKind.normal ? 2px : 0px;
     border-color: root.checked ? Theme.accent : Theme.success;
     accessible-role: button;
     accessible-label: root.text;
@@ -171,7 +181,7 @@ export component StepSelector inherits HorizontalLayout {
     in-out property <float> selected;
     callback changed(float);
 
-    spacing: 4px;
+    spacing: Theme.spacing-small;
     alignment: center;
 
     if root.label != "": Text {
@@ -317,9 +327,9 @@ export component Card inherits Rectangle {
 
     VerticalLayout {
         padding: Theme.padding;
-        spacing: 6px;
+        spacing: Theme.spacing-medium;
         if root.title != "": HorizontalLayout {
-            spacing: 6px;
+            spacing: Theme.spacing-medium;
             height: 20px;
             if root.icon.width > 0: Image {
                 cross-axis-self-alignment: center;
@@ -357,7 +367,7 @@ export component ValueTile inherits Rectangle {
     callback clicked;
     background: tile-touch.pressed ? Theme.surface-raised : Theme.surface;
     border-radius: Theme.radius;
-    min-height: 52px;
+    min-height: Theme.row-height-small;
     // The width of tiles side by side follows their `weight` only (default: equal), never their text:
     // a changing value must not move the columns.
     horizontal-stretch: root.weight;
@@ -376,8 +386,8 @@ export component ValueTile inherits Rectangle {
             cross-axis-self-alignment: center;
             source: root.icon;
             colorize: root.icon-color;
-            width: 22px;
-            height: 22px;
+            width: Theme.icon-medium;
+            height: Theme.icon-medium;
         }
         VerticalLayout {
             alignment: center;
@@ -607,7 +617,7 @@ export component IconLabel inherits HorizontalLayout {
     in property <color> color: Theme.foreground;
     in property <length> font-size: Theme.font-normal;
     in property <length> icon-size: 20px;
-    spacing: 6px;
+    spacing: Theme.spacing-medium;
 
     Image {
         cross-axis-self-alignment: center;
@@ -703,6 +713,69 @@ export component ColorBar inherits Rectangle {
             border-top-right-radius: parent.border-top-right-radius;
             border-bottom-left-radius: parent.border-bottom-left-radius;
             border-bottom-right-radius: parent.border-bottom-right-radius;
+        }
+    }
+}
+
+// A row with an icon, a name and its value, "Off", a slider and "100%": the dimmer of a light or of the display. The
+// callbacks do the work; `value-text` may use `shown`, the value under the finger.
+export component SliderRow inherits Rectangle {
+    in property <image> icon;
+    in property <color> icon-color;
+    in property <string> label;
+    in property <string> value-text;
+    in property <bool> off-checked;
+    in property <bool> full-checked;
+    in property <float> value;
+    in property <float> minimum: 0;
+    out property <float> shown: slider.shown;
+    callback off-clicked;
+    callback full-clicked;
+    callback changed(float);
+    height: Theme.row-height;
+    background: Theme.surface;
+    border-radius: Theme.radius;
+
+    HorizontalLayout {
+        padding: 4px;
+        padding-left: 10px;
+        spacing: Theme.spacing;
+        Image {
+            cross-axis-self-alignment: center;
+            source: root.icon;
+            colorize: root.icon-color;
+            width: 28px;
+            height: 28px;
+        }
+        VerticalLayout {
+            alignment: center;
+            width: 170px;
+            Text { text: root.label; color: Theme.muted; font-size: Theme.font-small; overflow: elide; }
+            Text {
+                text: root.value-text;
+                color: Theme.foreground;
+                font-size: Theme.font-normal;
+                font-weight: 600;
+            }
+        }
+        IconButton {
+            width: Theme.button-narrow;
+            text: @tr("Off");
+            checked: root.off-checked;
+            clicked => { root.off-clicked(); }
+        }
+        slider := TouchSlider {
+            cross-axis-self-alignment: center;
+            horizontal-stretch: 1;
+            minimum: root.minimum;
+            value: root.value;
+            changed(level) => { root.changed(level); }
+        }
+        IconButton {
+            width: Theme.button-narrow;
+            text: "100%";
+            checked: root.full-checked;
+            clicked => { root.full-clicked(); }
         }
     }
 }

@@ -1,0 +1,137 @@
+// Everything the UI can ask of the app: the UI calls these callbacks, Rust implements them.
+
+export global Actions {
+    callback home(bool, bool, bool);
+    callback jog(string, float);
+    callback disable-motors();
+    callback level();
+    callback set-heater(string, float);
+    // + or − by the step (with sign); respects Klipper's min_temp/max_temp.
+    callback step-heater(string, float);
+    callback apply-preset(int);
+    callback cool-down();
+    // Fan by Klipper object name, 0 to 100.
+    callback set-fan(string, float);
+    // White light of an LED, 0 to 100.
+    callback set-light(string, float);
+    callback toggle-light();
+    callback set-led-effect(string, bool);
+    // A value of the expert tab by id: one step (direction 1 or -1), or back to the configuration.
+    callback step-tuning(string, float);
+    callback reset-tuning(string);
+    // Temperature history of a heater or sensor (Klipper object name) in an overlay.
+    callback open-history(string);
+    callback close-history();
+    callback adjust-z-offset(float);
+    callback reset-z-offset();
+    callback apply-z-offset();
+    callback save-config();
+    callback calibrate-bed-mesh();
+    callback load-bed-mesh(string);
+    callback clear-bed-mesh();
+    callback save-bed-mesh(string);
+    callback remove-bed-mesh(string);
+    // Why a typed name cannot be saved, or that it overwrites a profile; empty if neither.
+    pure callback bed-mesh-name-hint(string) -> string;
+    callback calculate-screws-tilt();
+    callback adjust-bed-screws();
+    // PROBE_CALIBRATE or Z_ENDSTOP_CALIBRATE, whichever the printer has.
+    callback calibrate-z();
+    // Within the manual probe: a relative move in mm; bisect-z goes halfway up (1) or down (-1) to the nearest
+    // height tried.
+    callback test-z(float);
+    callback bisect-z(int);
+    callback accept-calibration();
+    callback screw-adjusted();
+    callback abort-calibration();
+    callback set-speed-factor(float);
+    callback extrude(float, float);
+    callback load-filament();
+    callback unload-filament();
+    callback run-macro(string);
+    callback exclude-object(string);
+    // User and password; only Moonraker sees the password.
+    callback log-in(string, string);
+    callback log-out();
+    // The index of the print object under a tap on the bed map, or -1: position and the finger's reach as shares of
+    // the map's width and height, from the top left.
+    callback print-object-at(float, float, float) -> int;
+    callback mmu-select-gate(int);
+    callback mmu-load();
+    // Selects the gate and loads it.
+    callback mmu-load-gate(int);
+    callback mmu-unload();
+    callback mmu-home();
+    callback mmu-eject(int);
+    callback mmu-recover();
+    callback mmu-unlock();
+    callback mmu-motors-off();
+    callback mmu-check-gate(int);
+    callback mmu-check-all-gates();
+    callback mmu-preload(int);
+    callback mmu-servo-up();
+    callback mmu-servo-down();
+    callback mmu-select-bypass();
+    // Selects the bypass and loads the filament fed into it.
+    callback mmu-load-bypass();
+    // The tool takes its filament from the gate: (tool, gate).
+    callback mmu-map-tool(int, int);
+    callback mmu-reset-tool-map();
+    callback mmu-set-endless-spool(bool);
+    // Moves a gate into an EndlessSpool group: (gate, group).
+    callback mmu-set-endless-spool-group(int, int);
+    // Material or colour of a gate in Happy Hare's gate map, for printers without Spoolman.
+    callback set-gate-material(int, string);
+    callback set-gate-color(int, color);
+    callback run-gcode(string);
+    callback refresh-files();
+    callback toggle-file-mark(string);
+    callback clear-file-marks();
+    // Deletes the marked files from the printer.
+    callback delete-marked-files();
+    // Makes the file the job of the print page, in the app only; an empty path drops the prepared file.
+    callback prepare-file(string);
+    callback start-print(string);
+    callback pause-print();
+    callback resume-print();
+    callback cancel-print();
+    callback pause-at-layer(int);
+    callback clear-layer-pause();
+    // The height a layer ahead will have, e.g. "~10.00 mm"; empty if it cannot be told.
+    pure callback height-at-layer(int) -> string;
+    callback emergency-stop();
+    callback restart-klipper();
+    callback firmware-restart();
+    callback refresh-system();
+    callback set-power(string, bool);
+    callback restart-service(string);
+    callback reboot-host();
+    callback shutdown-host();
+    callback refresh-updates();
+    callback upgrade(string);
+    callback load-console();
+    callback clear-console();
+    // The message list was opened or closed; use `Navigation.open-messages()` and `close-messages()`.
+    callback messages-opened();
+    callback messages-closed();
+    callback messages-clear();
+    // A key of the on-screen keyboard (the text it types, or a special key such as Key.Backspace); the focused field
+    // handles it like a key of a physical keyboard.
+    callback press-key(string);
+    callback set-macro-visible(string, bool);
+    callback macro-has-params(string) -> bool;
+    // Spoolman. `gate` is -1 for a printer without MMU.
+    callback load-spools();
+    callback set-active-spool(int);
+    callback assign-gate-spool(int, int);
+    // Spool id and the gross weight in grams as typed.
+    callback measure-spool(int, string);
+    callback apply-spool-preset();
+    // What differs between a file and the spools, as lines of text for the confirmation; empty if nothing.
+    pure callback print-hints(string) -> [string];
+    // Klipper would refuse the typed target of a heater (Klipper object, text as typed); false while it is no number.
+    pure callback heater-target-outside(string, string) -> bool;
+    callback open-macro-form(string);
+    callback set-macro-param(int, string);
+    callback macro-form-script() -> string;
+}

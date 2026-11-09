@@ -1,0 +1,125 @@
+// Flyout below the status bar with all errors and informations.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, Navigation, Page, Printer } from "../state.slint";
+import { FlyoutPanel, IconButton, ScrollList } from "controls.slint";
+import { DialogHeader } from "dialog.slint";
+
+component SectionHeading inherits Text {
+    color: Theme.muted;
+    font-size: Theme.font-small;
+    font-weight: 600;
+    height: 18px;
+    vertical-alignment: center;
+}
+
+// Flyout below the field of the status bar with all errors and informations, newest first: what came since the
+// last time stands under "New", the rest under "Earlier". The page beside it stays covered by a tap catcher: a tap
+// there closes the flyout and does nothing else, like a menu. Every way out goes through `Navigation.close-messages()`.
+export component MessagesFlyout inherits Rectangle {
+    // Below the status bar, so that its field, the light and the emergency stop stay in reach.
+    TouchArea {
+        y: 44px;
+        height: root.height - 44px;
+        clicked => { Navigation.close-messages(); }
+    }
+
+    FlyoutPanel {
+        x: 8px;
+        y: 50px;
+        width: min(520px, root.width - 16px);
+        height: root.height - 58px;
+
+        VerticalLayout {
+            padding: 10px;
+            spacing: 8px;
+            DialogHeader {
+                title: @tr("Messages");
+                close => { Navigation.close-messages(); }
+            }
+
+            messages-list := ScrollList {
+                vertical-stretch: 1;
+                content-height: Printer.messages-height;
+                if Printer.messages-has-new: SectionHeading {
+                    x: 0;
+                    y: 0;
+                    width: messages-list.row-width;
+                    text: @tr("NEW");
+                }
+                if Printer.messages-has-earlier: SectionHeading {
+                    x: 0;
+                    y: Printer.messages-earlier-top;
+                    width: messages-list.row-width;
+                    text: @tr("EARLIER");
+                }
+                for message in Printer.messages: Rectangle {
+                    x: 0;
+                    y: message.top;
+                    width: messages-list.row-width;
+                    height: message.height;
+                    background: Theme.surface-raised;
+                    border-radius: Theme.radius;
+                    HorizontalLayout {
+                        padding: 10px;
+                        spacing: 10px;
+                        Image {
+                            y: 0px;
+                            source: message.is-error ? Icons.ui-error : Icons.ui-info;
+                            colorize: message.is-error ? Theme.danger : Theme.info;
+                            width: 20px;
+                            height: 20px;
+                        }
+                        Text {
+                            horizontal-stretch: 1;
+                            text: message.text;
+                            color: Theme.foreground;
+                            font-size: Theme.font-normal;
+                            font-weight: message.new ? 600 : 400;
+                            wrap: word-wrap;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: message.time;
+                            color: Theme.muted;
+                            font-size: Theme.font-small;
+                        }
+                    }
+                }
+            }
+
+            // Flat and wide: the height belongs to the messages, the width keeps the buttons easy to hit.
+            HorizontalLayout {
+                spacing: Theme.spacing;
+                height: 44px;
+                alignment: end;
+                IconButton {
+                    width: 140px;
+                    text: @tr("Clear");
+                    icon: Icons.ui-delete;
+                    icon-size: 20px;
+                    horizontal: true;
+                    min-height: 44px;
+                    // Nothing is left to read: the flyout closes with it.
+                    clicked => {
+                        Actions.messages-clear();
+                        Navigation.close-messages();
+                    }
+                }
+                IconButton {
+                    width: 140px;
+                    text: @tr("Console");
+                    icon: Icons.nav-console;
+                    icon-size: 20px;
+                    horizontal: true;
+                    min-height: 44px;
+                    clicked => {
+                        Navigation.close-messages();
+                        Navigation.page = Page.console;
+                    }
+                }
+            }
+        }
+    }
+}

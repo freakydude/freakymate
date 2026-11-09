@@ -50,10 +50,21 @@ export global Theme {
     // Inside the outline of a dialog.
     out property <length> dialog-padding: 12px;
     out property <length> spacing-tight: 2px;
+    out property <length> spacing-small: 4px;
+    out property <length> spacing-medium: 6px;
     // Minimum size for reliably hittable touch areas.
     out property <length> touch: 56px;
     out property <length> icon: 28px;
     out property <length> icon-small: 20px;
+    // Icon sizes between the steps above, kept apart where they differ by a pixel (pixel-identical to the old literals).
+    out property <length> icon-tiny: 14px;
+    out property <length> icon-compact: 16px;
+    out property <length> icon-medium: 22px;
+    out property <length> icon-large: 24px;
+    // Rows of controls (label, slider, buttons) and the narrow square-ish buttons in them.
+    out property <length> row-height: 60px;
+    out property <length> row-height-small: 52px;
+    out property <length> button-narrow: 64px;
 
     out property <length> font-small: 13px;
     // Labels below an icon (navigation); Material's "label medium" (12 sp) at the size of the HDMI5.

@@ -4,7 +4,7 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, Navigation, Printer, TuneTab, TuningItem, UiSettings } from "../state.slint";
-import { Card, IconButton, ScrollList, StepSelector, TabBar, TabButton } from "../components/controls.slint";
+import { ButtonKind, Card, IconButton, ScrollList, StepSelector, TabBar, TabButton } from "../components/controls.slint";
 
 // Names of the expert values; the core identifies them by id.
 global TuningTexts {
@@ -38,7 +38,7 @@ component Adjuster inherits Card {
     HorizontalLayout {
         spacing: Theme.spacing;
         height: 56px;
-        IconButton { width: 64px; icon: Icons.ui-minus; clicked => { root.decrease(); } }
+        IconButton { width: Theme.button-narrow; icon: Icons.ui-minus; clicked => { root.decrease(); } }
         Text {
             horizontal-stretch: 1;
             text: root.value;
@@ -48,14 +48,14 @@ component Adjuster inherits Card {
             horizontal-alignment: center;
             vertical-alignment: center;
         }
-        IconButton { width: 64px; icon: Icons.ui-plus; clicked => { root.increase(); } }
-        if root.resettable: IconButton { width: 64px; icon: Icons.ui-refresh; enabled: root.can-reset; clicked => { root.reset(); } }
+        IconButton { width: Theme.button-narrow; icon: Icons.ui-plus; clicked => { root.increase(); } }
+        if root.resettable: IconButton { width: Theme.button-narrow; icon: Icons.ui-refresh; enabled: root.can-reset; clicked => { root.reset(); } }
     }
 }
 
 component TuningRow inherits Rectangle {
     in property <TuningItem> item;
-    height: 60px;
+    height: Theme.row-height;
     background: Theme.surface;
     border-radius: Theme.radius;
 
@@ -84,10 +84,10 @@ component TuningRow inherits Rectangle {
                 }
             }
         }
-        IconButton { width: 64px; icon: Icons.ui-minus; clicked => { Actions.step-tuning(root.item.id, -1); } }
-        IconButton { width: 64px; icon: Icons.ui-plus; clicked => { Actions.step-tuning(root.item.id, 1); } }
+        IconButton { width: Theme.button-narrow; icon: Icons.ui-minus; clicked => { Actions.step-tuning(root.item.id, -1); } }
+        IconButton { width: Theme.button-narrow; icon: Icons.ui-plus; clicked => { Actions.step-tuning(root.item.id, 1); } }
         IconButton {
-            width: 64px;
+            width: Theme.button-narrow;
             icon: Icons.ui-refresh;
             enabled: root.item.can-reset;
             accessible-label: @tr("Back to the configuration");
@@ -156,7 +156,7 @@ component BasicsTab inherits Rectangle {
                         icon: Icons.ui-save;
                         text: @tr("Save config");
                         enabled: Printer.save-config-pending && !Printer.is-printing;
-                        kind: Printer.save-config-pending ? "accent" : "normal";
+                        kind: Printer.save-config-pending ? ButtonKind.accent : ButtonKind.normal;
                         clicked => { Confirm.ask(@tr("Save config"), @tr("Klipper writes the configuration and restarts."), "save-config", "", false); }
                     }
                 }

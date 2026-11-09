@@ -1,12 +1,12 @@
 # Configuration
 
-Most settings are changed on the screen (System → Display). This page covers the command line, the settings file,
+Most settings are changed on the screen (System → Settings → Display). This page covers the command line, the settings file,
 the Moonraker login, displays and the network settings.
 
 ## Command line
 
 ```text
-freakymate [--moonraker <url>] [--fullscreen] [--framebuffer] [--settings <file>] [--logfile <file>] [--simulate-network]
+freakymate [--moonraker <url>] [--fullscreen] [--framebuffer] [--settings <file>] [--logfile <file>] [--simulate-network] [--simulate-backlight]
 ```
 
 | Option               | Meaning                                                                                          |
@@ -17,6 +17,7 @@ freakymate [--moonraker <url>] [--fullscreen] [--framebuffer] [--settings <file>
 | `--settings`         | Settings file (TOML), default `~/.config/freakymate/settings.conf` (Windows: `%APPDATA%`). The installer passes `printer_data/config/freakymate.conf` |
 | `-l, --logfile`      | Log file, rotated daily like those of Klipper and Moonraker (default: stderr only). The installer passes `printer_data/logs/freakymate.log` |
 | `--simulate-network` | Simulated Wi-Fi/Ethernet instead of NetworkManager (development builds only, see [Development](development.md#development-builds-and-releases)) |
+| `--simulate-backlight` | Simulated backlight with brightness and standby (development builds only) |
 
 Useful environment variables: `RUST_LOG=debug` (logging), `SLINT_BACKEND=winit-software` (force software rendering if the GPU
 driver causes trouble), `SLINT_SCALE_FACTOR=1.5` (sets the scale by hand and turns the fitting to the display off, also in fullscreen).
@@ -125,7 +126,7 @@ interfaces and addresses read from Moonraker.
 
 On displays whose backlight Linux can control (`/sys/class/backlight`: DSI displays such as the Raspberry Pi Touch
 Display, SPI displays with a backlight pin, laptops) the light panel of the status bar has a row **Display**: the
-slider sets the brightness (10 to 100 %), **Off** switches the screen off at once. Settings → Display sets when
+slider sets the brightness (10 to 100 %), **Off** switches the screen off at once. System → Settings → Display sets when
 the screen goes off by itself, without a touch, once while idle and once while printing (pause included). Both are
 **Never** by default.
 

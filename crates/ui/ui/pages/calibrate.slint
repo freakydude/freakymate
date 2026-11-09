@@ -5,7 +5,7 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, MeshDialogs, Printer, ScrewItem } from "../state.slint";
-import { Card, IconButton, ScrollList } from "../components/controls.slint";
+import { ButtonKind, Card, IconButton, Note, ScrollList } from "../components/controls.slint";
 import { MeshMap } from "../components/bed-mesh.slint";
 
 component ActionButton inherits IconButton {
@@ -18,12 +18,6 @@ component ActionButton inherits IconButton {
 component CardButton inherits IconButton {
     height: Theme.touch;
     horizontal-stretch: 1;
-}
-
-component Note inherits Text {
-    color: Theme.muted;
-    font-size: Theme.font-small;
-    wrap: word-wrap;
 }
 
 component ScrewRow inherits HorizontalLayout {
@@ -41,8 +35,8 @@ component ScrewRow inherits HorizontalLayout {
     if !root.screw.is-base: Image {
         source: root.screw.clockwise ? Icons.calibration-screw-clockwise : Icons.calibration-screw-counterclockwise;
         colorize: Theme.foreground;
-        width: 22px;
-        height: 22px;
+        width: Theme.icon-medium;
+        height: Theme.icon-medium;
         cross-axis-self-alignment: center;
         accessible-role: image;
         accessible-label: root.screw.clockwise ? @tr("clockwise") : @tr("counterclockwise");
@@ -180,8 +174,8 @@ component BedMeshCard inherits Card {
             Image {
                 source: Icons.ui-chevron-down;
                 colorize: Theme.foreground;
-                width: 24px;
-                height: 24px;
+                width: Theme.icon-large;
+                height: Theme.icon-large;
                 cross-axis-self-alignment: center;
             }
         }
@@ -251,7 +245,7 @@ export component CalibrateTab inherits Rectangle {
                 icon: Icons.ui-save;
                 text: @tr("Save config");
                 horizontal: true;
-                kind: "accent";
+                kind: ButtonKind.accent;
                 enabled: Printer.save-config-pending;
                 clicked => { Confirm.ask(@tr("Save config"), @tr("Klipper writes the configuration and restarts."), "save-config", "", false); }
             }

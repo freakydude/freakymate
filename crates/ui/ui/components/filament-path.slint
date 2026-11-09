@@ -80,11 +80,11 @@ export component FilamentPath inherits VerticalLayout {
         return root.position >= 10 ? 1 : root.position == 9 ? 0.5 : 0;
     }
 
-    spacing: 4px;
+    spacing: Theme.spacing-small;
 
     // Symbols, tubes and distance all sit on the middle line of the row.
     HorizontalLayout {
-        spacing: 4px;
+        spacing: Theme.spacing-small;
         alignment: stretch;
         cross-axis-alignment: center;
         // Direction of movement at the left: the gate pushes or pulls.
@@ -105,8 +105,8 @@ export component FilamentPath inherits VerticalLayout {
         SensorMark { state: root.path.extruder-sensor; }
         // The extruder gears: lit once the filament has reached them (6) or they have it (7 and on).
         Image {
-            width: 22px;
-            height: 22px;
+            width: Theme.icon-medium;
+            height: Theme.icon-medium;
             source: Icons.filament-extruder-gears;
             colorize: root.position >= 6 ? root.line-color : Theme.muted;
         }
@@ -114,8 +114,8 @@ export component FilamentPath inherits VerticalLayout {
         SensorMark { state: root.path.toolhead-sensor; }
         Tube { horizontal-stretch: 1; fill: root.fill(4); filament: root.tube-colors; }
         Image {
-            width: 22px;
-            height: 22px;
+            width: Theme.icon-medium;
+            height: Theme.icon-medium;
             source: Icons.thermal-nozzle;
             colorize: root.position >= 10 ? root.line-color : Theme.muted;
         }

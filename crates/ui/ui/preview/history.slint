@@ -1,0 +1,31 @@
+// Preview: the temperature history dialog of the nozzle, with a heating curve, target, power and axis labels.
+// Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component HistoryPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.temperature;
+        Navigation.history-open = true;
+        Printer.history-title = "Nozzle";
+        Printer.history-current = "214.6 °C";
+        Printer.history-temperature-path = "M 0 900 L 150 700 L 300 300 L 450 120 L 600 80 L 800 90 L 1000 85";
+        Printer.history-target-path = "M 0 80 L 1000 80";
+        Printer.history-power-path = "M 0 950 L 200 600 L 400 800 L 600 900 L 800 880 L 1000 890";
+        Printer.history-grid-path = "M 0 0 L 1000 0 M 0 333 L 1000 333 M 0 666 L 1000 666 M 0 1000 L 1000 1000";
+        Printer.history-temperature-labels = [
+            { text: "220", position: 0 },
+            { text: "147", position: 0.333 },
+            { text: "73", position: 0.666 },
+            { text: "0", position: 1 },
+        ];
+        Printer.history-time-labels = [
+            { text: "-10 min", position: 0 },
+            { text: "-5 min", position: 0.5 },
+            { text: "now", position: 1 },
+        ];
+    }
+}

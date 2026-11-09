@@ -78,14 +78,17 @@ their reader (`led_effect.rs`, `spoolman.rs`, `moonraker_server/power.rs`, `mach
 `wled.rs`), and what it asks (`files::list_call()`, `spoolman::fetch_state()`, ...); `service/queries.rs` only
 sends those. `sources/fields.rs` reads single fields of the objects. `service/` has `session.rs` (handshake, login,
 loop), `dispatch.rs` (commands) and `queries.rs`; `commands/` has `resolve/` with one module per area (heating,
-lighting, filament, MMU, layer pause, calibration). The texts that name a command for people are in the app
+lighting, filament, MMU, layer pause, calibration) and `error.rs` (`CommandError`). Beside the layers `backlight/`
+(brightness and standby: sysfs, ddcutil, simulated) and `network/` have their own services. The texts that name a command for people are in the app
 (`command_name.rs`). G-code
 of every source reaches Klipper through `klipper::commands::run_gcode`.
 
 Domain: `filament.rs` (what Load and Unload run, which filament sensors belong to the printer), `pause.rs` (what is
 known about a pause, planning a pause at a layer), `spools.rs` (lanes, hints before a print), `estimates.rs` (print
 time, weight, layers, flow; measured before estimated, see `sourced.rs`), `file_catalog.rs` (the file list joined
-with metadata, last completed print and its spool), `job_end.rs` (when the job Klipper shows ended, from the job
+with metadata, last completed print and its spool), `filament_match.rs` (what the tools of a file ask for against the
+filament of the gates or the spool: a verdict per tool, only a hint, never a lock), `prepared_job.rs` (the file prepared
+as the job of the print page; kept only in the app and forgotten at a restart), `light.rs`, `screen_wake.rs`, `job_end.rs` (when the job Klipper shows ended, from the job
 history).
 
 ## Data flow
@@ -123,7 +126,7 @@ history).
    The rows of the Slint models come from `items.rs`; lists are updated with `items::replace_rows`, which changes
    rows in place, so a tap on a button in a row survives the next status update.
    One area each is written by its own module next to it: `mmu_view.rs` (Happy Hare, tools and what the job's file
-   asks of them), `files_view.rs` (file list and marks), `spool_view.rs` (Spoolman), `macro_view.rs` (macros and their
+   asks of them), `files_view.rs` (file list, marks and the prepared file), `spool_view.rs` (Spoolman), `macro_view.rs` (macros and their
    form), `console_view.rs` (console), `status_view.rs` (status bar and flyout, the layout of the list is
    `StatusLog::layout`), besides `calibration_view.rs`, `history_view.rs` and `objects_view.rs`. The presenter keeps the
    cache, routes events and writes the rest of the snapshot in small `show_*` steps.
@@ -147,22 +150,25 @@ history).
 ## UI (`crates/ui/ui`)
 
 - `app.slint`: window 800x480 (grows with the screen), status bar, navigation rail, page, overlays.
-- `state.slint`: globals `Printer` (read-only), `UiSettings`, `Actions` (callbacks), `Navigation`, `Confirm`, `StateIcons`.
+- `state.slint`: globals `Printer` (read-only), `UiSettings`, `Navigation`, `Confirm` and the other state globals; it re-exports
+  `structs.slint` (enums and row structs) and `actions.slint` (`Actions`, callbacks). `state-icons.slint`: `StateIcons`.
 - `components/`: `controls.slint` (IconButton, ToggleRow, StepSelector, TabBar, Card, ValueTile, ProgressBar,
-  ScrollList, TouchSlider, TextWithValue, IconLabel, ColorBar), `dialog.slint` (the look all dialogs share),
-  `overlays.slint` (confirmation, messages flyout, on-screen keyboard, text and number entry, macro form, exclude
-  objects, layer pause, calibration modes, spool picker), `chrome.slint` (status bar with what is running and the
+  ScrollList, TouchSlider, SliderRow, Note, TextWithValue, IconLabel, ColorBar), `dialog.slint` (the look all dialogs
+  share), `confirm-dialog.slint`, `messages-flyout.slint`, `keyboard.slint` (on-screen keyboard and keypad),
+  `entry-dialogs.slint` (text and number entry), `macro-form.slint`, `print-dialogs.slint` (exclude objects, layer
+  pause), `calibration-dialog.slint`, `spool-dialog.slint`, `mmu-tiles.slint`, `thumbnail.slint`, `chrome.slint` (status bar with what is running and the
   newest message, navigation), `system-tabs.slint`, `history.slint` (temperature chart), `light.slint` (light panel),
   `bed-map.slint` (objects on the bed), `bed-mesh.slint` (mesh map and profiles), `filament-path.slint`,
   `spool-strip.slint`, `busy-wheel.slint`. Messages (errors and informations) are kept in `status_log.rs`, pure logic
   that `status_view.rs` shows. Colours of filament are one struct, `BarColors` (up to three colours and whether they
   run along the filament), which `ColorBar` draws.
-- `pages/`: print, move (with the Calibrate tab in `calibrate.slint`), temperature, tune, filament (with Happy Hare the
+- `pages/`: print (with the file list in `files.slint` and the prepared file in `print-prepared.slint`), move (with the Calibrate tab in `calibrate.slint`), temperature, tune, filament (with Happy Hare the
   tabs Gates in `mmu.slint` with the dialogs in `mmu-dialogs.slint`, Extruder, Tools in `mmu-tools.slint` and
   Service in `mmu-service.slint`;
   otherwise the extruder alone), and the system tabs: system (machine), updates, network (`network-page.slint` with
   `network.slint`), console (with the macro list), settings; connection replaces the printer pages while
   Moonraker or Klipper is not ready or wants a login.
+- `preview/`: small components with sample data (`sample.slint`) for `scripts/ui-preview.sh`, never imported by the app.
 - Pages only read globals and only call `Actions`/`Confirm`; printer-related logic belongs in the core.
 - Touch rules: controls at least 56 px (`Theme.touch`), confirmation for cancel, emergency stop and host actions;
   Move and Filament are locked while printing, and the window leaves them when a print starts (`app.slint`).
@@ -211,27 +217,30 @@ history).
   `domain/`, which decides the order of the sources, returns a `Sourced` value where it names its source, and gets a
   test per source. `view.rs` only formats it (a prediction gets a `~`).
 - **New page**: `pages/<name>.slint`, entry in `Page`, `NavRail` and `app.slint`; check with `ui-snapshot`.
-- **Extend the fake**: method in `fake-moonraker/src/session.rs`, G-code in `gcode.rs`/`printer.rs`, plus a test.
+- **Extend the fake**: method in `fake-moonraker/src/session.rs`, G-code in `fake-moonraker/src/gcode/` (one module per
+  area: motion, heating, macros, calibration, Happy Hare; `gcode.rs` dispatches), printer state in `printer/`, plus a test.
 
 ## Checks
 
+- `scripts/verify.sh [--snapshot[=<scenes>]]` runs the checks below in one go (fmt, clippy, tests, build, previews, and
+  the snapshot scenes on request) and prints OK or FAIL per step. A skill check runs too, but only where `.claude/` exists:
+  it is a local folder, not part of the repository.
 - `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` (includes end-to-end tests of the
   service against the fake and the icon set check).
-- `scripts/ui-preview.sh [-n temperature]` (WSL2/Arch) or `powershell -File scripts\ui-preview.ps1 [-Name temperature]`
-  (Windows) renders the previews in `crates/ui/ui/preview`
+- `scripts/ui-preview.sh [-n temperature]` renders the previews in `crates/ui/ui/preview`
   with `slint-viewer` in under a second each, without building Rust code. A preview is a small component that
   inherits `AppWindow` and fills the globals with sample data (`preview/sample.slint`); the same files open in the
   Slint live preview of VS Code. The app never imports this folder. Fastest way to check layouts; keep the sample
   data in line when globals change (the script fails on compile errors).
-- `scripts/ui-snapshot.sh` (WSL2/Arch) or `powershell -File scripts\ui-snapshot.ps1` (Windows), or `cargo run -p ui-snapshot`
+- `scripts/ui-snapshot.sh`, or `cargo run -p ui-snapshot`
   against a running fake, renders the pages
-  as PNG without a window. Scenes: `pages`, `spools`, `network`, `taps`, `typing`, `calibrate`, `printing`,
+  as PNG without a window (the scenes live in `crates/ui-snapshot/src/scenes/`). Scenes: `pages`, `spools`, `network`, `taps`, `typing`, `calibrate`, `printing`,
   `shutdown`; `idle` is slow and runs only when chosen (or with `all`), `login` only when chosen by name (the fake then
   wants a login).
 
 ## Development mode
 
 Cargo feature `dev-mode` (default of `crates/app`, passed on to `crates/core`) bundles everything that is only meant
-for development: today the simulated networks and the option `--simulate-network`. Release builds use
+for development: today the simulated networks and backlight and the options `--simulate-network` and `--simulate-backlight`. Release builds use
 `--no-default-features`; CI runs Clippy for that configuration too. `cargo test --workspace` includes `dev-mode`
 because `crates/ui-snapshot` requires it.

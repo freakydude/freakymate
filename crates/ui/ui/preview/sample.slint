@@ -1,4 +1,4 @@
-// Sample data for previews (VS Code Slint preview, slint-viewer, scripts/ui-preview.ps1).
+// Sample data for previews (VS Code Slint preview, slint-viewer, scripts/ui-preview.sh).
 // Not part of the app: nothing in app.slint imports this folder. In the app, Rust fills these globals.
 
 import { MoveTab, Navigation, Network, Page, Printer, UiSettings } from "../state.slint";
@@ -83,6 +83,7 @@ export global Sample {
             { label: "Toolhead Runout", enabled: true, detected: true },
             { label: "Extruder Encoder", enabled: true, detected: false },
         ];
+        Printer.print-start-macro = "PRINT_START";
         Printer.macros = ["PRINT_START", "PRINT_END", "LOAD_FILAMENT", "UNLOAD_FILAMENT", "PARK"];
         Printer.power-devices = [{ name: "printer", on: true, locked: true }, { name: "lights", on: false, locked: false }];
         Printer.updates = [

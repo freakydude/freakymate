@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Checks the development setup on Arch Linux (native or in WSL2) and installs slint-viewer for the UI previews.
-# Linux counterpart of setup.ps1. Installs nothing system-wide (no sudo): missing packages are printed as pacman commands.
+# Checks the development setup on Arch Linux and installs slint-viewer for the UI previews.
+# Installs nothing system-wide (no sudo): missing packages are printed as pacman commands.
 # Usage (repo root): scripts/setup-linux.sh
 set -uo pipefail
 

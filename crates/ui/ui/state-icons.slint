@@ -1,0 +1,132 @@
+// Icons, texts and colours for states.
+
+import { Icons } from "icons.slint";
+import { Theme } from "theme.slint";
+import { Printer } from "state.slint";
+import { Severity } from "structs.slint";
+
+// Icons and texts for the three state levels: connection/Klipper (webhooks), machine activity
+// (idle_timeout) and print job (print_stats). The same state name uses the same icon on every level.
+export global StateIcons {
+    public pure function print-state-label(state: string) -> string {
+        if (state == "printing") { return @tr("Printing"); }
+        if (state == "paused") { return @tr("Paused"); }
+        if (state == "complete") { return @tr("Complete"); }
+        if (state == "cancelled") { return @tr("Cancelled"); }
+        if (state == "error") { return @tr("Print error"); }
+        return @tr("No print");
+    }
+
+    public pure function print-state(state: string) -> image {
+        if (state == "printing") { return Icons.state-printing; }
+        if (state == "paused") { return Icons.state-paused; }
+        if (state == "complete") { return Icons.state-complete; }
+        if (state == "cancelled") { return Icons.state-cancelled; }
+        if (state == "error") { return Icons.state-error; }
+        return Icons.state-standby;
+    }
+
+    public pure function activity-label(activity: string) -> string {
+        if (activity == "busy") { return @tr("Busy"); }
+        if (activity == "idle") { return @tr("Idle"); }
+        return @tr("Ready");
+    }
+
+    public pure function activity(activity: string) -> image {
+        if (activity == "busy") { return Icons.state-busy; }
+        if (activity == "idle") { return Icons.state-idle; }
+        return Icons.state-ready;
+    }
+
+    public pure function klippy-label(connection: string, state: string) -> string {
+        if (connection == "connecting") { return @tr("Moonraker: connecting"); }
+        if (connection == "login-required") { return @tr("Moonraker: login required"); }
+        if (connection != "connected") { return @tr("Moonraker: not reachable"); }
+        if (state == "ready") { return @tr("Klipper ready"); }
+        if (state == "startup") { return @tr("Klipper: starting"); }
+        if (state == "shutdown") { return @tr("Klipper: shutdown"); }
+        if (state == "error") { return @tr("Klipper: error"); }
+        return @tr("Klipper: not connected");
+    }
+
+    // Status bar: connection/Klipper while not ready, then a print job if there is one, otherwise the activity.
+    // While printing the progress and the remaining time say it all, the file name is on the print page.
+    public pure function summary-label() -> string {
+        if (!Printer.ready) { return self.klippy-label(Printer.connection, Printer.klippy-state); }
+        if (Printer.print-state == "printing") { return ""; }
+        if (Printer.print-state != "standby") { return self.print-state-label(Printer.print-state); }
+        return self.activity-label(Printer.activity);
+    }
+
+    // The value after the summary that must not be cut off: the progress of a print.
+    public pure function summary-value() -> string {
+        if (Printer.ready && Printer.is-printing) { return round(Printer.progress * 100) + "%"; }
+        return "";
+    }
+
+    // The part of the summary that is shortened first: remaining time, first fact of a pause or an error, or
+    // Klipper's message.
+    public pure function summary-detail() -> string {
+        if (!Printer.ready) {
+            if (Printer.is-connected && (Printer.klippy-state == "shutdown" || Printer.klippy-state == "error")) {
+                return Printer.klippy-headline;
+            }
+            return "";
+        }
+        if (Printer.print-state == "printing") { return Printer.remaining == "-" ? "" : @tr("{} left", Printer.remaining); }
+        if (Printer.print-state == "paused" || Printer.print-state == "error") { return Printer.interruption-headline; }
+        return "";
+    }
+
+    // The one place that says what a state means; the colour follows from it (see `severity-color`).
+    public pure function summary-severity() -> Severity {
+        if (!Printer.ready) {
+            if (Printer.connection == "connecting") { return Severity.info; }
+            if (Printer.connection == "login-required") { return Severity.attention; }
+            if (Printer.is-connected && Printer.klippy-state == "startup") { return Severity.info; }
+            return Severity.error;
+        }
+        if (Printer.print-state == "paused") { return Severity.attention; }
+        if (Printer.print-state == "error") { return Severity.error; }
+        if (Printer.print-state == "complete") { return Severity.fine; }
+        if (Printer.print-state == "standby" && Printer.activity != "busy") { return Severity.fine; }
+        return Severity.neutral;
+    }
+
+    // One colour per meaning, for a symbol, a word or a line; never a filled area.
+    public pure function severity-color(severity: Severity) -> color {
+        if (severity == Severity.fine) { return Theme.success; }
+        if (severity == Severity.running) { return Theme.accent; }
+        if (severity == Severity.attention) { return Theme.warning; }
+        if (severity == Severity.error) { return Theme.danger; }
+        if (severity == Severity.info) { return Theme.info; }
+        return Theme.foreground;
+    }
+
+    // A state that is in order in the colour of `fine`, anything else in `otherwise` (neutral, or another meaning).
+    public pure function ok-color(ok: bool, otherwise: color) -> color {
+        return ok ? self.severity-color(Severity.fine) : otherwise;
+    }
+
+    // The word of a state carries the colour only when it asks for a human.
+    public pure function label-color(severity: Severity) -> color {
+        if (severity == Severity.attention || severity == Severity.error) { return self.severity-color(severity); }
+        return Theme.foreground;
+    }
+
+    public pure function summary() -> image {
+        if (!Printer.ready) { return self.klippy-state(Printer.connection, Printer.klippy-state); }
+        if (Printer.print-state != "standby") { return self.print-state(Printer.print-state); }
+        return self.activity(Printer.activity);
+    }
+
+    public pure function klippy-state(connection: string, state: string) -> image {
+        if (connection == "login-required") { return Icons.ui-lock; }
+        if (connection != "connected") { return Icons.system-disconnected; }
+        if (state == "ready") { return Icons.state-ready; }
+        if (state == "startup") { return Icons.state-startup; }
+        if (state == "shutdown") { return Icons.state-shutdown; }
+        if (state == "error") { return Icons.state-error; }
+        return Icons.state-disconnected;
+    }
+}

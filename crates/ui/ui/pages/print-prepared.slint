@@ -5,7 +5,7 @@ import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { FilamentTab, ToolMatchItem, Navigation, Page, Printer, SpoolPicker } from "../state.slint";
 import { Card, ColorBar, ScrollList, TextWithValue, ValueTile } from "../components/controls.slint";
-import { VerdictIcon } from "mmu.slint";
+import { VerdictIcon } from "../components/mmu-tiles.slint";
 import { GateColor, WantedColor } from "mmu-tools.slint";
 
 // A tool of the file: the colour it asks for beside the colour of its gate, and whether they fit.
@@ -21,7 +21,7 @@ component ToolChip inherits Rectangle {
     }
     VerticalLayout {
         padding: 5px;
-        spacing: 4px;
+        spacing: Theme.spacing-small;
         alignment: center;
         HorizontalLayout {
             Text {
@@ -34,13 +34,13 @@ component ToolChip inherits Rectangle {
             }
             VerdictIcon {
                 cross-axis-self-alignment: center;
-                width: 16px;
-                height: 16px;
+                width: Theme.icon-compact;
+                height: Theme.icon-compact;
                 verdict: root.mapping.verdict;
             }
         }
         HorizontalLayout {
-            spacing: 4px;
+            spacing: Theme.spacing-small;
             height: 12px;
             if root.mapping.wanted-has-color: WantedColor { mapping: root.mapping; }
             if root.has-gate: GateColor {
@@ -71,7 +71,7 @@ component ToolChipGrid inherits ScrollList {
     property <int> columns: 5;
     property <int> count: max(0, root.tools.length - root.skip);
     property <int> rows: ceil(root.count / root.columns);
-    property <length> chip-height: 52px;
+    property <length> chip-height: Theme.row-height-small;
     property <length> gap: 6px;
     property <length> row-step: root.chip-height + root.gap;
     property <length> chip-width: (root.row-width - (root.columns - 1) * root.gap) / root.columns;
@@ -107,7 +107,7 @@ component ToolMatchCard inherits Card {
     }
 
     HorizontalLayout {
-        spacing: 6px;
+        spacing: Theme.spacing-medium;
         height: 24px;
         VerdictIcon {
             cross-axis-self-alignment: center;
@@ -214,7 +214,7 @@ component ExtruderMatchCard inherits Card {
         }
     }
     if root.first.verdict == "fits" || root.first.verdict == "differs": HorizontalLayout {
-        spacing: 6px;
+        spacing: Theme.spacing-medium;
         VerdictIcon {
             cross-axis-self-alignment: start;
             verdict: root.first.verdict;

@@ -119,7 +119,7 @@ Besides the Moonraker route there are plain packages, for example to try it on a
   yourself. Use either the zip installer or the package, not both (they would compete for `tty1`).
 
   ```bash
-  sudo apt install ./freakymate_0.3.0_arm64.deb
+  sudo apt install ./freakymate_<version>_arm64.deb
   sudo systemctl disable getty@tty1                # free tty1 for the kiosk
   sudo usermod -aG video $USER                  # brightness and standby, if the display has a backlight
   sudo usermod -aG i2c $USER                    # the same for a monitor on DDC/CI, with `ddcutil` installed
@@ -132,5 +132,5 @@ Besides the Moonraker route there are plain packages, for example to try it on a
   and talks to any Moonraker over the network. On Debian and Ubuntu install the `.deb` and start FreakyMate from the
   application menu or with `freakymate` in a terminal (skip the `systemctl` lines above, they set up the kiosk); on Windows unpack
   `freakymate-x86_64-pc-windows-msvc.zip` and run `freakymate.exe`. There is no Windows installer yet. Set the
-  Moonraker address on System → Display or with `-m` (default `http://127.0.0.1:7125`). For fullscreen with a mouse,
-  switch on Fullscreen on System → Display; `-f` is the kiosk mode for a touch screen and hides the mouse pointer.
+  Moonraker address on System → Settings → Display or with `-m` (default `http://127.0.0.1:7125`). For fullscreen with a mouse,
+  switch on Fullscreen on System → Settings → Display; `-f` is the kiosk mode for a touch screen and hides the mouse pointer.

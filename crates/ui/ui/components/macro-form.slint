@@ -1,0 +1,120 @@
+// Form for the parameters of a macro.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, Dialogs, Printer } from "../state.slint";
+import { ButtonKind, IconButton, ScrollList } from "controls.slint";
+import { NumberEntryDialog, TextEntryDialog } from "entry-dialogs.slint";
+import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
+
+// Parameters of a macro: one field per parameter, Klipper defaults as placeholders. Running asks for confirmation.
+export component MacroFormDialog inherits Scrim {
+    in-out property <bool> open;
+    property <int> edit-index: -1;
+    // A tap on the status bar or the navigation cancels the form.
+    property <int> dismissals: Dialogs.dismissals;
+    visible: root.open;
+
+    changed dismissals => {
+        root.open = false;
+    }
+
+    DialogPanel {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: parent.height - 16px;
+
+        VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing;
+            DialogHeader {
+                title: Printer.macro-form-name;
+                close => { root.open = false; }
+            }
+
+            // Each parameter is an input field: its name on the left, the value (or the Klipper default in grey) on the
+            // right. The names share one column width, so the fields line up.
+            params-list := ScrollList {
+                vertical-stretch: 1;
+                content-height: Printer.macro-form.length * (Theme.touch + Theme.spacing);
+                for param[index] in Printer.macro-form: Rectangle {
+                    x: 8px;
+                    y: index * (Theme.touch + Theme.spacing);
+                    width: params-list.row-width - 16px;
+                    height: Theme.touch;
+                    background: Theme.surface-raised;
+                    border-radius: Theme.radius;
+                    HorizontalLayout {
+                        padding-left: 14px;
+                        padding-right: 8px;
+                        padding-top: 7px;
+                        padding-bottom: 7px;
+                        spacing: 12px;
+                        Text {
+                            width: min(220px, params-list.row-width * 0.3);
+                            text: param.name;
+                            color: Theme.foreground;
+                            font-size: Theme.font-normal;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            background: Theme.background;
+                            border-radius: 6px;
+                            border-width: 1px;
+                            border-color: Theme.border;
+                            Text {
+                                x: 10px;
+                                width: parent.width - 20px;
+                                text: param.value != "" ? param.value : param.placeholder;
+                                color: param.value != "" ? Theme.foreground : Theme.disabled-foreground;
+                                font-size: Theme.font-normal;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+                        }
+                    }
+                    TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        clicked => {
+                            root.edit-index = index;
+                            if (param.numeric) {
+                                edit-number.title = param.name;
+                                edit-number.text = param.value;
+                                edit-number.open = true;
+                            } else {
+                                edit.title = param.name;
+                                edit.text = param.value;
+                                edit.open = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            IconButton {
+                height: Theme.touch;
+                text: @tr("Run");
+                icon: Icons.ui-check;
+                kind: ButtonKind.accent;
+                horizontal: true;
+                // Running is the confirmation: the user has just seen every parameter.
+                clicked => {
+                    Actions.run-macro(Actions.macro-form-script());
+                    root.open = false;
+                }
+            }
+        }
+    }
+
+    edit := TextEntryDialog {
+        accepted(text) => { Actions.set-macro-param(root.edit-index, text); }
+    }
+    edit-number := NumberEntryDialog {
+        accepted(text) => { Actions.set-macro-param(root.edit-index, text); }
+    }
+}

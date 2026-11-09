@@ -6,7 +6,18 @@ shown, as in Mainsail: macros, heaters, temperature sensors, fans, LEDs, LED eff
 probe still counts as the probe).
 
 - **Print**: thumbnail, progress, elapsed/remaining/ETA, layers with current and object height, filament; start, pause, resume, cancel, pause at a layer (planned pause shown), exclude objects (on a map of the bed if the slicer defines their outlines);
-  file browser with thumbnails, filament, nozzle and print time of each file.
+  file browser with thumbnails, filament (material of each tool), nozzle and print time of each file.
+  - **Prepare**: a tap on a file marks it; with one file marked, **Prepare** makes it the job of the print page and
+    **Delete** removes it (with several marked, only **Delete**, which names the files first). Preparing happens only
+    in FreakyMate: Moonraker and other clients notice nothing, and after a restart the print page shows Klipper's current
+    file again. The page then shows the file's estimated time, filament, nozzle diameter and temperatures, and what each
+    tool asks of the filament. A print that starts, from anywhere, takes the place of the prepared file; a prepared file
+    that is deleted is dropped. **Print** asks for confirmation as before.
+  - **Filament check per tool**: the file's colour, material and weight for each tool, against the filament where that
+    tool prints from (with Happy Hare the gate of the tool, otherwise the active spool; only what both sides know is
+    compared). The result is a hint on the print page (for example "2 of 3 tools match", a tap leads to Filament →
+    Tools), in the tool list and in the gate picker; it never blocks a print or a change. A clear filament (colour with
+    full transparency) is not compared by colour.
 - **Move**: jog X/Y/Z with selectable steps, home (all/XY/Z), motors off, Quad Gantry Level or Z-Tilt when configured.
   Move and Filament are locked while a print runs; the screen leaves them when a print starts.
   - **Calibrate** tab: Klipper's own calibration commands, with their results. Bed screws
@@ -31,7 +42,7 @@ probe still counts as the probe).
   the calibration values until the next restart: flow factor, pressure advance and smooth time, velocity and
   acceleration limits, square corner velocity, minimum cruise ratio and firmware retraction; it shows where a value
   differs from the configuration and resets it.
-- **Filament**: extrude/retract with length and speed (lengths up to `max_extrude_only_distance`), `LOAD_FILAMENT`/`UNLOAD_FILAMENT` macros when present, filament sensors (with Happy Hare those it does not show itself).
+- **Filament**: filament colours with transparency are drawn over a checkerboard, so a clear or translucent filament reads as see-through; extrude/retract with length and speed (lengths up to `max_extrude_only_distance`), `LOAD_FILAMENT`/`UNLOAD_FILAMENT` macros when present, filament sensors (with Happy Hare those it does not show itself).
 - **System**, in five tabs:
   - **Machine**: Klipper/firmware restart, host reboot/shutdown, service restart, power devices.
   - **Updates**: Moonraker's update manager; the tab shows how many updates are waiting.
@@ -47,11 +58,13 @@ probe still counts as the probe).
     and when the screen goes off by itself (see [Brightness and standby](configuration.md#brightness-and-standby)).
     Temperature presets are set in the [settings file](configuration.md#settings-file).
 
-| ![Pause at a layer](screenshots/layer-pause.png)            | ![Exclude objects on the bed map](screenshots/objects-map.png)        |
-| ----------------------------------------------------------- | --------------------------------------------------------------------- |
-| Pause at a layer, with the pause planned for layer 45       | Exclude objects: the bed map with the outlines from the slicer        |
-| ![Calibrate tab](screenshots/calibrate.png)                 | ![Bed mesh map](screenshots/bed-mesh.png)                             |
-| The Calibrate tab: bed screws, Z height and the bed mesh    | The map of the active bed mesh, with a faulty region framed           |
+| ![A prepared file on the print page](screenshots/print-prepared.png) | ![Pause at a layer](screenshots/layer-pause.png)            |
+| -------------------------------------------------------------------- | ----------------------------------------------------------- |
+| A prepared file with the filament check per tool                     | Pause at a layer, with the pause planned for layer 45       |
+| ![Exclude objects on the bed map](screenshots/objects-map.png)       | ![Calibrate tab](screenshots/calibrate.png)                 |
+| Exclude objects: the bed map with the outlines from the slicer       | The Calibrate tab: bed screws, Z height and the bed mesh    |
+| ![Bed mesh map](screenshots/bed-mesh.png)                   |                                                                       |
+| The map of the active bed mesh, with a faulty region framed |                                                                       |
 
 ## Happy Hare (MMU)
 
@@ -71,7 +84,9 @@ A tap on a gate opens what can be done with it: select, load, preload, check or 
 Spoolman the dialog sets material and colour of the gate in Happy Hare's gate map instead, from a set of common
 materials and colours. A tap on a gate never moves the selector by itself. The bypass takes filament fed by hand past
 the gates; its dialog selects and loads it. The **Tools** tab is the one place to set which gate each tool takes its
-filament from (Happy Hare's tool-to-gate map): a tap on a tool offers the gates with their colour and material. It
+filament from (Happy Hare's tool-to-gate map): a tap on a tool offers the gates with their colour and material. With a file
+prepared (or the file of the current job), the tab shows beside each tool what the file asks of it and whether the gate
+fits (✓ or ⚠, a hint only); the gate list marks the gates that fit. It
 also resets the map and turns EndlessSpool on or off; while it is on, it moves each gate from group to group.
 The **Service** tab holds what is rarely needed for the MMU as a whole: home, recover, unlock, motors off, check all
 gates and, on selectors with a servo, servo up and down.
@@ -106,6 +121,7 @@ Appears when Moonraker has the `spoolman` component, with or without an MMU:
   filaments: side by side for coaxial ones (silk), taking turns for longitudinal ones (gradient);
 - a picker lists the spools (the ones in a gate first, then the most recently used): assign a spool to a gate or, without
   an MMU, choose the active spool, and correct the remaining weight by weighing;
+- a filament colour with transparency (alpha) shows over a checkerboard in the gate bars, dialogs and the Tools tab;
 - the temperature page offers a preset for the spool in use and notes quietly when the target is off from it;
 - before a print the confirmation names what differs between the file and the spools (material, weight, colour), only as
   a hint.

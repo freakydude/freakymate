@@ -6,7 +6,7 @@ import { Printer, SpoolPicker } from "../state.slint";
 import { ColorBar, TextWithValue } from "controls.slint";
 
 export component SpoolStrip inherits Rectangle {
-    height: 52px;
+    height: Theme.row-height-small;
     background: Theme.surface;
     border-radius: Theme.radius;
     accessible-role: button;
@@ -44,8 +44,8 @@ export component SpoolStrip inherits Rectangle {
             cross-axis-self-alignment: center;
             source: Icons.filament-spool;
             colorize: Theme.muted;
-            width: 22px;
-            height: 22px;
+            width: Theme.icon-medium;
+            height: Theme.icon-medium;
         }
     }
     TouchArea {
