@@ -1,9 +1,10 @@
-//! Spools in the printer: the lanes they sit in. A lane is one place for a spool: a gate of Happy Hare, or the one
-//! spool of a printer without MMU (the active spool of Moonraker). How a print compares with them is
+//! Spools in the printer: the lanes they sit in (see [`super::machine_tree`]). How a print compares with them is
 //! [`super::filament_match`].
 
+pub use super::machine_tree::Lane;
 use crate::color::Rgba;
 use crate::commands::Command;
+use crate::domain::machine_tree::MachineTree;
 use crate::sources::happy_hare::MmuGate;
 use crate::sources::klipper::BED_HEATER;
 use crate::sources::spoolman::{Spool, SpoolmanState};
@@ -30,43 +31,9 @@ impl FilamentColors {
     }
 }
 
-/// One place for a spool.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Lane {
-    /// `None` without MMU.
-    pub gate: Option<usize>,
-    /// First tool that is mapped to the gate.
-    pub tool: Option<usize>,
-    pub spool_id: Option<u32>,
-    /// The spool, once Spoolman has answered.
-    pub spool: Option<Spool>,
-    /// The filament of this lane is the one in use: the selected gate, or the only spool.
-    pub active: bool,
-}
-
-/// The lanes of the printer: a gate each while Happy Hare has the say, otherwise the one active spool.
+/// The lanes of the printer, for code that has no tree at hand.
 pub fn lanes(status: &PrinterStatus, state: &SpoolmanState) -> Vec<Lane> {
-    let spool = |id: Option<u32>| id.and_then(|id| state.spools.get(&id)).cloned();
-    match status.happy_hare().filter(|mmu| !mmu.gates.is_empty()) {
-        Some(mmu) => mmu
-            .gates
-            .iter()
-            .map(|gate| Lane {
-                gate: Some(gate.index),
-                tool: gate.tools.first().copied(),
-                spool_id: gate.spool_id,
-                spool: spool(gate.spool_id),
-                active: usize::try_from(mmu.gate) == Ok(gate.index),
-            })
-            .collect(),
-        None => vec![Lane {
-            gate: None,
-            tool: Some(0),
-            spool_id: state.active_spool_id,
-            spool: spool(state.active_spool_id),
-            active: true,
-        }],
-    }
+    MachineTree::build(status).lanes(state)
 }
 
 /// The lane in use, if it has a spool.

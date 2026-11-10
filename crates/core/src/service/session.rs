@@ -9,6 +9,7 @@ use super::{
 };
 use crate::commands::CommandError;
 use crate::credentials::{Credential, CredentialStore};
+use crate::domain::machine_tree::MachineTree;
 use crate::moonraker::access::{self, AccessError};
 use crate::moonraker::{CallError, Connection, ConnectionState, Endpoint, Notification};
 use crate::sources::happy_hare::stale_gate_map;
@@ -556,6 +557,7 @@ impl<'a> Session<'a> {
             endpoint: self.endpoint.display(),
             connection: ConnectionState::Connected,
             access: self.access.clone(),
+            tree: MachineTree::build(&status),
             status,
             sources: self.sources.clone(),
         });

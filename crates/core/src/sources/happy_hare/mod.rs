@@ -82,6 +82,9 @@ pub struct MmuStatus {
     /// Only selectors with a servo report it; `None` for the others.
     pub servo: Option<ServoPosition>,
     pub gates: Vec<MmuGate>,
+    /// The units of a multi-unit machine (`mmu_machine.unit_<n>`), in order; empty when Happy Hare does not report
+    /// them (before version 4), in which case all gates form one unit.
+    pub units: Vec<MmuUnit>,
     /// Gate of each tool (`ttg_map`).
     pub tool_to_gate: Vec<usize>,
     /// EndlessSpool is on (`endless_spool_enabled`); the groups are in [`MmuGate::endless_spool_group`].
@@ -94,6 +97,29 @@ pub struct MmuStatus {
     /// Flow rate in percent: measured by the encoder, else estimated by the sync-feedback controller with a
     /// proportional sensor. `None` if neither exists.
     pub flow_rate: Option<Sourced<f64>>,
+}
+
+/// One unit of a Happy Hare machine: a run of gates that share a selector.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MmuUnit {
+    pub first_gate: usize,
+    pub num_gates: usize,
+}
+
+impl MmuUnit {
+    pub fn contains(&self, gate: usize) -> bool {
+        (self.first_gate..self.first_gate + self.num_gates).contains(&gate)
+    }
+}
+
+/// `unit_0`, `unit_1`, … of `mmu_machine`; units that lack a gate range are skipped.
+fn read_units(machine: &Value, num_units: usize) -> Vec<MmuUnit> {
+    (0..num_units)
+        .filter_map(|index| {
+            let unit = machine.get(format!("unit_{index}"))?;
+            Some(MmuUnit { first_gate: count(unit, "first_gate")?, num_gates: count(unit, "num_gates")? })
+        })
+        .collect()
 }
 
 impl MmuStatus {
@@ -158,13 +184,14 @@ pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
     let mmu = store.object("mmu")?;
     let machine = store.object("mmu_machine").unwrap_or(&Value::Null);
     let num_gates = count::<usize>(mmu, "num_gates").max(count(machine, "num_gates")).unwrap_or_default();
+    let num_units = count::<usize>(machine, "num_units").unwrap_or_default().max(1);
     let sensors = read_sensors(mmu);
     let tool_to_gate = read_tool_to_gate(mmu);
     Some(MmuStatus {
         version: text(machine, "happy_hare_version").to_owned(),
         enabled: flag(mmu, "enabled"),
         num_gates,
-        num_units: count::<usize>(machine, "num_units").unwrap_or_default().max(1),
+        num_units,
         gate: integer(mmu, "gate", -1),
         tool: integer(mmu, "tool", -1),
         action: text(mmu, "action").to_owned(),
@@ -190,6 +217,7 @@ pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
             .and_then(Value::as_str)
             .map(ServoPosition::parse),
         gates: read_gates(mmu, num_gates, &tool_to_gate),
+        units: read_units(machine, num_units),
         tool_to_gate,
         endless_spool: flag(mmu, "endless_spool_enabled"),
         spoolman_support: text(mmu, "spoolman_support").to_owned(),
@@ -216,6 +244,17 @@ mod tests {
         let mut store = ObjectStore::default();
         store.replace(&status);
         store
+    }
+
+    #[test]
+    fn reads_the_gate_range_of_every_unit() {
+        let machine =
+            json!({ "num_units": 2, "unit_0": { "first_gate": 0, "num_gates": 4 }, "unit_1": { "first_gate": 4 } });
+
+        let units = read_units(&machine, 2);
+
+        assert_eq!(units, [MmuUnit { first_gate: 0, num_gates: 4 }]);
+        assert!(units[0].contains(3) && !units[0].contains(4));
     }
 
     /// `mmu` and `mmu_machine` of a real single-gate machine with a proportional buffer and no encoder (Happy Hare 4.1.0).

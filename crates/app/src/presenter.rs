@@ -646,7 +646,7 @@ impl Presenter {
     }
 
     fn lanes(&self, snapshot: &Snapshot) -> Vec<Lane> {
-        spools::lanes(&snapshot.status, &self.cache.borrow().spoolman)
+        snapshot.tree.lanes(&self.cache.borrow().spoolman)
     }
 
     fn store_spoolman(&self, state: SpoolmanState) {

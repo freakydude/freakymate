@@ -7,6 +7,7 @@ pub mod filament_match;
 pub mod file_catalog;
 pub mod job_end;
 pub mod light;
+pub mod machine_tree;
 pub mod pause;
 pub mod prepared_job;
 pub mod screen_wake;
