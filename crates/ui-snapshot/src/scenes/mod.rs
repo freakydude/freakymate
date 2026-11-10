@@ -16,6 +16,7 @@ mod printing;
 mod spools;
 mod system;
 mod temperature;
+mod toolchanger;
 
 use calibrate::calibrate;
 use console::typing;
@@ -26,6 +27,7 @@ use printing::printing;
 use spools::spools;
 use system::{idle, shutdown};
 use temperature::taps;
+use toolchanger::toolchanger;
 
 /// Scenes run in this order; each one leaves the printer ready for the next.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +36,8 @@ pub enum Scene {
     Pages,
     /// Spoolman: the spool in use, the temperature hint, the picker and the hints before a print.
     Spools,
+    /// A tool changer (`-p toolchanger`): spool in use, hints, the picker of a tool macro, the prepared file.
+    Toolchanger,
     /// Settings > Network: list, connecting, confirmation, read-only fallback.
     Network,
     /// Taps that last longer than a status update still count while the temperatures change.
@@ -54,9 +58,10 @@ pub enum Scene {
 }
 
 impl Scene {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Pages,
         Self::Spools,
+        Self::Toolchanger,
         Self::Network,
         Self::Taps,
         Self::Typing,
@@ -66,9 +71,10 @@ impl Scene {
         Self::Idle,
         Self::Login,
     ];
-    pub const DEFAULT: [Self; 8] = [
+    pub const DEFAULT: [Self; 9] = [
         Self::Pages,
         Self::Spools,
+        Self::Toolchanger,
         Self::Network,
         Self::Taps,
         Self::Typing,
@@ -88,7 +94,7 @@ impl Scene {
     fn parse(name: &str) -> Result<Self, String> {
         Self::ALL.into_iter().find(|scene| scene.name() == name).ok_or_else(|| {
             format!(
-                "unknown scene '{name}' (pages, spools, network, taps, typing, calibrate, printing, shutdown, idle, \
+                "unknown scene '{name}' (pages, spools, toolchanger, network, taps, typing, calibrate, printing, shutdown, idle, \
                  login, all)"
             )
         })
@@ -98,6 +104,7 @@ impl Scene {
         match self {
             Self::Pages => "pages",
             Self::Spools => "spools",
+            Self::Toolchanger => "toolchanger",
             Self::Network => "network",
             Self::Taps => "taps",
             Self::Typing => "typing",
@@ -113,6 +120,7 @@ impl Scene {
         match self {
             Self::Pages => pages(session),
             Self::Spools => spools(session),
+            Self::Toolchanger => toolchanger(session),
             Self::Network => network(session),
             Self::Taps => taps(session),
             Self::Typing => typing(session),

@@ -7,10 +7,10 @@ use crate::{
 };
 use freakymate_core::color::Rgba;
 use freakymate_core::domain::filament_match::{self, Difference, Supply, ToolMatch, Verdict};
-use freakymate_core::domain::spools::{self, FilamentColors, Lane};
+use freakymate_core::domain::spools::{self, FilamentColors, Lane, SpoolHolder};
 use freakymate_core::sources::happy_hare::{self, FilamentPath, PathSensor};
 use freakymate_core::sources::klipper::tuning::TuningValue;
-use freakymate_core::sources::klipper::{Fan, Heater, Led, TemperatureSensor, BED_HEATER, NOZZLE_HEATER};
+use freakymate_core::sources::klipper::{Fan, Heater, Led, TemperatureSensor};
 use freakymate_core::sources::led_effect::LedEffect;
 use freakymate_core::sources::moonraker_server::machine::HostInterface;
 use freakymate_core::sources::moonraker_server::power::PowerDevice;
@@ -50,10 +50,7 @@ pub(crate) fn spool_rows(spools: &[Spool], lanes: &[Lane]) -> Vec<SpoolItem> {
         .iter()
         .map(|spool| {
             let lane = lanes.iter().find(|lane| lane.spool_id == Some(spool.id));
-            let place = match lane {
-                Some(lane) => lane.gate.map_or_else(|| "In use".to_owned(), |gate| format!("Gate {gate}")),
-                None => String::new(),
-            };
+            let place = lane.map(spool_place).unwrap_or_default();
             SpoolItem {
                 id: spool.id as i32,
                 title: spool.title().into(),
@@ -65,6 +62,15 @@ pub(crate) fn spool_rows(spools: &[Spool], lanes: &[Lane]) -> Vec<SpoolItem> {
             }
         })
         .collect()
+}
+
+/// Where a spool sits: the tool changer head, else the gate, else "In use".
+fn spool_place(lane: &Lane) -> String {
+    match (&lane.head, lane.gate) {
+        (Some(head), _) => head.clone(),
+        (None, Some(gate)) => format!("Gate {gate}"),
+        (None, None) => "In use".to_owned(),
+    }
 }
 
 pub(crate) fn color_of([red, green, blue, alpha]: Rgba) -> slint::Color {
@@ -94,15 +100,11 @@ pub(crate) fn spool_colors(spool: &Spool) -> BarColors {
     bar_colors(&FilamentColors { colors: spool.colors.clone(), longitudinal: spool.has_longitudinal_colors() })
 }
 
-/// The row of a heater; the hint says that the target is off from what the spool in use recommends.
-pub(crate) fn heater_item(heater: &Heater, spool: Option<&Spool>, has_history: bool) -> HeaterItem {
-    let recommended = spool.and_then(|spool| match heater.object.as_str() {
-        NOZZLE_HEATER => spool.extruder_temp,
-        BED_HEATER => spool.bed_temp,
-        _ => None,
-    });
+/// The row of a heater; the hint says that the target is off from what the spools recommend.
+pub(crate) fn heater_item(heater: &Heater, lanes: &[Lane], has_history: bool) -> HeaterItem {
+    let recommended = spools::recommended_temperature(lanes, &heater.object);
     let spool_hint = spools::temperature_hint(heater.target, recommended)
-        .map_or_else(SharedString::new, |degrees| format!("Spool {degrees:.0}°").into());
+        .map_or_else(SharedString::new, |degrees| format!("{degrees:.0}°").into());
     HeaterItem {
         spool_hint,
         object: heater.object.as_str().into(),
@@ -115,6 +117,7 @@ pub(crate) fn heater_item(heater: &Heater, spool: Option<&Spool>, has_history: b
             format!("Klipper: {:.0}–{maximum:.0} °C", heater.min_temp).into()
         }),
         has_history,
+        nozzle: heater.is_nozzle(),
     }
 }
 
@@ -231,9 +234,20 @@ pub(crate) fn id_or_none<T: TryInto<i32>>(id: Option<T>) -> i32 {
     id.and_then(|id| id.try_into().ok()).unwrap_or(-1)
 }
 
+/// `ToolMatchItem.spool_pick`: the tool has no spool of its own to pick.
+const SPOOL_PICK_NONE: i32 = -2;
+/// `ToolMatchItem.spool_pick`: the spool in use is picked.
+const SPOOL_PICK_ACTIVE: i32 = -1;
+
 /// A tool of Happy Hare (`gate` `None` for a tool of the file without gate) with what the file (`matches`) asks of it.
 pub(crate) fn tool_match_item(tool: usize, gate: Option<usize>, matches: &[ToolMatch]) -> ToolMatchItem {
-    let mut item = ToolMatchItem { tool: tool as i32, gate: id_or_none(gate), ..ToolMatchItem::default() };
+    let mut item = ToolMatchItem {
+        tool: tool as i32,
+        gate: id_or_none(gate),
+        spool_pick: SPOOL_PICK_NONE,
+        spool_id: -1,
+        ..ToolMatchItem::default()
+    };
     let Some(found) = matches.iter().find(|found| found.request.tool == tool) else { return item };
     let request = &found.request;
     item.used = true;
@@ -271,9 +285,28 @@ pub(crate) fn compared_tool_items(
             if let Some(supply) = filament_match::tool_supply(found, status, lanes) {
                 fill_loaded(&mut item, &supply, found.reserve);
             }
+            fill_spool_pick(&mut item, lanes);
             item
         })
         .collect()
+}
+
+/// The tool macro that holds the spool in use, -1 when the spool in use is not kept by a tool macro.
+pub(crate) fn spool_tool(lanes: &[Lane]) -> i32 {
+    match lanes.iter().find(|lane| lane.active).and_then(Lane::spool_holder) {
+        Some(SpoolHolder::ToolMacro(tool)) => id_or_none(Some(tool)),
+        _ => -1,
+    }
+}
+
+/// Which spool a tool without gate can be assigned: the spool of its tool macro or the spool in use; none otherwise.
+fn fill_spool_pick(item: &mut ToolMatchItem, lanes: &[Lane]) {
+    let lane = usize::try_from(item.tool).ok().and_then(|tool| spools::direct_lane(lanes, tool));
+    (item.spool_pick, item.spool_id) = match lane.and_then(Lane::spool_holder) {
+        Some(SpoolHolder::ToolMacro(tool)) => (id_or_none(Some(tool)), id_or_none(lane.and_then(|lane| lane.spool_id))),
+        Some(SpoolHolder::ActiveSpool) => (SPOOL_PICK_ACTIVE, id_or_none(lane.and_then(|lane| lane.spool_id))),
+        Some(SpoolHolder::Gate(_)) | None => (SPOOL_PICK_NONE, -1),
+    };
 }
 
 fn differs(found: &ToolMatch, kind: impl Fn(&Difference) -> bool) -> bool {
@@ -314,6 +347,57 @@ pub(crate) fn reuse_flags(old: Option<ModelRc<bool>>, flags: Option<Vec<bool>>) 
 mod tests {
     use super::*;
     use freakymate_core::domain::filament_match::ToolRequest;
+
+    fn lane(gate: Option<usize>, head: Option<&str>, spool_id: Option<u32>) -> Lane {
+        Lane {
+            gate,
+            unit: None,
+            head: head.map(str::to_owned),
+            extruder: "extruder".into(),
+            tool: Some(1),
+            spool_id,
+            tool_macro_spool: head.is_some(),
+            spool: None,
+            active: false,
+        }
+    }
+
+    #[test]
+    fn a_spool_names_its_head_its_gate_or_that_it_is_in_use() {
+        let spools: Vec<Spool> = (1..=4).map(|id| Spool { id, ..Spool::default() }).collect();
+        let lanes = [lane(None, Some("T1"), Some(1)), lane(Some(2), None, Some(2)), lane(None, None, Some(3))];
+
+        let rows = spool_rows(&spools, &lanes);
+        let place = |id: i32| rows.iter().find(|row| row.id == id).map(|row| row.place.to_string());
+
+        assert_eq!(place(1).as_deref(), Some("T1"));
+        assert_eq!(place(2).as_deref(), Some("Gate 2"));
+        assert_eq!(place(3).as_deref(), Some("In use"));
+        assert_eq!(place(4).as_deref(), Some(""));
+    }
+
+    #[test]
+    fn a_tool_picks_the_spool_of_its_macro_the_spool_in_use_or_none() {
+        let mut item = tool_match_item(1, None, &[]);
+        fill_spool_pick(&mut item, &[lane(None, Some("T1"), Some(7))]);
+        assert_eq!((item.spool_pick, item.spool_id), (1, 7));
+
+        let mut in_use = lane(None, None, Some(3));
+        in_use.active = true;
+        fill_spool_pick(&mut item, &[in_use]);
+        assert_eq!((item.spool_pick, item.spool_id), (SPOOL_PICK_ACTIVE, 3));
+
+        fill_spool_pick(&mut item, &[lane(None, None, None)]);
+        assert_eq!((item.spool_pick, item.spool_id), (SPOOL_PICK_NONE, -1));
+    }
+
+    #[test]
+    fn the_spool_in_use_belongs_to_a_tool_only_through_its_macro() {
+        let mut head = lane(None, Some("T1"), Some(7));
+        assert_eq!(spool_tool(std::slice::from_ref(&head)), -1);
+        head.active = true;
+        assert_eq!(spool_tool(&[head]), 1);
+    }
 
     #[test]
     fn a_colour_bar_has_up_to_six_colours() {

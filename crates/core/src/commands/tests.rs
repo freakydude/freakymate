@@ -364,3 +364,28 @@ fn tuning_steps_from_the_current_value_and_resets_to_the_configuration() {
 fn a_heater_target_is_never_negative() {
     assert_eq!(resolved(set("heater_bed", -5.0), &["heater_bed"]), Ok(vec![set("heater_bed", 0.0)]));
 }
+
+#[test]
+fn a_tool_spool_goes_into_the_macro_under_its_reported_name_and_is_saved_where_possible() {
+    let status = PrinterStatus {
+        tool_spools: vec![crate::sources::tool_macros::ToolSpool { tool: 1, macro_name: "t1".into(), spool_id: None }],
+        ..PrinterStatus::default()
+    };
+    let assign = |objects: &[&str], tool| {
+        Command::AssignToolSpool { tool, spool_id: Some(4) }.resolve(&printer(objects), &status)
+    };
+
+    assert_eq!(
+        assign(&["gcode_macro t1"], 1),
+        Ok(vec![Command::RunGcode { script: "SET_GCODE_VARIABLE MACRO=t1 VARIABLE=spool_id VALUE=4".into() }])
+    );
+    assert_eq!(
+        assign(&["gcode_macro t1", "save_variables"], 1),
+        Ok(vec![Command::RunGcode {
+            script:
+                "SET_GCODE_VARIABLE MACRO=t1 VARIABLE=spool_id VALUE=4\nSAVE_VARIABLE VARIABLE=t1__spool_id VALUE=4"
+                    .into()
+        }])
+    );
+    assert_eq!(assign(&[], 0), Err(CommandError::NoToolSpoolVariable(0)));
+}

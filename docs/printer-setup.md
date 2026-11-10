@@ -40,6 +40,35 @@ colour in the slicer to `#FD7E14` (RGB 253, 126, 20) and the thumbnail matches t
 FreakyMate calls macros by name with their documented parameters and makes no assumptions about what they do inside.
 Where a macro is missing, its button does not appear.
 
+### What FreakyMate looks for
+
+No macro is required. Pause, resume and cancel go through Moonraker's print API, which runs Klipper's `PAUSE`,
+`RESUME` and `CANCEL_PRINT` (from `[pause_resume]`, or the macros that replace them, as mainsail-config does).
+
+Macros FreakyMate recognises by name and uses when they exist:
+
+| Macro                                        | Comes from                                                                     | Used for                                                                                          |
+| -------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `LOAD_FILAMENT`, `UNLOAD_FILAMENT`           | a naming convention documented by [KlipperScreen][ks-macros]; Mainsail and Fluidd call the same names | the Load and Unload buttons without Happy Hare, called without parameters ([below](#load-and-unload-filament)) |
+| `SET_PAUSE_NEXT_LAYER`, `SET_PAUSE_AT_LAYER` | [mainsail-config][mainsail-config] `client.cfg`, with `ENABLE` since v1.1.0    | planning a pause at a layer, with `ENABLE` and `LAYER` ([below](#pause-at-a-layer))               |
+| `PRINT_START`                                | a common name in printer configurations                                        | never called; the console's macro list greys it out during a print, since it would start a second one |
+| `T0` … `Tn` (any `T<n>` command)             | your macros, or a plugin that registers them (Happy Hare, tool changers)       | the comparison before a print: a tool of the file without its `T<n>` command is marked, because the print would stop there |
+
+Every other macro shows in the console's macro list, except those whose name starts with `_` and those that replace
+a built-in command (`rename_existing`). Their parameters are read from the template (`params.NAME`, with
+`|default(...)` as the placeholder), as Mainsail and KlipperScreen do; none is treated as required.
+
+Variables FreakyMate reads from macros, only where the variable is declared under exactly this name. A missing
+variable leaves the macro a black box:
+
+| Macro                  | Variables                            | Comes from                                                                  | Used for                                                                     |
+| ---------------------- | ------------------------------------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `SET_PRINT_STATS_INFO` | `pause_next_layer`, `pause_at_layer` | [mainsail-config][mainsail-config] `client.cfg`, since v1.1.0               | the planned layer pause, also one planned in another client ([below](#pause-at-a-layer)) |
+| `T0` … `Tn`            | `spool_id`                           | your tool macros; the convention of Fluidd (since v1.28.0) and Mainsail (since v2.13.0) | the Spoolman spool of each tool head; FreakyMate also assigns it ([below](#spools-of-tool-heads)) |
+
+[ks-macros]: https://github.com/KlipperScreen/KlipperScreen/blob/master/docs/macros.md
+[mainsail-config]: https://github.com/mainsail-crew/mainsail-config
+
 ### Load and unload filament
 
 Without Happy Hare the **Load** and **Unload** buttons of the Filament page run the macros `LOAD_FILAMENT` and
@@ -62,3 +91,22 @@ The plan itself lives in the variables `pause_next_layer` and `pause_at_layer` o
 `SET_PRINT_STATS_INFO`. FreakyMate reads them, so a pause planned here or in another client shows on the layer tile
 (the layer, or `next`, below the pause icon) and in the dialog. With a different `SET_PRINT_STATS_INFO` that lacks
 these variables, the plan is not shown and the dialog always offers to take it back.
+
+### Spools of tool heads
+
+Moonraker knows one active spool. A tool changer has a spool on each head, and Fluidd and Mainsail keep it in a
+variable `spool_id` of the tool's macro. FreakyMate follows the same convention: when `gcode_macro T<n>` declares
+`spool_id`, its value is the spool of that head, and choosing a spool for the head on the display sends what Fluidd
+and Mainsail send:
+
+```
+SET_GCODE_VARIABLE MACRO=T0 VARIABLE=spool_id VALUE=12
+SAVE_VARIABLE VARIABLE=t0__spool_id VALUE=12
+```
+
+The macro name is used as written in the configuration (Klipper matches it exactly), the saved variable in lower
+case, as Fluidd (since v1.32.0) and Mainsail (since v2.14.0) save it; their earlier versions saved it in upper
+case. The second line only when the printer has `[save_variables]`; restoring the value at start-up is up to the
+macros. Without the variable a head has no spool of its own, and the head in use shows Moonraker's active spool. A tool
+changer plugin that registers `T<n>` itself skips a name that a `gcode_macro` already has, so the variable needs a
+macro `T<n>` of your own that calls the plugin's tool change.

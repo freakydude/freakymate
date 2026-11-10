@@ -33,6 +33,8 @@ pub enum CommandError {
     UnknownHeater(String),
     #[error("gate {0} does not exist")]
     UnknownGate(usize),
+    #[error("the macro T{0} declares no spool_id")]
+    NoToolSpoolVariable(usize),
     /// A source or Klipper did not accept the command or a value in it; their reason.
     #[error("{0}")]
     Rejected(String),

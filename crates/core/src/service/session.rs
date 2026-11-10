@@ -1,7 +1,7 @@
 //! One connection to Moonraker: reconnecting, handshake and login, subscription and the loop that serves requests.
 
 use super::dispatch::console_line;
-use super::queries::{gate_spool_ids, update_status_events};
+use super::queries::update_status_events;
 use super::Snapshot;
 use super::{
     Access, Event, Outputs, Query, Request, SessionEnd, ACCESS_CHECK_INTERVAL, CLIENT_NAME, KLIPPY_POLL_INTERVAL,
@@ -145,8 +145,8 @@ pub(super) struct Session<'a> {
     /// What each fan's tachometer has measured since Klipper started; the snapshot marks the stalled ones.
     pub(super) fan_watch: FanWatch,
     pub(super) height_watch: HeightWatch,
-    /// The spools of the gates at the last look; `None` until Spoolman was asked once.
-    pub(super) spoolman_gate_spools: Option<Vec<u32>>,
+    /// The spools the lanes keep (gates, tool macros) at the last look; `None` until Spoolman was asked once.
+    pub(super) spoolman_lane_spools: Option<Vec<u32>>,
     /// Limits the file details in flight, so a long file list does not flood Moonraker.
     pub(super) file_details: Arc<Semaphore>,
     /// Moonraker's WLED strips; part of the snapshot's lights.
@@ -180,7 +180,7 @@ impl<'a> Session<'a> {
             pending_targets: PendingTargets::default(),
             fan_watch: FanWatch::default(),
             height_watch: HeightWatch::default(),
-            spoolman_gate_spools: None,
+            spoolman_lane_spools: None,
             file_details: Arc::new(Semaphore::new(PARALLEL_FILE_DETAILS)),
             wled: Vec::new(),
             wled_answers,
@@ -546,10 +546,11 @@ impl<'a> Session<'a> {
                 self.answer(Query::PrintHistory);
             }
         }
+        let tree = MachineTree::build(&status);
         if self.components.spoolman {
-            let gate_spools = gate_spool_ids(&status);
-            if self.spoolman_gate_spools.as_ref() != Some(&gate_spools) {
-                self.spoolman_gate_spools = Some(gate_spools);
+            let lane_spools = tree.own_spool_ids();
+            if self.spoolman_lane_spools.as_ref() != Some(&lane_spools) {
+                self.spoolman_lane_spools = Some(lane_spools);
                 self.answer(Query::Spoolman);
             }
         }
@@ -557,7 +558,7 @@ impl<'a> Session<'a> {
             endpoint: self.endpoint.display(),
             connection: ConnectionState::Connected,
             access: self.access.clone(),
-            tree: MachineTree::build(&status),
+            tree,
             status,
             sources: self.sources.clone(),
         });

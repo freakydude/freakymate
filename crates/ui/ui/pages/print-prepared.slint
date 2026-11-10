@@ -163,6 +163,18 @@ component ExtruderMatchCard inherits Card {
 
     function pick-spool() {
         if (Printer.has-spoolman) {
+            SpoolPicker.show-in-use();
+        }
+    }
+
+    // A further tool: the spool of its own tool macro, or the spool in use; nothing when it has no spool to pick.
+    function pick-tool-spool(mapping: ToolMatchItem) {
+        if (!Printer.has-spoolman || mapping.spool-pick == -2) {
+            return;
+        }
+        if (mapping.spool-pick >= 0) {
+            SpoolPicker.show-tool(mapping.spool-pick, mapping.spool-id);
+        } else {
             SpoolPicker.show(-1, Printer.spool-id);
         }
     }
@@ -239,7 +251,7 @@ component ExtruderMatchCard inherits Card {
     if root.several: ToolChipGrid {
         tools: Printer.prepared-tools;
         skip: 1;
-        clicked(mapping) => { root.pick-spool(); }
+        clicked(mapping) => { root.pick-tool-spool(mapping); }
     }
 }
 

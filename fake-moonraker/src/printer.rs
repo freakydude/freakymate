@@ -16,6 +16,7 @@ mod config;
 mod status;
 #[cfg(test)]
 mod tests;
+mod toolchanger;
 
 const AMBIENT_TEMPERATURE: f64 = 24.0;
 const HEAT_RATE_PER_SECOND: f64 = 3.0;
@@ -199,6 +200,8 @@ pub struct Printer {
     uptime: f64,
     profile: MachineProfile,
     mmu: Option<HappyHare>,
+    /// `None` without a tool changer; the heaters of its extra extruders live in there.
+    toolchanger: Option<toolchanger::Toolchanger>,
     klippy: KlippyState,
     extruder: Heater,
     bed: Heater,
@@ -253,6 +256,7 @@ impl Printer {
             uptime: 0.0,
             profile,
             mmu: profile.mmu_gates.map(|gates| HappyHare::new(gates, profile.spoolman)),
+            toolchanger: (profile.tools > 0).then(|| toolchanger::Toolchanger::new(profile.tools)),
             klippy: KlippyState::Ready,
             extruder: Heater::cold(),
             bed: Heater::cold(),
@@ -320,6 +324,9 @@ impl Printer {
         let seconds = elapsed.as_secs_f64() * self.time_scale;
         self.uptime += seconds;
         self.extruder.advance(seconds);
+        if let Some(toolchanger) = self.toolchanger.as_mut() {
+            toolchanger.advance(seconds);
+        }
         self.bed.advance(seconds);
         if let Some(chamber) = self.chamber.as_mut() {
             chamber.advance(seconds);
@@ -346,6 +353,9 @@ impl Printer {
         };
         let mut samples =
             vec![("extruder".to_owned(), heater(&self.extruder)), ("heater_bed".to_owned(), heater(&self.bed))];
+        for (name, extruder) in self.toolchanger.iter().flat_map(|toolchanger| toolchanger.extra_extruders()) {
+            samples.push((name, heater(extruder)));
+        }
         if let Some(chamber) = &self.chamber {
             samples.push(("heater_generic chamber".to_owned(), heater(chamber)));
         }
@@ -384,7 +394,9 @@ impl Printer {
         self.inactive_seconds = 0.0;
         match command {
             Command::Home(axes) => self.home(&axes),
-            Command::SetExtruderTarget(target) => self.extruder.set_target(target, MAX_EXTRUDER_TARGET)?,
+            Command::SetExtruderTarget { tool, target } => {
+                self.extruder_of_tool_mut(tool)?.set_target(target, MAX_EXTRUDER_TARGET)?
+            }
             Command::SetBedTarget(target) => self.bed.set_target(target, MAX_BED_TARGET)?,
             Command::SetFanSpeed(speed) => self.fan_speed = speed,
             Command::AbsolutePositioning => self.relative_positioning = false,
@@ -412,6 +424,7 @@ impl Printer {
             }
             Command::QuadGantryLevel => self.level_gantry()?,
             Command::Mmu(command) => self.apply_mmu(command)?,
+            Command::Toolchanger(command) => self.apply_toolchanger(command)?,
             Command::LayerPause(command) => self.layer_pause.apply(command),
             Command::FakePrintError => self.fail_print()?,
             // The session delays the answer of a dwell; the printer itself does nothing.
@@ -498,6 +511,10 @@ impl Printer {
     }
 
     fn set_named_heater(&mut self, heater: &str, target: f64) -> Result<(), CommandError> {
+        if let Some(extruder) = self.toolchanger.as_mut().and_then(|toolchanger| toolchanger.extra_extruder_mut(heater))
+        {
+            return extruder.set_target(target, MAX_EXTRUDER_TARGET);
+        }
         match (heater, self.chamber.as_mut()) {
             ("extruder", _) => self.extruder.set_target(target, MAX_EXTRUDER_TARGET),
             ("heater_bed", _) => self.bed.set_target(target, MAX_BED_TARGET),
@@ -532,6 +549,12 @@ impl Printer {
     }
 
     fn apply_mmu(&mut self, command: MmuCommand) -> Result<(), CommandError> {
+        // With a tool changer `T<n>` mounts a tool instead of changing a gate.
+        if let MmuCommand::ChangeTool { tool } = command {
+            if let Some(result) = self.select_tool(tool) {
+                return result;
+            }
+        }
         match self.mmu.as_mut() {
             Some(mmu) => mmu.apply(command, self.print_state.as_str()),
             None => Err(CommandError::new(format!("Unknown command:\"{}\"", command.gcode_name()))),
@@ -583,6 +606,9 @@ impl Printer {
 
     fn switch_heaters_off(&mut self) {
         self.extruder.target = 0.0;
+        if let Some(toolchanger) = self.toolchanger.as_mut() {
+            toolchanger.switch_heaters_off();
+        }
         self.bed.target = 0.0;
     }
 
@@ -630,7 +656,7 @@ impl Printer {
             target[index] = position;
         }
         if let Some(distance) = movement.e {
-            if self.extruder.temperature < MIN_EXTRUDE_TEMPERATURE {
+            if self.active_extruder_mut().temperature < MIN_EXTRUDE_TEMPERATURE {
                 return Err(CommandError::new("Extrude below minimum temp"));
             }
             target[EXTRUDER_INDEX] = if self.relative_positioning || self.relative_extrusion {

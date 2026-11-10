@@ -1,7 +1,7 @@
 //! Spools in the printer: the lanes they sit in (see [`super::machine_tree`]). How a print compares with them is
 //! [`super::filament_match`].
 
-pub use super::machine_tree::Lane;
+pub use super::machine_tree::{Lane, SpoolHolder};
 use crate::color::Rgba;
 use crate::commands::Command;
 use crate::domain::machine_tree::MachineTree;
@@ -39,6 +39,32 @@ pub fn lanes(status: &PrinterStatus, state: &SpoolmanState) -> Vec<Lane> {
 /// The lane in use, if it has a spool.
 pub fn active_spool(lanes: &[Lane]) -> Option<&Spool> {
     lanes.iter().find(|lane| lane.active).and_then(|lane| lane.spool.as_ref())
+}
+
+/// The spool that feeds the nozzle of `extruder`: of its lane in use, or of its only lane (a head that is not
+/// mounted). For the temperature hint at each extruder.
+pub fn nozzle_spool<'a>(lanes: &'a [Lane], extruder: &str) -> Option<&'a Spool> {
+    let mut fed = lanes.iter().filter(|lane| lane.extruder == extruder);
+    let lane = match (fed.clone().find(|lane| lane.active), fed.next(), fed.next()) {
+        (Some(active), _, _) => active,
+        (None, Some(only), None) => only,
+        _ => return None,
+    };
+    lane.spool.as_ref()
+}
+
+/// The direct feed of `tool` (the head of a tool changer, or tool 0 without MMU); `None` with Happy Hare's gates.
+pub fn direct_lane(lanes: &[Lane], tool: usize) -> Option<&Lane> {
+    lanes.iter().find(|lane| lane.gate.is_none() && lane.tool == Some(tool))
+}
+
+/// What the spools recommend for `heater`: at the nozzle of an extruder its spool's nozzle temperature, at the bed the
+/// bed temperature of the spool in use.
+pub fn recommended_temperature(lanes: &[Lane], heater: &str) -> Option<f64> {
+    if heater == BED_HEATER {
+        return active_spool(lanes)?.bed_temp;
+    }
+    nozzle_spool(lanes, heater)?.extruder_temp
 }
 
 /// The spool for a hint about the temperature: the target that does not match it, if it is off by more than the
@@ -144,6 +170,38 @@ mod tests {
 
         assert_eq!(lanes.len(), 1);
         assert_eq!((lanes[0].gate, lanes[0].spool_id), (None, Some(5)));
+    }
+
+    #[test]
+    fn each_nozzle_shows_the_spool_of_its_lane_in_use_or_of_its_only_lane() {
+        let lane = |extruder: &str, id: u32, active: bool| Lane {
+            gate: None,
+            unit: None,
+            head: None,
+            extruder: extruder.into(),
+            tool: None,
+            spool_id: Some(id),
+            tool_macro_spool: false,
+            spool: Some(test_spool(id, "PLA", 500.0, [0, 0, 0])),
+            active,
+        };
+        let heads = [lane("extruder", 1, false), lane("extruder1", 2, true)];
+        let gates = [lane("extruder", 3, false), lane("extruder", 4, false)];
+
+        assert_eq!(nozzle_spool(&heads, "extruder").map(|spool| spool.id), Some(1));
+        assert_eq!(nozzle_spool(&heads, "extruder1").map(|spool| spool.id), Some(2));
+        assert_eq!(nozzle_spool(&gates, "extruder"), None, "several gates, none selected");
+        assert_eq!(nozzle_spool(&heads, "extruder2"), None);
+
+        let mut hot = heads.clone();
+        for (lane, temperatures) in hot.iter_mut().zip([(200.0, 60.0), (240.0, 80.0)]) {
+            let spool = lane.spool.as_mut().unwrap();
+            (spool.extruder_temp, spool.bed_temp) = (Some(temperatures.0), Some(temperatures.1));
+        }
+        assert_eq!(recommended_temperature(&hot, "extruder"), Some(200.0));
+        assert_eq!(recommended_temperature(&hot, "extruder1"), Some(240.0));
+        assert_eq!(recommended_temperature(&hot, BED_HEATER), Some(80.0), "the bed follows the spool in use");
+        assert_eq!(recommended_temperature(&hot, "heater_generic chamber"), None);
     }
 
     #[test]

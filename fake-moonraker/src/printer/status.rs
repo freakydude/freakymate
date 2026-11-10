@@ -14,6 +14,7 @@ impl Printer {
         let mut objects = self.core_status();
         self.add_modules(&mut objects);
         self.add_sensors(&mut objects);
+        self.add_toolchanger_status(&mut objects);
         if let Some(retraction) = self.retraction {
             objects.insert("firmware_retraction".to_owned(), retraction_json(retraction));
         }
@@ -100,18 +101,22 @@ impl Printer {
     }
 
     fn extruder_json(&self) -> Value {
+        self.heater_json(&self.extruder)
+    }
+
+    pub(super) fn heater_json(&self, heater: &Heater) -> Value {
         json!({
-            "temperature": round(self.extruder.temperature, 2),
-            "target": self.extruder.target,
-            "power": if self.extruder.target > self.extruder.temperature { 1.0 } else { 0.0 },
+            "temperature": round(heater.temperature, 2),
+            "target": heater.target,
+            "power": if heater.target > heater.temperature { 1.0 } else { 0.0 },
             "pressure_advance": self.pressure_advance,
             "smooth_time": self.smooth_time,
-            "can_extrude": self.extruder.temperature >= MIN_EXTRUDE_TEMPERATURE,
+            "can_extrude": heater.temperature >= MIN_EXTRUDE_TEMPERATURE,
         })
     }
 
     fn toolhead_json(&self) -> Value {
-        json!({
+        let mut toolhead = json!({
             "position": self.rounded_position(),
             "homed_axes": self.homed_axes(),
             "max_accel": self.limits.max_accel,
@@ -120,7 +125,11 @@ impl Printer {
             "max_velocity": self.limits.max_velocity,
             "square_corner_velocity": self.limits.square_corner_velocity,
             "minimum_cruise_ratio": self.limits.minimum_cruise_ratio,
-        })
+        });
+        if let Some(toolchanger) = &self.toolchanger {
+            toolhead["extruder"] = json!(toolchanger.active_extruder_name());
+        }
+        toolhead
     }
 
     fn print_stats_json(&self) -> Value {

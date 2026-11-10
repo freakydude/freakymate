@@ -9,6 +9,8 @@ import { ButtonKind, IconButton, IconLabel, ProgressBar, ScrollList, StepSelecto
 component HeaterRow inherits Rectangle {
     in property <HeaterItem> heater;
     in property <float> step;
+    // The row is narrowed by a scroll bar: notes take their short form.
+    in property <bool> compact;
     callback edit-target();
     height: Theme.row-height;
     background: history-touch.pressed ? Theme.surface-raised : Theme.surface;
@@ -26,7 +28,7 @@ component HeaterRow inherits Rectangle {
         spacing: Theme.spacing;
         Image {
             cross-axis-self-alignment: center;
-            source: root.heater.object == "heater_bed" ? Icons.thermal-bed : root.heater.object == "extruder" ? Icons.thermal-nozzle : Icons.thermal-chamber;
+            source: root.heater.object == "heater_bed" ? Icons.thermal-bed : root.heater.nozzle ? Icons.thermal-nozzle : Icons.thermal-chamber;
             colorize: root.heater.target > 0 ? Theme.accent : Theme.muted;
             width: 28px;
             height: 28px;
@@ -49,11 +51,12 @@ component HeaterRow inherits Rectangle {
                     width: Theme.icon-tiny;
                     height: Theme.icon-tiny;
                 }
-                // The spool in use recommends another temperature than the target: a quiet note, nothing is changed.
+                // The spool recommends another temperature than the target: a quiet note, nothing is changed. In a
+                // narrow row the spool icon stands for the word.
                 if root.heater.spool-hint != "": IconLabel {
-                    icon: Icons.ui-warning;
+                    icon: root.compact ? Icons.filament-spool : Icons.ui-warning;
                     icon-size: 14px;
-                    text: root.heater.spool-hint;
+                    text: root.compact ? root.heater.spool-hint : @tr("Spool {}", root.heater.spool-hint);
                     color: Theme.warning;
                     font-size: Theme.font-small;
                 }
@@ -183,6 +186,7 @@ component FanRow inherits Rectangle {
 
 component HeatersTab inherits Rectangle {
     callback edit-target(HeaterItem);
+    property <length> row-step: Theme.row-height + Theme.spacing;
     VerticalLayout {
         padding: Theme.padding;
         spacing: Theme.spacing;
@@ -194,12 +198,19 @@ component HeatersTab inherits Rectangle {
             VerticalLayout {
                 horizontal-stretch: 1;
                 spacing: Theme.spacing;
-                for heater in Printer.heaters: HeaterRow {
-                    heater: heater;
-                    step: UiSettings.temperature-step;
-                    edit-target => { root.edit-target(heater); }
+                // Scrolls when the heaters do not fit (a tool changer brings one nozzle per head).
+                list := ScrollList {
+                    vertical-stretch: 1;
+                    content-height: Printer.heaters.length * root.row-step - Theme.spacing;
+                    for heater[index] in Printer.heaters: HeaterRow {
+                        y: index * root.row-step;
+                        width: list.row-width;
+                        compact: list.scrollable;
+                        heater: heater;
+                        step: UiSettings.temperature-step;
+                        edit-target => { root.edit-target(heater); }
+                    }
                 }
-                Rectangle { vertical-stretch: 1; }
                 // Under the heaters, so the presets can take the full height beside them.
                 StepSelector {
                     label: @tr("Step");

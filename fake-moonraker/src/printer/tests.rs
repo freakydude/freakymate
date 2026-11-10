@@ -320,3 +320,173 @@ fn restart_keeps_the_machine_profile() {
 
     assert_eq!(printer.status()["mmu"]["is_homed"], false);
 }
+
+fn toolchanger_printer() -> Printer {
+    Printer::with_profile(1.0, MachineProfile::toolchanger())
+}
+
+#[test]
+fn toolchanger_profile_lists_its_objects() {
+    let names = toolchanger_printer().object_names();
+
+    for expected in [
+        "extruder",
+        "extruder1",
+        "extruder2",
+        "toolchanger",
+        "tool T0",
+        "tool T1",
+        "tool T2",
+        "gcode_macro T0",
+        "gcode_macro T1",
+        "gcode_macro T2",
+        "save_variables",
+    ] {
+        assert!(names.iter().any(|name| name == expected), "missing {expected}");
+    }
+    assert!(!Printer::with_profile(1.0, MachineProfile::voron()).object_names().contains(&"toolchanger".to_owned()));
+}
+
+#[test]
+fn toolchanger_starts_with_tool_0_mounted_and_known_spools() {
+    let status = toolchanger_printer().status();
+
+    assert_eq!(status["toolchanger"]["tool"], "tool T0");
+    assert_eq!(status["toolchanger"]["tool_number"], 0);
+    assert_eq!(status["toolchanger"]["tool_names"], json!(["tool T0", "tool T1", "tool T2"]));
+    assert_eq!(status["tool T0"]["detect_state"], "mounted");
+    assert_eq!(status["tool T1"]["gcode_z_offset"], 0.3);
+    assert_eq!(status["toolhead"]["extruder"], "extruder");
+    assert_eq!(status["gcode_macro T0"]["spool_id"], 1);
+    assert_eq!(status["gcode_macro T1"]["spool_id"], 3);
+    assert_eq!(status["gcode_macro T2"]["spool_id"], Value::Null);
+}
+
+#[test]
+fn tool_macro_switches_the_tool_and_the_toolhead_extruder() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "T1").unwrap();
+
+    let status = printer.status();
+    assert_eq!(status["toolchanger"]["tool"], "tool T1");
+    assert_eq!(status["toolchanger"]["detected_tool_number"], 1);
+    assert_eq!(status["tool T1"]["active"], true);
+    assert_eq!(status["tool T1"]["detect_state"], "mounted");
+    assert_eq!(status["tool T0"]["detect_state"], "absent");
+    assert_eq!(status["toolhead"]["extruder"], "extruder1");
+}
+
+#[test]
+fn select_tool_accepts_number_and_name_and_rejects_unknown_tools() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "SELECT_TOOL T=2").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 2);
+    run(&mut printer, "SELECT_TOOL T=1").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 1);
+
+    assert_eq!(run(&mut printer, "SELECT_TOOL T=7").unwrap_err().message(), "Select tool: T7 not found");
+    assert_eq!(run(&mut printer, "SELECT_TOOL TOOL=T1").unwrap_err().message(), "Unknown config object 'T1'");
+    assert_eq!(
+        run(&mut printer, "SELECT_TOOL").unwrap_err().message(),
+        "Select tool: Either TOOL or T needs to be specified"
+    );
+}
+
+#[test]
+fn unselect_tool_leaves_no_tool_but_keeps_the_toolhead_extruder() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "T2\nUNSELECT_TOOL").unwrap();
+
+    let status = printer.status();
+    assert_eq!(status["toolchanger"]["tool"], Value::Null);
+    assert_eq!(status["toolchanger"]["tool_number"], -1);
+    assert_eq!(status["tool T2"]["detect_state"], "absent");
+    assert_eq!(status["toolhead"]["extruder"], "extruder2");
+}
+
+#[test]
+fn m104_with_t_heats_that_extruder_whichever_is_active() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "T1\nM104 T0 S190\nM104 T2 S180").unwrap();
+
+    let status = printer.status();
+    assert_eq!(status["extruder"]["target"], 190.0);
+    assert_eq!(status["extruder1"]["target"], 0.0);
+    assert_eq!(status["extruder2"]["target"], 180.0);
+    assert!(run(&mut printer, "M104 T5 S180").is_err());
+}
+
+#[test]
+fn heating_follows_the_active_extruder() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "T1\nM104 S200").unwrap();
+    printer.advance(Duration::from_secs(10));
+
+    let status = printer.status();
+    assert_eq!(status["extruder1"]["target"], 200.0);
+    assert_eq!(status["extruder"]["target"], 0.0);
+    assert!(status["extruder1"]["temperature"].as_f64().unwrap() > 30.0);
+
+    run(&mut printer, "SET_HEATER_TEMPERATURE HEATER=extruder2 TARGET=180").unwrap();
+    assert_eq!(printer.status()["extruder2"]["target"], 180.0);
+}
+
+#[test]
+fn set_gcode_variable_changes_a_macro_variable() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "SET_GCODE_VARIABLE MACRO=T2 VARIABLE=spool_id VALUE=5").unwrap();
+    assert_eq!(printer.status()["gcode_macro T2"]["spool_id"], 5);
+
+    run(&mut printer, "SET_GCODE_VARIABLE MACRO=T1 VARIABLE=spool_id VALUE=None").unwrap();
+    assert_eq!(printer.status()["gcode_macro T1"]["spool_id"], Value::Null);
+}
+
+#[test]
+fn set_gcode_variable_rejects_unknown_macros_and_variables() {
+    let mut printer = toolchanger_printer();
+
+    let macro_error = run(&mut printer, "SET_GCODE_VARIABLE MACRO=T9 VARIABLE=spool_id VALUE=5").unwrap_err();
+    let variable_error = run(&mut printer, "SET_GCODE_VARIABLE MACRO=T0 VARIABLE=colour VALUE=5").unwrap_err();
+
+    assert_eq!(macro_error.message(), "The value 'T9' is not valid for MACRO. Options: 'T0', 'T1', 'T2'");
+    assert_eq!(variable_error.message(), "Unknown gcode_macro variable 'colour'");
+    assert!(run(&mut printer, "SET_GCODE_VARIABLE MACRO=T0 VARIABLE=SPOOL_ID VALUE=5").is_err(), "names are exact");
+    assert_eq!(
+        run(&mut printer, "SAVE_VARIABLE VARIABLE=T0__spool_id VALUE=5").unwrap_err().message(),
+        "VARIABLE must not contain upper case"
+    );
+}
+
+#[test]
+fn save_variable_shows_in_save_variables() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "SAVE_VARIABLE VARIABLE=t0__spool_id VALUE=4").unwrap();
+
+    assert_eq!(printer.status()["save_variables"]["variables"]["t0__spool_id"], 4);
+}
+
+#[test]
+fn activate_extruder_sets_the_toolhead_extruder() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "ACTIVATE_EXTRUDER EXTRUDER=extruder2").unwrap();
+
+    assert_eq!(printer.status()["toolhead"]["extruder"], "extruder2");
+    assert!(run(&mut printer, "ACTIVATE_EXTRUDER EXTRUDER=extruder9").is_err());
+}
+
+#[test]
+fn other_profiles_report_no_tool_changer_details() {
+    let mut printer = Printer::with_profile(1.0, MachineProfile::voron());
+
+    run(&mut printer, "SELECT_TOOL T=1").unwrap();
+
+    let status = printer.status();
+    assert!(status["toolhead"].get("extruder").is_none());
+    assert!(status.get("extruder1").is_none());
+    assert!(status.get("save_variables").is_none());
+}

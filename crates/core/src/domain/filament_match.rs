@@ -2,10 +2,11 @@
 //! both sides have are compared, and everything here is a hint: nothing forbids anything.
 //!
 //! Where the filament of a tool comes from depends on what the printer has: with Happy Hare the gate of the tool
-//! (`ttg_map`), its spool from Spoolman first, otherwise what Happy Hare knows of the gate; without Happy Hare only
-//! tool 0 and the active spool of Spoolman. Without either there is nothing to compare. Tools that share a gate share
-//! its spool, so their planned weights add up. Without Happy Hare a tool beyond 0 needs a command `T<n>` in Klipper's
-//! command list (a toolchanger, a blackbox here); a file that calls a missing one stops at an unknown command.
+//! (`ttg_map`), its spool from Spoolman first, otherwise what Happy Hare knows of the gate; with a tool changer the
+//! spool of the tool's head; otherwise only tool 0 and the active spool of Spoolman. Without either there is nothing
+//! to compare. Tools that share a gate share its spool, so their planned weights add up. Without Happy Hare a tool
+//! beyond 0 needs a command `T<n>` in Klipper's command list (a tool changer's or a macro); a file that calls a missing
+//! one stops at an unknown command.
 //!
 //! Slicers know one colour per tool (with alpha), so a multi-colour spool is compared by its first colour. With
 //! EndlessSpool on, the other gates of a gate's group add their weight, except those a tool of the file uses; gates of
@@ -308,7 +309,8 @@ fn match_tool(
 }
 
 /// What a tool of the file prints with, as far as it is known: with Happy Hare's gates what its gate holds, without
-/// them the spool in use for tool 0. `None` when there is nothing to show (no gate, no spool, a tool beyond 0).
+/// them the spool of the direct feed for that tool (the head of a tool changer, or tool 0 with the spool in use).
+/// `None` when there is nothing to show (no gate, no spool, no lane for the tool).
 pub fn tool_supply(found: &ToolMatch, status: &PrinterStatus, lanes: &[Lane]) -> Option<Supply> {
     supply_of(found.request.tool, found.gate, status, lanes)
 }
@@ -319,7 +321,7 @@ fn supply_of(tool: usize, gate: Option<usize>, status: &PrinterStatus, lanes: &[
             let gate = gate?;
             mmu.gates.iter().find(|candidate| candidate.index == gate).map(|state| gate_supply(state, lanes))
         }
-        None => lanes.first().filter(|_| tool == 0)?.spool.as_ref().map(Supply::of_spool),
+        None => super::spools::direct_lane(lanes, tool)?.spool.as_ref().map(Supply::of_spool),
     }
 }
 
@@ -636,6 +638,39 @@ mod tests {
 
         // A second tool without MMU is a toolchanger's macro nobody reports on.
         assert_eq!(found.iter().map(|found| &found.verdict).collect::<Vec<_>>(), [&Verdict::Fits, &Verdict::Unknown]);
+    }
+
+    #[test]
+    fn with_a_tool_changer_each_tool_is_compared_with_the_spool_of_its_head() {
+        use crate::sources::tool_macros::ToolSpool;
+        use crate::sources::toolchanger::{ToolHead, ToolchangerStatus};
+        let head = |number: usize, extruder: &str| ToolHead {
+            name: format!("T{number}"),
+            number: Some(number),
+            extruder: Some(extruder.into()),
+            active: number == 0,
+        };
+        let status = PrinterStatus {
+            toolchanger: Some(ToolchangerStatus {
+                status: "ready".into(),
+                heads: vec![head(0, "extruder"), head(1, "extruder1")],
+            }),
+            tool_spools: vec![ToolSpool { tool: 1, macro_name: "T1".into(), spool_id: Some(6) }],
+            ..PrinterStatus::default()
+        };
+        let spools = spoolman(
+            &[test_spool(5, "PLA", 800.0, [0x26, 0xA6, 0x9A]), test_spool(6, "PETG", 800.0, [0, 0, 0])],
+            Some(5),
+        );
+        let metadata = FileMetadata {
+            referenced_tools: vec![0, 1],
+            ..file(&[5.0, 5.0], &["PLA", "PLA"], &["#26A69A", "#000000"])
+        };
+
+        let found = match_tools(&metadata, &status, &lanes(&status, &spools), &Setup::with_tool_commands(&[0, 1]));
+
+        assert_eq!(found[0].verdict, Verdict::Fits);
+        assert!(matches!(&found[1].verdict, Verdict::Differs(differences) if differences.len() == 1));
     }
 
     #[test]

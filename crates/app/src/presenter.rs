@@ -8,7 +8,7 @@ use crate::files_view::{FileState, FilesView};
 use crate::history_view::HistoryView;
 use crate::items::{
     compared_tool_items, connection_name, fan_item, heater_item, host_interface_item, led_effect_item, led_item,
-    power_item, replace_rows, sensor_item, tuning_item, update_item,
+    power_item, replace_rows, sensor_item, spool_tool, tuning_item, update_item,
 };
 use crate::macro_view::MacroView;
 use crate::mmu_view::{JobFile, MmuView};
@@ -210,7 +210,7 @@ impl Presenter {
         self.show_devices(&printer, snapshot);
         let lanes = self.lanes(snapshot);
         let active_spool = spools::active_spool(&lanes).cloned();
-        self.show_temperatures(&printer, snapshot, ready, active_spool.as_ref());
+        self.show_temperatures(&printer, snapshot, ready, &lanes);
         self.print_objects.show(&printer, &status.print_objects, status.motion.bed());
         self.show_capabilities(&printer, snapshot);
         self.show_filament(&printer, snapshot, &lanes, active_spool.as_ref());
@@ -315,8 +315,8 @@ impl Presenter {
         });
     }
 
-    /// Nozzle and bed, the heaters with the hint of the spool in use, and the sensors.
-    fn show_temperatures(&self, printer: &Printer, snapshot: &Snapshot, ready: bool, active_spool: Option<&Spool>) {
+    /// Nozzle and bed, the heaters with the hint of the spools, and the sensors.
+    fn show_temperatures(&self, printer: &Printer, snapshot: &Snapshot, ready: bool, lanes: &[Lane]) {
         let status = &snapshot.status;
         let nozzle = status.heater(NOZZLE_HEATER);
         printer.set_nozzle_temperature(nozzle.map_or(0.0, |heater| heater.temperature) as f32);
@@ -330,7 +330,7 @@ impl Presenter {
             status
                 .heaters
                 .iter()
-                .map(|heater| heater_item(heater, active_spool, self.history.has_history(&heater.object)))
+                .map(|heater| heater_item(heater, lanes, self.history.has_history(&heater.object)))
                 .collect(),
         );
         replace_rows(
@@ -390,6 +390,7 @@ impl Presenter {
             }
         };
         self.spools.show_active(printer, &spoolman, active_spool);
+        printer.set_spool_tool(spool_tool(lanes));
     }
 
     /// Logs which source a derived value comes from when it changes; `None` means no source has a value.

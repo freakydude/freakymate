@@ -211,6 +211,12 @@ fn bind_spools(actions: &Actions, service: &PrinterService, presenter: &Rc<Prese
             assign_service.send(Command::AssignGateSpool { gate, spool_id: u32::try_from(id).ok() });
         }
     });
+    let tool_service = service.clone();
+    actions.on_assign_tool_spool(move |tool, id| {
+        if let Ok(tool) = usize::try_from(tool) {
+            tool_service.send(Command::AssignToolSpool { tool, spool_id: u32::try_from(id).ok() });
+        }
+    });
     let (measure_service, measure_presenter) = (service.clone(), Rc::clone(presenter));
     actions.on_measure_spool(move |id, text| match (u32::try_from(id), parse_weight(&text)) {
         (Ok(spool_id), Some(weight)) => measure_service.send(Command::MeasureSpool { spool_id, weight }),

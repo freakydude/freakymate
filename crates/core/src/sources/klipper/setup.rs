@@ -46,6 +46,8 @@ pub struct Setup {
     /// The tool numbers Klipper has a `T<n>` command for (macros, Happy Hare, toolchanger plugins alike), from
     /// `printer.gcode.help`; `None` until asked or when the answer failed.
     pub tool_commands: Option<Vec<usize>>,
+    /// `[save_variables]` is configured, so `SAVE_VARIABLE` keeps values across restarts.
+    pub save_variables: bool,
 }
 
 impl Setup {
@@ -58,6 +60,7 @@ impl Setup {
             match (kind, instance) {
                 (_, None) if Leveling::objects().contains(&kind) => leveling_objects.push(kind),
                 ("probe" | "bltouch" | "smart_effector" | "probe_eddy_current", _) => setup.probe = true,
+                ("save_variables", None) => setup.save_variables = true,
                 // What is only shown leaves out helpers; what changes behaviour (probe, leveling) counts above.
                 _ if devices::is_hidden(name) => {}
                 ("heater_generic" | "temperature_fan", Some(_)) => setup.extra_heaters.push(name.to_owned()),
@@ -177,7 +180,7 @@ impl Setup {
     }
 }
 
-fn is_additional_extruder(name: &str) -> bool {
+pub(super) fn is_additional_extruder(name: &str) -> bool {
     name.strip_prefix("extruder")
         .is_some_and(|number| !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()))
 }

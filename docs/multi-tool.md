@@ -179,15 +179,22 @@ The fields a fragment needs; the full lists are in each project's `get_status()`
 | AFC | `AFC`, `AFC_lane <name>` / `AFC_stepper <name>`, `AFC_extruder <name>`, units such as `AFC_BoxTurtle <name>`, `AFC_Toolchanger <name>` | `AFC.units`, `lanes`, `extruders`; per lane `unit`, `extruder`, `map`; Klipper extruder per `AFC_extruder` from `configfile` | `AFC.current_load`, `current_state`; per lane `status`, `tool_loaded`, `spool_id`, `color`, `material`; per `AFC_extruder` `lane_loaded`, `on_shuttle`, `status` |
 
 Setups built from macros only (INDX under Klipper, IDEX, several extruders) often follow the convention that
-Mainsail's and Fluidd's tool buttons read: macros `T0` … `Tn` with the variables `active` (and often `color`). INDX
-sets them from its own state (`save_variables`: `active_tool`, offsets), see
+Fluidd's tool buttons read: macros `T0` … `Tn` with the variables `active` and `color` (Fluidd
+`ToolChangeCommands.vue`; Mainsail reads neither). INDX sets them from its own state (`save_variables`:
+`active_tool`, offsets), see
 [indx-tc-macros.cfg](https://github.com/BondtechAB/INDX/blob/main/macros/indx-tc-macros.cfg). For FreakyMate this
-is a convention source like `LOAD_FILAMENT`: what the macros report is shown, nothing more is assumed. Which
-variables Mainsail reads exactly is still to be checked.
+is a convention source like `LOAD_FILAMENT`: what the macros report is shown, nothing more is assumed.
+
+A spool per tool follows the convention of both clients: a variable `spool_id` on `gcode_macro T<n>` (Fluidd
+`SpoolSelectionDialog.vue`, Mainsail `SpoolmanChangeSpoolDialog.vue`). Both assign it with
+`SET_GCODE_VARIABLE MACRO=T<n> VARIABLE=spool_id VALUE=<id|None>` and, if the printer has `save_variables`, also
+`SAVE_VARIABLE VARIABLE=t<n>__spool_id VALUE=<id>`; restoring it at start is up to the macros. Moonraker itself
+knows only one active spool. FreakyMate reads and assigns the variable the same way, so all clients agree; without
+the variable a head has no spool of its own and the active head shows Moonraker's active spool.
 
 | Source | Objects | Structure (read once) | State (per update) |
 | --- | --- | --- | --- |
-| Tool macro convention | `gcode_macro T<n>` | the macros `T0` … `Tn` | per macro `active`, `color` if declared |
+| Tool macro convention | `gcode_macro T<n>` | the macros `T0` … `Tn` | per macro `active`, `color`, `spool_id` if declared |
 
 Notes:
 
@@ -238,13 +245,23 @@ never needed for setups the detection covers:
      are looked up by their index, not by their position in a list.
    - Tests: the tree of each `fake-moonraker` profile (basic, voron, happy-hare, ercf) equals today's lanes; the
      snapshot scenes stay pixel-identical.
-2. **Tool changer** (viesturz and KTC-easy share the objects): heads with one lane each; Spoolman per head.
+2. **Tool changer** (viesturz and KTC-easy share the objects): heads with one lane each; Spoolman per head
+   through `spool_id` on the tool macros (see above). Screens unchanged apart from labels: the spool list names the
+   head of a lane, the comparison before a print checks each tool against its head; a view of the heads follows
+   later.
 3. **Combinations**: AFC (with its tool changer unit) and Happy Hare v4 with several units; the unit as a label.
 4. **IDEX**: carriages, copy and mirror as two active paths.
 5. **Two nozzles on one head, several extruders into one nozzle**: rare, generic Klipper objects only.
 
 Each step needs a matching profile in `fake-moonraker` (tool changer, AFC, IDEX) so that screens can be tested
-without the hardware.
+without the hardware. Its objects, fields, commands and error texts come from the projects' sources, since there is
+no hardware to compare with.
+
+Technical steps and new screens land separately: a step changes existing screens only where its data arrives
+differently (labels, hints). New views and controls for multi-tool printers (a view of the heads, switching tools,
+units as groups) follow as their own change after the technical steps they need, so each technical change can be
+tested on its own first. Planned order: steps 1 and 2, step 3, then the screens for heads and units, then steps 4
+and 5.
 
 ## Open questions
 
@@ -257,9 +274,6 @@ without the hardware.
 - **AFC with a tool changer**: AFC turns each head into a lane of the tool changer unit and calls `SELECT_TOOL`
   itself; the tool changer's own objects are there as well. Which of the two the tree trusts for the head is to be
   decided (proposal: `toolchanger` for the head, AFC for the lanes).
-- **Spoolman per head without MMU**: only AFC keeps a spool per head (as a lane). Otherwise there is no common place;
-  `SET_ACTIVE_SPOOL` in the tool change macros is a convention, not a fact. Possibly FreakyMate keeps the
-  assignment itself.
 - **Several extruders into one nozzle**: `extruder_stepper.motion_queue` shows which extruder a stepper is synced to
   right now, so the link is known while it is synced. Whether an unsynced stepper still counts as a lane of that
   nozzle (from its `extruder:` option in the configuration) is open.

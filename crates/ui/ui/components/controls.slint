@@ -453,7 +453,8 @@ export component ScrollList inherits Rectangle {
     out property <length> row-width: list.width;
     in-out property <length> offset <=> list.content-y;
     property <length> range: max(0px, list.content-height - list.height);
-    property <bool> scrollable: root.content-height > root.height;
+    // The content does not fit, so the bar is shown and the rows are narrower.
+    out property <bool> scrollable: root.content-height > root.height;
     property <length> bar-width: 36px;
 
     // Fixed geometry instead of a layout: the bar must not change the size of the list's container.

@@ -79,6 +79,7 @@ pub fn command_name(command: &Command) -> String {
         Command::AssignGateSpool { .. } => "Assign Gate Spool".to_owned(),
         Command::SetGateFilament { .. } => "Set Gate Filament".to_owned(),
         Command::SetActiveSpool { .. } => "Set Active Spool".to_owned(),
+        Command::AssignToolSpool { .. } => "Assign Tool Spool".to_owned(),
         Command::MeasureSpool { .. } => "Measure Spool".to_owned(),
         Command::EmergencyStop => "Emergency Stop".to_owned(),
         Command::RestartKlipper => "Restart Klipper".to_owned(),

@@ -242,6 +242,12 @@ pub enum Command {
     SetActiveSpool {
         spool_id: Option<u32>,
     },
+    /// Puts a Spoolman spool into the variable `spool_id` of the tool macro `T<n>` (the convention of Fluidd and
+    /// Mainsail); `None` takes it out. Resolved into G-code that also saves it where `[save_variables]` exists.
+    AssignToolSpool {
+        tool: usize,
+        spool_id: Option<u32>,
+    },
     /// Sets the weight of a spool from a measurement; `weight` is the gross weight of the spool in grams.
     MeasureSpool {
         spool_id: u32,
@@ -364,7 +370,8 @@ impl Command {
             | Self::PauseAtLayer { .. }
             | Self::ClearLayerPause
             | Self::SetGateFilament { .. }
-            | Self::SetEndlessSpoolGroup { .. } => return None,
+            | Self::SetEndlessSpoolGroup { .. }
+            | Self::AssignToolSpool { .. } => return None,
         };
         Some(call)
     }

@@ -207,6 +207,8 @@ export global Printer {
     in property <bool> has-spool;
     // Spoolman id of the spool in use, -1 for none.
     in property <int> spool-id: -1;
+    // The tool macro that keeps the spool in use (tool changer), -1 when none does.
+    in property <int> spool-tool: -1;
     in property <string> spool-title;
     in property <string> spool-material;
     // What is left of the spool, for example "613 g".
@@ -347,12 +349,32 @@ export global SpoolPicker {
     in-out property <int> gate: -1;
     // The spool the gate (or the printer) has now, -1 for none; the dialog opens with it selected.
     in-out property <int> current: -1;
+    // The tool macro of a tool changer head to assign a spool to, -1 for none (a gate or the active spool).
+    in-out property <int> tool: -1;
 
     public function show(gate: int, current: int) {
         self.gate = gate;
+        self.tool = -1;
         self.current = current;
         self.open = true;
         Actions.load-spools();
+    }
+
+    public function show-tool(tool: int, current: int) {
+        self.gate = -1;
+        self.tool = tool;
+        self.current = current;
+        self.open = true;
+        Actions.load-spools();
+    }
+
+    // The spool in use: that of its tool macro when it has one, else the active spool.
+    public function show-in-use() {
+        if (Printer.spool-tool >= 0) {
+            self.show-tool(Printer.spool-tool, Printer.spool-id);
+        } else {
+            self.show(-1, Printer.spool-id);
+        }
     }
 }
 

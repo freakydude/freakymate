@@ -5,7 +5,10 @@ use super::*;
 /// Parses `name` if it belongs to this group.
 pub(super) fn parse(name: &str, args: &[&str]) -> Result<Option<Command>, CommandError> {
     let command: Result<Command, CommandError> = match name {
-        "M104" => Ok(Command::SetExtruderTarget(letter_value(args, 'S')?.unwrap_or(0.0))),
+        "M104" => Ok(Command::SetExtruderTarget {
+            tool: letter_value(args, 'T')?.map(|tool| tool as usize),
+            target: letter_value(args, 'S')?.unwrap_or(0.0),
+        }),
         "M140" => Ok(Command::SetBedTarget(letter_value(args, 'S')?.unwrap_or(0.0))),
         "M106" => Ok(Command::SetFanSpeed(fan_speed(args)?)),
         "M107" => Ok(Command::SetFanSpeed(0.0)),

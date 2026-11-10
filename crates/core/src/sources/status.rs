@@ -8,6 +8,8 @@ use super::klipper::{
 use super::led_effect::{self, LedEffect};
 use super::mainsail_config::{self, PlannedLayerPause};
 use super::objects::ObjectStore;
+use super::tool_macros::{self, ToolSpool};
+use super::toolchanger::{self, ToolchangerStatus};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PrinterStatus {
@@ -39,6 +41,10 @@ pub struct PrinterStatus {
     pub mmu: Option<MmuStatus>,
     /// The pause planned with Mainsail's layer macros; `None` if the plan is not known.
     pub layer_pause_plan: Option<PlannedLayerPause>,
+    /// The tool changer with its heads; `None` without one.
+    pub toolchanger: Option<ToolchangerStatus>,
+    /// The spools the tool macros `T<n>` hold, for those that declare `spool_id`.
+    pub tool_spools: Vec<ToolSpool>,
 }
 
 impl PrinterStatus {
@@ -64,6 +70,8 @@ impl PrinterStatus {
             print_objects: klipper.print_objects,
             mmu: happy_hare::read_mmu(store),
             layer_pause_plan: mainsail_config::read_plan(store),
+            toolchanger: toolchanger::read_toolchanger(store),
+            tool_spools: tool_macros::read_spools(store),
         }
     }
 

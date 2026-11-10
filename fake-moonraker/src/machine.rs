@@ -20,6 +20,8 @@ pub struct MachineProfile {
     pub bed_mesh: bool,
     /// `[bed_screws]` and `[screws_tilt_adjust]` with four screws, as on a bed slinger.
     pub bed_screws: bool,
+    /// Tools of a `klipper-toolchanger` tool changer, each with its own extruder; 0 means no tool changer.
+    pub tools: usize,
 }
 
 /// Klipper object names of the simulated filament sensors; the second reports a runout.
@@ -40,6 +42,7 @@ pub const MMU_FILAMENT_SENSORS: [&str; 6] = [
 
 impl MachineProfile {
     pub const MAX_MMU_GATES: usize = 16;
+    pub const TOOLCHANGER_TOOLS: usize = 3;
 
     pub fn basic() -> Self {
         Self {
@@ -53,6 +56,7 @@ impl MachineProfile {
             probe: true,
             bed_mesh: true,
             bed_screws: true,
+            tools: 0,
         }
     }
 
@@ -68,6 +72,7 @@ impl MachineProfile {
             probe: true,
             bed_mesh: true,
             bed_screws: false,
+            tools: 0,
         }
     }
 
@@ -83,7 +88,13 @@ impl MachineProfile {
             probe: true,
             bed_mesh: true,
             bed_screws: false,
+            tools: 0,
         }
+    }
+
+    /// A voron with a tool changer of three tools and no MMU.
+    pub fn toolchanger() -> Self {
+        Self { tools: Self::TOOLCHANGER_TOOLS, ..Self::voron() }
     }
 
     /// Happy Hare without Moonraker's Spoolman: material and colour of the gates live in Happy Hare's gate map.

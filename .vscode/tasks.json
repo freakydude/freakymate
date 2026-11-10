@@ -46,6 +46,72 @@
       "problemMatcher": ["$rustc"]
     },
     {
+      "label": "run: fake-moonraker (Basic)",
+      "type": "shell",
+      "command": "cargo run -p fake-moonraker -- --port 7125 --time-scale 10 --profile basic",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "rust",
+        "pattern": { "regexp": "^__never__$" },
+        "background": {
+          "activeBegin": true,
+          "beginsPattern": "^.*(Compiling|Finished|Running).*$",
+          "endsPattern": "^Fake-Moonraker listening.*$"
+        }
+      }
+    },
+    {
+      "label": "run: freakymate (fake Moonraker, Basic)",
+      "type": "shell",
+      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
+      "dependsOn": "run: fake-moonraker (Basic)",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "run: fake-moonraker (ERCF)",
+      "type": "shell",
+      "command": "cargo run -p fake-moonraker -- --port 7125 --time-scale 10 --profile ercf --gates 8",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "rust",
+        "pattern": { "regexp": "^__never__$" },
+        "background": {
+          "activeBegin": true,
+          "beginsPattern": "^.*(Compiling|Finished|Running).*$",
+          "endsPattern": "^Fake-Moonraker listening.*$"
+        }
+      }
+    },
+    {
+      "label": "run: freakymate (fake Moonraker, ERCF)",
+      "type": "shell",
+      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
+      "dependsOn": "run: fake-moonraker (ERCF)",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "run: fake-moonraker (Tool changer)",
+      "type": "shell",
+      "command": "cargo run -p fake-moonraker -- --port 7125 --time-scale 10 --profile toolchanger",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "rust",
+        "pattern": { "regexp": "^__never__$" },
+        "background": {
+          "activeBegin": true,
+          "beginsPattern": "^.*(Compiling|Finished|Running).*$",
+          "endsPattern": "^Fake-Moonraker listening.*$"
+        }
+      }
+    },
+    {
+      "label": "run: freakymate (fake Moonraker, Tool changer)",
+      "type": "shell",
+      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
+      "dependsOn": "run: fake-moonraker (Tool changer)",
+      "problemMatcher": ["$rustc"]
+    },
+    {
       "label": "run: freakymate (saved settings)",
       "type": "shell",
       "command": "cargo run -p freakymate",

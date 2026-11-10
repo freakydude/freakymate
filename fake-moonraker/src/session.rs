@@ -354,6 +354,9 @@ fn printer_info(backend: &Backend) -> Value {
     })
 }
 
+/// Commands the tool changer profile adds beside the tool macros `T<n>`.
+const TOOLCHANGER_COMMANDS: [&str; 4] = ["SELECT_TOOL", "UNSELECT_TOOL", "SET_GCODE_VARIABLE", "SAVE_VARIABLE"];
+
 /// Klipper's command list: a few of its own commands, every macro, and Happy Hare's tool commands (one per gate).
 fn gcode_help(backend: &Backend) -> Value {
     let status = backend.with_printer(|printer| printer.status());
@@ -364,6 +367,11 @@ fn gcode_help(backend: &Backend) -> Value {
     let macros = status.as_object().into_iter().flat_map(|objects| objects.keys());
     for name in macros.filter_map(|key| key.strip_prefix("gcode_macro ")) {
         help.insert(name.to_ascii_uppercase(), json!("G-Code macro"));
+    }
+    if status.get("toolchanger").is_some() {
+        for command in TOOLCHANGER_COMMANDS {
+            help.insert(command.to_owned(), json!("Klipper command"));
+        }
     }
     let gates = status.pointer("/mmu/num_gates").and_then(Value::as_u64).unwrap_or(0);
     for tool in 0..gates {
@@ -594,6 +602,18 @@ mod tests {
         assert_eq!(entry["type"], "response");
         assert_eq!(entry["message"].as_str().unwrap().lines().count(), 9);
         assert!(entry["message"].as_str().unwrap().starts_with("Available commands:\nG0, G1"));
+    }
+
+    #[test]
+    fn toolchanger_profile_lists_its_commands_in_gcode_help() {
+        let backend = Backend::with_profile(1.0, MachineProfile::toolchanger());
+        let mut session = Session::new(1);
+
+        let reply = exchange(&mut session, &backend, call("printer.gcode.help", json!({})));
+
+        for command in ["T0", "T1", "T2", "SELECT_TOOL", "UNSELECT_TOOL", "SET_GCODE_VARIABLE", "SAVE_VARIABLE"] {
+            assert!(reply["result"].get(command).is_some(), "missing {command}");
+        }
     }
 
     #[test]

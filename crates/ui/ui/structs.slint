@@ -17,10 +17,12 @@ export struct HeaterItem {
     can-raise: bool,
     // The targets Klipper takes (min_temp to max_temp), as a note for typing one; empty without max_temp.
     target-range: string,
-    // The temperature the spool in use recommends, when the target is off from it; empty otherwise.
+    // The temperature the spool recommends ("210°"), when the target is off from it; empty otherwise.
     spool-hint: string,
     // Moonraker keeps its temperature history, so a tap can show it.
     has-history: bool,
+    // The heater of a nozzle (`extruder`, `extruder1`, …).
+    nozzle: bool,
 }
 
 export struct SensorItem {
@@ -157,6 +159,11 @@ export struct ToolMatchItem {
     // Only in `Printer.prepared-tools`: the tool's row in `Printer.mmu-tools`, so that a tap opens its dialog on the
     // Tools tab; -1 when it has none there.
     tools-row: int,
+    // Which spool a tap on the tool picks, for a tool without gate: -2 none, -1 the spool in use, 0 and up the tool
+    // macro of that tool (tool changer head).
+    spool-pick: int,
+    // Spoolman id of the spool of that tool macro, -1 for none.
+    spool-id: int,
 }
 
 // A label of the temperature chart at `position`, a share from 0 to 1 along its axis.

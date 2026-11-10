@@ -89,11 +89,12 @@ pub fn jog(motion: &Motion, axis: Axis, distance: f64) -> Option<String> {
     Some(format!("G90\nG1 {}{} F{}", axis.letter(), number(target), number(speed * SECONDS_PER_MINUTE)))
 }
 
-/// G-code for a target temperature, matching the kind of heater; below zero is off.
+/// G-code for a target temperature, matching the kind of heater; below zero is off. `M104` names `T0`, because without
+/// it Klipper heats the active extruder, which is another one once a tool changer has mounted a second head.
 pub fn heater_target(heater: &str, target: f64) -> String {
     let target = number(target);
     match heater.split_once(' ') {
-        None if heater == NOZZLE_HEATER => format!("M104 S{target}"),
+        None if heater == NOZZLE_HEATER => format!("M104 T0 S{target}"),
         None if heater == BED_HEATER => format!("M140 S{target}"),
         Some(("temperature_fan", name)) => format!("SET_TEMPERATURE_FAN_TARGET TEMPERATURE_FAN={name} TARGET={target}"),
         Some((_, name)) => format!("SET_HEATER_TEMPERATURE HEATER={name} TARGET={target}"),
@@ -239,7 +240,7 @@ mod tests {
 
     #[test]
     fn heater_targets_use_matching_gcode() {
-        assert_eq!(heater_target("extruder", 210.0), "M104 S210");
+        assert_eq!(heater_target("extruder", 210.0), "M104 T0 S210");
         assert_eq!(heater_target("heater_bed", 0.0), "M140 S0");
         assert_eq!(heater_target("heater_generic chamber", 45.5), "SET_HEATER_TEMPERATURE HEATER=chamber TARGET=45.5");
         assert_eq!(
