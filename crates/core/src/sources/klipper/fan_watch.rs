@@ -87,6 +87,7 @@ mod tests {
                 rpm: Some(rpm),
                 off_below: 0.0,
                 kick_start_time: 0.5,
+                heaters: Vec::new(),
                 stalled: false,
             }];
             self.watch.apply(&mut fans, self.start + Duration::from_secs_f64(seconds));

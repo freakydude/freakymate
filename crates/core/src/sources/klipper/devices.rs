@@ -53,6 +53,9 @@ pub struct Fan {
     pub off_below: f64,
     /// Seconds Klipper runs the fan at full power when switching it on or raising it a lot (`kick_start_time`).
     pub kick_start_time: f64,
+    /// The heaters a `heater_fan` runs with (`heater` in the configuration, Klipper's default is `extruder`); empty
+    /// for every other kind. Names the heaters only, not where the fan sits.
+    pub heaters: Vec<String>,
     /// At a speed where its tachometer has measured before, it has reported 0 rpm for a while (set by `FanWatch`).
     pub stalled: bool,
 }
@@ -134,6 +137,17 @@ pub fn is_hidden(object: &str) -> bool {
     object.split_once(' ').is_some_and(|(_, name)| name.starts_with('_'))
 }
 
+/// Klipper's default of `heater` in `[heater_fan]`.
+const DEFAULT_FAN_HEATER: &str = "extruder";
+
+/// `heater` of a `[heater_fan]` section: one name or several separated by commas (Klipper splits it at the comma).
+/// Without the section (not subscribed yet) nothing is known, so nothing is claimed.
+fn heater_names(section: Option<&Value>) -> Vec<String> {
+    let Some(section) = section else { return Vec::new() };
+    let heater = section.get("heater").and_then(Value::as_str).unwrap_or(DEFAULT_FAN_HEATER);
+    heater.split(',').map(str::trim).filter(|name| !name.is_empty()).map(str::to_owned).collect()
+}
+
 /// Part fan first, then generic, heater and controller fans, each in name order.
 pub(super) fn read_fans(store: &ObjectStore) -> Vec<Fan> {
     let settings = store.object("configfile").and_then(|configfile| configfile.get("settings"));
@@ -142,12 +156,8 @@ pub(super) fn read_fans(store: &ObjectStore) -> Vec<Fan> {
         .filter_map(|name| Some((name, FanKind::of(name)?)))
         .filter_map(|(name, kind)| {
             let value = store.object(name)?;
-            let setting = |key: &str| {
-                settings
-                    .and_then(|settings| settings.get(name.to_lowercase()))
-                    .and_then(|section| section.get(key))
-                    .and_then(Value::as_f64)
-            };
+            let section = settings.and_then(|settings| settings.get(name.to_lowercase()));
+            let setting = |key: &str| section.and_then(|section| section.get(key)).and_then(Value::as_f64);
             Some(Fan {
                 object: name.to_owned(),
                 label: if kind == FanKind::Part { "Part fan".to_owned() } else { label(name) },
@@ -156,6 +166,7 @@ pub(super) fn read_fans(store: &ObjectStore) -> Vec<Fan> {
                 rpm: value.get("rpm").and_then(Value::as_f64),
                 off_below: setting("off_below").unwrap_or_default(),
                 kick_start_time: setting("kick_start_time").unwrap_or(KLIPPER_KICK_START_TIME),
+                heaters: if kind == FanKind::Heater { heater_names(section) } else { Vec::new() },
                 stalled: false,
             })
         })
@@ -210,6 +221,29 @@ mod tests {
         assert_eq!(fans[4].rpm, Some(3100.0));
         assert!(fans[0].kind.is_controllable() && fans[2].kind.is_controllable());
         assert!(!fans[3].kind.is_controllable() && !fans[4].kind.is_controllable());
+    }
+
+    #[test]
+    fn a_heater_fan_names_its_heaters_from_the_configuration() {
+        let fans = read_fans(&store(json!({
+            "heater_fan hotend": { "speed": 1.0 },
+            "heater_fan default": { "speed": 0.0 },
+            "heater_fan both": { "speed": 0.0 },
+            "heater_fan unknown": { "speed": 0.0 },
+            "fan": { "speed": 0.5 },
+            "configfile": { "settings": {
+                "heater_fan hotend": { "heater": "extruder1" },
+                "heater_fan default": {},
+                "heater_fan both": { "heater": "extruder, extruder1" }
+            } }
+        })));
+
+        let heaters = |object: &str| fans.iter().find(|fan| fan.object == object).unwrap().heaters.clone();
+        assert_eq!(heaters("heater_fan hotend"), ["extruder1"]);
+        assert_eq!(heaters("heater_fan default"), ["extruder"], "Klipper's default");
+        assert_eq!(heaters("heater_fan both"), ["extruder", "extruder1"]);
+        assert!(heaters("heater_fan unknown").is_empty(), "no section, no claim");
+        assert!(heaters("fan").is_empty());
     }
 
     #[test]

@@ -269,6 +269,41 @@ units as groups) follow as their own change after the technical steps they need,
 tested on its own first. Planned order: steps 1 and 2, step 3, then the screens for heads and units, then steps 4
 and 5.
 
+## Sensors, fans and drivers (decided 2026-11-11)
+
+The tree answers where filament goes. Sensors, fans and drivers answer what a part measures or does; they stay out of
+the tree. Every device exists once as a flat list entry under its Klipper object name (`heaters.rs`, `devices.rs`).
+A device is tied to a tree node only where the printer states it; everything else belongs to the machine ("System").
+
+| Device | Tie that is stated | Where it shows |
+|---|---|---|
+| Extruder heater and temperature | the extruder, which the nozzle names | nozzle |
+| `heater_fan` | `heater` in `configfile.settings` (one name or a comma list; default `extruder`); read into `Fan::heaters` | nozzle of that extruder |
+| Part fan of a tool | `tool.fan` of the tool changer plugins | head |
+| Driver temperature (`tmc2240`, `tmc5262`) | section name equals the stepper (`tmc2240 extruder1`) | stepper, so its lane or extruder |
+| MCU, chamber, housing, power supply, `controller_fan` | none | System |
+
+- **No guesses.** A name like `hotend_fan` is no tie. A guess by name may come later as a second, clearly marked
+  level for all facts of the app, not only for devices.
+- **Drivers.** Only `tmc2240` and `tmc5262` have a temperature register; the other TMC drivers report `temperature`
+  as always null and must not show up as a sensor without a value. `temperature` of those two is null before the
+  first poll and after a communication error.
+- **Combined sensors (to do).** A `temperature_sensor` with `sensor_type: temperature_combined` joins other sensors
+  (`sensor_list`, mean, minimum or maximum). Only `configfile.settings` shows it; the object looks like any sensor.
+  It is no measurement of its own: it must not report its sources a second time in System or in warnings, it is
+  marked as combined and linked to its sources, and it gets no place from them (all sources on one head does not
+  place the sensor). The sources can be combined sensors again, so resolving them must survive loops. `temperature_fan`
+  and `heater_generic` can use the same sensor type, so detection sits in the shared part of `heaters.rs`. Verify
+  against `klippy/extras/temperature_combined.py` before building.
+- **MCU per device (later).** Pins carry the MCU as a prefix (`toolhead:PA3`), so "this heater, fan or stepper hangs
+  on MCU X" is stated in `configfile.settings` (`heater_pin`, `sensor_pin`, `step_pin`, `cs_pin`, `uart_pin`, and
+  `sensor_mcu` for `temperature_mcu`). That groups System by board without saying where a board sits: a MCU named
+  `toolhead` is not proven to be on the head. Aliases and bus drivers (SPI, UART) make it more work than it looks,
+  so it is its own step.
+- **Operation.** Main page: only the essentials (active nozzle and bed temperature, part fan). Per head or nozzle: its
+  stated devices. System: the rest, grouped by kind. A warning (a hot driver) is a hint at the device and, where the
+  tie is stated, at its head; never a block.
+
 ## Open questions
 
 - **IDEX: which nozzle on which carriage.** Klipper's `[dual_carriage]` does not name an extruder; the link lives

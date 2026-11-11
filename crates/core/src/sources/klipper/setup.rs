@@ -24,7 +24,7 @@ pub struct Setup {
     pub calibration: CalibrationSetup,
     /// Additional heaters with a target temperature (`heater_generic`, `temperature_fan`, additional extruders).
     pub extra_heaters: Vec<String>,
-    /// Temperatures without a target: `temperature_sensor` and the drivers that measure their own (`tmc2240`).
+    /// Temperatures without a target: `temperature_sensor` and the drivers that measure their own (`tmc2240`, `tmc5262`).
     /// Klipper adds a `temperature_host` or `temperature_combined` object next to the section that uses that sensor
     /// type (`temperature_sensor cb1` brings `temperature_host cb1`); those are the same sensor and left out.
     pub temperature_sensors: Vec<String>,
@@ -64,7 +64,9 @@ impl Setup {
                 // What is only shown leaves out helpers; what changes behaviour (probe, leveling) counts above.
                 _ if devices::is_hidden(name) => {}
                 ("heater_generic" | "temperature_fan", Some(_)) => setup.extra_heaters.push(name.to_owned()),
-                ("temperature_sensor" | "tmc2240", Some(_)) => setup.temperature_sensors.push(name.to_owned()),
+                ("temperature_sensor" | "tmc2240" | "tmc5262", Some(_)) => {
+                    setup.temperature_sensors.push(name.to_owned())
+                }
                 _ if FanKind::of(name).is_some() => setup.fans.push(name.to_owned()),
                 _ if devices::is_led(name) => setup.leds.push(name.to_owned()),
                 (_, Some(_)) if is_filament_sensor(kind) => setup.filament_sensors.push(name.to_owned()),
