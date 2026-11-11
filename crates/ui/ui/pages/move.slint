@@ -5,7 +5,7 @@ import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, MoveTab, Navigation, Printer, UiSettings } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
-import { ButtonKind, Card, IconButton, StepSelector, TabBar, TabButton } from "../components/controls.slint";
+import { ButtonKind, Card, IconButton, Note, StepSelector, TabBar, TabButton } from "../components/controls.slint";
 import { CalibrateTab } from "calibrate.slint";
 
 component AxisValue inherits HorizontalLayout {
@@ -58,7 +58,7 @@ component AxesTab inherits Rectangle {
                         }
                         Row {
                             IconButton { icon: Icons.motion-x-minus; text: "X-"; enabled: Printer.homed-x; clicked => { Actions.jog("x", -root.step); } }
-                            IconButton { icon: Icons.motion-home-xy; text: @tr("Home XY"); done: Printer.homed-xy; clicked => { Actions.home(true, true, false); } }
+                            IconButton { icon: Icons.motion-home-xy; text: @tr("Home XY"); enabled: !Printer.position-locked; done: Printer.homed-xy; clicked => { Actions.home(true, true, false); } }
                             IconButton { icon: Icons.motion-x-plus; text: "X+"; enabled: Printer.homed-x; clicked => { Actions.jog("x", root.step); } }
                         }
                         Row {
@@ -76,7 +76,7 @@ component AxesTab inherits Rectangle {
                         spacing: Theme.spacing;
                         vertical-stretch: 1;
                         IconButton { icon: Icons.motion-z-plus; text: "Z+"; vertical-stretch: 1; enabled: Printer.homed-z; clicked => { Actions.jog("z", root.step); } }
-                        IconButton { icon: Icons.motion-home-z; text: @tr("Home Z"); vertical-stretch: 1; done: Printer.homed-z; clicked => { Actions.home(false, false, true); } }
+                        IconButton { icon: Icons.motion-home-z; text: @tr("Home Z"); vertical-stretch: 1; enabled: !Printer.position-locked; done: Printer.homed-z; clicked => { Actions.home(false, false, true); } }
                         IconButton { icon: Icons.motion-z-minus; text: "Z-"; vertical-stretch: 1; enabled: Printer.homed-z; clicked => { Actions.jog("z", -root.step); } }
                     }
                 }
@@ -107,6 +107,7 @@ component AxesTab inherits Rectangle {
                 horizontal: true;
                 align-start: true;
                 vertical-stretch: 1;
+                enabled: !Printer.position-locked;
                 done: Printer.homed-xy && Printer.homed-z;
                 clicked => { Actions.home(true, true, true); }
             }
@@ -116,6 +117,7 @@ component AxesTab inherits Rectangle {
                 horizontal: true;
                 align-start: true;
                 vertical-stretch: 1;
+                enabled: !Printer.position-locked;
                 done: Printer.leveling-state == "applied";
                 clicked => { Actions.level(); }
             }
@@ -125,6 +127,7 @@ component AxesTab inherits Rectangle {
                 horizontal: true;
                 align-start: true;
                 vertical-stretch: 1;
+                enabled: !Printer.position-locked;
                 clicked => { Confirm.ask(@tr("Motors off"), @tr("The axes lose their reference and must be homed again."), "disable-motors", "", false); }
             }
         }
@@ -150,6 +153,13 @@ export component MovePage inherits Rectangle {
                 checked: root.tab == MoveTab.calibrate;
                 clicked => { Navigation.move-tab = MoveTab.calibrate; }
             }
+        }
+        // While paused: moving and extruding stay possible, what would lose the print's position does not.
+        if Printer.position-locked: Note {
+            text: @tr("Print paused: homing, leveling, calibrating and motors off stay off until the print ends.");
+            horizontal-alignment: center;
+            height: Theme.font-small * 2;
+            vertical-alignment: center;
         }
         if root.tab == MoveTab.axes: AxesTab { vertical-stretch: 1; }
         if root.tab == MoveTab.calibrate: CalibrateTab { vertical-stretch: 1; }

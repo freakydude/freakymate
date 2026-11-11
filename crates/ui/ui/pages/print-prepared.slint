@@ -173,7 +173,7 @@ component ExtruderMatchCard inherits Card {
             return;
         }
         if (mapping.spool-pick >= 0) {
-            SpoolPicker.show-tool(mapping.spool-pick, mapping.spool-id);
+            SpoolPicker.show-tool(mapping.spool-pick, mapping.spool-id, mapping.spool-target);
         } else {
             SpoolPicker.show(-1, Printer.spool-id);
         }

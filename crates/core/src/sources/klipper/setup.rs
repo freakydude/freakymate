@@ -46,6 +46,8 @@ pub struct Setup {
     /// The tool numbers Klipper has a `T<n>` command for (macros, Happy Hare, toolchanger plugins alike), from
     /// `printer.gcode.help`; `None` until asked or when the answer failed.
     pub tool_commands: Option<Vec<usize>>,
+    /// Klipper has the command `UNSELECT_TOOL` (a tool changer without `require_tool_present`); from the same answer.
+    pub has_unselect_tool: bool,
     /// `[save_variables]` is configured, so `SAVE_VARIABLE` keeps values across restarts.
     pub save_variables: bool,
 }
@@ -187,6 +189,11 @@ pub(super) fn is_additional_extruder(name: &str) -> bool {
         .is_some_and(|number| !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
+/// Whether the answer of `printer.gcode.help` lists `command`.
+pub fn lists_command(help: &Value, command: &str) -> bool {
+    help.as_object().is_some_and(|commands| commands.keys().any(|key| key.eq_ignore_ascii_case(command)))
+}
+
 /// The tool numbers of the `T<n>` commands in the answer of `printer.gcode.help` (command → help text), sorted.
 pub fn tool_commands(help: &Value) -> Vec<usize> {
     let mut tools: Vec<usize> = help
@@ -273,5 +280,7 @@ mod tests {
 
         assert_eq!(tool_commands(&help), [0, 2]);
         assert_eq!(tool_commands(&Value::Null), Vec::<usize>::new());
+        assert!(lists_command(&help, "T0"));
+        assert!(!lists_command(&help, "UNSELECT_TOOL"));
     }
 }

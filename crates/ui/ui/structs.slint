@@ -94,6 +94,44 @@ export struct BarColors {
     longitudinal: bool,
 }
 
+// A swappable head of a tool changer on the Filament page: its nozzle, the spool it carries and how it is brought
+// to the carriage.
+export struct HeadItem {
+    // The name of the head's section (what its commands take), such as `T1` or `left`.
+    name: string,
+    // What names the head on screen: `T<n>` of its tool number, the name for a head without one.
+    label: string,
+    // The section name as a second line when it differs from the label, else "".
+    subtitle: string,
+    // The nozzle of the head's extruder; `has-nozzle` is false for a head without one.
+    has-nozzle: bool,
+    temperature: float,
+    target: float,
+    // The changer selected this head.
+    mounted: bool,
+    // The detection pins find this head on the carriage.
+    detected: bool,
+    // Lanes on the nozzle; more than one is a unit of its own.
+    lanes: int,
+    // How a head that is not mounted is picked up: "" none, "macro" (`pick-up-macro`, such as "T2") or "head"
+    // (`SELECT_TOOL` with the name).
+    pick-up: string,
+    pick-up-macro: string,
+    // The spool of the head's lane in use (Spoolman), as on the spool strip.
+    has-spool: bool,
+    spool-title: string,
+    spool-material: string,
+    spool-weight: string,
+    spool-low: bool,
+    spool-colors: BarColors,
+    // Spoolman id of that spool, -1 for none.
+    spool-id: int,
+    // Where a tap on the spool assigns another one: the tool macro `T<n>`, -1 when the spool is not assigned there
+    // (then `can-pick-spool` says whether the spool in use is).
+    spool-tool: int,
+    can-pick-spool: bool,
+}
+
 // One gate of the MMU. `availability`: unknown | empty | available | buffered.
 export struct MmuGateItem {
     index: int,
@@ -114,6 +152,28 @@ export struct MmuGateItem {
     spool-low: bool,
     // Spoolman id of the spool in the gate, -1 for none.
     spool-id: int,
+}
+
+// A page of tiles on the Gates tab: a run of rows of `Printer.mmu-gates` (the gates of one unit, at most five), the
+// bypass after them when it belongs on this page.
+export struct MmuGatePage {
+    first-row: int,
+    count: int,
+    bypass: bool,
+    // Caption line above the tiles: the unit and its head, empty without (one unit or none, then no caption).
+    unit: string,
+    head: string,
+    // Gate numbers of the first and the last tile; -1 for a page with the bypass only.
+    first-gate: int,
+    last-gate: int,
+}
+
+// The pages a view of the Gates tab has in `Printer.mmu-pages` (all gates, or one head's): where they start, how many
+// there are and the one it opens on.
+export struct MmuPageRange {
+    first: int,
+    count: int,
+    start: int,
 }
 
 // A tool of the MMU and the gate it takes its filament from (Happy Hare's tool-to-gate map).
@@ -164,6 +224,8 @@ export struct ToolMatchItem {
     // Which spool a tap on the tool picks, for a tool without gate: -2 none, -1 the spool in use, 0 and up the tool
     // macro of that tool (tool changer head).
     spool-pick: int,
+    // The head or AFC lane the tool's spool is assigned to, for the picker title; empty when there is none to name.
+    spool-target: string,
     // Spoolman id of the spool of that tool macro, -1 for none.
     spool-id: int,
 }

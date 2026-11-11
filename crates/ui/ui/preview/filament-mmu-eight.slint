@@ -20,6 +20,11 @@ export component FilamentMmuEightPreview inherits AppWindow {
             { index: 6, availability: "unknown", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "", selected: false },
             { index: 7, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T7", selected: false },
         ];
+        Printer.mmu-pages = [
+            { first-row: 0, count: 5, bypass: false, unit: "", head: "", first-gate: 0, last-gate: 4 },
+            { first-row: 5, count: 3, bypass: true, unit: "", head: "", first-gate: 5, last-gate: 7 },
+        ];
+        Printer.mmu-page-ranges = [{ first: 0, count: 2, start: 0 }];
         Printer.mmu-filament = "loaded";
         Printer.mmu-action = "Loading";
         Printer.mmu-buffer-state = "neutral";

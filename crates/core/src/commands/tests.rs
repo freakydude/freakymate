@@ -404,3 +404,52 @@ fn a_tool_spool_goes_into_the_afc_lane_mapped_to_the_tool() {
     assert_eq!(assign(Some(4)), Ok(vec![Command::RunGcode { script: "SET_SPOOL_ID LANE=lane2 SPOOL_ID=4".into() }]));
     assert_eq!(assign(None), Ok(vec![Command::RunGcode { script: "SET_SPOOL_ID LANE=lane2".into() }]));
 }
+
+fn status_with_heads(mounted: Option<&str>) -> PrinterStatus {
+    use crate::sources::toolchanger::{ToolHead, ToolchangerStatus};
+    let head = |name: &str, extruder: &str| ToolHead {
+        name: name.into(),
+        number: name.strip_prefix('T').and_then(|number| number.parse().ok()),
+        extruder: Some(extruder.into()),
+        active: mounted == Some(name),
+    };
+    PrinterStatus {
+        toolchanger: Some(ToolchangerStatus {
+            status: "ready".into(),
+            heads: vec![head("T0", "extruder"), head("T1", "extruder1")],
+            ..ToolchangerStatus::default()
+        }),
+        ..status_with_targets(&[("extruder", 0.0), ("extruder1", 0.0), ("heater_bed", 0.0)])
+    }
+}
+
+#[test]
+fn a_preset_heats_the_nozzle_of_the_mounted_head() {
+    let preset = Command::ApplyPreset { extruder: 210.0, bed: 60.0 };
+
+    let commands = preset.resolve(&printer(&[]), &status_with_heads(Some("T1")));
+
+    assert_eq!(commands, Ok(vec![set("extruder1", 210.0), set("heater_bed", 60.0)]));
+}
+
+#[test]
+fn a_preset_heats_only_the_bed_while_no_head_is_mounted() {
+    let preset = Command::ApplyPreset { extruder: 210.0, bed: 60.0 };
+
+    let commands = preset.resolve(&printer(&[]), &status_with_heads(None));
+
+    assert_eq!(commands, Ok(vec![set("heater_bed", 60.0)]));
+}
+
+#[test]
+fn head_commands_become_the_plugins_g_code() {
+    let script = |command: Command| match command.to_call(&Motion::default()).unwrap().params {
+        Some(params) => params["script"].as_str().unwrap().to_owned(),
+        None => String::new(),
+    };
+
+    assert_eq!(script(Command::PickUpHead { head: "left".into() }), "SELECT_TOOL TOOL=left");
+    assert_eq!(script(Command::DropHead), "UNSELECT_TOOL");
+    assert_eq!(script(Command::InitializeToolchanger { recover: true }), "INITIALIZE_TOOLCHANGER RECOVER=1");
+    assert!(Command::PickUpHead { head: "two words".into() }.to_call(&Motion::default()).is_none());
+}

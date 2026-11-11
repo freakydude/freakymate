@@ -2,11 +2,13 @@
 
 use crate::{format, view};
 use crate::{
-    BarColors, FanItem, FilamentPathItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, PowerItem, SensorItem,
-    SpoolItem, ToolMatchItem, TuningItem, UpdateItem,
+    BarColors, FanItem, FilamentPathItem, HeadItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, PowerItem,
+    SensorItem, SpoolItem, ToolMatchItem, TuningItem, UpdateItem,
 };
 use freakymate_core::color::Rgba;
 use freakymate_core::domain::filament_match::{self, Difference, Supply, ToolMatch, Verdict};
+use freakymate_core::domain::heads::{HeadRow, PickUp};
+use freakymate_core::domain::machine_tree::MachineTree;
 use freakymate_core::domain::spools::{self, FilamentColors, Lane, SpoolHolder};
 use freakymate_core::sources::happy_hare::{self, FilamentPath, PathSensor};
 use freakymate_core::sources::klipper::tuning::TuningValue;
@@ -78,6 +80,90 @@ fn spool_place(lane: &Lane) -> String {
         return "In use".to_owned();
     }
     parts.join(" · ")
+}
+
+/// What the spool picker names as the place it assigns a spool to, for a lane kept through its tool macro: the AFC lane
+/// (`lane2`) or the head (`T1`) of a tool changer; empty elsewhere, where the picker says what it did before.
+pub(crate) fn spool_target(lane: &Lane) -> String {
+    match (&lane.head, lane.spool_holder()) {
+        (Some(head), Some(SpoolHolder::Tool(_))) => lane.name.clone().unwrap_or_else(|| head.clone()),
+        _ => String::new(),
+    }
+}
+
+/// The place of the spool in use for the picker title, see [`spool_target`].
+pub(crate) fn spool_in_use_target(lanes: &[Lane]) -> String {
+    lanes.iter().find(|lane| lane.active).map(spool_target).unwrap_or_default()
+}
+
+/// The nozzle heaters of the swappable heads as `(label, extruder)`, in head order; empty without heads.
+pub(crate) fn head_nozzles(rows: &[HeadRow]) -> Vec<(&str, &str)> {
+    rows.iter().filter_map(|row| Some((row.label.as_str(), row.extruder.as_deref()?))).collect()
+}
+
+/// The label (`T1`) of the mounted head; `None` without heads or while none is mounted.
+pub(crate) fn selected_head(rows: &[HeadRow]) -> Option<&str> {
+    rows.iter().find(|row| row.mounted).map(|row| row.label.as_str())
+}
+
+/// The printer has swappable heads but none is mounted, so no nozzle takes a target.
+pub(crate) fn no_head_selected(tree: &MachineTree) -> bool {
+    tree.has_swappable_heads() && tree.selected_extruder().is_none()
+}
+
+/// The heaters for the Thermal page: with heads, the nozzles of the heads first in head order, named after their head
+/// ("Nozzle T1"), then the others as they come; without heads as they come.
+pub(crate) fn heaters_by_head<'a>(
+    heaters: &'a [Heater],
+    nozzles: &[(&str, &str)],
+) -> Vec<(&'a Heater, Option<String>)> {
+    let mut rows: Vec<(&Heater, Option<String>)> = nozzles
+        .iter()
+        .filter_map(|(head, extruder)| {
+            let heater = heaters.iter().find(|heater| heater.object == *extruder)?;
+            Some((heater, Some(format!("Nozzle {head}"))))
+        })
+        .collect();
+    let rest = heaters.iter().filter(|heater| !nozzles.iter().any(|(_, extruder)| heater.object == *extruder));
+    rows.extend(rest.map(|heater| (heater, None)));
+    rows
+}
+
+/// The row of a head for the Filament page: its nozzle, the spool of its lane in use and how it is picked up.
+pub(crate) fn head_item(row: &HeadRow, status: &PrinterStatus) -> HeadItem {
+    let nozzle = row.extruder.as_deref().and_then(|object| status.heater(object));
+    let spool = row.lane.as_ref().and_then(|lane| lane.spool.as_ref());
+    let holder = row.lane.as_ref().and_then(Lane::spool_holder);
+    let (pick_up, pick_up_macro) = match row.pick_up {
+        Some(PickUp::Macro(number)) => ("macro", format!("T{number}")),
+        Some(PickUp::Head) => ("head", String::new()),
+        None => ("", String::new()),
+    };
+    HeadItem {
+        name: row.name.as_str().into(),
+        label: row.label.as_str().into(),
+        subtitle: row.subtitle.as_deref().unwrap_or_default().into(),
+        has_nozzle: nozzle.is_some(),
+        temperature: nozzle.map_or(0.0, |heater| heater.temperature) as f32,
+        target: nozzle.map_or(0.0, |heater| heater.target) as f32,
+        mounted: row.mounted,
+        detected: row.detected,
+        lanes: i32::try_from(row.lane_count).unwrap_or(i32::MAX),
+        pick_up: pick_up.into(),
+        pick_up_macro: pick_up_macro.into(),
+        has_spool: spool.is_some(),
+        spool_title: spool.map(Spool::title).unwrap_or_default().into(),
+        spool_material: spool.map(|spool| spool.material.as_str()).unwrap_or_default().into(),
+        spool_weight: spool.map(view::spool_remaining).unwrap_or_default().into(),
+        spool_low: spool.is_some_and(Spool::is_low),
+        spool_colors: spool.map(spool_colors).unwrap_or_default(),
+        spool_id: id_or_none(spool.map(|spool| spool.id)),
+        spool_tool: match holder {
+            Some(SpoolHolder::Tool(tool)) => i32::try_from(tool).unwrap_or(-1),
+            _ => -1,
+        },
+        can_pick_spool: matches!(holder, Some(SpoolHolder::Tool(_) | SpoolHolder::ActiveSpool)),
+    }
 }
 
 pub(crate) fn color_of([red, green, blue, alpha]: Rgba) -> slint::Color {
@@ -310,6 +396,7 @@ pub(crate) fn spool_tool(lanes: &[Lane]) -> i32 {
 /// Which spool a tool without gate can be assigned: the spool of its tool macro or the spool in use; none otherwise.
 fn fill_spool_pick(item: &mut ToolMatchItem, lanes: &[Lane]) {
     let lane = usize::try_from(item.tool).ok().and_then(|tool| spools::tool_lane(lanes, tool));
+    item.spool_target = lane.map(spool_target).unwrap_or_default().into();
     (item.spool_pick, item.spool_id) = match lane.and_then(Lane::spool_holder) {
         Some(SpoolHolder::Tool(tool)) => (id_or_none(Some(tool)), id_or_none(lane.and_then(|lane| lane.spool_id))),
         Some(SpoolHolder::ActiveSpool) => (SPOOL_PICK_ACTIVE, id_or_none(lane.and_then(|lane| lane.spool_id))),
@@ -400,6 +487,122 @@ mod tests {
         assert_eq!(place(1).as_deref(), Some("T1 · Tradrack · Gate 5"));
         assert_eq!(place(2).as_deref(), Some("lane2"));
         assert_eq!(place(3).as_deref(), Some("e0"));
+    }
+
+    #[test]
+    fn a_head_row_names_its_pick_up_and_where_its_spool_is_assigned() {
+        let row = |pick_up| HeadRow {
+            name: "T1".into(),
+            label: "T1".into(),
+            subtitle: None,
+            number: Some(1),
+            extruder: Some("extruder1".into()),
+            mounted: false,
+            detected: true,
+            lane_count: 1,
+            lane: Some(lane(None, Some("T1"), None)),
+            pick_up,
+        };
+        let status = PrinterStatus::default();
+        let by_macro = head_item(&row(Some(PickUp::Macro(1))), &status);
+        assert_eq!((by_macro.pick_up.as_str(), by_macro.pick_up_macro.as_str()), ("macro", "T1"));
+        assert_eq!((by_macro.spool_tool, by_macro.can_pick_spool, by_macro.spool_id), (1, true, -1));
+        assert!(by_macro.detected && !by_macro.has_nozzle);
+        assert_eq!(head_item(&row(Some(PickUp::Head)), &status).pick_up.as_str(), "head");
+        assert_eq!(head_item(&row(None), &status).pick_up.as_str(), "");
+    }
+
+    fn tree(heads: &[(Option<&str>, bool, &str)]) -> MachineTree {
+        use freakymate_core::domain::machine_tree::{Carriage, Head, Nozzle};
+        let head = |(name, active, extruder): &(Option<&str>, bool, &str)| Head {
+            name: name.map(str::to_owned),
+            active: *active,
+            nozzles: vec![Nozzle { extruder: (*extruder).into(), lanes: Vec::new() }],
+        };
+        MachineTree { carriages: vec![Carriage { heads: heads.iter().map(head).collect() }] }
+    }
+
+    /// The rows of the swappable heads of `tree`, the head at position `n` answering to `T<n>`.
+    fn head_rows(tree: &MachineTree) -> Vec<HeadRow> {
+        let heads = tree.carriages.iter().flat_map(|carriage| &carriage.heads);
+        heads
+            .enumerate()
+            .filter_map(|(number, head)| {
+                let name = head.name.clone()?;
+                Some(HeadRow {
+                    label: format!("T{number}"),
+                    subtitle: None,
+                    name,
+                    number: Some(number),
+                    extruder: head.nozzles.first().map(|nozzle| nozzle.extruder.clone()),
+                    mounted: head.active,
+                    detected: false,
+                    lane_count: 0,
+                    lane: None,
+                    pick_up: None,
+                })
+            })
+            .collect()
+    }
+
+    fn heater(object: &str) -> Heater {
+        Heater {
+            object: object.into(),
+            label: object.into(),
+            temperature: 0.0,
+            target: 0.0,
+            power: 0.0,
+            min_temp: 0.0,
+            max_temp: None,
+        }
+    }
+
+    #[test]
+    fn the_picker_names_the_afc_lane_or_the_head_of_a_tool_macro() {
+        let head = lane(None, Some("T1"), Some(7));
+        assert_eq!(spool_target(&head), "T1");
+        let afc = Lane { name: Some("lane2".into()), ..head.clone() };
+        assert_eq!(spool_target(&afc), "lane2");
+        assert_eq!(spool_target(&lane(Some(5), None, Some(7))), "");
+        assert_eq!(spool_target(&lane(None, None, Some(7))), "");
+        let mut in_use = head;
+        in_use.active = true;
+        assert_eq!(spool_in_use_target(&[in_use]), "T1");
+    }
+
+    #[test]
+    fn the_thermal_page_lists_the_nozzles_by_head_before_the_bed() {
+        let heaters = [heater("heater_bed"), heater("extruder1"), heater("extruder")];
+        let heads = tree(&[(Some("T0"), false, "extruder"), (Some("T1"), true, "extruder1")]);
+        let rows = heaters_by_head(&heaters, &head_nozzles(&head_rows(&heads)));
+        let seen: Vec<(&str, Option<&str>)> =
+            rows.iter().map(|(heater, name)| (heater.object.as_str(), name.as_deref())).collect();
+        assert_eq!(seen, [("extruder", Some("Nozzle T0")), ("extruder1", Some("Nozzle T1")), ("heater_bed", None)]);
+        let fixed = tree(&[(None, true, "extruder")]);
+        assert!(head_nozzles(&head_rows(&fixed)).is_empty());
+        assert_eq!(heaters_by_head(&heaters, &[]).len(), 3);
+    }
+
+    #[test]
+    fn a_head_is_shown_by_its_number_even_when_its_section_has_another_name() {
+        let heads = tree(&[(Some("left"), true, "extruder")]);
+        let mut rows = head_rows(&heads);
+        rows[0].label = "T4".into();
+        assert_eq!(selected_head(&rows), Some("T4"));
+        assert_eq!(heaters_by_head(&[heater("extruder")], &head_nozzles(&rows))[0].1.as_deref(), Some("Nozzle T4"));
+    }
+
+    #[test]
+    fn the_status_bar_follows_the_mounted_head() {
+        let mounted = tree(&[(Some("T0"), false, "extruder"), (Some("T1"), true, "extruder1")]);
+        assert_eq!(selected_head(&head_rows(&mounted)), Some("T1"));
+        assert!(!no_head_selected(&mounted));
+        let none = tree(&[(Some("T0"), false, "extruder"), (Some("T1"), false, "extruder1")]);
+        assert_eq!(selected_head(&head_rows(&none)), None);
+        assert!(no_head_selected(&none));
+        let fixed = tree(&[(None, true, "extruder")]);
+        assert_eq!(selected_head(&head_rows(&fixed)), None);
+        assert!(!no_head_selected(&fixed));
     }
 
     #[test]

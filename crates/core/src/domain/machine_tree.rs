@@ -123,6 +123,26 @@ impl MachineTree {
         Self { carriages: vec![Carriage { heads }] }
     }
 
+    /// The tree has swappable heads (a tool changer); only then the screens show a head level.
+    pub fn has_swappable_heads(&self) -> bool {
+        self.heads().any(|head| head.name.is_some())
+    }
+
+    /// The Klipper extruder of the nozzle in use: that of the mounted head of a tool changer (`None` while no head
+    /// is mounted or the mounted one has no nozzle), else that of the fixed head.
+    pub fn selected_extruder(&self) -> Option<&str> {
+        let selected = if self.has_swappable_heads() {
+            self.heads().find(|head| head.name.is_some() && head.active)
+        } else {
+            self.heads().next()
+        };
+        selected.and_then(|head| head.nozzles.first()).map(|nozzle| nozzle.extruder.as_str())
+    }
+
+    fn heads(&self) -> impl Iterator<Item = &Head> {
+        self.carriages.iter().flat_map(|carriage| &carriage.heads)
+    }
+
     /// The spools the lanes keep themselves (gates, tool macros), sorted and without duplicates: those Spoolman has to
     /// be asked for besides the active spool.
     pub fn own_spool_ids(&self) -> Vec<u32> {
@@ -365,6 +385,7 @@ mod tests {
             toolchanger: Some(ToolchangerStatus {
                 status: "ready".into(),
                 heads: vec![head(0, "extruder"), head(1, "extruder1"), head(2, "extruder2")],
+                ..ToolchangerStatus::default()
             }),
             tool_spools: vec![
                 ToolSpool { tool: 0, macro_name: "T0".into(), spool_id: Some(1) },
@@ -606,5 +627,26 @@ mod tests {
         let lanes = MachineTree::build(&mmu(&[(0, 2)], 0)).lanes(&SpoolmanState::default());
 
         assert_eq!(lanes[0].unit_name, None);
+    }
+
+    #[test]
+    fn the_selected_nozzle_is_that_of_the_mounted_head() {
+        assert_eq!(MachineTree::build(&toolchanger(1)).selected_extruder(), Some("extruder1"));
+    }
+
+    #[test]
+    fn no_nozzle_is_selected_while_no_head_is_mounted() {
+        let tree = MachineTree::build(&toolchanger(7));
+
+        assert!(tree.has_swappable_heads());
+        assert_eq!(tree.selected_extruder(), None);
+    }
+
+    #[test]
+    fn a_printer_without_heads_heats_the_extruder() {
+        let tree = MachineTree::build(&PrinterStatus::default());
+
+        assert!(!tree.has_swappable_heads());
+        assert_eq!(tree.selected_extruder(), Some("extruder"));
     }
 }

@@ -51,6 +51,10 @@ export global Actions {
     callback load-filament();
     callback unload-filament();
     callback run-macro(string);
+    // Tool changer: pick up the head with this name, park the mounted one, initialise (`true`: recover after an error).
+    callback pick-up-head(string);
+    callback drop-head();
+    callback initialize-toolchanger(bool);
     callback exclude-object(string);
     // User and password; only Moonraker sees the password.
     callback log-in(string, string);

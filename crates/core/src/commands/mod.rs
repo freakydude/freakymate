@@ -15,7 +15,7 @@ use crate::sources::klipper::tuning::TuningKey;
 use crate::sources::klipper::{Axis, Motion, TestZ};
 use crate::sources::moonraker_server::wled::{self, StripAction};
 use crate::sources::moonraker_server::{files, machine, power, update_manager};
-use crate::sources::{led_effect, spoolman};
+use crate::sources::{led_effect, spoolman, toolchanger};
 
 /// A command triggered by a person. The UI only knows this level, not G-code or JSON-RPC.
 ///
@@ -207,6 +207,16 @@ pub enum Command {
     MmuServo {
         position: mmu::ServoCommand,
     },
+    /// Picks up the head with this name (`SELECT_TOOL`) on a tool changer.
+    PickUpHead {
+        head: String,
+    },
+    /// Parks the mounted head (`UNSELECT_TOOL`).
+    DropHead,
+    /// Initialises the tool changer; `recover` also restores the position after an error.
+    InitializeToolchanger {
+        recover: bool,
+    },
     /// Selects the bypass for filament fed by hand past the gates.
     MmuSelectBypass,
     /// Selects the bypass and loads the filament fed into it.
@@ -326,6 +336,9 @@ impl Command {
             Self::ExcludeObject { name } => run_gcode(klipper::exclude_object(name)?),
             // Klipper plugins
             Self::SetLedEffect { effect, on } => run_gcode(led_effect::set_effect(effect, *on)),
+            Self::PickUpHead { head } => run_gcode(toolchanger::commands::pick_up(head)?),
+            Self::DropHead => run_gcode(toolchanger::commands::DROP),
+            Self::InitializeToolchanger { recover } => run_gcode(toolchanger::commands::initialize(*recover)),
             Self::MmuSelectGate { gate } => run_gcode(mmu::select_gate(*gate)),
             Self::MmuLoad => run_gcode(mmu::LOAD),
             Self::MmuLoadGate { gate } => run_gcode(mmu::load_gate(*gate)),
@@ -395,6 +408,26 @@ impl Command {
         )
     }
 
+    /// Changes the position or the leveling a paused print resumes from (homing, leveling, probing, motors off); refused
+    /// for the whole print, pause included. What a pause is for (moving away, extruding, the MMU, the heads) stays
+    /// allowed.
+    pub fn loses_print_position(&self) -> bool {
+        matches!(
+            self,
+            Self::Home { .. }
+                | Self::DisableMotors
+                | Self::Level
+                | Self::QuadGantryLevel
+                | Self::ZTiltAdjust
+                | Self::CalibrateZ
+                | Self::ProbeCalibrate
+                | Self::ZEndstopCalibrate
+                | Self::CalibrateBedMesh
+                | Self::CalculateScrewsTilt
+                | Self::AdjustBedScrews
+        )
+    }
+
     /// Moves the axes, the extruder or the MMU on its own; refused while the print moves the machine
     /// ([`PrinterStatus::print_moving`](crate::sources::PrinterStatus::print_moving)), allowed while it is paused.
     /// The Move and Filament pages are locked then, too; G-code typed in the console is up to the person.
@@ -410,6 +443,9 @@ impl Command {
                 | Self::CalibrateZ
                 | Self::ProbeCalibrate
                 | Self::ZEndstopCalibrate
+                | Self::PickUpHead { .. }
+                | Self::DropHead
+                | Self::InitializeToolchanger { .. }
                 | Self::CalibrateBedMesh
                 | Self::CalculateScrewsTilt
                 | Self::AdjustBedScrews

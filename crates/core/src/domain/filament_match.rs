@@ -660,6 +660,7 @@ mod tests {
             toolchanger: Some(ToolchangerStatus {
                 status: "ready".into(),
                 heads: vec![head(0, "extruder"), head(1, "extruder1")],
+                ..ToolchangerStatus::default()
             }),
             tool_spools: vec![ToolSpool { tool: 1, macro_name: "T1".into(), spool_id: Some(6) }],
             ..PrinterStatus::default()

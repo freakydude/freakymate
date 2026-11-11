@@ -129,7 +129,7 @@ fn a_gate_of_the_second_unit_does_not_move_the_head_but_select_tool_does() {
     assert_eq!(status["mmu"]["unit"], 1);
     assert_eq!(status["mmu"]["extruder_name"], "extruder1");
     assert_eq!(status["toolhead"]["extruder"], "extruder");
-    assert_eq!(status["toolchanger"]["tool"], "tool T0");
+    assert_eq!(status["toolchanger"]["detected_tool"], "tool T0");
 
     run(&mut printer, "SELECT_TOOL T=1").unwrap();
     let status = printer.status();

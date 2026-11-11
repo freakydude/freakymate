@@ -72,10 +72,11 @@ fn bind_temperatures(
     actions.on_step_heater(move |heater, step| {
         step_service.send(Command::StepHeater { heater: heater.into(), step: f64::from(step) });
     });
-    let (preset_service, preset_settings) = (service.clone(), Rc::clone(settings));
+    let (preset_presenter, preset_settings) = (Rc::clone(presenter), Rc::clone(settings));
     actions.on_apply_preset(move |index| {
         let Some(preset) = usize::try_from(index).ok().and_then(|index| preset_settings.preset(index)) else { return };
-        preset_service.send(Command::ApplyPreset { extruder: preset.extruder, bed: preset.bed });
+        let command = Command::ApplyPreset { extruder: preset.extruder, bed: preset.bed };
+        preset_presenter.send_preset(command, &preset_presenter.snapshot());
     });
     actions.on_cool_down(send(service, || Command::CoolDown));
     let fan_service = service.clone();
@@ -148,6 +149,14 @@ fn bind_filament(actions: &Actions, service: &PrinterService) {
     });
     actions.on_load_filament(send(service, || Command::LoadFilament));
     actions.on_unload_filament(send(service, || Command::UnloadFilament));
+    actions.on_pick_up_head(with(service, |service, head: SharedString| {
+        service.send(Command::PickUpHead { head: head.into() })
+    }));
+    actions.on_drop_head(send(service, || Command::DropHead));
+    let initialize_service = service.clone();
+    actions.on_initialize_toolchanger(move |recover| {
+        initialize_service.send(Command::InitializeToolchanger { recover });
+    });
 }
 
 /// Happy Hare: gates, tools, endless spool, bypass and the filament of a gate.

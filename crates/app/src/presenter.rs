@@ -7,8 +7,9 @@ use crate::console_view::ConsoleView;
 use crate::files_view::{FileState, FilesView};
 use crate::history_view::HistoryView;
 use crate::items::{
-    compared_tool_items, connection_name, fan_item, heater_item, host_interface_item, led_effect_item, led_item,
-    power_item, replace_rows, sensor_item, spool_tool, tuning_item, update_item,
+    compared_tool_items, connection_name, fan_item, head_item, head_nozzles, heater_item, heaters_by_head,
+    host_interface_item, led_effect_item, led_item, no_head_selected, power_item, replace_rows, selected_head,
+    sensor_item, spool_in_use_target, spool_tool, tuning_item, update_item,
 };
 use crate::macro_view::MacroView;
 use crate::mmu_view::{JobFile, MmuView};
@@ -17,12 +18,13 @@ use crate::spool_view::{SpoolView, SpoolmanLine};
 use crate::status_view::StatusView;
 use crate::{bed_map, format, thumbnail, view};
 use crate::{
-    AppWindow, FanItem, FilamentSensorItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, Network, PowerItem,
-    Printer, SensorItem, ToolMatchItem, TuningItem, UiSettings, UpdateItem,
+    AppWindow, FanItem, FilamentSensorItem, HeadItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, Network,
+    PowerItem, Printer, SensorItem, ToolMatchItem, TuningItem, UiSettings, UpdateItem,
 };
 use chrono::Local;
 use freakymate_core::domain::filament::{self, FilamentHandling};
 use freakymate_core::domain::filament_match::{self, ToolMatch};
+use freakymate_core::domain::heads::{self, ChangerNote};
 use freakymate_core::domain::prepared_job::PreparedJob;
 use freakymate_core::domain::spools::{self, Lane};
 use freakymate_core::domain::{estimates, light, pause};
@@ -32,6 +34,7 @@ use freakymate_core::sources::moonraker_server::files::{FileEntry, FileMetadata,
 use freakymate_core::sources::moonraker_server::gcode_store::{ConsoleKind, ConsoleLine};
 use freakymate_core::sources::moonraker_server::history::{FinishedJob, PrintHistory};
 use freakymate_core::sources::spoolman::{Spool, SpoolmanState};
+use freakymate_core::sources::toolchanger::ToolchangerStatus;
 use freakymate_core::sources::PrinterStatus;
 use freakymate_core::{Access, Command, ConnectionState, Event, PrinterService, Query, Snapshot};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
@@ -64,6 +67,7 @@ pub struct Presenter {
     /// Last logged source of each derived value, so that a change is logged once.
     origins: RefCell<HashMap<&'static str, &'static str>>,
     heaters: Rc<VecModel<HeaterItem>>,
+    heads: Rc<VecModel<HeadItem>>,
     sensors: Rc<VecModel<SensorItem>>,
     fans: Rc<VecModel<FanItem>>,
     leds: Rc<VecModel<LedItem>>,
@@ -100,6 +104,7 @@ impl Presenter {
             cache: RefCell::default(),
             origins: RefCell::default(),
             heaters: Rc::default(),
+            heads: Rc::default(),
             sensors: Rc::default(),
             fans: Rc::default(),
             leds: Rc::default(),
@@ -126,6 +131,7 @@ impl Presenter {
         });
         let printer = window.global::<Printer>();
         printer.set_heaters(ModelRc::from(presenter.heaters.clone()));
+        printer.set_heads(ModelRc::from(presenter.heads.clone()));
         printer.set_sensors(ModelRc::from(presenter.sensors.clone()));
         printer.set_fans(ModelRc::from(presenter.fans.clone()));
         printer.set_leds(ModelRc::from(presenter.leds.clone()));
@@ -318,7 +324,13 @@ impl Presenter {
     /// Nozzle and bed, the heaters with the hint of the spools, and the sensors.
     fn show_temperatures(&self, printer: &Printer, snapshot: &Snapshot, ready: bool, lanes: &[Lane]) {
         let status = &snapshot.status;
-        let nozzle = status.heater(NOZZLE_HEATER);
+        let head_rows = heads::head_rows(&snapshot.tree, status, lanes);
+        let head_nozzles = head_nozzles(&head_rows);
+        let has_heads = !head_nozzles.is_empty();
+        let nozzle_heater = if has_heads { snapshot.tree.selected_extruder() } else { Some(NOZZLE_HEATER) };
+        let nozzle = nozzle_heater.and_then(|object| status.heater(object));
+        printer.set_nozzle_head(selected_head(&head_rows).unwrap_or_default().into());
+        printer.set_nozzle_selected(!has_heads || nozzle_heater.is_some());
         printer.set_nozzle_temperature(nozzle.map_or(0.0, |heater| heater.temperature) as f32);
         printer.set_nozzle_target(nozzle.map_or(0.0, |heater| heater.target) as f32);
         let bed = status.heater(BED_HEATER);
@@ -327,10 +339,15 @@ impl Presenter {
         printer.set_bed_target(bed.map_or(0.0, |heater| heater.target) as f32);
         replace_rows(
             &self.heaters,
-            status
-                .heaters
-                .iter()
-                .map(|heater| heater_item(heater, lanes, self.history.has_history(&heater.object)))
+            heaters_by_head(&status.heaters, &head_nozzles)
+                .into_iter()
+                .map(|(heater, name)| {
+                    let mut item = heater_item(heater, lanes, self.history.has_history(&heater.object));
+                    if let Some(name) = name {
+                        item.label = name.into();
+                    }
+                    item
+                })
                 .collect(),
         );
         replace_rows(
@@ -391,6 +408,29 @@ impl Presenter {
         };
         self.spools.show_active(printer, &spoolman, active_spool);
         printer.set_spool_tool(spool_tool(lanes));
+        printer.set_spool_target(spool_in_use_target(lanes).into());
+        self.show_heads(printer, snapshot, lanes);
+    }
+
+    /// The head level of the Filament page: the heads and the deviations of the tool changer; nothing without heads.
+    fn show_heads(&self, printer: &Printer, snapshot: &Snapshot, lanes: &[Lane]) {
+        let status = &snapshot.status;
+        let rows = heads::head_rows(&snapshot.tree, status, lanes);
+        replace_rows(&self.heads, rows.iter().map(|row| head_item(row, status)).collect());
+        self.mmu.show_pages(status, lanes, &rows);
+        printer.set_mounted_head(rows.iter().position(|row| row.mounted).map_or(-1, |row| row as i32));
+        let changer = status.toolchanger.as_ref();
+        let (kind, selected, detected) = match changer.and_then(heads::changer_note) {
+            Some(ChangerNote::Uninitialized) => ("uninitialized", String::new(), String::new()),
+            Some(ChangerNote::Error) => ("error", String::new(), String::new()),
+            Some(ChangerNote::Mismatch { selected, detected }) => ("mismatch", selected, detected),
+            None => ("", String::new(), String::new()),
+        };
+        printer.set_changer_note(kind.into());
+        printer.set_changer_selected(selected.into());
+        printer.set_changer_detected(detected.into());
+        printer.set_changer_ready(changer.is_none_or(ToolchangerStatus::accepts_tool_change));
+        printer.set_has_drop(changer.is_some() && snapshot.sources.klipper.has_unselect_tool);
     }
 
     /// Logs which source a derived value comes from when it changes; `None` means no source has a value.
@@ -694,7 +734,15 @@ impl Presenter {
         let snapshot = self.snapshot();
         let lanes = self.lanes(&snapshot);
         if let Some(preset) = spools::active_spool(&lanes).and_then(|spool| spools::preset(spool, &snapshot.status)) {
-            self.service.send(preset);
+            self.send_preset(preset, &snapshot);
+        }
+    }
+
+    /// Sends a heating preset; with heads but none mounted the core heats only the bed, which the notice says.
+    pub fn send_preset(&self, preset: Command, snapshot: &Snapshot) {
+        self.service.send(preset);
+        if no_head_selected(&snapshot.tree) {
+            self.show_notice("No head selected, nozzle not heated", false);
         }
     }
 

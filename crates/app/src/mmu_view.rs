@@ -5,8 +5,10 @@ use crate::items::{
     bar_colors, compared_tool_items, filament_path_item, fill_loaded, id_or_none, replace_rows, reuse_flags,
     tool_match_item,
 };
-use crate::{view, MmuGateItem, MmuSensorItem, Printer, ToolMatchItem};
+use crate::{view, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem, Printer, ToolMatchItem};
 use freakymate_core::domain::filament_match::{self, ToolMatch, Verdict};
+use freakymate_core::domain::gate_pages::{self, BypassAt, GatePage};
+use freakymate_core::domain::heads::HeadRow;
 use freakymate_core::domain::spools::{FilamentColors, Lane};
 use freakymate_core::sources::happy_hare::MmuStatus;
 use freakymate_core::sources::spoolman::Spool;
@@ -17,6 +19,8 @@ use std::rc::Rc;
 #[derive(Default)]
 pub struct MmuView {
     gates: Rc<VecModel<MmuGateItem>>,
+    pages: Rc<VecModel<MmuGatePage>>,
+    page_ranges: Rc<VecModel<MmuPageRange>>,
     sensors: Rc<VecModel<MmuSensorItem>>,
     tools: Rc<VecModel<ToolMatchItem>>,
     /// The tools of the file prepared for the print page.
@@ -34,6 +38,8 @@ pub struct JobFile<'a> {
 impl MmuView {
     pub fn bind(&self, printer: &Printer) {
         printer.set_mmu_gates(ModelRc::from(self.gates.clone()));
+        printer.set_mmu_pages(ModelRc::from(self.pages.clone()));
+        printer.set_mmu_page_ranges(ModelRc::from(self.page_ranges.clone()));
         printer.set_mmu_sensors(ModelRc::from(self.sensors.clone()));
         printer.set_mmu_tools(ModelRc::from(self.tools.clone()));
         printer.set_prepared_tools(ModelRc::from(self.prepared_tools.clone()));
@@ -70,6 +76,45 @@ impl MmuView {
             .collect();
         replace_rows(&self.sensors, sensors);
         show_state(printer, mmu);
+    }
+
+    /// The pages of the Gates tab: one view per head (`heads`, in the order of the heads), a single one of all gates
+    /// without heads. Call with the lanes of the tree, whose heads say which gates a head is fed from.
+    pub fn show_pages(&self, status: &PrinterStatus, lanes: &[Lane], heads: &[HeadRow]) {
+        let Some(mmu) = status.happy_hare() else {
+            replace_rows(&self.pages, Vec::new());
+            replace_rows(&self.page_ranges, Vec::new());
+            return;
+        };
+        let gates: Vec<usize> = mmu.gates.iter().map(|gate| gate.index).collect();
+        let loaded = usize::try_from(mmu.gate).ok();
+        let views: Vec<Option<&str>> =
+            if heads.is_empty() { vec![None] } else { heads.iter().map(|head| Some(head.name.as_str())).collect() };
+        // The bypass is the machine's, not a head's: it sits on the unit that has it, whichever head that is on. Where
+        // the units do not say, it goes to the last unit.
+        let bypass_unit = mmu.bypass_unit();
+        let last_head = gates
+            .last()
+            .and_then(|last| lanes.iter().find(|lane| lane.gate == Some(*last)))
+            .and_then(|lane| lane.head.as_deref());
+        let mut pages = Vec::new();
+        let mut ranges = Vec::new();
+        for head in views {
+            let bypass = match bypass_unit {
+                Some(unit) => BypassAt::Unit(unit),
+                None if head.is_none() || head == last_head => BypassAt::LastUnit,
+                None => BypassAt::Nowhere,
+            };
+            let view = gate_pages::gate_pages(&gates, lanes, head, bypass, loaded, SLOTS_PER_PAGE);
+            ranges.push(MmuPageRange {
+                first: pages.len() as i32,
+                count: view.pages.len() as i32,
+                start: view.start as i32,
+            });
+            pages.extend(view.pages.iter().map(|page| page_item(page, heads)));
+        }
+        replace_rows(&self.pages, pages);
+        replace_rows(&self.page_ranges, ranges);
     }
 
     /// The tools of the prepared file with what each prints with; none without a prepared file. Call after `show`, so
@@ -131,6 +176,24 @@ impl MmuView {
         printer.set_mmu_match_file(if matches.is_empty() { String::new() } else { file.name.clone() }.into());
         printer.set_mmu_match_summary(view::match_summary(matches).into());
         printer.set_mmu_match_verdict(view::combined_verdict(matches.iter().map(|found| &found.verdict)).into());
+    }
+}
+
+/// Tiles on a page of the Gates tab, the bypass included.
+const SLOTS_PER_PAGE: usize = 5;
+
+/// The caption names the head by its label (`T1`), not by its section.
+fn page_item(page: &GatePage, heads: &[HeadRow]) -> MmuGatePage {
+    let head = page.head.as_ref().map(|name| heads.iter().find(|row| &row.name == name).map_or(name, |row| &row.label));
+    let (first, last) = page.gates.map_or((-1, -1), |(first, last)| (first as i32, last as i32));
+    MmuGatePage {
+        first_row: page.first_row as i32,
+        count: page.count as i32,
+        bypass: page.bypass,
+        unit: page.unit.clone().unwrap_or_default().into(),
+        head: head.cloned().unwrap_or_default().into(),
+        first_gate: first,
+        last_gate: last,
     }
 }
 

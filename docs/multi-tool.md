@@ -331,6 +331,21 @@ Happy Hare v4 `mmu_unit.py`, `mmu_controller.py`; Klipper `extruder.py`, `heater
 - **Names.** A viesturz tool has only its object name (`tool T0` → shown as `T0`; it may be `tool left`). Happy Hare
   v4 gives each unit a `display_name` (default: the vendor) and the selected unit in `mmu.unit`. An AFC unit has no
   name field; its name is the object suffix (`AFC_BoxTurtle Turtle_1` → `Turtle_1`).
+- **Initialising (`initialize_on`, viesturz at 94756df).** The status is `uninitialized` after every connect and after
+  every rejected G-code command (`gcode:command_error` resets it and drops the active tool, `toolchanger.py` Z.219-223).
+  `initialize_on` (`configfile.settings.toolchanger`, default `first-use`) says what follows: `first-use`:
+  `select_tool` initialises first, so a change from `uninitialized` just works (Z.406-411); `home`: the first
+  homing initialises (Z.210-212); `manual`: only `INITIALIZE_TOOLCHANGER`. A change at any other status than `ready`
+  fails with `Cannot select tool, toolchanger status is <status>, reason: <error_message>`.
+- **Errors.** `error` comes only from `process_error` (Z.475-503), for example the detection not matching after a change
+  (`Expected tool tool T1 but active is None`), and then runs `error_gcode` (the example config: `PAUSE`). The error text
+  is not in the status. The plugin recommends pausing and `INITIALIZE_TOOLCHANGER` in the resume macro
+  (`toolchanger.md`), and checks no print state: head actions are for a paused print too.
+- **One number per head.** `tool_number` of a `[tool]` is a scalar (`tool.py` Z.60); a duplicate is a config error. So
+  `T<n>` names a head unambiguously, the section name is only a second line. AFC's heads take the number from their
+  lane's `map`.
+- **One bypass per machine.** Happy Hare reports `has_bypass` per unit (`mmu_machine.unit_<n>`), and only one unit may
+  have it (`mmu_machine.py` `unit_with_bypass`).
 - **Heating a nozzle that is not active.** `SET_HEATER_TEMPERATURE HEATER=extruder1 TARGET=…` (or `M104 T1 S…`,
   which does not change the active extruder).
 
@@ -377,8 +392,11 @@ Heads with a unit of their own (rare): heads and machine tabs above, the path ta
   map can be changed (Happy Hare; for a tool changer without MMU `Tn` is the head number, nothing to change),
   Service only with a filament changer. The tool changer gets no Service tab: its few actions sit on the head view.
 - **Fit:** four to five heads, gates or tools fit without paging; from six on the row pages with chevrons left and
-  right, like the gate tiles today. A head tab shows a colour edge, the name and the nozzle temperature (about
-  90 px). Five heads plus Tools and Service is the widest row; check with the longest names in the fake.
+  right, like the gate tiles today. A head tab shows a colour edge, `T<n>` with the nozzle temperature at its right
+  and, only where the section name is not `T<n>` itself, the name small and muted below (elided; about 98 px).
+  A head without a number shows its name instead. Every other screen (status bar, Thermal "Nozzle T1", "Spool for
+  T1", "T2 is not mounted", "Select T2") uses `T<n>` only. Five heads plus Tools and Service page already; check
+  with the longest names in the fake.
 
 **Head view.**
 
@@ -390,19 +408,21 @@ Heads with a unit of their own (rare): heads and machine tabs above, the path ta
 - On the mounted head: "Drop" (`UNSELECT_TOOL`, AFC `AFC_UNSELECT_TOOL`), only where the command exists.
 - "Mounted" (success icon) at the head tab only with detection; no word for absent (the normal case).
 - Deviations of the changer replace nothing on the page, they are one hint line under the tabs, with the button that
-  helps: `uninitialized` → "Not initialized" (info) + "Initialize"; `error` → "Tool changer error, see console"
+  helps: `uninitialized` → "Not initialized" (info) + "Initialize", only where a change would fail (`initialize_on`
+  is not `first-use`; with `first-use` the next selection initialises by itself and nothing is said); `error` → "Tool changer error, see console"
   (danger) + "Recover" (`INITIALIZE_TOOLCHANGER RECOVER=1`, with confirmation); selected ≠ detected → "T1 selected,
   T2 detected" (warning), no button.
 - The spool card's ◎ opens the picker for this head's `T<n>` macro (D5). Heating a parked head: Thermal.
-- Select, Pick up, Drop and Recover are disabled while printing (the page is locked then anyway) and while the
-  changer is not `ready`, with the reason as hint.
+- Select, Pick up, Drop, Initialize and Recover are disabled while a print runs (the page is locked then anyway), not
+  while it is paused (error recovery happens there, see the facts), and while the changer is not `ready` (or
+  `uninitialized` with `first-use`), with the reason as hint.
 - No overview of all heads at once: temperatures of all heads are on Thermal, the spools per tool on the print page.
 
 ### D3 Status bar: the nozzle of the selected head (decided 2026-11-11: A)
 
 | Variant | Normal | No head selected |
 | --- | --- | --- |
-| **A (chosen)** | `T1 ▽ 190°/190°`: head name before the nozzle icon, at most 56 px, elided | `▽ No head` |
+| **A (chosen)** | `T1 ▽ 190°/190°`: head label (`T<n>`) before the nozzle icon, at most 56 px, elided | `▽ No head` |
 | B | `▽ 190°/190°` of the selected head, no name | `▽ –` |
 | C | as today, always `extruder` | as today |
 
@@ -433,7 +453,8 @@ Happy Hare v4 units (`display_name`) and AFC units (object suffix). The gate til
 **One page per unit (decided 2026-11-11).** Pages break at unit boundaries (a unit with 9 gates gets two pages); a
 caption line above the tiles names the unit, its head when it sits on one, and the page within the unit. The tab
 opens on the unit of the loaded gate (`mmu.unit`, AFC: the unit of `current_load`). A unit's bypass (`has_bypass`)
-is its last tile.
+is its last tile (it follows the unit that reports it, whichever head that is on; without unit information it is the
+last unit's).
 
 ```text
  │   [Gates]     Extruder      Tools      Service

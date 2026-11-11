@@ -94,6 +94,36 @@ pub struct MachineProfile {
     /// Tools of a `klipper-toolchanger` tool changer, each with its own extruder; 0 means no tool changer. The heads
     /// of the AFC tool changer are not counted here (see `afc`).
     pub tools: usize,
+    /// `require_tool_present` of `[toolchanger]` (viesturz `toolchanger.py`): `UNSELECT_TOOL` is registered only if it
+    /// is off.
+    pub require_tool_present: bool,
+    /// `initialize_on` of `[toolchanger]` (viesturz `toolchanger.py` Z.109-110, default `first-use`).
+    pub initialize_on: InitializeOn,
+    /// `error_gcode: PAUSE` of `[toolchanger]` (viesturz example `examples/dock location/fixed/toolchanger.cfg` Z.23-26
+    /// at 94756df): an error of the changer pauses the print. Unset by default.
+    pub error_gcode_pause: bool,
+}
+
+/// When the plugin initialises itself (viesturz `klipper/extras/toolchanger.py` Z.105-110 at 94756df).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InitializeOn {
+    /// At the first tool selection (`select_tool`, Z.406-411); the default.
+    FirstUse,
+    /// When the printer homes (`_handle_home_rails_begin`, Z.210-212).
+    Home,
+    /// Only by `INITIALIZE_TOOLCHANGER`.
+    Manual,
+}
+
+impl InitializeOn {
+    /// The value as written in the config.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::FirstUse => "first-use",
+            Self::Home => "home",
+            Self::Manual => "manual",
+        }
+    }
 }
 
 /// Klipper object names of the simulated filament sensors; the second reports a runout.
@@ -131,6 +161,9 @@ impl MachineProfile {
             bed_mesh: true,
             bed_screws: true,
             tools: 0,
+            require_tool_present: false,
+            initialize_on: InitializeOn::FirstUse,
+            error_gcode_pause: false,
         }
     }
 
@@ -149,6 +182,9 @@ impl MachineProfile {
             bed_mesh: true,
             bed_screws: false,
             tools: 0,
+            require_tool_present: false,
+            initialize_on: InitializeOn::FirstUse,
+            error_gcode_pause: false,
         }
     }
 
@@ -167,12 +203,26 @@ impl MachineProfile {
             bed_mesh: true,
             bed_screws: false,
             tools: 0,
+            require_tool_present: false,
+            initialize_on: InitializeOn::FirstUse,
+            error_gcode_pause: false,
         }
     }
 
     /// A voron with a tool changer of three tools and no MMU.
     pub fn toolchanger() -> Self {
         Self { tools: Self::TOOLCHANGER_TOOLS, ..Self::voron() }
+    }
+
+    /// Like the example config of viesturz (`examples/dock location/fixed/toolchanger.cfg` Z.23-26): `initialize_on:
+    /// home`, `require_tool_present: True` (so no `UNSELECT_TOOL`) and `error_gcode: PAUSE`.
+    pub fn toolchanger_required() -> Self {
+        Self {
+            require_tool_present: true,
+            initialize_on: InitializeOn::Home,
+            error_gcode_pause: true,
+            ..Self::toolchanger()
+        }
     }
 
     /// Happy Hare v4 with two units (ERCF and Tradrack, four gates each) on the one extruder.

@@ -1,8 +1,12 @@
 //! A tool changer as `klipper-toolchanger` (viesturz) reports it: `toolchanger`, one `tool T<n>` and one extruder per
 //! tool, the user macros `T<n>` with their `spool_id` variable, and Klipper's `save_variables`.
+//!
+//! Behaviour follows viesturz/klipper-toolchanger `klipper/extras/toolchanger.py` at commit 94756df (read 2026-11-11);
+//! line numbers below refer to that file.
 
 use super::*;
-use crate::gcode::{ToolSelector, ToolchangerCommand};
+use crate::gcode::{ToolSelector, ToolchangerCommand, ToolchangerState};
+use crate::machine::InitializeOn;
 use std::collections::BTreeMap;
 
 /// Tool offsets of the first tools (`gcode_x_offset`, `gcode_y_offset`, `gcode_z_offset`); further tools have none.
@@ -26,7 +30,20 @@ enum Kind {
 pub(super) struct Toolchanger {
     kind: Kind,
     tool_count: usize,
+    /// The tool that is physically on the carriage (`detected_tool`; the fake has detection pins).
     mounted: Option<usize>,
+    /// The tool the plugin has selected (`active_tool`): none until it initialised, and again after any rejected
+    /// command (`_handle_command_error`, Z.219-223).
+    active: Option<usize>,
+    /// `toolchanger.status`; anything but `ready` makes the plugin refuse tool changes.
+    state: ToolchangerState,
+    /// `error_message` (Z.149, 477): empty until `process_error` ran, and never cleared afterwards.
+    error_message: String,
+    /// `require_tool_present` of the config: with it the plugin registers no `UNSELECT_TOOL`.
+    require_tool_present: bool,
+    initialize_on: InitializeOn,
+    /// `error_gcode: PAUSE` is configured.
+    error_gcode_pause: bool,
     /// Index of the extruder `toolhead.extruder` names; `UNSELECT_TOOL` leaves it as it was.
     active_extruder: usize,
     /// The heaters of `extruder1`, `extruder2`, ...
@@ -37,7 +54,9 @@ pub(super) struct Toolchanger {
 }
 
 impl Toolchanger {
-    pub(super) fn new(tool_count: usize) -> Self {
+    /// The plugin after the connect: `uninitialized` with no active tool (`_handle_connect`, Z.214-217).
+    pub(super) fn new(profile: &MachineProfile) -> Self {
+        let tool_count = profile.tools;
         let macro_variables = (0..tool_count)
             .map(|tool| {
                 let spool_id = START_SPOOL_IDS.get(tool).copied().flatten();
@@ -49,6 +68,12 @@ impl Toolchanger {
             kind: Kind::Viesturz,
             tool_count,
             mounted: Some(0),
+            active: None,
+            state: ToolchangerState::Uninitialized,
+            error_message: String::new(),
+            require_tool_present: profile.require_tool_present,
+            initialize_on: profile.initialize_on,
+            error_gcode_pause: profile.error_gcode_pause,
             active_extruder: 0,
             extra_extruders: vec![Heater::cold(); tool_count.saturating_sub(1)],
             macro_variables,
@@ -63,11 +88,107 @@ impl Toolchanger {
             kind: Kind::Afc,
             tool_count: head_count,
             mounted: None,
+            active: None,
+            state: ToolchangerState::Ready,
+            error_message: String::new(),
+            require_tool_present: false,
+            initialize_on: InitializeOn::FirstUse,
+            error_gcode_pause: false,
             active_extruder,
             extra_extruders: vec![Heater::cold(); head_count.saturating_sub(1)],
             macro_variables: BTreeMap::new(),
             saved_variables: Map::new(),
         }
+    }
+
+    /// The commands the plugin registers beside the tool macros; `UNSELECT_TOOL` only without `require_tool_present`
+    /// (viesturz `toolchanger.py`). Empty for AFC, which has none of them.
+    pub(super) fn plugin_commands(&self) -> Vec<&'static str> {
+        if self.kind == Kind::Afc {
+            return Vec::new();
+        }
+        let mut commands = vec!["SELECT_TOOL", "INITIALIZE_TOOLCHANGER", "SET_GCODE_VARIABLE", "SAVE_VARIABLE"];
+        if !self.require_tool_present {
+            commands.push("UNSELECT_TOOL");
+        }
+        commands
+    }
+
+    /// `initialize` (Z.368-404): the status becomes `ready` and the detected tool the active one. With
+    /// `require_tool_present` and no tool on the carriage it fails.
+    fn initialize(&mut self) -> Result<(), CommandError> {
+        self.active = self.mounted;
+        if let Some(tool) = self.mounted {
+            self.active_extruder = tool;
+        }
+        if self.require_tool_present && self.active.is_none() {
+            return Err(CommandError::new(
+                "toolchanger failed to initialize, require_tool_present set and no tool present after initialization",
+            ));
+        }
+        self.state = ToolchangerState::Ready;
+        Ok(())
+    }
+
+    /// `select_tool` (Z.406-427): `first-use` initialises first; the plugin changes tools only in the status `ready`.
+    /// `None` unselects.
+    fn select_tool(&mut self, tool: Option<usize>) -> Result<(), CommandError> {
+        if self.state == ToolchangerState::Uninitialized && self.initialize_on == InitializeOn::FirstUse {
+            self.initialize()?;
+        }
+        if self.state != ToolchangerState::Ready {
+            return Err(CommandError::new(format!(
+                "Cannot select tool, toolchanger status is {}, reason: {}",
+                self.state.as_str(),
+                self.error_message
+            )));
+        }
+        if self.active != tool {
+            self.mounted = tool;
+            self.active = tool;
+            if let Some(tool) = tool {
+                self.active_extruder = tool;
+            }
+        }
+        Ok(())
+    }
+
+    /// `_handle_home_rails_begin` (Z.210-212): with `initialize_on: home` the first homing initialises.
+    pub(super) fn initialize_on_home(&mut self) -> Result<(), CommandError> {
+        if self.kind == Kind::Viesturz
+            && self.initialize_on == InitializeOn::Home
+            && self.state == ToolchangerState::Uninitialized
+        {
+            self.initialize()?;
+        }
+        Ok(())
+    }
+
+    /// `_handle_command_error` (Z.219-223): any rejected G-code command resets the plugin.
+    pub(crate) fn note_command_error(&mut self) {
+        if self.kind == Kind::Viesturz {
+            self.state = ToolchangerState::Uninitialized;
+            self.active = None;
+        }
+    }
+
+    /// The state of the test hook `FAKE_TOOLCHANGER_STATE`. `error` is what `process_error` leaves (Z.475-503, message
+    /// of `validate_detected_tool`, Z.572-578: the active tool is expected, none detected).
+    fn force_state(&mut self, state: ToolchangerState) {
+        if state == ToolchangerState::Error {
+            let expected = self.active.or(self.mounted).map_or("None".to_owned(), tool_object_name);
+            self.error_message = format!("Expected tool {expected} but active is None");
+        }
+        if state == ToolchangerState::Uninitialized {
+            // The plugin is only ever `uninitialized` without an active tool (Z.214-217, 219-223).
+            self.active = None;
+        }
+        self.state = state;
+    }
+
+    /// Whether `process_error` runs `error_gcode: PAUSE` for an error that was just forced.
+    pub(super) fn pauses_on_error(&self) -> bool {
+        self.error_gcode_pause
     }
 
     pub(super) fn has_tool(&self, tool: usize) -> bool {
@@ -115,12 +236,28 @@ impl Toolchanger {
             return Ok(());
         }
         match command {
+            ToolchangerCommand::Initialize { recover } => {
+                // Z.266-273; `initialize` raises while changing, which the fake never rests in.
+                let was_error = self.state == ToolchangerState::Error;
+                self.initialize()?;
+                if was_error && recover && self.active.is_none() {
+                    return Err(CommandError::new("Cannot recover, no tool"));
+                }
+            }
+            ToolchangerCommand::FakeState(state) => self.force_state(state),
             ToolchangerCommand::SelectTool(selector) => {
                 let tool = self.resolve(&selector)?;
-                self.mounted = Some(tool);
-                self.active_extruder = tool;
+                self.select_tool(Some(tool))?;
             }
-            ToolchangerCommand::UnselectTool => self.mounted = None,
+            ToolchangerCommand::UnselectTool => {
+                if self.require_tool_present {
+                    return Err(CommandError::new("Unknown command:\"UNSELECT_TOOL\""));
+                }
+                // Without an active tool the command does nothing (Z.335-340); otherwise it is `select_tool(None)`.
+                if self.active.is_some() {
+                    self.select_tool(None)?;
+                }
+            }
             ToolchangerCommand::ActivateExtruder { extruder } => {
                 let names: Vec<String> = (0..self.tool_count).map(extruder_name).collect();
                 self.active_extruder =
@@ -191,15 +328,14 @@ impl Toolchanger {
     }
 
     fn toolchanger_json(&self) -> Value {
-        let tool = self.mounted.map(tool_object_name);
-        let number = self.mounted.map_or(-1, |tool| tool as i64);
+        let number_of = |tool: Option<usize>| tool.map_or(-1, |tool| tool as i64);
         json!({
             "name": "toolchanger",
-            "status": "ready",
-            "tool": tool,
-            "tool_number": number,
-            "detected_tool": tool,
-            "detected_tool_number": number,
+            "status": self.state.as_str(),
+            "tool": self.active.map(tool_object_name),
+            "tool_number": number_of(self.active),
+            "detected_tool": self.mounted.map(tool_object_name),
+            "detected_tool_number": number_of(self.mounted),
             "tool_numbers": (0..self.tool_count).collect::<Vec<_>>(),
             "tool_names": (0..self.tool_count).map(tool_object_name).collect::<Vec<_>>(),
             "has_detection": true,
@@ -218,7 +354,7 @@ impl Toolchanger {
             "heater": extruder_name(tool),
             "extruder_stepper": null,
             "fan": null,
-            "active": mounted,
+            "active": self.active == Some(tool),
             "gcode_x_offset": x,
             "gcode_y_offset": y,
             "gcode_z_offset": z,
@@ -228,6 +364,17 @@ impl Toolchanger {
     /// The configfile sections of the extra extruders and of the tool macros.
     pub(super) fn config_sections(&self) -> Map<String, Value> {
         let mut sections = Map::new();
+        if self.kind == Kind::Viesturz {
+            // `settings` lists the defaults too (`initialize_on` Z.109-110, `require_tool_present` Z.112).
+            let mut section = json!({
+                "initialize_on": self.initialize_on.as_str(),
+                "require_tool_present": self.require_tool_present,
+            });
+            if self.error_gcode_pause {
+                section["error_gcode"] = json!("PAUSE");
+            }
+            sections.insert("toolchanger".to_owned(), section);
+        }
         for (name, _) in self.extra_extruders() {
             sections.insert(name, extruder_config());
         }
@@ -308,11 +455,35 @@ impl Printer {
     }
 
     pub(super) fn apply_toolchanger(&mut self, command: ToolchangerCommand) -> Result<(), CommandError> {
+        let forces_error = matches!(command, ToolchangerCommand::FakeState(ToolchangerState::Error));
         // Without a tool changer these commands are unknown to Klipper and the fake ignores them.
+        let Some(toolchanger) = self.toolchanger.as_mut() else { return Ok(()) };
+        toolchanger.apply(command)?;
+        // `process_error` runs `error_gcode`, which is `PAUSE` in the example config (Z.481-493).
+        if forces_error && toolchanger.pauses_on_error() && self.print_state == PrintState::Printing {
+            self.pause_print()?;
+        }
+        Ok(())
+    }
+
+    /// Klipper's `gcode:command_error` event, which resets the tool changer plugin.
+    pub(crate) fn note_command_error(&mut self) {
+        if let Some(toolchanger) = self.toolchanger.as_mut() {
+            toolchanger.note_command_error();
+        }
+    }
+
+    /// `initialize_on: home`: the homing initialises the plugin first.
+    pub(super) fn initialize_toolchanger_on_home(&mut self) -> Result<(), CommandError> {
         match self.toolchanger.as_mut() {
-            Some(toolchanger) => toolchanger.apply(command),
+            Some(toolchanger) => toolchanger.initialize_on_home(),
             None => Ok(()),
         }
+    }
+
+    /// The commands of the tool changer plugin beside the tool macros; empty without one.
+    pub(crate) fn toolchanger_commands(&self) -> Vec<&'static str> {
+        self.toolchanger.as_ref().map(Toolchanger::plugin_commands).unwrap_or_default()
     }
 
     /// `T<n>` of the tool changer; `None` if the printer has none.

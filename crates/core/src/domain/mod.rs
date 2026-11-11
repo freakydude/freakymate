@@ -5,6 +5,8 @@ pub mod estimates;
 pub mod filament;
 pub mod filament_match;
 pub mod file_catalog;
+pub mod gate_pages;
+pub mod heads;
 pub mod job_end;
 pub mod light;
 pub mod machine_tree;

@@ -348,11 +348,18 @@ fn toolchanger_profile_lists_its_objects() {
 }
 
 #[test]
-fn toolchanger_starts_with_tool_0_mounted_and_known_spools() {
+fn toolchanger_starts_uninitialized_with_tool_0_on_the_carriage_and_known_spools() {
     let status = toolchanger_printer().status();
 
-    assert_eq!(status["toolchanger"]["tool"], "tool T0");
-    assert_eq!(status["toolchanger"]["tool_number"], 0);
+    // `_handle_connect`: status `uninitialized`, no active tool; the detection still sees T0.
+    assert_eq!(status["toolchanger"]["status"], "uninitialized");
+    assert_eq!(status["toolchanger"]["tool"], Value::Null);
+    assert_eq!(status["toolchanger"]["tool_number"], -1);
+    assert_eq!(status["toolchanger"]["detected_tool"], "tool T0");
+    assert_eq!(status["toolchanger"]["detected_tool_number"], 0);
+    assert_eq!(status["configfile"]["settings"]["toolchanger"]["initialize_on"], "first-use");
+    assert_eq!(status["configfile"]["settings"]["toolchanger"]["require_tool_present"], false);
+    assert!(status["configfile"]["settings"]["toolchanger"].get("error_gcode").is_none());
     assert_eq!(status["toolchanger"]["tool_names"], json!(["tool T0", "tool T1", "tool T2"]));
     assert_eq!(status["tool T0"]["detect_state"], "mounted");
     assert_eq!(status["tool T1"]["gcode_z_offset"], 0.3);
@@ -489,4 +496,160 @@ fn other_profiles_report_no_tool_changer_details() {
     assert!(status["toolhead"].get("extruder").is_none());
     assert!(status.get("extruder1").is_none());
     assert!(status.get("save_variables").is_none());
+}
+
+#[test]
+fn toolchanger_status_follows_the_fake_state_hook() {
+    let mut printer = toolchanger_printer();
+    assert_eq!(printer.status()["toolchanger"]["status"], "uninitialized");
+
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=ready").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["status"], "ready");
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=error").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["status"], "error");
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=uninitialized").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["status"], "uninitialized");
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=ready").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["status"], "ready");
+    assert!(run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=bogus").is_err());
+}
+
+#[test]
+fn first_use_initializes_on_the_first_tool_selection() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "T1").unwrap();
+
+    let status = printer.status();
+    assert_eq!(status["toolchanger"]["status"], "ready");
+    assert_eq!(status["toolchanger"]["tool_number"], 1);
+}
+
+#[test]
+fn an_error_refuses_tool_changes_with_its_reason_until_initialize_toolchanger_heals() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=ready\nT1\nFAKE_TOOLCHANGER_STATE STATE=error").unwrap();
+
+    let error = run(&mut printer, "T2").unwrap_err();
+
+    assert_eq!(
+        error.message(),
+        "Cannot select tool, toolchanger status is error, reason: Expected tool tool T1 but active is None"
+    );
+    // The rejected command reset the plugin (`gcode:command_error`); the reason stays.
+    assert_eq!(printer.status()["toolchanger"]["status"], "uninitialized");
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], -1);
+    // `first-use` initialises by itself at the next selection.
+    run(&mut printer, "T2").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 2);
+}
+
+#[test]
+fn any_rejected_command_resets_the_plugin() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "T1").unwrap();
+
+    assert!(run(&mut printer, "SET_HEATER_TEMPERATURE HEATER=nothing TARGET=1").is_err());
+
+    let status = printer.status();
+    assert_eq!(status["toolchanger"]["status"], "uninitialized");
+    assert_eq!(status["toolchanger"]["tool_number"], -1);
+    assert_eq!(status["toolchanger"]["detected_tool_number"], 1);
+}
+
+#[test]
+fn a_manual_changer_refuses_tool_changes_until_it_is_initialized() {
+    let mut printer = Printer::with_profile(
+        1.0,
+        MachineProfile { initialize_on: crate::machine::InitializeOn::Manual, ..MachineProfile::toolchanger() },
+    );
+
+    let error = run(&mut printer, "T1").unwrap_err();
+    assert_eq!(error.message(), "Cannot select tool, toolchanger status is uninitialized, reason: ");
+    run(&mut printer, "INITIALIZE_TOOLCHANGER").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 0);
+    run(&mut printer, "T1").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 1);
+}
+
+#[test]
+fn unselect_tool_without_an_active_tool_does_nothing() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "UNSELECT_TOOL").unwrap();
+
+    assert_eq!(printer.status()["toolchanger"]["status"], "uninitialized");
+}
+
+#[test]
+fn initialize_toolchanger_makes_the_detected_tool_active() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "INITIALIZE_TOOLCHANGER").unwrap();
+
+    let status = printer.status();
+    assert_eq!(status["toolchanger"]["status"], "ready");
+    assert_eq!(status["toolchanger"]["tool_number"], 0);
+}
+
+#[test]
+fn initialize_toolchanger_with_recover_heals_an_error() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=error\nINITIALIZE_TOOLCHANGER RECOVER=1").unwrap();
+
+    assert_eq!(printer.status()["toolchanger"]["status"], "ready");
+}
+
+#[test]
+fn recover_without_a_tool_fails() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "T1\nUNSELECT_TOOL\nFAKE_TOOLCHANGER_STATE STATE=error").unwrap();
+
+    let error = run(&mut printer, "INITIALIZE_TOOLCHANGER RECOVER=1").unwrap_err();
+
+    assert_eq!(error.message(), "Cannot recover, no tool");
+}
+
+#[test]
+fn an_error_pauses_a_running_print_only_with_error_gcode_pause() {
+    let file = Catalog::demo().find("benchy.gcode").unwrap().clone();
+    for (profile, expected) in
+        [(MachineProfile::toolchanger(), "printing"), (MachineProfile::toolchanger_required(), "paused")]
+    {
+        let mut printer = Printer::with_profile(1.0, profile);
+        printer.start_print(&file).unwrap();
+
+        run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=error").unwrap();
+
+        assert_eq!(printer.status()["print_stats"]["state"], expected);
+        assert_eq!(printer.status()["toolchanger"]["status"], "error");
+    }
+}
+
+#[test]
+fn require_tool_present_removes_unselect_tool() {
+    let mut printer = Printer::with_profile(1.0, MachineProfile::toolchanger_required());
+
+    let error = run(&mut printer, "UNSELECT_TOOL").unwrap_err();
+
+    assert_eq!(error.message(), "Unknown command:\"UNSELECT_TOOL\"");
+    run(&mut printer, "G28").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 0);
+    run(&mut printer, "T1").unwrap();
+}
+
+#[test]
+fn initialize_on_home_waits_for_the_homing() {
+    let mut printer = Printer::with_profile(1.0, MachineProfile::toolchanger_required());
+    let settings = printer.status()["configfile"]["settings"]["toolchanger"].clone();
+    assert_eq!(settings["initialize_on"], "home");
+    assert_eq!(settings["require_tool_present"], true);
+    assert_eq!(settings["error_gcode"], "PAUSE");
+
+    let error = run(&mut printer, "T1").unwrap_err();
+    assert_eq!(error.message(), "Cannot select tool, toolchanger status is uninitialized, reason: ");
+
+    run(&mut printer, "G28").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["status"], "ready");
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 0);
 }

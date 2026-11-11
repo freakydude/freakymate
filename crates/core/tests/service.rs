@@ -474,6 +474,11 @@ async fn a_layer_pause_pauses_and_the_history_tells_when_the_job_ended() {
     service.send(Command::PauseAtLayer { layer: offer.current_layer + 1 });
     let paused = wait_for(&mut channels, |snapshot| snapshot.status.job.state == PrintState::Paused).await;
     assert!(pause::interruption(&paused.status).is_some_and(|interruption| !interruption.failed));
+    service.send(Command::Home { x: true, y: true, z: true });
+    let refused = next_event(&mut channels, |event| matches!(event, Event::CommandFailed { .. })).await;
+    assert!(
+        matches!(refused, Event::CommandFailed { error, .. } if error.to_string().contains("resume from a wrong position"))
+    );
 
     service.send(Command::CancelPrint);
     let cancelled = wait_for(&mut channels, |snapshot| snapshot.status.job.state == PrintState::Cancelled).await;

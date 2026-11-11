@@ -1,0 +1,27 @@
+// Preview: Filament page of a tool changer with eight heads and no Happy Hare: the row of heads pages with chevrons, the fifth head (on the second page) is mounted.
+// Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component FilamentHeadsEightPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Printer.has-load-macro = true;
+        Printer.has-unload-macro = true;
+        Printer.has-spoolman = true;
+                Printer.heads = [
+            { name: "T0", label: "T0", has-nozzle: true, temperature: 215, mounted: false, lanes: 1, pick-up: "macro", pick-up-macro: "T0", has-spool: true, spool-title: "Red PLA", spool-material: "PLA", spool-weight: "812 g", spool-colors: { first: #e03131, count: 1 }, spool-id: 1, spool-tool: 0, can-pick-spool: true },
+            { name: "T1", label: "T1", has-nozzle: true, temperature: 24, mounted: false, lanes: 1, pick-up: "macro", pick-up-macro: "T1", spool-id: -1, spool-tool: 1 },
+            { name: "T2", label: "T2", has-nozzle: true, temperature: 24, mounted: false, lanes: 1, pick-up: "macro", pick-up-macro: "T2", spool-id: -1, spool-tool: 2 },
+            { name: "T3", label: "T3", has-nozzle: true, temperature: 24, mounted: false, lanes: 1, pick-up: "macro", pick-up-macro: "T3", spool-id: -1, spool-tool: 3 },
+            { name: "T4", label: "T4", has-nozzle: true, temperature: 24, mounted: true, detected: true, lanes: 1, pick-up: "macro", pick-up-macro: "T4", spool-id: -1, spool-tool: 4 },
+            { name: "T5", label: "T5", has-nozzle: true, temperature: 24, mounted: false, lanes: 1, pick-up: "macro", pick-up-macro: "T5", spool-id: -1, spool-tool: 5 },
+            { name: "T6", label: "T6", has-nozzle: true, temperature: 24, mounted: false, lanes: 1, pick-up: "macro", pick-up-macro: "T6", spool-id: -1, spool-tool: 6 },
+            { name: "T7", label: "T7", has-nozzle: true, temperature: 24, mounted: false, lanes: 1, pick-up: "macro", pick-up-macro: "T7", spool-id: -1, spool-tool: 7 },
+        ];
+        Printer.mounted-head = 4;
+        Navigation.page = Page.filament;
+    }
+}

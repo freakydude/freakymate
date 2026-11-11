@@ -114,10 +114,35 @@ pub enum ToolSelector {
     Name(String),
 }
 
+/// `toolchanger.status` of klipper-toolchanger (viesturz `klipper/extras/toolchanger.py`, `STATUS_*`). The plugin also
+/// knows `initializing` and `changing`; the fake never rests in them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolchangerState {
+    Uninitialized,
+    Ready,
+    Error,
+}
+
+impl ToolchangerState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Uninitialized => "uninitialized",
+            Self::Ready => "ready",
+            Self::Error => "error",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ToolchangerCommand {
     SelectTool(ToolSelector),
     UnselectTool,
+    /// `INITIALIZE_TOOLCHANGER [RECOVER=1]`; the fake treats both alike.
+    Initialize {
+        recover: bool,
+    },
+    /// `FAKE_TOOLCHANGER_STATE STATE=...`: test hook of the fake, not in the plugin.
+    FakeState(ToolchangerState),
     ActivateExtruder {
         extruder: String,
     },

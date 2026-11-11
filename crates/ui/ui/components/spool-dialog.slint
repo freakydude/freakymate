@@ -28,7 +28,7 @@ export component SpoolDialog inherits Scrim {
             padding: Theme.dialog-padding;
             spacing: Theme.spacing;
             DialogHeader {
-                title: SpoolPicker.gate >= 0 ? @tr("Spool for gate {}", SpoolPicker.gate) : @tr("Spool in use");
+                title: SpoolPicker.gate >= 0 ? @tr("Spool for gate {}", SpoolPicker.gate) : SpoolPicker.target != "" ? @tr("Spool for {}", SpoolPicker.target) : @tr("Spool in use");
                 close => { SpoolPicker.open = false; }
                 if Printer.spoolman-offline: IconLabel {
                     icon: Icons.ui-warning;

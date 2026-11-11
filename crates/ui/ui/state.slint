@@ -2,10 +2,10 @@
 
 import { Icons } from "icons.slint";
 import { Theme } from "theme.slint";
-import { Severity, Page, HeaterItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 import { Actions } from "actions.slint";
 
-export { Severity, Page, HeaterItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 export { Actions } from "actions.slint";
 
 
@@ -78,6 +78,23 @@ export global Printer {
     // Temperatures and fans
     in property <[HeaterItem]> heaters;
     in property <[SensorItem]> sensors;
+    // The swappable heads of a tool changer for the Filament page; empty without them (then the page shows no head level).
+    in property <[HeadItem]> heads;
+    // The row of the mounted head in `heads`, -1 while none is mounted.
+    in property <int> mounted-head: -1;
+    // The deviation of the tool changer worth a line: "" | "uninitialized" | "error" | "mismatch" (`changer-selected`
+    // and `changer-detected` name the heads of a mismatch).
+    in property <string> changer-note;
+    in property <string> changer-selected;
+    in property <string> changer-detected;
+    // The changer can change heads now (`ready`).
+    in property <bool> changer-ready: true;
+    // The mounted head can be dropped (`UNSELECT_TOOL` exists).
+    in property <bool> has-drop;
+    // The name of the head whose nozzle the status bar shows (`T1`); empty without swappable heads.
+    in property <string> nozzle-head;
+    // False while the printer has heads but none is mounted: no nozzle to show.
+    in property <bool> nozzle-selected: true;
     in property <float> nozzle-temperature;
     in property <float> nozzle-target;
     in property <bool> has-bed;
@@ -115,6 +132,10 @@ export global Printer {
     in property <bool> has-mmu;
     in property <bool> mmu-unsupported;
     in property <[MmuGateItem]> mmu-gates;
+    // The pages of the Gates tab, all views one after the other; `mmu-page-ranges` says which belong to a view: one
+    // range per head (a row of `heads`), a single one without heads.
+    in property <[MmuGatePage]> mmu-pages;
+    in property <[MmuPageRange]> mmu-page-ranges;
     in property <[MmuSensorItem]> mmu-sensors;
     // loaded | unloaded | unknown
     in property <string> mmu-filament;
@@ -209,6 +230,8 @@ export global Printer {
     in property <int> spool-id: -1;
     // The tool macro that keeps the spool in use (tool changer), -1 when none does.
     in property <int> spool-tool: -1;
+    // The head or AFC lane that keeps the spool in use, for the picker title; empty when none is named.
+    in property <string> spool-target;
     in property <string> spool-title;
     in property <string> spool-material;
     // What is left of the spool, for example "613 g".
@@ -258,6 +281,9 @@ export global Printer {
     out property <bool> is-printing: print-state == "printing" || print-state == "paused";
     // Moving and extruding are allowed while paused, e.g. to change the filament; a running print locks them.
     out property <bool> motion-locked: print-state == "printing";
+    // Homing, leveling, calibrating and motors off would change the position a paused print resumes from; the core
+    // refuses them for the whole print (`Command::loses_print_position`).
+    out property <bool> position-locked: is-printing;
     // Moonraker's update manager looks for or installs updates, from here or another client.
     in property <bool> updates-busy;
     // Restarts, reboots and updates would abort a print or a running command (idle_timeout "Printing"), or an update
@@ -351,18 +377,22 @@ export global SpoolPicker {
     in-out property <int> current: -1;
     // The tool macro of a tool changer head to assign a spool to, -1 for none (a gate or the active spool).
     in-out property <int> tool: -1;
+    // What the tool belongs to (a head such as `T1`, an AFC lane), for the title; empty for none.
+    in-out property <string> target;
 
     public function show(gate: int, current: int) {
         self.gate = gate;
         self.tool = -1;
+        self.target = "";
         self.current = current;
         self.open = true;
         Actions.load-spools();
     }
 
-    public function show-tool(tool: int, current: int) {
+    public function show-tool(tool: int, current: int, target: string) {
         self.gate = -1;
         self.tool = tool;
+        self.target = target;
         self.current = current;
         self.open = true;
         Actions.load-spools();
@@ -371,7 +401,7 @@ export global SpoolPicker {
     // The spool in use: that of its tool macro when it has one, else the active spool.
     public function show-in-use() {
         if (Printer.spool-tool >= 0) {
-            self.show-tool(Printer.spool-tool, Printer.spool-id);
+            self.show-tool(Printer.spool-tool, Printer.spool-id, Printer.spool-target);
         } else {
             self.show(-1, Printer.spool-id);
         }
@@ -409,8 +439,10 @@ export global Navigation {
     out property <bool> messages-open;
     // Filament page; with an MMU it opens on the Gates tab.
     in-out property <FilamentTab> filament-tab;
-    // Page of gate tiles the Gates tab shows, counted from 0.
-    in-out property <int> mmu-page;
+    // The head the Filament page shows, a row of `Printer.heads`; -1 follows the mounted head.
+    in-out property <int> filament-head: -1;
+    // Page of gate tiles the Gates tab shows, counted from 0 within its view; -1 opens on the unit of the loaded gate.
+    in-out property <int> mmu-page: -1;
     in-out property <HeatTab> heat-tab;
     // The navigation rail opens the basics.
     in-out property <TuneTab> tune-tab;
@@ -489,6 +521,7 @@ export global Confirm {
         if (self.action == "cancel-print") { Actions.cancel-print(); }
         if (self.action == "emergency-stop") { Actions.emergency-stop(); }
         if (self.action == "run-macro") { Actions.run-macro(self.argument); }
+        if (self.action == "recover-toolchanger") { Actions.initialize-toolchanger(true); }
         if (self.action == "mmu-eject") { Actions.mmu-eject(self.argument.to-float()); }
         if (self.action == "mmu-motors-off") { Actions.mmu-motors-off(); }
         if (self.action == "mmu-check-gate") { Actions.mmu-check-gate(self.argument.to-float()); }

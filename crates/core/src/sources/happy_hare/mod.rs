@@ -111,6 +111,16 @@ pub struct MmuUnit {
     pub num_gates: usize,
     /// The Klipper extruder the unit feeds (`extruder_name` of its section, `extruder` by default).
     pub extruder: String,
+    /// The unit has the bypass (`mmu_machine.unit_<n>.has_bypass`; `mmu_unit.py` `has_bypass()`, and `mmu_machine.py`
+    /// `unit_with_bypass` allows only one unit per machine).
+    pub has_bypass: bool,
+}
+
+impl MmuStatus {
+    /// Position in `units` of the unit that has the bypass; `None` if the units do not say (Happy Hare before 4).
+    pub fn bypass_unit(&self) -> Option<usize> {
+        self.units.iter().position(|unit| unit.has_bypass)
+    }
 }
 
 impl MmuUnit {
@@ -135,6 +145,7 @@ fn read_units(machine: &Value, num_units: usize, settings: &Value) -> Vec<MmuUni
                 first_gate: count(unit, "first_gate")?,
                 num_gates: count(unit, "num_gates")?,
                 extruder: extruder.unwrap_or(NOZZLE_HEATER).to_owned(),
+                has_bypass: flag(unit, "has_bypass"),
             })
         })
         .collect()
@@ -299,6 +310,20 @@ mod tests {
             units.iter().map(|unit| (unit.display_name.as_str(), unit.extruder.as_str())).collect::<Vec<_>>(),
             [("ERCF", "extruder"), ("Tradrack", "extruder1")]
         );
+    }
+
+    #[test]
+    fn the_bypass_belongs_to_the_unit_that_reports_it() {
+        let machine = json!({
+            "num_units": 2,
+            "unit_0": { "name": "ercf", "first_gate": 0, "num_gates": 4, "has_bypass": false },
+            "unit_1": { "name": "tradrack", "first_gate": 4, "num_gates": 4, "has_bypass": true },
+        });
+        let units = read_units(&machine, 2, &Value::Null);
+        let status = MmuStatus { units, ..MmuStatus::default() };
+
+        assert_eq!(status.bypass_unit(), Some(1));
+        assert_eq!(MmuStatus::default().bypass_unit(), None);
     }
 
     /// `mmu` and `mmu_machine` of a real single-gate machine with a proportional buffer and no encoder (Happy Hare 4.1.0).

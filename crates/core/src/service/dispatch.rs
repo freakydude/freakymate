@@ -20,6 +20,10 @@ impl Session<'_> {
             self.outputs.event(Event::CommandFailed { command, error: CommandError::PrintMovesMachine });
             return;
         }
+        if command.loses_print_position() && status.print_running() {
+            self.outputs.event(Event::CommandFailed { command, error: CommandError::PrintNeedsPosition });
+            return;
+        }
         let commands = match command.clone().resolve(&self.sources, &status) {
             Ok(commands) => commands,
             Err(error) => {

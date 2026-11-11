@@ -4,7 +4,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, MmuDialogs, MmuGateItem, Navigation, Printer } from "../state.slint";
+import { Actions, MmuDialogs, MmuGateItem, MmuGatePage, MmuPageRange, Navigation, Printer } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
 import { ButtonKind, Card, IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
 import { FilamentColors, FilamentSwatch } from "../components/filament-swatch.slint";
@@ -33,21 +33,46 @@ component MmuRecoverRow inherits HorizontalLayout {
 // moves anything. Loading belongs to a gate (its dialog); unloading takes out whatever is loaded, so it sits at the
 // filament path. The tools are on the Tools tab, the commands for the MMU as a whole on the Service tab.
 export component MmuGatesTab inherits Rectangle {
-    // The bypass is one more slot after the last gate.
-    property <int> bypass-slot: Printer.mmu-gates.length;
+    // Under the head tabs and their path tabs the page has 64 px less: smaller tiles, the path card without its heading.
+    in property <bool> compact;
+    // The head whose gates the tab shows, a row of `Printer.heads`; -1 without a head level (all gates).
+    in property <int> head-index: -1;
+    // The pages of this view: one unit at a time, five tiles at most (the split is made in the core, `gate_pages.rs`).
+    property <MmuPageRange> range: Printer.mmu-page-ranges[max(0, root.head-index)];
+    property <int> pages: root.range.count;
+    // Until a chevron is used the tab opens on the unit of the loaded gate.
+    property <int> page: max(0, min(Navigation.mmu-page < 0 ? root.range.start : Navigation.mmu-page, root.pages - 1));
+    property <MmuGatePage> current: Printer.mmu-pages[root.range.first + root.page];
+    // With several units a caption names the unit, its head and the gates; one unit or none has no caption.
+    property <bool> captioned: root.current.unit != "";
     property <int> slots-per-page: 5;
-    property <int> pages: max(1, ceil((root.bypass-slot + 1) / root.slots-per-page));
-    property <int> page: min(Navigation.mmu-page, root.pages - 1);
-    property <int> first: root.page * root.slots-per-page;
     property <bool> needs-recovery: Printer.mmu-paused || Printer.mmu-locked;
 
     VerticalLayout {
         padding: Theme.padding;
         spacing: Theme.spacing;
 
+        if root.captioned: HorizontalLayout {
+            spacing: Theme.spacing;
+            Text {
+                text: root.current.head != "" ? @tr("{} · on {}", root.current.unit, root.current.head) : root.current.unit;
+                color: Theme.foreground;
+                font-size: Theme.font-normal;
+                font-weight: 700;
+                overflow: elide;
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Text {
+                text: root.current.first-gate < 0 ? "" : root.current.first-gate == root.current.last-gate ? @tr("Gate {}", root.current.first-gate) : @tr("Gates {}–{}", root.current.first-gate, root.current.last-gate);
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                vertical-alignment: center;
+            }
+        }
+
         HorizontalLayout {
             spacing: Theme.spacing;
-            height: 150px;
+            height: root.compact ? 128px : 150px;
             if root.pages > 1: IconButton {
                 width: 48px;
                 icon: Icons.ui-chevron-left;
@@ -57,16 +82,15 @@ export component MmuGatesTab inherits Rectangle {
             tiles := Rectangle {
                 horizontal-stretch: 1;
                 property <length> cell-width: (self.width - (root.slots-per-page - 1) * Theme.spacing) / root.slots-per-page;
-                for item[row] in Printer.mmu-gates: GateTile {
-                    visible: row >= root.first && row < root.first + root.slots-per-page;
-                    x: mod(row, root.slots-per-page) * (tiles.cell-width + Theme.spacing);
+                for slot in root.current.count: GateTile {
+                    x: slot * (tiles.cell-width + Theme.spacing);
                     width: tiles.cell-width;
                     height: tiles.height;
-                    gate: item;
-                    clicked => { MmuDialogs.gate-row = row; }
+                    gate: Printer.mmu-gates[root.current.first-row + slot];
+                    clicked => { MmuDialogs.gate-row = root.current.first-row + slot; }
                 }
-                if root.bypass-slot >= root.first && root.bypass-slot < root.first + root.slots-per-page: BypassTile {
-                    x: mod(root.bypass-slot, root.slots-per-page) * (tiles.cell-width + Theme.spacing);
+                if root.current.bypass: BypassTile {
+                    x: root.current.count * (tiles.cell-width + Theme.spacing);
                     width: tiles.cell-width;
                     height: tiles.height;
                     clicked => { MmuDialogs.bypass-open = true; }
@@ -81,7 +105,7 @@ export component MmuGatesTab inherits Rectangle {
         }
 
         Card {
-            title: @tr("Filament path");
+            title: root.compact ? "" : @tr("Filament path");
             icon: Icons.filament-sensor;
             HorizontalLayout {
                 spacing: Theme.spacing;

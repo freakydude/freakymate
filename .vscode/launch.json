@@ -153,6 +153,15 @@
         "args": ["build", "-p", "fake-moonraker"]
       },
       "args": ["--port", "7125", "--time-scale", "10", "--profile", "afc-toolchanger"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: fake-moonraker (Tool changer, UNSELECT_TOOL absent)",
+      "cargo": {
+        "args": ["build", "-p", "fake-moonraker"]
+      },
+      "args": ["--port", "7125", "--time-scale", "10", "--profile", "toolchanger-required"]
     }
   ]
 }

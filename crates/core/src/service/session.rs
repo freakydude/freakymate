@@ -379,7 +379,10 @@ impl<'a> Session<'a> {
         self.log_detected(&sources, &result).await;
         self.wled = self.fetch_wled().await;
         sources.wled_strips = self.wled.iter().map(WledStrip::object).collect();
-        sources.klipper.tool_commands = self.fetch_tool_commands().await;
+        if let Some(help) = self.fetch_help().await {
+            sources.klipper.tool_commands = Some(klipper::tool_commands(&help));
+            sources.klipper.has_unselect_tool = klipper::lists_command(&help, "UNSELECT_TOOL");
+        }
         self.sources = sources;
         self.store.replace(result.get("status").unwrap_or(&Value::Null));
         // After a restart the configuration or the hardware may have changed: what was learned about the fans is gone.
@@ -401,10 +404,9 @@ impl<'a> Session<'a> {
         log_fact("Detected", &sources.summary());
     }
 
-    /// The `T<n>` commands Klipper knows, from its command list; `None` when it cannot be asked.
-    async fn fetch_tool_commands(&self) -> Option<Vec<usize>> {
-        let help = self.connection.call("printer.gcode.help", None).await.ok()?;
-        Some(klipper::tool_commands(&help))
+    /// Klipper's command list; `None` when it cannot be asked.
+    async fn fetch_help(&self) -> Option<Value> {
+        self.connection.call("printer.gcode.help", None).await.ok()
     }
 
     /// Moonraker's WLED strips; none without its `wled` component or when it cannot be asked.

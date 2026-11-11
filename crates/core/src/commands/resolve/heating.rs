@@ -1,8 +1,9 @@
 //! Heater targets and the tuning values.
 
 use crate::commands::{Command, CommandError};
+use crate::domain::machine_tree::MachineTree;
 use crate::sources::klipper::tuning::TuningKey;
-use crate::sources::klipper::{Setup, BED_HEATER, NOZZLE_HEATER};
+use crate::sources::klipper::{Setup, BED_HEATER};
 use crate::sources::PrinterStatus;
 
 /// A heater target; never below zero, which is off.
@@ -10,9 +11,11 @@ pub(super) fn target(heater: &str, target: f64) -> Command {
     Command::SetHeaterTarget { heater: heater.to_owned(), target: target.max(0.0) }
 }
 
-/// Heats the nozzle and, if there is one, the bed.
+/// Heats the nozzle in use (that of the mounted head; with no head mounted none) and, if there is one, the bed.
 pub(super) fn preset(status: &PrinterStatus, extruder: f64, bed: f64) -> Vec<Command> {
-    let mut commands = vec![target(NOZZLE_HEATER, extruder)];
+    let tree = MachineTree::build(status);
+    let mut commands: Vec<Command> =
+        tree.selected_extruder().map(|nozzle| target(nozzle, extruder)).into_iter().collect();
     if status.heater(BED_HEATER).is_some() {
         commands.push(target(BED_HEATER, bed));
     }

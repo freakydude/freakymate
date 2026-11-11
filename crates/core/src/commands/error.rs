@@ -42,6 +42,8 @@ pub enum CommandError {
     PrintMovesMachine,
     #[error("not possible while a print is running")]
     PrintRunning,
+    #[error("not possible during a print, also when paused: the print would resume from a wrong position")]
+    PrintNeedsPosition,
     #[error("connection to Moonraker closed")]
     ConnectionClosed,
     #[error("not connected to Moonraker")]

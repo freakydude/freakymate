@@ -265,21 +265,26 @@ const HELP_TEXT: &str = "Available commands:\n\
 fn run_script(backend: &Backend, params: &Value) -> Result<(Value, Duration), RpcError> {
     let script = required_str(params, "script")?;
     backend.record_command(script);
-    let outcome = gcode::parse_script(script).and_then(|commands| {
-        let help = commands.contains(&gcode::Command::Help);
-        let dwell = commands
-            .iter()
-            .map(|command| match command {
-                gcode::Command::Dwell(duration) => *duration,
-                _ => Duration::ZERO,
-            })
-            .sum();
-        backend.with_printer(|printer| commands.into_iter().try_for_each(|command| printer.apply(command)))?;
-        if help {
-            backend.respond(HELP_TEXT);
-        }
-        Ok(dwell)
-    });
+    let outcome = gcode::parse_script(script)
+        .inspect_err(|_| {
+            // A script that does not parse is a rejected command as well (`gcode:command_error`).
+            backend.with_printer(|printer| printer.note_command_error());
+        })
+        .and_then(|commands| {
+            let help = commands.contains(&gcode::Command::Help);
+            let dwell = commands
+                .iter()
+                .map(|command| match command {
+                    gcode::Command::Dwell(duration) => *duration,
+                    _ => Duration::ZERO,
+                })
+                .sum();
+            backend.with_printer(|printer| commands.into_iter().try_for_each(|command| printer.apply(command)))?;
+            if help {
+                backend.respond(HELP_TEXT);
+            }
+            Ok(dwell)
+        });
     if let Err(error) = &outcome {
         backend.respond(&format!("!! {}", error.message()));
     }
@@ -354,9 +359,6 @@ fn printer_info(backend: &Backend) -> Value {
     })
 }
 
-/// Commands the tool changer profile adds beside the tool macros `T<n>`.
-const TOOLCHANGER_COMMANDS: [&str; 4] = ["SELECT_TOOL", "UNSELECT_TOOL", "SET_GCODE_VARIABLE", "SAVE_VARIABLE"];
-
 /// Commands AFC registers for its lanes (the `T<n>` of the lanes come from `AFC.maps`).
 const AFC_COMMANDS: [&str; 8] =
     ["CHANGE_TOOL", "TOOL_LOAD", "TOOL_UNLOAD", "LANE_UNLOAD", "SET_SPOOL_ID", "SET_COLOR", "SET_MATERIAL", "SET_MAP"];
@@ -372,10 +374,8 @@ fn gcode_help(backend: &Backend) -> Value {
     for name in macros.filter_map(|key| key.strip_prefix("gcode_macro ")) {
         help.insert(name.to_ascii_uppercase(), json!("G-Code macro"));
     }
-    if status.get("toolchanger").is_some() {
-        for command in TOOLCHANGER_COMMANDS {
-            help.insert(command.to_owned(), json!("Klipper command"));
-        }
+    for command in backend.with_printer(|printer| printer.toolchanger_commands()) {
+        help.insert(command.to_owned(), json!("Klipper command"));
     }
     let gates = status.pointer("/mmu/num_gates").and_then(Value::as_u64).unwrap_or(0);
     for tool in 0..gates {
@@ -625,6 +625,22 @@ mod tests {
 
         for command in ["T0", "T1", "T2", "SELECT_TOOL", "UNSELECT_TOOL", "SET_GCODE_VARIABLE", "SAVE_VARIABLE"] {
             assert!(reply["result"].get(command).is_some(), "missing {command}");
+        }
+    }
+
+    #[test]
+    fn toolchanger_profiles_list_initialize_and_unselect_by_require_tool_present() {
+        for (profile, has_unselect) in
+            [(MachineProfile::toolchanger(), true), (MachineProfile::toolchanger_required(), false)]
+        {
+            let backend = Backend::with_profile(1.0, profile);
+            let mut session = Session::new(1);
+
+            let reply = exchange(&mut session, &backend, call("printer.gcode.help", json!({})));
+
+            assert!(reply["result"].get("INITIALIZE_TOOLCHANGER").is_some());
+            assert!(reply["result"].get("SELECT_TOOL").is_some());
+            assert_eq!(reply["result"].get("UNSELECT_TOOL").is_some(), has_unselect);
         }
     }
 

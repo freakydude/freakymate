@@ -275,7 +275,7 @@ impl Printer {
                 (None, gates) => gates.map(|gates| HappyHare::new(gates, profile.spoolman)),
             },
             toolchanger: if profile.tools > 0 {
-                Some(toolchanger::Toolchanger::new(profile.tools))
+                Some(toolchanger::Toolchanger::new(&profile))
             } else {
                 afc.as_ref()
                     .filter(|afc| afc.is_toolchanger())
@@ -416,11 +416,23 @@ impl Printer {
         }
     }
 
+    /// Runs one command; a rejected command reaches the tool changer plugin as Klipper's `gcode:command_error` event.
     pub fn apply(&mut self, command: Command) -> Result<(), CommandError> {
+        let result = self.apply_command(command);
+        if result.is_err() {
+            self.note_command_error();
+        }
+        result
+    }
+
+    fn apply_command(&mut self, command: Command) -> Result<(), CommandError> {
         self.ensure_running()?;
         self.inactive_seconds = 0.0;
         match command {
-            Command::Home(axes) => self.home(&axes),
+            Command::Home(axes) => {
+                self.initialize_toolchanger_on_home()?;
+                self.home(&axes)
+            }
             Command::SetExtruderTarget { tool, target } => {
                 self.extruder_of_tool_mut(tool)?.set_target(target, MAX_EXTRUDER_TARGET)?
             }
