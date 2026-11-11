@@ -1,6 +1,6 @@
 //! Lanes and the load path (package D2): the lanes of AFC as tiles with their dialog, the load path card for the lane
 //! loaded and the one tapped last, the head's part of the path on the Extruder view of a tool changer, and the sensors
-//! of the machine on System where there are several heads. Runs on the profiles `afc`, `toolchanger-mmu` and
+//! of the machine on the Sensors tab where there are several heads. Runs on the profiles `afc`, `toolchanger-mmu` and
 //! `toolchanger`; what a profile does not have is skipped.
 
 use crate::session::Session;
@@ -116,15 +116,17 @@ fn units_on_heads(session: &mut Session) -> Result<(), String> {
     Ok(())
 }
 
-/// A tool changer without lanes: the head's part of the path on its Extruder view, the machine's sensors on System.
+/// A tool changer without lanes: the head's part of the path on its Extruder view, the machine's sensors on the Sensors tab.
 fn head_without_lanes(session: &mut Session) -> Result<(), String> {
     session.window.global::<Navigation>().set_filament_head(1);
     session.window.global::<Navigation>().set_filament_tab(FilamentTab::Extruder);
     session.show_page(Page::Filament, "lanes-head-extruder")?;
-    session.window.global::<Navigation>().set_filament_head(-1);
-    session.show_page(Page::System, "lanes-system")?;
     if session.window.global::<Printer>().get_filament_sensors().row_count() == 0 {
-        return Err("the machine should have filament sensors for the System page".into());
+        return Err("the machine should have filament sensors for the Sensors tab".into());
     }
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Sensors);
+    session.show_page(Page::Filament, "lanes-sensors")?;
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Extruder);
+    session.window.global::<Navigation>().set_filament_head(-1);
     Ok(())
 }

@@ -386,16 +386,15 @@ impl Presenter {
     /// The filament: sensors, the MMU, the job's file compared with it and the spool in use.
     fn show_filament(&self, printer: &Printer, snapshot: &Snapshot, lanes: &[Lane], active_spool: Option<&Spool>) {
         let status = &snapshot.status;
-        replace_rows(
-            &self.filament_sensors,
-            filament::printer_sensors(status)
-                .map(|sensor| FilamentSensorItem {
-                    label: sensor.label.as_str().into(),
-                    enabled: sensor.enabled,
-                    detected: sensor.detected,
-                })
-                .collect(),
-        );
+        let sensors: Vec<FilamentSensorItem> = filament::printer_sensors(status)
+            .map(|sensor| FilamentSensorItem {
+                label: sensor.label.as_str().into(),
+                enabled: sensor.enabled,
+                detected: sensor.detected,
+            })
+            .collect();
+        printer.set_filament_sensor_runout(sensors.iter().any(|sensor| sensor.enabled && !sensor.detected));
+        replace_rows(&self.filament_sensors, sensors);
         self.cache.borrow_mut().prepared.follow_job(&status.job);
         self.show_job_matches(printer, snapshot, lanes);
         let spoolman = {

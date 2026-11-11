@@ -194,15 +194,18 @@ export component FilamentText inherits VerticalLayout {
     in property <string> trail;
     in property <bool> trail-warn;
     in property <string> extra;
+    // A long text (a hint instead of a material) is cut to the room there is; a material keeps its width.
+    in property <bool> material-elide;
 
     alignment: center;
     spacing: 1px;
     Text {
-        min-width: self.preferred-width;
+        min-width: root.material-elide ? 0px : self.preferred-width;
         text: root.material;
         color: root.material-color;
         font-size: Theme.font-normal;
         font-weight: 700;
+        overflow: elide;
     }
     // The name takes what the fixed parts leave and no more, so the weight follows it right away.
     if root.lead != "" || root.name != "" || root.trail != "" || root.extra != "": HorizontalLayout {

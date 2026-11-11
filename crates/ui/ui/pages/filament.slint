@@ -185,6 +185,26 @@ component ExtruderTab inherits Rectangle {
     }
 }
 
+// The filament sensors of the machine with several heads: they are not at one extruder, so they have a tab of their own.
+component SensorsTab inherits VerticalLayout {
+    padding: Theme.padding;
+    Card {
+        vertical-stretch: 0;
+        title: @tr("Filament sensors");
+        icon: Icons.filament-sensor;
+        VerticalLayout {
+            spacing: Theme.spacing;
+            FilamentSensorGrid { }
+            Text {
+                text: @tr("Not tied to a head");
+                color: Theme.muted;
+                font-size: Theme.font-small;
+            }
+        }
+    }
+    Rectangle { vertical-stretch: 1; }
+}
+
 // With Happy Hare or AFC the gates (lanes) come first, then the extruder by hand, the tools with EndlessSpool and the service
 // commands of the MMU (AFC has the first two tabs only); without either the extruder alone. The dialogs of a gate, the bypass and a tool cover the whole
 // page. A tool changer adds the head level on top: a tab per head, the path tabs below the chosen head, and the tabs
@@ -195,9 +215,9 @@ export component FilamentPage inherits Rectangle {
     // Gates only where the head has several lanes.
     property <bool> path-tabs: root.has-heads && Printer.heads[root.head-index].lanes > 1;
     property <FilamentTab> raw-tab: Navigation.filament-tab;
-    property <bool> machine-tab: root.raw-tab == FilamentTab.tools || root.raw-tab == FilamentTab.service;
+    property <bool> machine-tab: root.raw-tab == FilamentTab.tools || root.raw-tab == FilamentTab.service || root.raw-tab == FilamentTab.sensors;
     property <FilamentTab> tab: root.has-heads
-        ? (root.machine-tab && Printer.has-mmu ? root.raw-tab : root.path-tabs && !root.machine-tab ? root.raw-tab : root.path-tabs ? FilamentTab.gates : FilamentTab.extruder)
+        ? (root.raw-tab == FilamentTab.sensors && Printer.filament-sensors.length > 0 ? FilamentTab.sensors : root.machine-tab && Printer.has-mmu && root.raw-tab != FilamentTab.sensors ? root.raw-tab : root.path-tabs && !root.machine-tab ? root.raw-tab : root.path-tabs ? FilamentTab.gates : FilamentTab.extruder)
         : Printer.has-mmu ? root.raw-tab : Printer.has-lanes ? (root.machine-tab ? FilamentTab.gates : root.raw-tab) : FilamentTab.extruder;
 
     VerticalLayout {
@@ -247,6 +267,9 @@ export component FilamentPage inherits Rectangle {
         }
         if root.tab == FilamentTab.extruder: ExtruderTab {
             head-index: root.has-heads ? root.head-index : -1;
+            vertical-stretch: 1;
+        }
+        if root.tab == FilamentTab.sensors: SensorsTab {
             vertical-stretch: 1;
         }
         if root.tab == FilamentTab.tools: MmuToolsTab {

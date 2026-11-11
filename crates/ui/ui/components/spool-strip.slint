@@ -35,7 +35,9 @@ export component SpoolStrip inherits Rectangle {
         VerticalLayout {
             alignment: center;
             horizontal-stretch: 1;
+            min-width: 0px;
             Text {
+                min-width: 0px;
                 text: root.has-spool ? (root.for-head ? root.head.spool-title : Printer.spool-title) : @tr("No spool selected");
                 color: root.has-spool ? Theme.foreground : Theme.muted;
                 font-size: Theme.font-normal;

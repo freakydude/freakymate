@@ -1,0 +1,32 @@
+// Preview: print page with a prepared file and Spoolman, but no spool selected: the hint must stay inside its column.
+// Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintPreparedNoSpoolPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.print;
+        Printer.prepared-path = "calibration_cube_with_a_rather_long_name_v2.gcode";
+        Printer.prepared = {
+            path: "calibration_cube_with_a_rather_long_name_v2.gcode",
+            name: "calibration_cube_with_a_rather_long_name_v2",
+            material: "PLA",
+            weight: "52 g",
+            nozzle: "0.4",
+            time: "2h 07m",
+            extruder-temperature: "215°",
+            bed-temperature: "60°",
+            chamber-temperature: "45°",
+            show-thumbnail: true,
+        };
+        Printer.prepared-tools = [{
+            tool: 0, gate: -1, used: true, wanted-colors: { first: #e8590c, count: 1 }, wanted-material: "PLA",
+            wanted-weight: "~52 g", needed-weight: "~52 g", wanted-profile: "Generic PLA @Voron 2.4", verdict: "",
+        }];
+        Printer.has-spoolman = true;
+        Printer.has-spool = false;
+    }
+}

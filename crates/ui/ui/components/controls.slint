@@ -226,6 +226,8 @@ export component TabButton inherits Rectangle {
     in property <bool> enabled: true;
     // Waiting items (updates), as a small badge after the text.
     in property <int> count;
+    // Something needs a look: a small dot in the top right corner.
+    in property <bool> warn;
     callback clicked;
 
     property <color> content: !root.enabled ? Theme.disabled-foreground : root.checked ? Theme.accent : Theme.muted;
@@ -280,6 +282,15 @@ export component TabButton inherits Rectangle {
                 vertical-alignment: center;
             }
         }
+    }
+
+    if root.warn: Rectangle {
+        x: parent.width - self.width - 8px;
+        y: 10px;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background: Theme.warning;
     }
 
     Rectangle {

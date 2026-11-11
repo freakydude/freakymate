@@ -226,7 +226,8 @@ component ExtruderMatchCard inherits Card {
             }
             FilamentText {
                 horizontal-stretch: 1;
-                material: Printer.has-spool ? (Printer.spool-material != "" ? Printer.spool-material : "-") : @tr("No spool selected");
+                material: Printer.has-spool ? (Printer.spool-material != "" ? Printer.spool-material : "-") : @tr("No spool");
+                material-elide: !Printer.has-spool;
                 material-color: !Printer.has-spool ? Theme.muted : root.first.material-differs ? Theme.warning : Theme.foreground;
                 name: Printer.has-spool ? Printer.spool-title : "";
                 trail: Printer.has-spool ? Printer.spool-weight : "";

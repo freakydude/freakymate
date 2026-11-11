@@ -171,10 +171,13 @@ export component HeadTabs inherits VerticalLayout {
 
     property <length> head-width: 98px;
     property <length> machine-width: 96px;
+    property <length> sensors-width: 124px;
     property <length> paging-width: 40px;
-    // Tools and Service belong to the machine (Happy Hare); they follow the heads after a gap.
-    property <int> machine-tabs: Printer.has-mmu ? 2 : 0;
-    property <length> machine-total: root.machine-tabs > 0 ? Theme.spacing + 1px + root.machine-tabs * (Theme.spacing + root.machine-width) : 0px;
+    // Tools and Service belong to the machine (Happy Hare), Sensors holds the filament sensors that no head owns; they
+    // follow the heads after a gap.
+    property <bool> has-sensors: Printer.filament-sensors.length > 0;
+    property <length> machine-tabs-width: (Printer.has-mmu ? 2 * (Theme.spacing + root.machine-width) : 0px) + (root.has-sensors ? Theme.spacing + root.sensors-width : 0px);
+    property <length> machine-total: root.machine-tabs-width > 0px ? Theme.spacing + 1px + root.machine-tabs-width : 0px;
     property <length> available: root.width - 2 * Theme.padding - root.machine-total;
     property <length> step: root.head-width + Theme.spacing;
     property <int> count: Printer.heads.length;
@@ -221,7 +224,7 @@ export component HeadTabs inherits VerticalLayout {
             enabled: root.start + root.per-page < root.count;
             clicked => { root.first = min(root.count - 1, root.start + root.per-page); }
         }
-        if root.machine-tabs > 0: Rectangle {
+        if root.machine-tabs-width > 0px: Rectangle {
             width: 1px;
             height: 28px;
             cross-axis-self-alignment: center;
@@ -240,6 +243,15 @@ export component HeadTabs inherits VerticalLayout {
             text: @tr("Service");
             checked: root.tab == FilamentTab.service;
             clicked => { root.tab-chosen(FilamentTab.service); }
+        }
+        if root.has-sensors: TabButton {
+            min-width: root.sensors-width;
+            max-width: root.sensors-width;
+            icon: Icons.filament-sensor;
+            text: @tr("Sensors");
+            warn: Printer.filament-sensor-runout;
+            checked: root.tab == FilamentTab.sensors;
+            clicked => { root.tab-chosen(FilamentTab.sensors); }
         }
     }
     if root.path-tabs: TabBar {

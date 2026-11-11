@@ -124,6 +124,8 @@ export global Printer {
     // Lengths for extruding by hand that Klipper accepts (`max_extrude_only_distance`).
     in property <[float]> extrude-lengths: [5, 10, 25, 50];
     in property <[FilamentSensorItem]> filament-sensors;
+    // A switched-on filament sensor reports no filament; the Sensors tab of a tool changer shows a dot.
+    in property <bool> filament-sensor-runout;
     // Objects of the running print; excluded ones cannot be printed again.
     in property <[PrintObjectItem]> print-objects;
     // The bed the objects lie on; not shown if the slicer did not tell where they are.
@@ -443,7 +445,7 @@ export global MmuDialogs {
 }
 
 // Tabs of the Filament page; without an MMU it shows the extruder alone.
-export enum FilamentTab { gates, extruder, tools, service }
+export enum FilamentTab { gates, extruder, tools, service, sensors }
 
 // Tabs of the Move page; without anything to calibrate it shows the axes alone.
 export enum MoveTab { axes, calibrate }
