@@ -1,7 +1,7 @@
 //! Lanes and the load path (package D2): the lanes of AFC as tiles with their dialog, the load path card for the lane
 //! loaded and the one tapped last, the head's part of the path on the Extruder view of a tool changer, and the sensors
-//! of the machine on the Sensors tab where there are several heads. Runs on the profiles `afc`, `toolchanger-mmu` and
-//! `toolchanger`; what a profile does not have is skipped.
+//! of the machine on the Sensors tab where there are several heads. Runs on the profiles `afc`, `afc-toolchanger`,
+//! `toolchanger-mmu` and `toolchanger`; what a profile does not have is skipped.
 
 use crate::session::Session;
 use freakymate::{Actions, FilamentTab, MmuDialogs, Navigation, Page, Printer};
@@ -21,9 +21,8 @@ pub(super) fn lanes(session: &mut Session) -> Result<(), String> {
     session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
     session.window.global::<Navigation>().set_filament_head(-1);
     if snapshot.status.afc.is_some() && snapshot.tree.has_swappable_heads() {
-        return Err("the scene 'lanes' does not know AFC with its own tool changer".into());
-    }
-    if snapshot.status.afc.is_some() {
+        afc_heads(session)?;
+    } else if snapshot.status.afc.is_some() {
         afc_lanes(session)?;
     }
     if snapshot.status.mmu.is_some() && snapshot.tree.has_swappable_heads() {
@@ -51,6 +50,14 @@ fn close_dialog(session: &Session) {
     session.window.global::<MmuDialogs>().set_gate_row(-1);
 }
 
+/// Loads `lane` through `CHANGE_TOOL` and waits until AFC names it as the lane in use.
+fn change_tool(session: &mut Session, lane: &str) -> Result<(), String> {
+    session.service.send(Command::RunGcode { script: format!("CHANGE_TOOL LANE={lane}") });
+    session.wait_until(&format!("{lane} loaded"), |snapshot| {
+        snapshot.status.afc.as_ref().is_some_and(|afc| afc.current_load.as_deref() == Some(lane))
+    })
+}
+
 /// A Box Turtle: the tiles, the card of the lane in use (lane2), then lane3 loaded through `CHANGE_TOOL`, the card
 /// after a tap on a lane that is not loaded, and the dialog of a lane that is.
 fn afc_lanes(session: &mut Session) -> Result<(), String> {
@@ -58,10 +65,7 @@ fn afc_lanes(session: &mut Session) -> Result<(), String> {
         return Err("AFC should give the Gates tab lane tiles and not Happy Hare's controls".into());
     }
     session.show_page(Page::Filament, "afc-lanes")?;
-    session.service.send(Command::RunGcode { script: "CHANGE_TOOL LANE=lane3".into() });
-    session.wait_until("lane3 loaded", |snapshot| {
-        snapshot.status.afc.as_ref().is_some_and(|afc| afc.current_load.as_deref() == Some("lane3"))
-    })?;
+    change_tool(session, "lane3")?;
     session.show_page(Page::Filament, "afc-path-loaded")?;
 
     tap_tile(session, 0, TILE_FIRST);
@@ -75,6 +79,20 @@ fn afc_lanes(session: &mut Session) -> Result<(), String> {
     tap_tile(session, 2, TILE_THIRD);
     session.capture("afc-lane-dialog-loaded")?;
     close_dialog(session);
+    Ok(())
+}
+
+/// AFC with its own tool changer has one lane per head and no Gates tab: the heads' Extruder view with the lane of the
+/// mounted head, then `CHANGE_TOOL` to the lane of the third head (the head moves to the carriage, its lane loads), and
+/// the view of a head that is not mounted.
+fn afc_heads(session: &mut Session) -> Result<(), String> {
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Extruder);
+    session.show_page(Page::Filament, "afc-toolchanger-heads")?;
+    change_tool(session, "e2")?;
+    session.show_page(Page::Filament, "afc-toolchanger-path-loaded")?;
+    session.window.global::<Navigation>().set_filament_head(0);
+    session.show_page(Page::Filament, "afc-toolchanger-head-parked")?;
+    session.window.global::<Navigation>().set_filament_head(-1);
     Ok(())
 }
 

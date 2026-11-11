@@ -66,6 +66,15 @@ export component FilamentSwatch inherits Rectangle {
     pure function nth(index: int) -> color {
         return index <= 0 ? root.colors.first : index == 1 ? root.colors.second : index == 2 ? root.colors.third : index == 3 ? root.colors.fourth : index == 4 ? root.colors.fifth : root.colors.sixth;
     }
+    // Too dark to stand out from the dark surfaces (under 3:1 to `surface-raised`, WCAG 1.4.11): relative luminance
+    // below 0.2, with the square for the sRGB curve.
+    pure function dark(c: color) -> bool {
+        return 0.2126 * (c.red / 255) * (c.red / 255) + 0.7152 * (c.green / 255) * (c.green / 255) + 0.0722 * (c.blue / 255) * (c.blue / 255) < 0.2;
+    }
+    // Every colour of the field is dark (black, navy, dark green): its frame turns light so the field is seen.
+    pure function all-dark() -> bool {
+        return root.count > 0 && root.dark(root.nth(0)) && (root.count < 2 || root.dark(root.nth(1))) && (root.count < 3 || root.dark(root.nth(2))) && (root.count < 4 || root.dark(root.nth(3))) && (root.count < 5 || root.dark(root.nth(4))) && (root.count < 6 || root.dark(root.nth(5)));
+    }
     pure function translucent() -> bool {
         return root.nth(0).alpha < 255 || (root.count > 1 && root.nth(1).alpha < 255) || (root.count > 2 && root.nth(2).alpha < 255) || (root.count > 3 && root.nth(3).alpha < 255) || (root.count > 4 && root.nth(4).alpha < 255) || (root.count > 5 && root.nth(5).alpha < 255);
     }
@@ -120,14 +129,14 @@ export component FilamentSwatch inherits Rectangle {
     if root.count > 1 && root.br > 0px: CornerMask { x: root.width - root.br; y: root.height - root.br; corner: 2; size: root.br; ground: root.ground; }
     if root.count > 1 && root.bl > 0px: CornerMask { x: 0px; y: root.height - root.bl; corner: 3; size: root.bl; ground: root.ground; }
 
-    // The frame: fine and grey, yellow with a gap when the colour differs.
+    // The frame: fine and grey (light around a dark filament), yellow with a gap when the colour differs.
     if !root.empty: Rectangle {
         border-top-left-radius: root.tl;
         border-bottom-left-radius: root.bl;
         border-top-right-radius: root.tr;
         border-bottom-right-radius: root.br;
         border-width: root.warn ? 2px : 1px;
-        border-color: root.warn ? Theme.warning : Theme.flyout-border;
+        border-color: root.warn ? Theme.warning : root.all-dark() ? Theme.muted : Theme.flyout-border;
     }
     // A narrow field has no room for a gap beside the yellow frame; the colour must stay to be seen.
     if root.warn && !root.empty && root.gap > 0px: Rectangle {

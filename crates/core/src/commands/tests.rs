@@ -442,6 +442,27 @@ fn a_lane_command_becomes_the_g_code_of_its_source() {
     );
     assert!(Command::EjectLane { lane: afc() }.moves_machine());
     assert!(!Command::AssignLaneSpool { lane: afc(), spool_id: None }.moves_machine());
+    assert_eq!(resolve(Command::MapToolToLane { tool: 3, lane: afc() }), gcode("SET_MAP LANE=lane2 MAP=T3"));
+    assert_eq!(
+        resolve(Command::MapToolToLane { tool: 3, lane: LaneId::Gate(1) }),
+        Ok(vec![Command::MmuMapTool { tool: 3, gate: 1 }])
+    );
+    assert_eq!(resolve(Command::MapToolToLane { tool: 0, lane: LaneId::Bypass }), Err(CommandError::NotForBypass));
+    assert_eq!(resolve(Command::AfcResetFailure), gcode("RESET_FAILURE"));
+    assert_eq!(resolve(Command::AfcResetLane { lane: "lane2".into() }), gcode("AFC_LANE_RESET LANE=lane2"));
+    assert!(Command::AfcResetLane { lane: "lane2".into() }.moves_machine());
+    assert!(!Command::MapToolToLane { tool: 0, lane: afc() }.moves_machine());
+}
+
+#[test]
+fn the_tool_map_resets_in_the_source_in_charge() {
+    use crate::sources::afc::AfcStatus;
+    let afc_only = PrinterStatus { afc: Some(AfcStatus::default()), ..PrinterStatus::default() };
+
+    let reset = Command::ResetToolMap.resolve(&printer(&[]), &afc_only);
+
+    assert_eq!(reset, Ok(vec![Command::RunGcode { script: "RESET_AFC_MAPPING RUNOUT=no".into() }]));
+    assert_eq!(Command::ResetToolMap.resolve(&printer(&[]), &PrinterStatus::default()), Err(CommandError::NoAfc));
 }
 
 fn status_with_heads(mounted: Option<&str>) -> PrinterStatus {

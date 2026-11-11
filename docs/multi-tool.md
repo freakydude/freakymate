@@ -542,10 +542,31 @@ Point     Free | Triggered | Disabled
 - **Machine sensors** (no tie, decided 2026-11-11): with several heads on System only; with one head on the
   Extruder view as today. Rejected: on every head's view as "Printer" (repeats per head, ties nothing).
 
-### Not in D2
+- **Happy Hare without a gate** (after a restart, before homing; decided 2026-11-11): the card shows what Happy Hare
+  still reports in `mmu.sensors` (hub, extruder entry, after the gears), labelled "No gate", with no lane of its own.
+  The filament is drawn only past the hub, since the lane it came from is not known.
+- **Dark filament** (decided 2026-11-11): a colour field whose colours are all too dark to stand out from the dark
+  surfaces (relative luminance under 0.2, below 3:1 to `surface-raised`, WCAG 1.4.11) gets a light frame
+  (`Theme.muted`) instead of the grey one. It lives in `FilamentSwatch`, so card, tiles and spool strip agree.
 
-AFC service actions (`AFC_RESET`, `AFC_LANE_RESET`, `RESET_FAILURE`, buffer settings), runout lanes (`SET_RUNOUT`),
-the tool map of AFC (`SET_MAP`), encoder details.
+### Tool map and service of AFC (decided 2026-11-11, after D2)
+
+Read from AFC `main` on 2026-11-11:
+
+| Command | What it does | Moves | In a print |
+| --- | --- | --- | --- |
+| `SET_MAP LANE= MAP=T<n>` | swaps: the lane gets `T<n>`, the lane that had it gets the lane's old tool (`AFC_spool.py` L147-185) | no | allowed (AFC uses it on a runout) |
+| `RESET_AFC_MAPPING RUNOUT=no` | the map of the configuration; `RUNOUT=no` keeps the runout lanes (L527-566) | no | allowed |
+| `RESET_FAILURE` | clears `error_state`, AFC idle; no resume (`AFC_error.py` L172-195) | no | allowed |
+| `AFC_LANE_RESET LANE=` | pulls the lane's filament back until the hub is clear (`AFC_functions.py` L1640-1750) | yes | not refused by AFC; refused here |
+
+- **Scope:** the Tools tab maps tools to lanes for both sources through one intent (`MapToolToLane`, `ResetToolMap`;
+  Happy Hare: `MMU_TTG_MAP`, AFC: `SET_MAP`, `RESET_AFC_MAPPING RUNOUT=no`). Service of AFC: "Clear error"
+  (`AfcResetFailure`) while `AFC.error_state` is set, and per lane "Back to hub" (`AfcResetLane`), not while
+  printing. Core and commands are done; the screens are not yet.
+- **Left out:** `AFC_RESET` (only opens a Mainsail prompt with `AFC_LANE_RESET` per lane), `AFC_RECOVER_LANE`,
+  `SET_LANE_LOADED`, `UNSET_LANE_LOADED`, `AFC_CALIBRATION` (their names depend on `show_macros`, and they are last
+  resorts: the console is the way), runout lanes (`SET_RUNOUT`), buffer settings, tests, statistics, encoder details.
 
 ## Open questions
 

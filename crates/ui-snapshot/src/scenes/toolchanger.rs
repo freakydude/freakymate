@@ -169,7 +169,21 @@ fn head_level(session: &mut Session) -> Result<(), String> {
     })?;
     session.capture("toolchanger-ready-again")?;
     session.window.global::<Navigation>().set_filament_head(-1);
-    Ok(())
+    no_head_mounted(session)
+}
+
+/// `UNSELECT_TOOL` drops the head: no head on the carriage, the Filament page with its head tabs and the status bar
+/// without a nozzle of a mounted head (`toolchanger-no-head`); then T2 is picked up again for the following scenes.
+fn no_head_mounted(session: &mut Session) -> Result<(), String> {
+    session.service.send(Command::RunGcode { script: "UNSELECT_TOOL".into() });
+    session.wait_until("no head mounted", |snapshot| {
+        snapshot.status.toolchanger.as_ref().is_some_and(|changer| changer.selected.is_none())
+    })?;
+    session.show_page(Page::Filament, "toolchanger-no-head")?;
+    session.service.send(Command::RunMacro { name: "T2".into() });
+    session.wait_until("T2 selected again", |snapshot| {
+        snapshot.status.toolchanger.as_ref().is_some_and(|changer| changer.selected == Some(2))
+    })
 }
 
 /// The line of the changer's error above the tabs of a head with a unit of its own, the fullest page of the head level

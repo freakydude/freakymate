@@ -389,6 +389,9 @@ impl<'a> Session<'a> {
         self.fan_watch = FanWatch::default();
         self.klippy_ready = true;
         self.publish();
+        // The print page offers the newest files while there is no job.
+        self.answer(Query::Files);
+        self.answer(Query::PrintHistory);
         Ok(())
     }
 

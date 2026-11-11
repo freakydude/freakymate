@@ -470,6 +470,11 @@ async fn a_deleted_file_comes_back_as_a_new_file_list_without_asking() {
     let (service, mut channels) =
         PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
     wait_for(&mut channels, ready).await;
+    // The list comes once on connecting, for the print page without a job.
+    let Event::Files(on_connect) = next_event(&mut channels, |event| matches!(event, Event::Files(_))).await else {
+        unreachable!()
+    };
+    assert!(on_connect.iter().any(|file| file.path == "calibration_cube.gcode"));
 
     service.send(Command::DeleteFile { path: "calibration_cube.gcode".into() });
     let Event::Files(files) = next_event(&mut channels, |event| matches!(event, Event::Files(_))).await else {

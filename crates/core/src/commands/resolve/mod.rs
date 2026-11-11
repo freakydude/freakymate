@@ -43,6 +43,10 @@ impl Command {
             Self::EjectLane { lane } => lanes::eject(status, lane)?,
             Self::AssignLaneSpool { lane, spool_id } => lanes::assign_spool(status, lane, spool_id)?,
             Self::SetLaneFilament { lane, material, color } => lanes::set_filament(status, lane, material, color)?,
+            Self::MapToolToLane { tool, lane } => lanes::map_tool(status, tool, lane)?,
+            Self::ResetToolMap => lanes::reset_tool_map(status)?,
+            Self::AfcResetFailure => vec![lanes::afc_reset_failure(status)?],
+            Self::AfcResetLane { lane } => vec![lanes::afc_reset_lane(status, &lane)?],
             Self::AssignToolSpool { tool, spool_id } => vec![assign_tool_spool(sources, status, tool, spool_id)?],
             Self::RunGcode { script } => match script.trim() {
                 "" => Vec::new(),

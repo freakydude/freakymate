@@ -191,16 +191,32 @@ fn gate_path(mmu: &MmuStatus, sensors: &[FilamentSensor], gate: usize) -> Option
 
 /// The bypass: filament fed by hand past the gates; `mmu.sensors` holds the bypass's sensors while it is selected.
 fn bypass_path(mmu: &MmuStatus) -> LoadPath {
-    let mut path = LoadPath::empty();
-    if mmu.bypass_selected() {
-        path.hub = generic(&mmu.sensors, SHARED_EXIT);
-        path.extruder = generic(&mmu.sensors, EXTRUDER_ENTRY);
-        path.toolhead = generic(&mmu.sensors, TOOLHEAD);
-        path.position = Some(mmu.filament_pos);
-        path.direction = mmu.filament_direction.signum();
-        path.distance = Some(mmu.filament_position);
-        path.bowden_progress = mmu.bowden_progress;
+    if !mmu.bypass_selected() {
+        return LoadPath::empty();
     }
+    let mut path = reported_shared_path(mmu);
+    path.position = Some(mmu.filament_pos);
+    path
+}
+
+/// Happy Hare with no gate selected (after a restart, before homing): no lane of its own, only the points it still
+/// reports in `mmu.sensors` (hub, extruder entry, after the gears). The filament is drawn only where it is past the
+/// hub, since the lane it came from is not known.
+pub fn without_gate_path(mmu: &MmuStatus) -> LoadPath {
+    let mut path = reported_shared_path(mmu);
+    path.position = Some(mmu.filament_pos).filter(|position| *position > AT_HUB);
+    path
+}
+
+/// The shared part of the path as `mmu.sensors` reports it for what Happy Hare has selected, without a position.
+fn reported_shared_path(mmu: &MmuStatus) -> LoadPath {
+    let mut path = LoadPath::empty();
+    path.hub = generic(&mmu.sensors, SHARED_EXIT);
+    path.extruder = generic(&mmu.sensors, EXTRUDER_ENTRY);
+    path.toolhead = generic(&mmu.sensors, TOOLHEAD);
+    path.direction = mmu.filament_direction.signum();
+    path.distance = Some(mmu.filament_position);
+    path.bowden_progress = mmu.bowden_progress;
     path
 }
 
@@ -405,6 +421,21 @@ mod tests {
         assert_eq!((first.extruder, first.position), (PathSensor::Triggered, Some(10)));
         assert_eq!((second.extruder, second.toolhead, second.position), (PathSensor::Free, PathSensor::Free, None));
         assert_eq!(first.entry, PathSensor::Absent);
+    }
+
+    #[test]
+    fn without_a_gate_the_path_has_the_reported_head_sensors_and_no_lane() {
+        let mut status = two_heads();
+        let mmu = status.mmu.as_mut().unwrap();
+        mmu.gate = -1;
+
+        let loaded = without_gate_path(mmu);
+        mmu.filament_pos = AT_HUB;
+        let at_hub = without_gate_path(mmu);
+
+        assert_eq!((loaded.entry, loaded.exit), (PathSensor::Absent, PathSensor::Absent));
+        assert_eq!((loaded.extruder, loaded.toolhead), (PathSensor::Triggered, PathSensor::Absent));
+        assert_eq!((loaded.position, at_hub.position), (Some(LOADED), None));
     }
 
     fn box_turtle() -> PrinterStatus {

@@ -64,9 +64,14 @@ impl FileState {
     }
 }
 
+/// How many of the newest files the print page offers while there is no job.
+const RECENT_FILES: usize = 4;
+
 #[derive(Default)]
 pub struct FilesView {
     rows: Rc<VecModel<FileItem>>,
+    /// The newest files (the list is sorted newest first), for the print page without a job.
+    recent: Rc<VecModel<FileItem>>,
     marked_names: Rc<VecModel<SharedString>>,
 }
 
@@ -74,17 +79,24 @@ impl FilesView {
     pub fn bind(&self, printer: &Printer) {
         printer.set_marked_file_names(ModelRc::from(self.marked_names.clone()));
         printer.set_files(ModelRc::from(self.rows.clone()));
+        printer.set_recent_files(ModelRc::from(self.recent.clone()));
     }
 
     pub fn show_rows(&self, state: &FileState) {
-        replace_rows(&self.rows, state.catalog.entries().iter().map(|entry| state.row(entry)).collect());
+        let rows: Vec<FileItem> = state.catalog.entries().iter().map(|entry| state.row(entry)).collect();
+        replace_rows(&self.recent, rows.iter().take(RECENT_FILES).cloned().collect());
+        replace_rows(&self.rows, rows);
     }
 
     /// Brings one row up to date, e.g. after its thumbnail arrived.
     pub fn update_row(&self, state: &FileState, filename: &str) {
         let Some(index) = state.catalog.position(filename) else { return };
+        let row = state.row(&state.catalog.entries()[index]);
+        if index < self.recent.row_count() {
+            self.recent.set_row_data(index, row.clone());
+        }
         if index < self.rows.row_count() {
-            self.rows.set_row_data(index, state.row(&state.catalog.entries()[index]));
+            self.rows.set_row_data(index, row);
         }
     }
 

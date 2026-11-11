@@ -57,6 +57,32 @@ pub(super) fn set_filament(
     }
 }
 
+pub(super) fn map_tool(status: &PrinterStatus, tool: usize, lane: LaneId) -> Result<Vec<Command>, CommandError> {
+    Ok(vec![match lane {
+        LaneId::Gate(gate) => Command::MmuMapTool { tool, gate },
+        LaneId::Bypass => return Err(CommandError::NotForBypass),
+        LaneId::Afc(name) => gcode(afc::map_tool(afc_lane(status, &name)?, tool)),
+    }])
+}
+
+/// The tool map of the source in charge: Happy Hare while it has the say, else AFC.
+pub(super) fn reset_tool_map(status: &PrinterStatus) -> Result<Vec<Command>, CommandError> {
+    if status.happy_hare().is_some() {
+        return Ok(vec![Command::MmuResetToolMap]);
+    }
+    status.afc.as_ref().ok_or(CommandError::NoAfc)?;
+    Ok(vec![gcode(afc::RESET_TOOL_MAP.to_owned())])
+}
+
+pub(super) fn afc_reset_failure(status: &PrinterStatus) -> Result<Command, CommandError> {
+    status.afc.as_ref().ok_or(CommandError::NoAfc)?;
+    Ok(gcode(afc::RESET_FAILURE.to_owned()))
+}
+
+pub(super) fn afc_reset_lane(status: &PrinterStatus, name: &str) -> Result<Command, CommandError> {
+    Ok(gcode(afc::reset_lane(afc_lane(status, name)?)))
+}
+
 /// The name of a lane AFC reports; AFC only logs an unknown lane, so it is refused here.
 fn afc_lane<'a>(status: &PrinterStatus, name: &'a str) -> Result<&'a str, CommandError> {
     let afc = status.afc.as_ref().ok_or(CommandError::NoAfc)?;

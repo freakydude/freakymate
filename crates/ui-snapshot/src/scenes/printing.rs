@@ -88,6 +88,7 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
         return Err("position-locked off while the print is paused".into());
     }
     session.show_page(Page::Move, "move-paused")?;
+    session.show_page(Page::Filament, "printing-paused-filament")?;
     session.window.global::<Navigation>().set_page(Page::Print);
     exclude_object(session)?;
     session.service.send(Command::ResumePrint);

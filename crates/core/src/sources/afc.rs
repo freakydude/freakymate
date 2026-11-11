@@ -340,6 +340,23 @@ pub fn unload_lane(lane: &str) -> String {
     format!("TOOL_UNLOAD LANE={lane}")
 }
 
+/// Maps `T<tool>` to `lane`; the lane that had it gets the old tool of `lane` (`SET_MAP`, `AFC_spool.py` L147-185).
+/// Moves nothing and is not refused while printing (AFC runs it itself on a runout).
+pub fn map_tool(lane: &str, tool: usize) -> String {
+    format!("SET_MAP LANE={lane} MAP=T{tool}")
+}
+
+/// Back to the tool map of the configuration; keeps the runout lanes (`RESET_AFC_MAPPING`, `AFC_spool.py` L527-566).
+pub const RESET_TOOL_MAP: &str = "RESET_AFC_MAPPING RUNOUT=no";
+
+/// Clears the error state and sets AFC idle; no resume (`RESET_FAILURE`, `AFC_error.py` L172-195).
+pub const RESET_FAILURE: &str = "RESET_FAILURE";
+
+/// Pulls the filament of `lane` back until the hub is clear (`AFC_LANE_RESET`, `AFC_functions.py` L1640-1750).
+pub fn reset_lane(lane: &str) -> String {
+    format!("AFC_LANE_RESET LANE={lane}")
+}
+
 /// Ejects the filament of `lane` out of the unit (`LANE_UNLOAD`, `AFC.py` L1321-1338); AFC refuses it while printing.
 pub fn eject_lane(lane: &str) -> String {
     format!("LANE_UNLOAD LANE={lane}")

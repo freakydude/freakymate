@@ -255,6 +255,8 @@ export global Printer {
     in property <[SpoolItem]> spools;
     in property <bool> spools-loading;
     in property <[FileItem]> files;
+    // The newest files (at most four), offered on the print page while there is no job.
+    in property <[FileItem]> recent-files;
     // The file prepared in the app as the job of the print page, empty for none; only the app knows it. A started
     // print, a deleted file or a restart drops it.
     in property <string> prepared-path;

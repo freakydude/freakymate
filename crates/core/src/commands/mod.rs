@@ -272,6 +272,19 @@ pub enum Command {
         material: Option<String>,
         color: Option<[u8; 3]>,
     },
+    /// Maps the slicer tool `T<tool>` to the lane; AFC swaps it with the lane that had it.
+    MapToolToLane {
+        tool: usize,
+        lane: LaneId,
+    },
+    /// Back to the configured tool map of the source in charge.
+    ResetToolMap,
+    /// Clears AFC's error state (`RESET_FAILURE`); moves nothing and does not resume.
+    AfcResetFailure,
+    /// Pulls the filament of an AFC lane back out of the hub (`AFC_LANE_RESET`).
+    AfcResetLane {
+        lane: String,
+    },
     // Spoolman
     /// The spool Moonraker tracks the filament use of; `None` for none.
     SetActiveSpool {
@@ -414,6 +427,10 @@ impl Command {
             | Self::EjectLane { .. }
             | Self::AssignLaneSpool { .. }
             | Self::SetLaneFilament { .. }
+            | Self::MapToolToLane { .. }
+            | Self::ResetToolMap
+            | Self::AfcResetFailure
+            | Self::AfcResetLane { .. }
             | Self::AssignToolSpool { .. } => return None,
         };
         Some(call)
@@ -497,6 +514,7 @@ impl Command {
                 | Self::LoadLane { .. }
                 | Self::UnloadLane { .. }
                 | Self::EjectLane { .. }
+                | Self::AfcResetLane { .. }
         )
     }
 }

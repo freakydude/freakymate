@@ -206,13 +206,18 @@ export component StepSelector inherits HorizontalLayout {
             }
         }
 
-        Text {
-            text: value + root.unit;
-            color: Theme.foreground;
-            font-size: Theme.font-small;
-            font-weight: 600;
-            horizontal-alignment: center;
-            vertical-alignment: center;
+        // A layout, not a bare Text: the button grows with its text and keeps the padding on a narrow row.
+        HorizontalLayout {
+            padding-left: Theme.padding;
+            padding-right: Theme.padding;
+            Text {
+                text: value + root.unit;
+                color: Theme.foreground;
+                font-size: Theme.font-small;
+                font-weight: 600;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
         }
     }
 }
