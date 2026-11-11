@@ -4,6 +4,7 @@ import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, Navigation, Page, Printer } from "../state.slint";
 import { Card, IconButton, IconLabel, ToggleRow } from "../components/controls.slint";
+import { FilamentSensorGrid } from "../components/sensor-grid.slint";
 import { SystemTabs } from "../components/system-tabs.slint";
 
 export component SystemPage inherits Rectangle {
@@ -106,6 +107,13 @@ export component SystemPage inherits Rectangle {
                         }
                     }
                 }
+            }
+            // With several heads the sensors of the machine are not at one extruder; the Filament page shows each
+            // head's own part of the path, so these are here (one head shows them on its Extruder tab).
+            if Printer.heads.length > 0 && Printer.filament-sensors.length > 0: Card {
+                title: @tr("Filament sensors");
+                icon: Icons.filament-sensor;
+                FilamentSensorGrid { }
             }
             Rectangle { vertical-stretch: 1; }
         }

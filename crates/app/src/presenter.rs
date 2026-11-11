@@ -25,6 +25,7 @@ use chrono::Local;
 use freakymate_core::domain::filament::{self, FilamentHandling};
 use freakymate_core::domain::filament_match::{self, ToolMatch};
 use freakymate_core::domain::heads::{self, ChangerNote};
+use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::domain::prepared_job::PreparedJob;
 use freakymate_core::domain::spools::{self, Lane};
 use freakymate_core::domain::{estimates, light, pause};
@@ -627,6 +628,17 @@ impl Presenter {
     /// Prepares the file at `path` as the job of the print page; an empty path drops the prepared file.
     pub fn prepare_file(&self, path: &str) {
         self.cache.borrow_mut().prepared.prepare(path);
+        self.refresh_job_matches();
+    }
+
+    /// The lane of the tile in `row` of the Gates tab.
+    pub fn lane_id(&self, row: usize) -> Option<LaneId> {
+        self.mmu.lane_id(row)
+    }
+
+    /// The load path card shows `lane` from now on (a tap on its tile).
+    pub fn show_lane(&self, lane: LaneId) {
+        self.mmu.remember_lane(lane);
         self.refresh_job_matches();
     }
 

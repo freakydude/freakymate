@@ -405,6 +405,45 @@ fn a_tool_spool_goes_into_the_afc_lane_mapped_to_the_tool() {
     assert_eq!(assign(None), Ok(vec![Command::RunGcode { script: "SET_SPOOL_ID LANE=lane2".into() }]));
 }
 
+#[test]
+fn a_lane_command_becomes_the_g_code_of_its_source() {
+    use crate::sources::afc::{AfcLane, AfcStatus};
+    use crate::sources::happy_hare::MmuStatus;
+    let lane = AfcLane { name: "lane2".into(), ..AfcLane::default() };
+    let status = PrinterStatus {
+        afc: Some(AfcStatus { lanes: vec![lane], ..AfcStatus::default() }),
+        mmu: Some(MmuStatus::default()),
+        ..PrinterStatus::default()
+    };
+    let resolve = |command: Command| command.resolve(&printer(&[]), &status);
+    let gcode = |script: &str| Ok(vec![Command::RunGcode { script: script.into() }]);
+    let afc = || LaneId::Afc("lane2".into());
+
+    assert_eq!(resolve(Command::LoadLane { lane: afc() }), gcode("CHANGE_TOOL LANE=lane2"));
+    assert_eq!(resolve(Command::UnloadLane { lane: afc() }), gcode("TOOL_UNLOAD LANE=lane2"));
+    assert_eq!(resolve(Command::EjectLane { lane: afc() }), gcode("LANE_UNLOAD LANE=lane2"));
+    assert_eq!(
+        resolve(Command::AssignLaneSpool { lane: afc(), spool_id: Some(4) }),
+        gcode("SET_SPOOL_ID LANE=lane2 SPOOL_ID=4")
+    );
+    assert_eq!(
+        resolve(Command::SetLaneFilament { lane: afc(), material: Some("PETG".into()), color: Some([255, 16, 0]) }),
+        gcode("SET_MATERIAL LANE=lane2 MATERIAL=PETG\nSET_COLOR LANE=lane2 COLOR=FF1000")
+    );
+    assert_eq!(resolve(Command::SetLaneFilament { lane: afc(), material: None, color: None }), Ok(Vec::new()));
+    assert_eq!(resolve(Command::LoadLane { lane: LaneId::Gate(3) }), Ok(vec![Command::MmuLoadGate { gate: 3 }]));
+    assert_eq!(resolve(Command::UnloadLane { lane: LaneId::Gate(3) }), Ok(vec![Command::MmuUnload]));
+    assert_eq!(resolve(Command::EjectLane { lane: LaneId::Gate(3) }), Ok(vec![Command::MmuEject { gate: Some(3) }]));
+    assert_eq!(resolve(Command::LoadLane { lane: LaneId::Bypass }), Ok(vec![Command::MmuLoadBypass]));
+    assert_eq!(resolve(Command::EjectLane { lane: LaneId::Bypass }), Err(CommandError::NotForBypass));
+    assert_eq!(
+        resolve(Command::LoadLane { lane: LaneId::Afc("lane9".into()) }),
+        Err(CommandError::UnknownLane("lane9".into()))
+    );
+    assert!(Command::EjectLane { lane: afc() }.moves_machine());
+    assert!(!Command::AssignLaneSpool { lane: afc(), spool_id: None }.moves_machine());
+}
+
 fn status_with_heads(mounted: Option<&str>) -> PrinterStatus {
     use crate::sources::toolchanger::{ToolHead, ToolchangerStatus};
     let head = |name: &str, extruder: &str| ToolHead {

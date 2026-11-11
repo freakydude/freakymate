@@ -56,8 +56,15 @@ impl Printer {
         objects.insert("temperature_sensor raspberry_pi".to_owned(), json!({ "temperature": host }));
         // Like Klipper: the sensor type `temperature_host` adds its own object beside the section.
         objects.insert("temperature_host raspberry_pi".to_owned(), json!({ "temperature": host }));
-        let sensor_names: &[&str] = if self.mmu.is_some() { &MMU_FILAMENT_SENSORS } else { &FILAMENT_SENSORS };
-        for (index, name) in sensor_names.iter().take(self.profile.filament_sensors).enumerate() {
+        if let Some(mmu) = &self.mmu {
+            // The profiles with units list all sensors of their units; the older ones the first few of one unit.
+            let limit = if self.profile.mmu_units.is_some() { usize::MAX } else { self.profile.filament_sensors };
+            for (name, detected) in mmu.filament_sensors(self.print_state.as_str()).into_iter().take(limit) {
+                objects.insert(name, json!({ "enabled": true, "filament_detected": detected }));
+            }
+            return;
+        }
+        for (index, name) in FILAMENT_SENSORS.iter().take(self.profile.filament_sensors).enumerate() {
             objects.insert((*name).to_owned(), json!({ "enabled": true, "filament_detected": index != 1 }));
         }
     }

@@ -94,6 +94,24 @@ export struct BarColors {
     longitudinal: bool,
 }
 
+// The way of the filament of a gate or lane on Happy Hare's `filament_pos` scale (see `FilamentPath`). Sensors: -1 not
+// fitted, 0 free, 1 triggered; in order along the way: gate entry, gate exit, hub, extruder, toolhead. `bowden-progress`
+// is 0 to 1 during a move through the bowden, -1 otherwise. The colours are those of the spool, as for `FilamentSwatch`.
+export struct FilamentPathItem {
+    position: int,
+    direction: int,
+    distance: string,
+    gate-label: string,
+    bowden-progress: float,
+    gate-entry-sensor: int,
+    gate-sensor: int,
+    extruder-sensor: int,
+    toolhead-sensor: int,
+    // Where the lanes of a unit meet; -1 for none (drawn only when fitted).
+    hub-sensor: int,
+    colors: BarColors,
+}
+
 // A swappable head of a tool changer on the Filament page: its nozzle, the spool it carries and how it is brought
 // to the carriage.
 export struct HeadItem {
@@ -130,10 +148,16 @@ export struct HeadItem {
     // (then `can-pick-spool` says whether the spool in use is).
     spool-tool: int,
     can-pick-spool: bool,
+    // The head's part of the filament path: its extruder sensors, the extruder and the nozzle (`FilamentPath.head-only`).
+    path: FilamentPathItem,
 }
 
-// One gate of the MMU. `availability`: unknown | empty | available | buffered.
+// One tile of the Gates tab: a gate of Happy Hare or a lane of AFC. `availability`: unknown | empty | available |
+// buffered (a lane of AFC is empty or available).
 export struct MmuGateItem {
+    // What names the tile: "Gate 3", or the name of the lane ("lane1").
+    title: string,
+    // The gate number (its name for Happy Hare's commands); -1 for a lane of AFC.
     index: int,
     availability: string,
     name: string,
@@ -147,6 +171,8 @@ export struct MmuGateItem {
     // EndlessSpool group of the gate, -1 if Happy Hare reports none.
     group: int,
     selected: bool,
+    // The filament of this tile is in the toolhead (what Unload acts on).
+    loaded: bool,
     // Remaining filament of the spool in the gate (for example "613 g"), empty without Spoolman or spool.
     spool-text: string,
     spool-low: bool,
@@ -234,22 +260,6 @@ export struct ToolMatchItem {
 export struct ChartLabel {
     text: string,
     position: float,
-}
-
-// The way of the filament of the selected gate (Happy Hare's `filament_pos`, see `FilamentPath`). Sensors: -1 not
-// fitted, 0 free, 1 triggered; in order along the way: gate entry, gate exit, extruder, toolhead. `bowden-progress`
-// is 0 to 1 during a move through the bowden, -1 otherwise. The colours are those of the spool, as for `FilamentSwatch`.
-export struct FilamentPathItem {
-    position: int,
-    direction: int,
-    distance: string,
-    gate-label: string,
-    bowden-progress: float,
-    gate-entry-sensor: int,
-    gate-sensor: int,
-    extruder-sensor: int,
-    toolhead-sensor: int,
-    colors: BarColors,
 }
 
 // A spool of Spoolman in the picker. `place`: where it sits ("Gate 2", "In use") or empty.

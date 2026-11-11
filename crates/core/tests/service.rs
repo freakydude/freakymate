@@ -5,9 +5,11 @@ use fake_moonraker::machine::MachineProfile;
 use fake_moonraker::server::{serve, ServerConfig};
 use freakymate_core::credentials::Credential;
 use freakymate_core::domain::filament::{self, FilamentHandling};
+use freakymate_core::domain::load_path::{head_path, load_path, BufferSide, LOADED};
+use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::domain::{job_end, light, pause, spools};
 use freakymate_core::sources::happy_hare::commands::{Gates, ServoCommand};
-use freakymate_core::sources::happy_hare::{GateAvailability, LoadedFilament, ServoPosition};
+use freakymate_core::sources::happy_hare::{GateAvailability, LoadedFilament, PathSensor, ServoPosition};
 use freakymate_core::sources::klipper::tuning::TuningKey;
 use freakymate_core::sources::klipper::{Axis, FanKind, KlippyState, Leveling, PrintState, WhiteChannel};
 use freakymate_core::sources::moonraker_server::files::ThumbnailImage;
@@ -205,6 +207,59 @@ async fn sets_the_filament_of_a_gate_and_loads_it() {
     let gate = &snapshot.status.mmu.unwrap().gates[1];
     assert_eq!((gate.material.as_str(), gate.color), ("PETG", Some([0xff, 0x80, 0x00, 0xff])));
     assert_eq!(gate.temperature, temperature);
+}
+
+/// A gate of the second unit on the second head: its load path reads the gate, the unit's shared exit and the
+/// toolhead the unit names; the first head's toolhead stays free.
+#[tokio::test(flavor = "multi_thread")]
+async fn follows_the_load_path_of_a_unit_on_its_head() {
+    let endpoint = start_fake_with(MachineProfile::toolchanger_mmu()).await;
+    let (service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+    wait_for(&mut channels, |snapshot| ready(snapshot) && snapshot.status.mmu.is_some()).await;
+
+    service.send(Command::MmuHome);
+    service.send(Command::LoadLane { lane: LaneId::Gate(5) });
+    let snapshot = wait_for(&mut channels, |snapshot| {
+        snapshot.status.mmu.as_ref().is_some_and(|mmu| mmu.gate == 5 && mmu.filament == LoadedFilament::Loaded)
+    })
+    .await;
+
+    let path = load_path(&snapshot.status, &LaneId::Gate(5)).unwrap();
+    assert_eq!((path.hub, path.toolhead, path.position), (PathSensor::Triggered, PathSensor::Triggered, Some(10)));
+    let other = load_path(&snapshot.status, &LaneId::Gate(4)).unwrap();
+    assert_eq!((other.entry, other.exit, other.position), (PathSensor::Triggered, PathSensor::Free, Some(0)));
+    assert_eq!(load_path(&snapshot.status, &LaneId::Gate(1)).unwrap().hub, PathSensor::Absent);
+    assert_eq!(head_path(&snapshot.status, "extruder1").toolhead, PathSensor::Triggered);
+    assert_eq!(head_path(&snapshot.status, "extruder").toolhead, PathSensor::Free);
+    assert!(filament::printer_sensors(&snapshot.status).all(|sensor| !sensor.object.contains(':')));
+}
+
+/// A lane of a Box Turtle loaded through the lane command: hub, toolhead switch and buffer on its way; AFC's switches
+/// are not the printer's.
+#[tokio::test(flavor = "multi_thread")]
+async fn follows_the_load_path_of_an_afc_lane() {
+    let endpoint = start_fake_with(MachineProfile::afc()).await;
+    let (service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+    wait_for(&mut channels, |snapshot| ready(snapshot) && snapshot.status.afc.is_some()).await;
+
+    service.send(Command::Home { x: true, y: true, z: true });
+    service.send(Command::LoadLane { lane: LaneId::Afc("lane3".into()) });
+    let snapshot = wait_for(&mut channels, |snapshot| {
+        snapshot.status.afc.as_ref().is_some_and(|afc| afc.current_load.as_deref() == Some("lane3"))
+    })
+    .await;
+
+    let path = load_path(&snapshot.status, &LaneId::Afc("lane3".into())).unwrap();
+    assert_eq!(
+        (path.entry, path.exit, path.hub),
+        (PathSensor::Triggered, PathSensor::Triggered, PathSensor::Triggered)
+    );
+    // The Box Turtle's buffer stands in for the switch before the extruder (`pin_tool_start: buffer`).
+    assert_eq!((path.extruder, path.toolhead), (PathSensor::Absent, PathSensor::Triggered));
+    assert_eq!((path.position, path.buffer), (Some(LOADED), Some(BufferSide::Tension)));
+    assert!(filament::printer_sensors(&snapshot.status).all(|sensor| !sensor.object.contains("lane")));
 }
 
 /// Commands sent one after another must reach the printer in that order; a heater target is absolute, so a

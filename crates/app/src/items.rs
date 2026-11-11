@@ -8,9 +8,10 @@ use crate::{
 use freakymate_core::color::Rgba;
 use freakymate_core::domain::filament_match::{self, Difference, Supply, ToolMatch, Verdict};
 use freakymate_core::domain::heads::{HeadRow, PickUp};
+use freakymate_core::domain::load_path::{self, LoadPath};
 use freakymate_core::domain::machine_tree::MachineTree;
 use freakymate_core::domain::spools::{self, FilamentColors, Lane, SpoolHolder};
-use freakymate_core::sources::happy_hare::{self, FilamentPath, PathSensor};
+use freakymate_core::sources::happy_hare::PathSensor;
 use freakymate_core::sources::klipper::tuning::TuningValue;
 use freakymate_core::sources::klipper::{Fan, Heater, Led, TemperatureSensor};
 use freakymate_core::sources::led_effect::LedEffect;
@@ -163,6 +164,10 @@ pub(crate) fn head_item(row: &HeadRow, status: &PrinterStatus) -> HeadItem {
             _ => -1,
         },
         can_pick_spool: matches!(holder, Some(SpoolHolder::Tool(_) | SpoolHolder::ActiveSpool)),
+        path: row.extruder.as_deref().map_or_else(no_path_item, |extruder| {
+            let colors = row.lane.as_ref().map(|lane| lane_colors(status, lane)).unwrap_or_default();
+            load_path_item(&load_path::head_path(status, extruder), "", &colors)
+        }),
     }
 }
 
@@ -297,29 +302,68 @@ pub(crate) fn tuning_item(value: &TuningValue) -> TuningItem {
     }
 }
 
-/// The way of the filament of the selected gate, in the colours of what is in it (see `gate_colors`).
-pub(crate) fn filament_path_item(path: &FilamentPath, gate: i32, colors: &FilamentColors) -> FilamentPathItem {
-    let sensor = |sensor: PathSensor| match sensor {
+/// The state of a sensor on the path for the drawing: -1 not fitted, 0 free, 1 triggered.
+fn sensor_state(sensor: PathSensor) -> i32 {
+    match sensor {
         PathSensor::Absent => -1,
         PathSensor::Free => 0,
         PathSensor::Triggered => 1,
-    };
+    }
+}
+
+/// The card without a lane to show: no filament, no sensors.
+pub(crate) fn no_path_item() -> FilamentPathItem {
     FilamentPathItem {
-        position: path.position,
+        position: load_path::UNKNOWN,
+        bowden_progress: -1.0,
+        gate_entry_sensor: -1,
+        gate_sensor: -1,
+        extruder_sensor: -1,
+        toolhead_sensor: -1,
+        hub_sensor: -1,
+        ..FilamentPathItem::default()
+    }
+}
+
+/// The load path of a lane of either source; `label` names the lane's piece. A lane that holds no filament has no
+/// position, so nothing is drawn filled.
+pub(crate) fn load_path_item(path: &LoadPath, label: &str, colors: &FilamentColors) -> FilamentPathItem {
+    FilamentPathItem {
+        position: path.position.unwrap_or(load_path::UNKNOWN),
         direction: path.direction,
-        distance: view::path_distance(path.distance).into(),
-        gate_label: match gate {
-            happy_hare::BYPASS => "Bypass".into(),
-            gate if gate >= 0 => format!("Gate {gate}").into(),
-            _ => SharedString::new(),
-        },
+        distance: path.distance.map(view::path_distance).unwrap_or_default().into(),
+        gate_label: label.into(),
         bowden_progress: path.bowden_progress.map_or(-1.0, |progress| progress as f32),
-        gate_entry_sensor: sensor(path.gate_entry_sensor),
-        gate_sensor: sensor(path.gate_exit_sensor),
-        extruder_sensor: sensor(path.extruder_sensor),
-        toolhead_sensor: sensor(path.toolhead_sensor),
+        gate_entry_sensor: sensor_state(path.entry),
+        gate_sensor: sensor_state(path.exit),
+        extruder_sensor: sensor_state(path.extruder),
+        toolhead_sensor: sensor_state(path.toolhead),
+        hub_sensor: sensor_state(path.hub),
         colors: bar_colors(colors),
     }
+}
+
+/// The colours of the filament in a lane: of a multi-colour spool, else the one colour its source reports (AFC falls
+/// back to the spool's).
+pub(crate) fn lane_colors(status: &PrinterStatus, lane: &Lane) -> FilamentColors {
+    let spool = lane.spool.as_ref();
+    if let Some(spool) = spool.filter(|spool| spool.is_multi_color()) {
+        return FilamentColors { colors: spool.colors.clone(), longitudinal: spool.has_longitudinal_colors() };
+    }
+    let color = match (lane.gate, &lane.name) {
+        (Some(gate), _) => status
+            .happy_hare()
+            .and_then(|mmu| mmu.gates.iter().find(|state| state.index == gate))
+            .and_then(|state| state.color),
+        (None, Some(name)) => status
+            .afc
+            .as_ref()
+            .and_then(|afc| afc.lane(name))
+            .and_then(|state| state.color)
+            .or_else(|| spool.and_then(|spool| spool.colors.first().copied())),
+        (None, None) => None,
+    };
+    FilamentColors { colors: color.into_iter().collect(), longitudinal: false }
 }
 
 /// An id, index or group number for a Slint model: -1 when there is none or it does not fit.

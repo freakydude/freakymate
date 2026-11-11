@@ -10,7 +10,7 @@ pub mod stale_gate_map;
 mod sync_feedback;
 
 pub use gates::{GateAvailability, LoadedFilament, MmuGate, BYPASS};
-pub use sensors::{is_shown_by_mmu, FilamentPath, MmuSensor, PathSensor};
+pub use sensors::{is_shown_by_mmu, MmuSensor, PathSensor};
 pub use sync_feedback::{
     FlowGuard, FlowGuardState, SyncFeedback, SyncFeedbackState, ORIGIN_ENCODER, ORIGIN_SYNC_FEEDBACK,
 };
@@ -27,6 +27,8 @@ use sync_feedback::{read_flow_rate, read_flowguard, read_sync_feedback};
 
 /// Oldest Happy Hare the project supports; older versions report different fields.
 const MIN_VERSION: (u32, u32) = (4, 1);
+/// The toolhead a unit names when its section has no `toolhead` (`mmu_unit.py` L462-463 at 7df830f).
+const DEFAULT_TOOLHEAD: &str = "default";
 
 /// Position of the selector servo (`mmu.selector.servo`, `mmu_linear_servo_selector.py`): up releases the filament,
 /// down grips it, move holds it while the selector moves.
@@ -69,7 +71,7 @@ pub struct MmuStatus {
     /// What to do about the pause (`pause_hint`, Happy Hare 4.2 and newer); empty before or outside a pause.
     pub pause_hint: String,
     pub filament: LoadedFilament,
-    /// Where the filament of the selected gate is, see [`FilamentPath`].
+    /// Where the filament of the selected gate is (`filament_pos`), see [`crate::domain::load_path`].
     pub filament_pos: i32,
     /// 1 loading, -1 unloading, 0 unknown.
     pub filament_direction: i32,
@@ -111,6 +113,11 @@ pub struct MmuUnit {
     pub num_gates: usize,
     /// The Klipper extruder the unit feeds (`extruder_name` of its section, `extruder` by default).
     pub extruder: String,
+    /// The `[mmu_toolhead <name>]` that owns the extruder and toolhead sensors on the unit's way (`toolhead`, `default`
+    /// by default; `mmu_unit.py` L462-463 at 7df830f). Several units may name the same.
+    pub toolhead: String,
+    /// The `[mmu_buffer <name>]` on the unit's way (`buffer`), which owns the buffer sensors; `None` without one.
+    pub buffer: Option<String>,
     /// The unit has the bypass (`mmu_machine.unit_<n>.has_bypass`; `mmu_unit.py` `has_bypass()`, and `mmu_machine.py`
     /// `unit_with_bypass` allows only one unit per machine).
     pub has_bypass: bool,
@@ -138,13 +145,15 @@ fn read_units(machine: &Value, num_units: usize, settings: &Value) -> Vec<MmuUni
             let name = text(unit, "name");
             let display_name = Some(text(unit, "display_name")).filter(|shown| !shown.is_empty()).unwrap_or(name);
             let section = settings.get(format!("mmu_unit {}", name.to_lowercase()));
-            let extruder = section.map(|section| text(section, "extruder_name")).filter(|name| !name.is_empty());
+            let option = |key: &str| section.map(|section| text(section, key)).filter(|value| !value.is_empty());
             Some(MmuUnit {
                 name: name.to_owned(),
                 display_name: display_name.to_owned(),
                 first_gate: count(unit, "first_gate")?,
                 num_gates: count(unit, "num_gates")?,
-                extruder: extruder.unwrap_or(NOZZLE_HEATER).to_owned(),
+                extruder: option("extruder_name").unwrap_or(NOZZLE_HEATER).to_owned(),
+                toolhead: option("toolhead").unwrap_or(DEFAULT_TOOLHEAD).to_owned(),
+                buffer: option("buffer").map(str::to_owned),
                 has_bypass: flag(unit, "has_bypass"),
             })
         })
@@ -152,16 +161,6 @@ fn read_units(machine: &Value, num_units: usize, settings: &Value) -> Vec<MmuUni
 }
 
 impl MmuStatus {
-    pub fn filament_path(&self) -> FilamentPath {
-        FilamentPath::new(
-            &self.sensors,
-            self.filament_pos,
-            self.filament_direction.signum(),
-            self.filament_position,
-            self.bowden_progress,
-        )
-    }
-
     /// The sensors to list on their own: neither the filament path draws them nor the buffer (sync feedback).
     pub fn listed_sensors(&self) -> Vec<&MmuSensor> {
         listed_sensors(&self.sensors, self.sync_feedback.is_some())
@@ -269,7 +268,6 @@ fn parse_version(text: &str) -> Option<(u32, u32)> {
 #[cfg(test)]
 mod tests {
     use super::gates::gate_color;
-    use super::sensors::path_sensor_names;
     use super::*;
     use serde_json::json;
 
@@ -286,7 +284,14 @@ mod tests {
 
         let units = read_units(&machine, 2, &Value::Null);
 
-        assert_eq!(units, [MmuUnit { first_gate: 0, num_gates: 4, extruder: "extruder".into(), ..MmuUnit::default() }]);
+        let expected = MmuUnit {
+            first_gate: 0,
+            num_gates: 4,
+            extruder: "extruder".into(),
+            toolhead: "default".into(),
+            ..MmuUnit::default()
+        };
+        assert_eq!(units, [expected]);
         assert!(units[0].contains(3) && !units[0].contains(4));
     }
 
@@ -618,57 +623,31 @@ mod tests {
     }
 
     #[test]
-    fn the_path_has_the_gate_entry_and_exit_and_skips_disabled_sensors() {
-        let path = |sensors: Value, progress: f64| {
-            read_mmu(&store(json!({ "mmu": {
-                "filament_pos": 3, "filament_direction": 1, "filament_position": 412.6, "sensors": sensors,
-                "bowden_progress": progress
-            } })))
-            .unwrap()
-            .filament_path()
-        };
+    fn reads_the_position_on_the_path_and_skips_disabled_sensors() {
+        let mmu = read_mmu(&store(json!({ "mmu": {
+            "filament_pos": 3, "filament_direction": 1, "filament_position": 412.6, "bowden_progress": 35.0,
+            "sensors": { "mmu_entry": true, "extruder": null }
+        } })))
+        .unwrap();
 
-        let both = path(json!({ "mmu_entry": true, "mmu_exit": false, "extruder": null, "toolhead": true }), 35.0);
-        assert_eq!((both.position, both.direction, both.distance, both.bowden_progress), (3, 1, 412.6, Some(0.35)));
-        assert_eq!((both.gate_entry_sensor, both.gate_exit_sensor), (PathSensor::Triggered, PathSensor::Free));
-        assert_eq!(both.extruder_sensor, PathSensor::Absent, "disabled");
-        assert_eq!(both.toolhead_sensor, PathSensor::Triggered);
-        let shared = path(json!({ "mmu_shared_exit": true }), -1.0);
-        assert_eq!((shared.gate_exit_sensor, shared.bowden_progress), (PathSensor::Triggered, None));
-        assert_eq!(read_mmu(&store(json!({ "mmu": {} }))).unwrap().filament_path().position, -1);
+        assert_eq!((mmu.filament_pos, mmu.filament_direction, mmu.filament_position), (3, 1, 412.6));
+        assert_eq!(mmu.bowden_progress, Some(0.35));
+        assert_eq!(mmu.sensors.iter().find(|sensor| sensor.name == "extruder").unwrap().triggered, None);
+        let unknown = read_mmu(&store(json!({ "mmu": { "bowden_progress": -1 } }))).unwrap();
+        assert_eq!((unknown.filament_pos, unknown.bowden_progress), (-1, None));
     }
 
+    /// The load path draws entry, exit, shared exit and the sensors at the extruder; the list shows the rest.
     #[test]
-    fn the_sensors_on_the_path_are_named_once() {
-        let sensors = |names: &[(&str, bool)]| -> Vec<MmuSensor> {
-            names.iter().map(|(name, on)| MmuSensor { name: (*name).into(), triggered: Some(*on) }).collect()
-        };
-        assert_eq!(
-            path_sensor_names(&sensors(&[("mmu_entry", true), ("mmu_exit", false)])),
-            ["mmu_entry", "mmu_exit", "extruder", "toolhead"]
-        );
-        assert_eq!(path_sensor_names(&sensors(&[("mmu_entry", true)])), ["mmu_entry", "extruder", "toolhead"]);
-    }
+    fn the_sensors_on_the_path_are_not_listed_again() {
+        let sensors = ["mmu_entry", "mmu_exit", "mmu_shared_exit", "extruder", "toolhead", "encoder"]
+            .into_iter()
+            .map(|name| MmuSensor { name: name.into(), triggered: Some(true) })
+            .collect();
+        let mmu = MmuStatus { sensors, ..MmuStatus::default() };
 
-    #[test]
-    fn every_sensor_of_the_path_is_optional() {
-        let path = |sensors: Value| {
-            read_mmu(&store(json!({ "mmu": { "filament_pos": 10, "sensors": sensors } }))).unwrap().filament_path()
-        };
-        let all_absent = |path: FilamentPath| {
-            [path.gate_entry_sensor, path.gate_exit_sensor, path.extruder_sensor, path.toolhead_sensor]
-                .iter()
-                .all(|sensor| *sensor == PathSensor::Absent)
-        };
+        let listed: Vec<&str> = mmu.listed_sensors().iter().map(|sensor| sensor.name.as_str()).collect();
 
-        assert!(all_absent(path(json!({}))), "no sensors at all: the path is drawn without marks");
-        assert!(all_absent(read_mmu(&store(json!({ "mmu": {} }))).unwrap().filament_path()), "no sensor list");
-        let only_toolhead = path(json!({ "toolhead": true }));
-        assert_eq!(only_toolhead.toolhead_sensor, PathSensor::Triggered);
-        assert_eq!(
-            (only_toolhead.gate_entry_sensor, only_toolhead.gate_exit_sensor, only_toolhead.extruder_sensor),
-            (PathSensor::Absent, PathSensor::Absent, PathSensor::Absent)
-        );
-        assert_eq!(path(json!({})).position, 10, "the position does not depend on sensors");
+        assert_eq!(listed, ["encoder"]);
     }
 }

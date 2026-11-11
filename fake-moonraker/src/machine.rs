@@ -16,6 +16,12 @@ pub struct MmuUnitSpec {
     pub gates: usize,
     /// `extruder_name` option: the Klipper extruder the unit feeds.
     pub extruder: &'static str,
+    /// `toolhead` option: the `[mmu_toolhead <name>]` section of the head the unit feeds; several units may name the
+    /// same one (`mmu_unit.py` L463-473; `config/base/mmu_hardware.cfg` L154 defaults to `default`).
+    pub toolhead: &'static str,
+    /// `buffer` option: the `[mmu_buffer <name>]` section, shared if several units name it (`mmu_unit.py` L530-546).
+    /// The installer names it after the unit (`installer/Kconfig.sync_feedback_buffer` L84).
+    pub buffer: Option<&'static str>,
 }
 
 /// Two units on one extruder, as `happy-hare-units` has them (`extruder_name` defaults to `extruder`).
@@ -27,6 +33,8 @@ pub const MMU_UNITS_ONE_EXTRUDER: [MmuUnitSpec; 2] = [
         version: "1.1sb",
         gates: 4,
         extruder: "extruder",
+        toolhead: "default",
+        buffer: Some("ercf"),
     },
     MmuUnitSpec {
         name: "tradrack",
@@ -35,6 +43,8 @@ pub const MMU_UNITS_ONE_EXTRUDER: [MmuUnitSpec; 2] = [
         version: "1.0",
         gates: 4,
         extruder: "extruder",
+        toolhead: "default",
+        buffer: Some("tradrack"),
     },
 ];
 
@@ -47,6 +57,8 @@ pub const MMU_UNITS_ON_HEADS: [MmuUnitSpec; 2] = [
         version: "1.1sb",
         gates: 4,
         extruder: "extruder",
+        toolhead: "t0",
+        buffer: Some("ercf"),
     },
     MmuUnitSpec {
         name: "tradrack",
@@ -55,6 +67,8 @@ pub const MMU_UNITS_ON_HEADS: [MmuUnitSpec; 2] = [
         version: "1.0",
         gates: 4,
         extruder: "extruder1",
+        toolhead: "t1",
+        buffer: Some("tradrack"),
     },
 ];
 
@@ -83,7 +97,7 @@ pub struct MachineProfile {
     /// Extra fans, LEDs with the led_effect plugin, a WLED strip of Moonraker, more temperature sensors and firmware
     /// retraction.
     pub devices: bool,
-    /// Number of filament sensors, taken from the front of the list of the profile (`FILAMENT_SENSORS` or `MMU_FILAMENT_SENSORS`).
+    /// Number of filament sensors, taken from the front of the list (`FILAMENT_SENSORS`; the profiles with Happy Hare units list the sensors of their units instead).
     pub filament_sensors: usize,
     /// A probe (`[probe]`, simulated like a BLTouch).
     pub probe: bool,
@@ -129,18 +143,6 @@ impl InitializeOn {
 /// Klipper object names of the simulated filament sensors; the second reports a runout.
 pub const FILAMENT_SENSORS: [&str; 2] =
     ["filament_switch_sensor toolhead_runout", "filament_motion_sensor extruder_encoder"];
-
-/// Happy Hare sensors as Klipper objects, as listed by a real single-lane type-B machine with a sync-feedback buffer
-/// (Happy Hare 4.1.0, `objects.list`, 2026-10-25). Names come from `mmu_constants.py`; the gate suffix is kept.
-/// The machine has no shared exit sensor and no encoder.
-pub const MMU_FILAMENT_SENSORS: [&str; 6] = [
-    "filament_switch_sensor mmu_entry_0",
-    "filament_switch_sensor mmu_exit_0",
-    "filament_switch_sensor toolhead",
-    "filament_switch_sensor extruder",
-    "filament_switch_sensor filament_compression",
-    "filament_switch_sensor filament_tension",
-];
 
 impl MachineProfile {
     pub const MAX_MMU_GATES: usize = 16;

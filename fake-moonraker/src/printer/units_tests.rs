@@ -339,3 +339,189 @@ fn the_empty_lane_of_the_tool_changer_cannot_be_loaded() {
     assert!(error.message().starts_with("Current lane not loaded"));
     assert_eq!(printer.status()["toolhead"]["extruder"], "extruder1");
 }
+
+// Filament sensors of Happy Hare units
+
+fn sensor_names(printer: &Printer) -> Vec<String> {
+    let mut sensors: Vec<String> = names(printer)
+        .into_iter()
+        .filter_map(|name| name.strip_prefix("filament_switch_sensor ").map(str::to_owned))
+        // `toolhead_runout` belongs to the voron base of the AFC profiles, not to AFC.
+        .filter(|name| name != "toolhead_runout")
+        .collect();
+    sensors.sort();
+    sensors
+}
+
+fn detected(printer: &Printer, sensor: &str) -> Value {
+    printer.status()[format!("filament_switch_sensor {sensor}")]["filament_detected"].clone()
+}
+
+#[test]
+fn one_unit_lists_its_sensors_without_prefix() {
+    let printer = with(MachineProfile::happy_hare(4));
+
+    // The older profiles list the first five of the six sensors of the recorded machine.
+    assert_eq!(sensor_names(&printer), ["extruder", "filament_compression", "mmu_entry_0", "mmu_exit_0", "toolhead"]);
+}
+
+#[test]
+fn two_units_on_one_head_list_gate_sensors_and_prefixed_owner_sensors() {
+    let printer = with(MachineProfile::happy_hare_units());
+
+    let mut expected: Vec<String> =
+        (0..8).flat_map(|gate| [format!("mmu_entry_{gate}"), format!("mmu_exit_{gate}")]).collect();
+    expected.extend(
+        [
+            "default:extruder",
+            "default:toolhead",
+            "ercf:filament_compression",
+            "ercf:filament_tension",
+            "tradrack:filament_compression",
+            "tradrack:filament_tension",
+            "tradrack:mmu_shared_exit",
+        ]
+        .map(str::to_owned),
+    );
+    expected.sort();
+    assert_eq!(sensor_names(&printer), expected);
+}
+
+#[test]
+fn two_units_on_two_heads_have_one_toolhead_each() {
+    let printer = with(MachineProfile::toolchanger_mmu());
+
+    let sensors = sensor_names(&printer);
+    for expected in ["t0:extruder", "t0:toolhead", "t1:extruder", "t1:toolhead", "tradrack:mmu_shared_exit"] {
+        assert!(sensors.contains(&expected.to_owned()), "missing {expected}");
+    }
+    assert!(!sensors.contains(&"default:toolhead".to_owned()));
+    assert!(!sensors.contains(&"ercf:mmu_shared_exit".to_owned()));
+}
+
+#[test]
+fn the_units_name_their_toolhead_and_buffer_in_the_settings() {
+    let one_head = settings(&with(MachineProfile::happy_hare_units()));
+    let two_heads = settings(&with(MachineProfile::toolchanger_mmu()));
+
+    assert_eq!(one_head["mmu_unit ercf"]["toolhead"], "default");
+    assert_eq!(one_head["mmu_unit tradrack"]["toolhead"], "default");
+    assert!(one_head.get("mmu_toolhead default").is_some());
+    assert!(one_head.get("mmu_toolhead t0").is_none());
+    assert_eq!(two_heads["mmu_unit ercf"]["toolhead"], "t0");
+    assert_eq!(two_heads["mmu_unit tradrack"]["toolhead"], "t1");
+    assert_eq!(two_heads["mmu_unit tradrack"]["buffer"], "tradrack");
+    for section in ["mmu_toolhead t0", "mmu_toolhead t1", "mmu_buffer ercf", "mmu_buffer tradrack"] {
+        assert!(two_heads.get(section).is_some(), "missing {section}");
+    }
+    assert!(two_heads.get("mmu_toolhead default").is_none());
+}
+
+#[test]
+fn loading_a_gate_of_the_second_unit_triggers_its_sensors_and_the_shared_toolhead() {
+    let mut printer = with(MachineProfile::happy_hare_units());
+    // Before any load the gates hold filament at their entry; the last gate is empty.
+    assert_eq!(detected(&printer, "mmu_entry_5"), true);
+    assert_eq!(detected(&printer, "mmu_entry_7"), false);
+    assert_eq!(detected(&printer, "mmu_exit_5"), false);
+
+    run(&mut printer, "MMU_HOME\nMMU_SELECT GATE=5\nMMU_LOAD").unwrap();
+
+    assert_eq!(detected(&printer, "mmu_exit_5"), true);
+    assert_eq!(detected(&printer, "tradrack:mmu_shared_exit"), true);
+    assert_eq!(detected(&printer, "default:extruder"), true);
+    assert_eq!(detected(&printer, "default:toolhead"), true);
+    assert_eq!(detected(&printer, "mmu_exit_1"), false);
+    assert_eq!(detected(&printer, "mmu_entry_1"), true);
+}
+
+#[test]
+fn only_the_toolhead_of_the_selected_unit_sees_the_filament() {
+    let mut printer = with(MachineProfile::toolchanger_mmu());
+
+    run(&mut printer, "MMU_HOME\nMMU_SELECT GATE=5\nMMU_LOAD").unwrap();
+    assert_eq!(detected(&printer, "t1:toolhead"), true);
+    assert_eq!(detected(&printer, "t1:extruder"), true);
+    assert_eq!(detected(&printer, "t0:toolhead"), false);
+    assert_eq!(detected(&printer, "t0:extruder"), false);
+
+    run(&mut printer, "MMU_UNLOAD\nMMU_SELECT GATE=1\nMMU_LOAD").unwrap();
+    assert_eq!(detected(&printer, "t0:toolhead"), true);
+    assert_eq!(detected(&printer, "t1:toolhead"), false);
+    assert_eq!(detected(&printer, "tradrack:mmu_shared_exit"), false);
+}
+
+// AFC sensors and buffer
+
+#[test]
+fn afc_lists_switch_sensors_buffer_and_tool_end_of_the_box_turtle() {
+    let printer = with(MachineProfile::afc());
+
+    assert_eq!(
+        sensor_names(&printer),
+        [
+            "TN_compressed",
+            "TN_expanded",
+            "Turtle_1_Hub",
+            "extruder_tool_end",
+            "lane1_load",
+            "lane1_prep",
+            "lane2_load",
+            "lane2_prep",
+            "lane3_load",
+            "lane3_prep",
+            "lane4_load",
+            "lane4_prep"
+        ]
+    );
+    assert!(names(&printer).contains(&"AFC_buffer TN".to_owned()));
+}
+
+#[test]
+fn afc_sensors_and_buffer_follow_the_tool_change() {
+    let mut printer = homed(MachineProfile::afc());
+    let status = printer.status();
+    assert_eq!(status["AFC_buffer TN"]["state"], "Advancing");
+    assert_eq!(status["AFC_buffer TN"]["active_lane"], "lane2");
+    assert_eq!(status["AFC_stepper lane1"]["buffer"], "TN");
+    assert_eq!(status["AFC_stepper lane1"]["buffer_status"], "Advancing");
+    assert_eq!(status["AFC_extruder extruder"]["tool_end_status"], true);
+    assert_eq!(status["AFC"]["buffers"], json!(["TN"]));
+    assert_eq!(status["AFC_BoxTurtle Turtle_1"]["buffers"], json!(["TN"]));
+    assert_eq!(detected(&printer, "extruder_tool_end"), true);
+    assert_eq!(detected(&printer, "Turtle_1_Hub"), true);
+
+    run(&mut printer, "TOOL_UNLOAD").unwrap();
+    let status = printer.status();
+    assert_eq!(status["AFC_buffer TN"]["state"], "Unknown");
+    assert_eq!(status["AFC_buffer TN"]["enabled"], false);
+    assert_eq!(status["AFC_extruder extruder"]["tool_end_status"], false);
+    assert_eq!(detected(&printer, "extruder_tool_end"), false);
+    assert_eq!(detected(&printer, "Turtle_1_Hub"), false);
+
+    run(&mut printer, "CHANGE_TOOL LANE=lane3").unwrap();
+    assert_eq!(printer.status()["AFC_buffer TN"]["active_lane"], "lane3");
+    assert_eq!(detected(&printer, "extruder_tool_end"), true);
+    assert_eq!(detected(&printer, "lane3_prep"), true);
+    assert_eq!(detected(&printer, "lane4_prep"), false);
+}
+
+#[test]
+fn afc_settings_name_the_buffer_and_the_tool_end_pin() {
+    let settings = settings(&with(MachineProfile::afc()));
+
+    assert_eq!(settings["afc_buffer tn"]["type"], "switched");
+    assert!(settings["afc_buffer tn"]["advance_pin"].is_string());
+    assert!(settings["afc_buffer tn"]["trailing_pin"].is_string());
+    assert!(settings["afc_extruder extruder"]["pin_tool_end"].is_string());
+    assert_eq!(settings["afc_extruder extruder"]["buffer"], "TN");
+    assert_eq!(settings["afc_boxturtle turtle_1"]["buffer"], "TN");
+}
+
+#[test]
+fn the_afc_tool_changer_has_no_switch_sensors_because_the_u1_template_has_no_pins() {
+    let printer = with(MachineProfile::afc_toolchanger());
+
+    assert!(sensor_names(&printer).is_empty());
+    assert!(!names(&printer).iter().any(|name| name.starts_with("AFC_buffer")));
+}

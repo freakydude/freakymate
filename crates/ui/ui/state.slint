@@ -130,6 +130,8 @@ export global Printer {
     in property <BedMapItem> bed-map;
     // Happy Hare (4.1 or newer). Without it the Filament page has no MMU tabs.
     in property <bool> has-mmu;
+    // The Gates tab has tiles: the gates of Happy Hare or the lanes of AFC (then only the tabs Gates and Extruder).
+    in property <bool> has-lanes;
     in property <bool> mmu-unsupported;
     in property <[MmuGateItem]> mmu-gates;
     // The pages of the Gates tab, all views one after the other; `mmu-page-ranges` says which belong to a view: one
@@ -239,6 +241,11 @@ export global Printer {
     in property <BarColors> spool-colors;
     // Where the filament of the selected gate is, for the drawing of its way.
     in property <FilamentPathItem> mmu-path;
+    // The load path card of the Gates tab: the lane whose tile was tapped last, else the loaded one.
+    in property <FilamentPathItem> lane-path;
+    // The buffer on the way of that lane: "" none, tension | neutral | compressed | unknown. With Happy Hare the
+    // gauge (`mmu-buffer-*`) shows the state; AFC has the word only.
+    in property <string> lane-buffer;
     in property <bool> spool-low;
     // Heating to what the spool in use recommends.
     in property <bool> has-spool-preset;
@@ -379,9 +386,12 @@ export global SpoolPicker {
     in-out property <int> tool: -1;
     // What the tool belongs to (a head such as `T1`, an AFC lane), for the title; empty for none.
     in-out property <string> target;
+    // The tile (row of `Printer.mmu-gates`) to assign a spool to, -1 for none; the same for a gate and a lane of AFC.
+    in-out property <int> lane: -1;
 
     public function show(gate: int, current: int) {
         self.gate = gate;
+        self.lane = -1;
         self.tool = -1;
         self.target = "";
         self.current = current;
@@ -389,8 +399,19 @@ export global SpoolPicker {
         Actions.load-spools();
     }
 
+    public function show-lane(row: int, current: int, target: string) {
+        self.gate = -1;
+        self.tool = -1;
+        self.lane = row;
+        self.target = target;
+        self.current = current;
+        self.open = true;
+        Actions.load-spools();
+    }
+
     public function show-tool(tool: int, current: int, target: string) {
         self.gate = -1;
+        self.lane = -1;
         self.tool = tool;
         self.target = target;
         self.current = current;
@@ -522,7 +543,7 @@ export global Confirm {
         if (self.action == "emergency-stop") { Actions.emergency-stop(); }
         if (self.action == "run-macro") { Actions.run-macro(self.argument); }
         if (self.action == "recover-toolchanger") { Actions.initialize-toolchanger(true); }
-        if (self.action == "mmu-eject") { Actions.mmu-eject(self.argument.to-float()); }
+        if (self.action == "lane-eject") { Actions.lane-eject(self.argument.to-float()); }
         if (self.action == "mmu-motors-off") { Actions.mmu-motors-off(); }
         if (self.action == "mmu-check-gate") { Actions.mmu-check-gate(self.argument.to-float()); }
         if (self.action == "mmu-check-all-gates") { Actions.mmu-check-all-gates(); }

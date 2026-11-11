@@ -9,6 +9,7 @@ pub mod gate_pages;
 pub mod heads;
 pub mod job_end;
 pub mod light;
+pub mod load_path;
 pub mod machine_tree;
 pub mod pause;
 pub mod prepared_job;

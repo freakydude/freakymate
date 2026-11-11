@@ -86,8 +86,8 @@ export component VerdictIcon inherits Image {
     colorize: root.verdict == "fits" ? Theme.success : Theme.warning;
 }
 
-// A gate as a tile: the colour of the filament as the left edge over the full height (`FilamentSwatch`), beside it the
-// gate and the tools that take its filament, the material (smaller in steps when long, never cut), the name or spool and
+// A gate or a lane of AFC as a tile: the colour of the filament as the left edge over the full height (`FilamentSwatch`), beside it the
+// gate (or lane) and the tools that take its filament, the material (smaller in steps when long, never cut), the name or spool and
 // what is left of it, and whether the gate has filament.
 export component GateTile inherits SlotTile {
     in property <MmuGateItem> gate;
@@ -99,7 +99,7 @@ export component GateTile inherits SlotTile {
     property <length> material-size: root.material.character-count <= 5 ? 19px : root.material.character-count <= 7 ? 16px : 14px;
 
     selected: root.gate.selected;
-    label: @tr("Gate {}", root.gate.index);
+    label: root.gate.title;
     // The selection border takes 3 px; the colour edge sits inside it, otherwise it forms the corner of the tile.
     content-padding: root.selected ? 3px : 0px;
 
@@ -123,10 +123,11 @@ export component GateTile inherits SlotTile {
             HorizontalLayout {
                 spacing: Theme.spacing-small;
                 Text {
-                    text: @tr("Gate {}", root.gate.index);
+                    text: root.gate.title;
                     color: Theme.foreground;
                     font-size: Theme.font-normal;
                     font-weight: 700;
+                    overflow: elide;
                 }
                 // The tools that take their filament from this gate; several share it after a remap.
                 Text {

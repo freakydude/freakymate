@@ -1,5 +1,6 @@
-// The way of the filament from the gate to the nozzle, drawn from Happy Hare's state (`filament_pos`, direction,
-// sensors, gate colour) instead of its console line: a tube that fills in the colour of the spool.
+// The way of the filament from the gate or lane to the nozzle, drawn from the state of Happy Hare or AFC (position on
+// Happy Hare's `filament_pos` scale, direction, sensors, colour): a tube that fills in the colour of the spool. With
+// `head-only` just the part at the head: extruder sensor, extruder gears, sensor behind them and nozzle.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
@@ -47,7 +48,10 @@ export component FilamentPath inherits VerticalLayout {
     in property <FilamentPathItem> path;
     // Print page: one line without labels.
     in property <bool> compact;
+    // The head's part only (the Extruder view of a tool changer head): nothing of gate, hub and bowden.
+    in property <bool> head-only;
 
+    property <bool> has-hub: root.path.hub-sensor >= 0;
     property <int> position: root.path.position;
     property <int> direction: root.path.direction;
     property <string> distance: root.compact ? "" : root.path.distance;
@@ -74,6 +78,8 @@ export component FilamentPath inherits VerticalLayout {
             return root.position == 3 ? 0.5 : root.position == 2 ? 0.1 : 0;
         }
         if (piece == 2) { return root.position >= 5 ? 1 : 0; }
+        // From the lane's exit to the hub.
+        if (piece == 5) { return root.position >= 1 ? 1 : 0; }
         // Behind the extruder gears: 7 means the gears have pulled the filament in.
         if (piece == 3) { return root.position >= 8 ? 1 : root.position == 7 ? 0.3 : 0; }
         return root.position >= 10 ? 1 : root.position == 9 ? 0.5 : 0;
@@ -95,12 +101,14 @@ export component FilamentPath inherits VerticalLayout {
             // The place stays, so the tube does not move when the filament starts or stops.
             opacity: root.direction == 0 ? 0 : 1;
         }
-        // Where the filament enters the gate from the spool.
-        SensorMark { state: root.path.gate-entry-sensor; }
-        Tube { horizontal-stretch: 1; fill: root.fill(0); filament: root.tube-colors; }
-        SensorMark { state: root.path.gate-sensor; }
-        Tube { horizontal-stretch: 5; fill: root.fill(1); filament: root.tube-colors; }
-        Tube { horizontal-stretch: 1; fill: root.fill(2); filament: root.tube-colors; }
+        if !root.head-only: SensorMark { state: root.path.gate-entry-sensor; }
+        if !root.head-only: Tube { horizontal-stretch: 1; fill: root.fill(0); filament: root.tube-colors; }
+        if !root.head-only: SensorMark { state: root.path.gate-sensor; }
+        // Where the lanes of a unit meet, when the printer has a sensor there.
+        if !root.head-only && root.has-hub: Tube { horizontal-stretch: 1; fill: root.fill(5); filament: root.tube-colors; }
+        if !root.head-only && root.has-hub: SensorMark { state: root.path.hub-sensor; }
+        if !root.head-only: Tube { horizontal-stretch: 5; fill: root.fill(1); filament: root.tube-colors; }
+        if !root.head-only: Tube { horizontal-stretch: 1; fill: root.fill(2); filament: root.tube-colors; }
         SensorMark { state: root.path.extruder-sensor; }
         // The extruder gears: lit once the filament has reached them (6) or they have it (7 and on).
         Image {
@@ -129,12 +137,19 @@ export component FilamentPath inherits VerticalLayout {
     }
 
     // Names under the stations; left out on the print page.
-    if !root.compact: HorizontalLayout {
+    if !root.compact && !root.head-only: HorizontalLayout {
         padding-left: 24px;
         padding-right: root.distance != "" ? 100px : 26px;
         Label { text: root.path.gate-label; horizontal-stretch: 1; horizontal-alignment: left; }
+        if root.has-hub: Label { text: @tr("Hub"); horizontal-stretch: 1; }
         Label { text: @tr("Bowden"); horizontal-stretch: 5; }
         Label { text: @tr("Extruder"); horizontal-stretch: 3; }
+        Label { text: @tr("Nozzle"); horizontal-stretch: 1; horizontal-alignment: right; }
+    }
+    if !root.compact && root.head-only: HorizontalLayout {
+        padding-left: 24px;
+        padding-right: 26px;
+        Label { text: @tr("Extruder"); horizontal-stretch: 3; horizontal-alignment: left; }
         Label { text: @tr("Nozzle"); horizontal-stretch: 1; horizontal-alignment: right; }
     }
 }

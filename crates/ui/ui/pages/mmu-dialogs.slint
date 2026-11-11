@@ -56,17 +56,17 @@ component ColorSwatch inherits Rectangle {
     }
 }
 
-// One gate: select, load, preload, check or eject it, and the filament in it: the spool with Spoolman, otherwise
-// material and colour in Happy Hare's gate map. The title names the tools that take their filament from the gate;
-// they and the EndlessSpool group are set on the Tools tab only.
-// Actions that move the filament close the dialog, so the filament path on the tab shows how it goes; the settings
+// One tile of the Gates tab, a gate of Happy Hare or a lane of AFC: load, unload, eject it, and the filament in it: the
+// spool with Spoolman, otherwise material and colour in Happy Hare's gate map or in the lane. Select, Preload, Check
+// and the title's tools are Happy Hare's; the tools and the EndlessSpool group are set on the Tools tab only.
+// Actions that move the filament close the dialog, so the load path on the tab shows how it goes; the settings
 // keep it open. The dialog hangs from the top, so its actions stay in the same place with and without Spoolman.
 export component GateDialog inherits Scrim {
     property <MmuGateItem> item: Printer.mmu-gates[MmuDialogs.gate-row];
     // A gate without a spool of Spoolman (no Spoolman at all, or a spool that is not kept there) has its material and
     // colour in Happy Hare's gate map, and a tap sets them right away. With a spool, Spoolman gives them, and when
-    // Happy Hare takes them from Spoolman (`pull`) they cannot be set here.
-    property <bool> sets-filament: Printer.mmu-gate-map-local && (!Printer.has-spoolman || root.item.spool-id < 0);
+    // Happy Hare takes them from Spoolman (`pull`) they cannot be set here. AFC has no such mode: its lane always takes them.
+    property <bool> sets-filament: !Printer.has-mmu || (Printer.mmu-gate-map-local && (!Printer.has-spoolman || root.item.spool-id < 0));
     visible: MmuDialogs.gate-row >= 0 && MmuDialogs.gate-row < Printer.mmu-gates.length;
 
     function close() {
@@ -83,7 +83,7 @@ export component GateDialog inherits Scrim {
             padding: Theme.dialog-padding;
             spacing: Theme.spacing;
             DialogHeader {
-                title: root.item.tools != "" ? @tr("Gate {} · {}", root.item.index, root.item.tools) : @tr("Gate {}", root.item.index);
+                title: root.item.tools != "" ? root.item.title + " · " + root.item.tools : root.item.title;
                 close => { root.close(); }
                 GateAvailabilityLabel {
                     availability: root.item.availability;
@@ -117,20 +117,20 @@ export component GateDialog inherits Scrim {
                         color: root.item.spool-low ? Theme.warning : Theme.muted;
                     }
                 }
-                // With Spoolman the gate takes the filament of a spool.
+                // With Spoolman the tile takes the filament of a spool.
                 if Printer.has-spoolman: IconButton {
                     width: 200px;
                     icon: Icons.filament-spool;
                     text: root.item.spool-id >= 0 ? @tr("Change spool") : @tr("Pick spool");
                     horizontal: true;
-                    clicked => { SpoolPicker.show(root.item.index, root.item.spool-id); }
+                    clicked => { SpoolPicker.show-lane(MmuDialogs.gate-row, root.item.spool-id, root.item.title); }
                 }
             }
 
             HorizontalLayout {
                 spacing: Theme.spacing;
                 height: 76px;
-                IconButton {
+                if Printer.has-mmu: IconButton {
                     icon: Icons.mmu-select-gate;
                     text: @tr("Select");
                     // Happy Hare changes the gate only with the filament unloaded.
@@ -140,16 +140,25 @@ export component GateDialog inherits Scrim {
                         root.close();
                     }
                 }
-                IconButton {
+                // The loaded tile unloads, any other loads.
+                if !root.item.loaded: IconButton {
                     icon: Icons.mmu-load;
                     text: @tr("Load");
-                    enabled: Printer.mmu-filament != "loaded" && root.item.availability != "empty";
+                    enabled: (!Printer.has-mmu || Printer.mmu-filament != "loaded") && root.item.availability != "empty";
                     clicked => {
-                        Actions.mmu-load-gate(root.item.index);
+                        Actions.lane-load(MmuDialogs.gate-row);
                         root.close();
                     }
                 }
-                IconButton {
+                if root.item.loaded: IconButton {
+                    icon: Icons.mmu-unload;
+                    text: @tr("Unload");
+                    clicked => {
+                        Actions.lane-unload(MmuDialogs.gate-row);
+                        root.close();
+                    }
+                }
+                if Printer.has-mmu: IconButton {
                     icon: Icons.mmu-preload;
                     text: @tr("Preload");
                     // Happy Hare refuses to preload while printing.
@@ -159,7 +168,7 @@ export component GateDialog inherits Scrim {
                         root.close();
                     }
                 }
-                IconButton {
+                if Printer.has-mmu: IconButton {
                     icon: Icons.mmu-check-gate;
                     text: @tr("Check");
                     clicked => {
@@ -174,10 +183,12 @@ export component GateDialog inherits Scrim {
                 IconButton {
                     icon: Icons.mmu-eject;
                     text: @tr("Eject");
-                    enabled: root.item.availability != "empty";
-                    // Pulls the filament out of the MMU, so it asks first.
+                    enabled: root.item.availability != "empty" && (Printer.has-mmu || Printer.print-state != "printing");
+                    // Pulls the filament out of the unit, so it asks first.
                     clicked => {
-                        Confirm.ask(@tr("Eject filament"), @tr("Pulls the filament of gate {} out of the MMU. If it is loaded, it is only unloaded; eject again to pull it out.", root.item.index), "mmu-eject", root.item.index, false);
+                        Confirm.ask(@tr("Eject filament"), Printer.has-mmu
+                            ? @tr("Pulls the filament of gate {} out of the MMU. If it is loaded, it is only unloaded; eject again to pull it out.", root.item.index)
+                            : @tr("Pulls the filament of {} out of its unit.", root.item.title), "lane-eject", MmuDialogs.gate-row, false);
                         root.close();
                     }
                 }
@@ -189,7 +200,7 @@ export component GateDialog inherits Scrim {
                     horizontal-stretch: 1;
                     text: material;
                     checked: root.item.material == material;
-                    clicked => { Actions.set-gate-material(root.item.index, material); }
+                    clicked => { Actions.set-lane-material(MmuDialogs.gate-row, material); }
                 }
             }
             if root.sets-filament: HorizontalLayout {
@@ -198,7 +209,7 @@ export component GateDialog inherits Scrim {
                     horizontal-stretch: 1;
                     swatch: swatch;
                     checked: root.item.has-color && root.item.colors.first == swatch;
-                    clicked => { Actions.set-gate-color(root.item.index, swatch); }
+                    clicked => { Actions.set-lane-color(MmuDialogs.gate-row, swatch); }
                 }
             }
         }

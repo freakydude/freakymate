@@ -17,7 +17,8 @@ pub struct GatePage {
     pub unit: Option<String>,
     /// The head the unit sits on, when it sits on one.
     pub head: Option<String>,
-    /// Gate indices of the first and the last gate on the page (the span of the caption); `None` without gates.
+    /// Gate indices of the first and the last gate on the page (the span of the caption); `None` without gates and for
+    /// the lanes of AFC, which have no numbers.
     pub gates: Option<(usize, usize)>,
 }
 
@@ -40,39 +41,37 @@ pub enum BypassAt {
     Unit(usize),
 }
 
-/// What the split needs of one gate.
+/// What the split needs of one tile.
 struct Slot<'a> {
     row: usize,
-    gate: usize,
-    lane: Option<&'a Lane>,
+    lane: &'a Lane,
 }
 
 impl Slot<'_> {
     fn unit(&self) -> Option<usize> {
-        self.lane.and_then(|lane| lane.unit)
+        self.lane.unit
     }
 }
 
-/// The pages of `gates` (their indices in the order of the list), `per_page` tiles each.
+/// The pages of `tiles` (the gates of Happy Hare or the lanes of AFC, in the order of the list), `per_page` tiles each.
 ///
-/// - `head`: only the gates fed to this head; `None`: all of them.
+/// - `head`: only the lanes fed to this head; `None`: all of them.
 /// - `bypass`: the unit whose last tile is the bypass (kept after the last gate even on a page of its own). A view
-///   without gates of that unit (another head's) has no bypass.
-/// - `loaded`: the gate that is loaded or selected; the view opens on its unit.
+///   without lanes of that unit (another head's) has no bypass.
+/// - `loaded`: the row of the lane that is loaded or selected; the view opens on its unit.
 pub fn gate_pages(
-    gates: &[usize],
-    lanes: &[Lane],
+    tiles: &[Lane],
     head: Option<&str>,
     bypass: BypassAt,
     loaded: Option<usize>,
     per_page: usize,
 ) -> GatePages {
     let per_page = per_page.max(1);
-    let slots: Vec<Slot> = gates
+    let slots: Vec<Slot> = tiles
         .iter()
         .enumerate()
-        .map(|(row, &gate)| Slot { row, gate, lane: lanes.iter().find(|lane| lane.gate == Some(gate)) })
-        .filter(|slot| head.is_none_or(|name| slot.lane.and_then(|lane| lane.head.as_deref()) == Some(name)))
+        .map(|(row, lane)| Slot { row, lane })
+        .filter(|slot| head.is_none_or(|name| slot.lane.head.as_deref() == Some(name)))
         .collect();
 
     // One group per unit: gates of the same unit follow each other.
@@ -106,9 +105,9 @@ pub fn gate_pages(
             BypassAt::Unit(unit) => group[0].unit() == Some(unit),
         };
         let tiles = group.len() + usize::from(bypass);
-        let unit = lane.and_then(|lane| lane.unit_name.clone());
-        let on_head = unit.as_ref().and(lane.and_then(|lane| lane.head.clone()));
-        if loaded.is_some_and(|loaded| group.iter().any(|slot| slot.gate == loaded)) {
+        let unit = lane.unit_name.clone();
+        let on_head = unit.as_ref().and(lane.head.clone());
+        if loaded.is_some_and(|loaded| group.iter().any(|slot| slot.row == loaded)) {
             result.start = result.pages.len();
         }
         for page in 0..tiles.div_ceil(per_page).max(1) {
@@ -120,7 +119,7 @@ pub fn gate_pages(
                 bypass: bypass && skipped + per_page >= tiles,
                 unit: unit.clone(),
                 head: on_head.clone(),
-                gates: shown.first().zip(shown.last()).map(|(first, last)| (first.gate, last.gate)),
+                gates: shown.first().zip(shown.last()).and_then(|(first, last)| first.lane.gate.zip(last.lane.gate)),
             });
         }
     }
@@ -167,10 +166,6 @@ mod tests {
         lanes
     }
 
-    fn all(lanes: &[Lane]) -> Vec<usize> {
-        (0..lanes.len()).collect()
-    }
-
     fn shape(pages: &GatePages) -> Vec<(usize, usize, bool)> {
         pages.pages.iter().map(|page| (page.first_row, page.count, page.bypass)).collect()
     }
@@ -178,27 +173,24 @@ mod tests {
     #[test]
     fn one_unit_pages_by_five_and_the_bypass_follows_the_last_gate() {
         let lanes = lanes(&[8], &[]);
-        let pages = gate_pages(&all(&lanes), &lanes, None, BypassAt::LastUnit, None, 5);
+        let pages = gate_pages(&lanes, None, BypassAt::LastUnit, None, 5);
         assert_eq!(shape(&pages), [(0, 5, false), (5, 3, true)]);
         assert!(pages.pages.iter().all(|page| page.unit.is_none() && page.head.is_none()));
         // Exactly five gates: the bypass has a page of its own.
         let lanes = self::lanes(&[5], &[]);
-        assert_eq!(
-            shape(&gate_pages(&all(&lanes), &lanes, None, BypassAt::LastUnit, None, 5)),
-            [(0, 5, false), (5, 0, true)]
-        );
+        assert_eq!(shape(&gate_pages(&lanes, None, BypassAt::LastUnit, None, 5)), [(0, 5, false), (5, 0, true)]);
     }
 
     #[test]
     fn without_gates_the_bypass_is_the_only_tile() {
-        assert_eq!(shape(&gate_pages(&[], &[], None, BypassAt::LastUnit, None, 5)), [(0, 0, true)]);
-        assert!(gate_pages(&[], &[], None, BypassAt::Nowhere, None, 5).pages.is_empty());
+        assert_eq!(shape(&gate_pages(&[], None, BypassAt::LastUnit, None, 5)), [(0, 0, true)]);
+        assert!(gate_pages(&[], None, BypassAt::Nowhere, None, 5).pages.is_empty());
     }
 
     #[test]
     fn a_page_never_mixes_units_and_the_last_unit_holds_the_bypass() {
         let lanes = lanes(&[4, 4], &[]);
-        let pages = gate_pages(&all(&lanes), &lanes, None, BypassAt::LastUnit, None, 5);
+        let pages = gate_pages(&lanes, None, BypassAt::LastUnit, None, 5);
         assert_eq!(shape(&pages), [(0, 4, false), (4, 4, true)]);
         assert_eq!(pages.pages[0].unit.as_deref(), Some("ercf"));
         assert_eq!(pages.pages[1].unit.as_deref(), Some("tradrack"));
@@ -208,7 +200,7 @@ mod tests {
     #[test]
     fn the_bypass_follows_the_unit_that_has_it() {
         let lanes = lanes(&[4, 4, 4], &[]);
-        let pages = gate_pages(&all(&lanes), &lanes, None, BypassAt::Unit(1), None, 5);
+        let pages = gate_pages(&lanes, None, BypassAt::Unit(1), None, 5);
         assert_eq!(shape(&pages), [(0, 4, false), (4, 4, true), (8, 4, false)]);
     }
 
@@ -216,14 +208,14 @@ mod tests {
     fn a_head_without_the_unit_with_the_bypass_has_none() {
         let lanes = lanes(&[4, 4], &[Some("T0"), Some("T1")]);
         let at = BypassAt::Unit(0);
-        assert_eq!(shape(&gate_pages(&all(&lanes), &lanes, Some("T0"), at, None, 5)), [(0, 4, true)]);
-        assert_eq!(shape(&gate_pages(&all(&lanes), &lanes, Some("T1"), at, None, 5)), [(4, 4, false)]);
+        assert_eq!(shape(&gate_pages(&lanes, Some("T0"), at, None, 5)), [(0, 4, true)]);
+        assert_eq!(shape(&gate_pages(&lanes, Some("T1"), at, None, 5)), [(4, 4, false)]);
     }
 
     #[test]
     fn a_unit_with_nine_gates_takes_two_pages() {
         let lanes = lanes(&[9, 3], &[]);
-        let pages = gate_pages(&all(&lanes), &lanes, None, BypassAt::Nowhere, None, 5);
+        let pages = gate_pages(&lanes, None, BypassAt::Nowhere, None, 5);
         assert_eq!(shape(&pages), [(0, 5, false), (5, 4, false), (9, 3, false)]);
         assert_eq!(pages.pages[1].gates, Some((5, 8)));
         assert_eq!(pages.pages[1].unit.as_deref(), Some("ercf"));
@@ -232,7 +224,7 @@ mod tests {
     #[test]
     fn the_view_opens_on_the_first_page_of_the_unit_of_the_loaded_gate() {
         let lanes = lanes(&[9, 3], &[]);
-        let start = |loaded| gate_pages(&all(&lanes), &lanes, None, BypassAt::LastUnit, loaded, 5).start;
+        let start = |loaded| gate_pages(&lanes, None, BypassAt::LastUnit, loaded, 5).start;
         assert_eq!(start(None), 0);
         assert_eq!(start(Some(7)), 0, "the second page of the first unit opens on its first page");
         assert_eq!(start(Some(10)), 2);
@@ -242,19 +234,19 @@ mod tests {
     #[test]
     fn a_head_has_the_pages_of_its_own_gates_with_the_global_rows() {
         let lanes = lanes(&[4, 4], &[Some("T0"), Some("T1")]);
-        let pages = gate_pages(&all(&lanes), &lanes, Some("T1"), BypassAt::LastUnit, Some(5), 5);
+        let pages = gate_pages(&lanes, Some("T1"), BypassAt::LastUnit, Some(5), 5);
         assert_eq!(shape(&pages), [(4, 4, true)]);
         assert_eq!(pages.pages[0].head.as_deref(), Some("T1"));
         assert_eq!(pages.pages[0].unit.as_deref(), Some("tradrack"));
         assert_eq!(pages.start, 0);
-        let first = gate_pages(&all(&lanes), &lanes, Some("T0"), BypassAt::Nowhere, None, 5);
+        let first = gate_pages(&lanes, Some("T0"), BypassAt::Nowhere, None, 5);
         assert_eq!(shape(&first), [(0, 4, false)]);
     }
 
     #[test]
     fn a_unit_without_a_head_names_no_head() {
         let lanes = lanes(&[4, 4], &[None, Some("T1")]);
-        let pages = gate_pages(&all(&lanes), &lanes, None, BypassAt::Nowhere, None, 5);
+        let pages = gate_pages(&lanes, None, BypassAt::Nowhere, None, 5);
         assert_eq!(pages.pages[0].head, None);
         assert_eq!(pages.pages[1].head.as_deref(), Some("T1"));
     }
@@ -262,7 +254,7 @@ mod tests {
     #[test]
     fn a_head_with_a_single_unit_of_the_machine_has_no_caption() {
         let lanes = lanes(&[4], &[Some("T1")]);
-        let pages = gate_pages(&all(&lanes), &lanes, Some("T1"), BypassAt::LastUnit, None, 5);
+        let pages = gate_pages(&lanes, Some("T1"), BypassAt::LastUnit, None, 5);
         assert_eq!((pages.pages[0].unit.clone(), pages.pages[0].head.clone()), (None, None));
     }
 }

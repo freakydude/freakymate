@@ -13,6 +13,7 @@ export component FilamentHeadsFivePreview inherits AppWindow {
         Printer.has-unload-macro = true;
         Printer.has-spoolman = true;
         Printer.has-mmu = true;
+        Printer.has-lanes = true;
         Printer.has-drop = true;
         Printer.heads = [
             { name: "Toolhead_A", label: "T0", subtitle: "Toolhead_A", has-nozzle: true, temperature: 215, mounted: true, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T0", has-spool: true, spool-title: "Red PLA", spool-material: "PLA", spool-weight: "812 g", spool-colors: { first: #e03131, count: 1 }, spool-id: 1, spool-tool: 0, can-pick-spool: true },

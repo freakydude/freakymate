@@ -155,8 +155,8 @@ pub(super) fn mmu_gate(session: &mut Session) -> Result<(), String> {
     session.window.global::<MmuDialogs>().set_gate_row(1);
     {
         let actions = session.window.global::<Actions>();
-        actions.invoke_set_gate_material(1, "PETG".into());
-        actions.invoke_set_gate_color(1, slint::Color::from_rgb_u8(0xff, 0x80, 0x00));
+        actions.invoke_set_lane_material(1, "PETG".into());
+        actions.invoke_set_lane_color(1, slint::Color::from_rgb_u8(0xff, 0x80, 0x00));
     }
     session.wait_until("PETG in orange in gate 1", |snapshot| {
         let gate = snapshot.status.mmu.as_ref().and_then(|mmu| mmu.gates.get(1).cloned()).unwrap_or_default();
@@ -176,6 +176,9 @@ pub(super) fn filament_path_midway(session: &mut Session) -> Result<(), String> 
     };
     session.service.send(Command::RunGcode { script: "FAKE_MMU_FILAMENT POS=3 DIRECTION=1".into() });
     session.wait_until("filament in the bowden", at(3))?;
+    // The load path card shows the gate tapped last; the scene's earlier taps were on another one.
+    let selected = session.presenter.snapshot().status.mmu.map_or(-1, |mmu| mmu.gate);
+    session.window.global::<Actions>().invoke_lane_tapped(selected);
     session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
     session.show_page(Page::Filament, "filament-mmu-loading")?;
     session.service.send(Command::RunGcode { script: "FAKE_MMU_FILAMENT POS=0 DIRECTION=0".into() });

@@ -3,6 +3,7 @@
 mod calibration;
 mod filament;
 mod heating;
+mod lanes;
 mod layer_pause;
 mod lighting;
 mod mmu;
@@ -37,6 +38,11 @@ impl Command {
             Self::ClearLayerPause => layer_pause::clear(sources)?,
             Self::SetGateFilament { gate, material, color } => mmu::set_gate_filament(status, gate, material, color)?,
             Self::SetEndlessSpoolGroup { gate, group } => mmu::set_endless_spool_group(status, gate, group)?,
+            Self::LoadLane { lane } => lanes::load(status, lane)?,
+            Self::UnloadLane { lane } => lanes::unload(status, lane)?,
+            Self::EjectLane { lane } => lanes::eject(status, lane)?,
+            Self::AssignLaneSpool { lane, spool_id } => lanes::assign_spool(status, lane, spool_id)?,
+            Self::SetLaneFilament { lane, material, color } => lanes::set_filament(status, lane, material, color)?,
             Self::AssignToolSpool { tool, spool_id } => vec![assign_tool_spool(sources, status, tool, spool_id)?],
             Self::RunGcode { script } => match script.trim() {
                 "" => Vec::new(),

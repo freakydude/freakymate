@@ -12,10 +12,10 @@ export component FilamentMmuSpoolColorsPreview inherits AppWindow {
         Navigation.filament-tab = FilamentTab.gates;
         Printer.has-spoolman = true;
         Printer.mmu-gates = [
-            { index: 0, availability: "available", name: "Red", material: "ABS+", colors: { first: #e31f2b, count: 1 }, has-color: true, tools: "T0", selected: true, spool-text: "613 g", spool-low: false, spool-id: 18 },
-            { index: 1, availability: "available", name: "Red+Green", material: "PLA", colors: { first: #e31f2b, second: #2e7d32, count: 2 }, has-color: true, tools: "T1", selected: false, spool-text: "38 g", spool-low: true, spool-id: 21 },
-            { index: 2, availability: "buffered", name: "Silk Red+Gold+Black", material: "PLA", colors: { first: #ff0004, second: #ffa424, third: #000000, count: 3 }, has-color: true, tools: "T2", selected: false, spool-text: "802 g", spool-low: false, spool-id: 19 },
-            { index: 3, availability: "available", name: "", material: "PETG", colors: { first: #000000, count: 0 }, has-color: false, tools: "T3", selected: false, spool-text: "", spool-low: false, spool-id: -1 },
+            { title: "Gate 0", index: 0, availability: "available", name: "Red", material: "ABS+", colors: { first: #e31f2b, count: 1 }, has-color: true, tools: "T0", selected: true, spool-text: "613 g", spool-low: false, spool-id: 18 },
+            { title: "Gate 1", index: 1, availability: "available", name: "Red+Green", material: "PLA", colors: { first: #e31f2b, second: #2e7d32, count: 2 }, has-color: true, tools: "T1", selected: false, spool-text: "38 g", spool-low: true, spool-id: 21 },
+            { title: "Gate 2", index: 2, availability: "buffered", name: "Silk Red+Gold+Black", material: "PLA", colors: { first: #ff0004, second: #ffa424, third: #000000, count: 3 }, has-color: true, tools: "T2", selected: false, spool-text: "802 g", spool-low: false, spool-id: 19 },
+            { title: "Gate 3", index: 3, availability: "available", name: "", material: "PETG", colors: { first: #000000, count: 0 }, has-color: false, tools: "T3", selected: false, spool-text: "", spool-low: false, spool-id: -1 },
         ];
     }
 }

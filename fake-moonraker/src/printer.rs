@@ -10,7 +10,7 @@ use crate::gcode::{
 use crate::happy_hare::HappyHare;
 use crate::history::{Sample, TemperatureStore};
 use crate::layer_pause::LayerPause;
-use crate::machine::{MachineProfile, FILAMENT_SENSORS, MMU_FILAMENT_SENSORS};
+use crate::machine::{MachineProfile, FILAMENT_SENSORS};
 use crate::print_objects::{self, Definitions};
 use serde_json::{json, Map, Value};
 use std::time::Duration;

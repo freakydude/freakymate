@@ -1,10 +1,12 @@
-// Filament: the gates of the MMU, extrude by hand, load and unload, the tools of the MMU and its service commands.
+// Filament: the gates of the MMU or the lanes of AFC, extrude by hand, load and unload, the tools of the MMU and its service commands.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, FilamentTab, HeadItem, Navigation, Printer, Severity, UiSettings } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
 import { ButtonKind, Card, IconButton, IconLabel, StepSelector, TabBar, TabButton } from "../components/controls.slint";
+import { FilamentSensorGrid } from "../components/sensor-grid.slint";
+import { FilamentPath } from "../components/filament-path.slint";
 import { SpoolStrip } from "../components/spool-strip.slint";
 import { HeadTabs } from "../components/head-tabs.slint";
 import { MmuGatesTab } from "mmu.slint";
@@ -118,27 +120,18 @@ component ExtruderTab inherits Rectangle {
                         clicked => { Actions.extrude(UiSettings.extrude-length, UiSettings.extrude-speed); }
                     }
                 }
-                if Printer.filament-sensors.length > 0: Card {
-                    // The head tabs leave no room for a heading; the labels say what the sensors are.
-                    title: root.has-head ? "" : @tr("Filament sensors");
+                // A tool changer shows the head's part of the filament path here; the sensors of the machine are on System.
+                if root.has-head && root.head.has-nozzle: Card {
                     icon: Icons.filament-sensor;
-                    // Grid with equal columns, so every name gets the same width.
-                    sensor-grid := Rectangle {
-                        property <int> columns: max(1, min(Printer.filament-sensors.length, floor(self.width / 180px)));
-                        property <length> cell-width: (self.width - (self.columns - 1) * Theme.spacing) / self.columns;
-                        property <length> row-height: 26px;
-                        height: ceil(Printer.filament-sensors.length / self.columns) * self.row-height;
-                        for sensor[index] in Printer.filament-sensors: IconLabel {
-                            x: mod(index, sensor-grid.columns) * (sensor-grid.cell-width + Theme.spacing);
-                            y: floor(index / sensor-grid.columns) * sensor-grid.row-height;
-                            width: sensor-grid.cell-width;
-                            height: sensor-grid.row-height;
-                            icon: !sensor.enabled ? Icons.ui-minus : sensor.detected ? Icons.ui-check : Icons.filament-runout;
-                            text: sensor.label;
-                            color: !sensor.enabled ? Theme.muted : StateIcons.ok-color(sensor.detected, StateIcons.severity-color(Severity.attention));
-                            font-size: Theme.font-small;
-                        }
+                    FilamentPath {
+                        path: root.head.path;
+                        head-only: true;
                     }
+                }
+                if !root.has-head && Printer.filament-sensors.length > 0: Card {
+                    title: @tr("Filament sensors");
+                    icon: Icons.filament-sensor;
+                    FilamentSensorGrid { }
                 }
             }
 
@@ -192,8 +185,8 @@ component ExtruderTab inherits Rectangle {
     }
 }
 
-// With Happy Hare the gates come first, then the extruder by hand, the tools with EndlessSpool and the service
-// commands of the MMU; without it the extruder alone. The dialogs of a gate, the bypass and a tool cover the whole
+// With Happy Hare or AFC the gates (lanes) come first, then the extruder by hand, the tools with EndlessSpool and the service
+// commands of the MMU (AFC has the first two tabs only); without either the extruder alone. The dialogs of a gate, the bypass and a tool cover the whole
 // page. A tool changer adds the head level on top: a tab per head, the path tabs below the chosen head, and the tabs
 // of the machine (Tools, Service) beside the heads; a printer with one head looks as before.
 export component FilamentPage inherits Rectangle {
@@ -205,7 +198,7 @@ export component FilamentPage inherits Rectangle {
     property <bool> machine-tab: root.raw-tab == FilamentTab.tools || root.raw-tab == FilamentTab.service;
     property <FilamentTab> tab: root.has-heads
         ? (root.machine-tab && Printer.has-mmu ? root.raw-tab : root.path-tabs && !root.machine-tab ? root.raw-tab : root.path-tabs ? FilamentTab.gates : FilamentTab.extruder)
-        : Printer.has-mmu ? root.raw-tab : FilamentTab.extruder;
+        : Printer.has-mmu ? root.raw-tab : Printer.has-lanes ? (root.machine-tab ? FilamentTab.gates : root.raw-tab) : FilamentTab.extruder;
 
     VerticalLayout {
         if root.has-heads: HeadTabs {
@@ -221,7 +214,7 @@ export component FilamentPage inherits Rectangle {
             }
             tab-chosen(tab) => { Navigation.filament-tab = tab; }
         }
-        if !root.has-heads && Printer.has-mmu: TabBar {
+        if !root.has-heads && Printer.has-lanes: TabBar {
             TabButton {
                 icon: Icons.mmu-unit;
                 text: @tr("Gates");
@@ -234,13 +227,13 @@ export component FilamentPage inherits Rectangle {
                 checked: root.tab == FilamentTab.extruder;
                 clicked => { Navigation.filament-tab = FilamentTab.extruder; }
             }
-            TabButton {
+            if Printer.has-mmu: TabButton {
                 icon: Icons.mmu-ttg-map;
                 text: @tr("Tools");
                 checked: root.tab == FilamentTab.tools;
                 clicked => { Navigation.filament-tab = FilamentTab.tools; }
             }
-            TabButton {
+            if Printer.has-mmu: TabButton {
                 icon: Icons.mmu-maintenance;
                 text: @tr("Service");
                 checked: root.tab == FilamentTab.service;

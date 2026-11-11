@@ -87,13 +87,19 @@ export component MmuGatesTab inherits Rectangle {
                     width: tiles.cell-width;
                     height: tiles.height;
                     gate: Printer.mmu-gates[root.current.first-row + slot];
-                    clicked => { MmuDialogs.gate-row = root.current.first-row + slot; }
+                    clicked => {
+                        Actions.lane-tapped(root.current.first-row + slot);
+                        MmuDialogs.gate-row = root.current.first-row + slot;
+                    }
                 }
                 if root.current.bypass: BypassTile {
                     x: root.current.count * (tiles.cell-width + Theme.spacing);
                     width: tiles.cell-width;
                     height: tiles.height;
-                    clicked => { MmuDialogs.bypass-open = true; }
+                    clicked => {
+                        Actions.bypass-tapped();
+                        MmuDialogs.bypass-open = true;
+                    }
                 }
             }
             if root.pages > 1: IconButton {
@@ -112,8 +118,8 @@ export component MmuGatesTab inherits Rectangle {
                 VerticalLayout {
                     horizontal-stretch: 1;
                     spacing: Theme.spacing;
-                    // Gate to nozzle with the sensors on the way; further sensors below as chips.
-                    FilamentPath { path: Printer.mmu-path; }
+                    // Gate or lane to nozzle with the sensors on the way, the one tapped last; further sensors below as chips.
+                    FilamentPath { path: Printer.lane-path; }
                     // Grid with equal columns, so every name gets the same width.
                     if Printer.mmu-sensors.length > 0: sensor-grid := Rectangle {
                         property <int> columns: max(1, min(Printer.mmu-sensors.length, floor(self.width / 150px)));
@@ -133,17 +139,32 @@ export component MmuGatesTab inherits Rectangle {
                     }
                     // While the MMU holds the print, recovering needs the room of the buffer.
                     if root.needs-recovery: MmuRecoverRow { }
-                    if Printer.mmu-has-buffer && !root.needs-recovery: VerticalLayout {
+                    // The lane of AFC: the side its buffer leans to, as a word; nothing is measured beyond that.
+                    if !Printer.has-mmu && Printer.lane-buffer != "": IconLabel {
+                        icon: Icons.mmu-sync;
+                        text: Printer.lane-buffer == "unknown" ? @tr("Buffer: -") : @tr("Buffer: {}", MmuTexts.buffer(Printer.lane-buffer));
+                        color: Theme.muted;
+                        font-size: Theme.font-small;
+                    }
+                    // Happy Hare's buffer is the selected gate's: another lane on the card has none to show.
+                    if Printer.mmu-has-buffer && Printer.lane-buffer != "" && !root.needs-recovery: VerticalLayout {
                         spacing: Theme.spacing-small;
-                        IconLabel {
+                        if !root.compact: IconLabel {
                             icon: Icons.mmu-sync;
                             text: @tr("Buffer: {}", MmuTexts.buffer(Printer.mmu-buffer-state));
                             color: gauge.marker-color;
                             font-size: Theme.font-small;
                         }
-                        // The ends named beside the gauge, so the card keeps its height with the filament path above.
+                        // The ends named beside the gauge, so the card keeps its height with the filament path above;
+                        // under the head tabs the state word stands in the same line.
                         HorizontalLayout {
                             spacing: Theme.spacing;
+                            if root.compact: IconLabel {
+                                icon: Icons.mmu-sync;
+                                text: @tr("Buffer: {}", MmuTexts.buffer(Printer.mmu-buffer-state));
+                                color: gauge.marker-color;
+                                font-size: Theme.font-small;
+                            }
                             Text { text: @tr("Tension"); color: Theme.muted; font-size: Theme.font-small; vertical-alignment: center; }
                             gauge := BufferGauge {
                                 horizontal-stretch: 1;
@@ -153,7 +174,7 @@ export component MmuGatesTab inherits Rectangle {
                             Text { text: @tr("Compression"); color: Theme.muted; font-size: Theme.font-small; vertical-alignment: center; }
                         }
                     }
-                    HorizontalLayout {
+                    if Printer.has-mmu: HorizontalLayout {
                         spacing: Theme.spacing;
                         if Printer.mmu-flowguard-state != "off": IconLabel {
                             icon: Icons.mmu-flowguard;
@@ -170,7 +191,8 @@ export component MmuGatesTab inherits Rectangle {
                     }
                     Rectangle { vertical-stretch: 1; }
                 }
-                VerticalLayout {
+                // Unloading a lane of AFC is in its tile's dialog.
+                if Printer.has-mmu: VerticalLayout {
                     width: 120px;
                     spacing: Theme.spacing;
                     IconButton {

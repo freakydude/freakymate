@@ -37,6 +37,23 @@ const TOOLCHANGER_TYPE: &str = "Toolchanger";
 /// A tool changer lane has no hub switch: `hub` is `direct` (`AFC_extruder.py` L327-331).
 const DIRECT_HUB: &str = "direct";
 
+/// The TurtleNeck buffer of the Box Turtle: `AFC_buffer TN` of type `switched` (the default, `AFC_buffer.py` L47) with an
+/// advance and a trailing switch (L97-108). The clone has no template with these pins for a Box Turtle; the name `TN`
+/// is that of the AFC tests (`tests/test_AFC_buffer.py` L204) and the pins (`^Turtle_1:ADV`, `^Turtle_1:TRL`) follow the
+/// pattern of `templates/AFC_Claymore_1-AFC_Lite.cfg` L106-107: a profile choice.
+const BUFFER_NAME: &str = "TN";
+const BUFFER_ADVANCE_PIN: &str = "^Turtle_1:ADV";
+const BUFFER_TRAILING_PIN: &str = "^Turtle_1:TRL";
+/// `pin_tool_end` of the Box Turtle head: a sensor after the extruder gears (`AFC_extruder.py` L227, optional; the
+/// templates only have it as `#pin_tool_end: None`, `AFC_Hardware-AFC.cfg` L6). The pin itself is a profile choice.
+const TOOL_END_PIN: &str = "^PG11";
+/// `AFC_buffer.last_state` before any switch moved (`AFC_buffer.py` L54) and while the buffer feeds (L365).
+const BUFFER_STATE_IDLE: &str = "Unknown";
+const BUFFER_STATE_ADVANCING: &str = "Advancing";
+/// The Klipper object of the switches of AFC (`AFC_utils.py` L55): `enable_sensors_in_gui: True` as in
+/// `config/AFC.cfg` L15 shows them; with `False` the object is called `_filament_switch_sensor <name>` (L82-84).
+const SWITCH_SENSOR: &str = "filament_switch_sensor";
+
 /// Spoolman spools on the lanes at the start: the red PLA, the black ABS (the spool Moonraker has active at its start)
 /// and the blue PLA.
 const SPOOL_ON_FIRST_LANE: u32 = 1;
@@ -156,7 +173,23 @@ struct Head {
     tool_stn_unload: f64,
     /// `pin_tool_start`; `buffer` is a valid value that needs no switch (`AFC_extruder.py` L288-298).
     tool_start: Option<&'static str>,
+    /// `pin_tool_end` (`AFC_extruder.py` L227).
+    tool_end: Option<&'static str>,
+    /// `buffer` (`AFC_extruder.py` L233): needed when `pin_tool_start` is `buffer` (`AFC_lane.py` L636-646).
+    buffer: Option<&'static str>,
     lane_loaded: Option<String>,
+}
+
+impl Head {
+    /// A switch reports the filament in the toolhead; the `buffer` start needs none and stays false.
+    fn tool_start_status(&self) -> bool {
+        self.lane_loaded.is_some() && self.tool_start.is_some_and(|pin| pin != "buffer")
+    }
+
+    /// The sensor after the extruder gears sees the filament of the lane in the toolhead.
+    fn tool_end_status(&self) -> bool {
+        self.lane_loaded.is_some() && self.tool_end.is_some()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -168,6 +201,8 @@ pub struct Afc {
     maps: Vec<String>,
     /// Index of the head on the shuttle of a tool changer; the single head of a Box Turtle is always there.
     shuttle: Option<usize>,
+    /// The `AFC_buffer` of the unit (`buffer` of `AFC_BoxTurtle`, `AFC_unit.py` L78); the lanes use it.
+    buffer: Option<&'static str>,
 }
 
 impl Afc {
@@ -207,9 +242,13 @@ impl Afc {
             tool_stn: 72.0,
             tool_stn_unload: 100.0,
             tool_start: Some("buffer"),
+            tool_end: Some(TOOL_END_PIN),
+            buffer: Some(BUFFER_NAME),
             lane_loaded: Some("lane2".to_owned()),
         };
-        Self::assemble(AfcLayout::BoxTurtle, lanes, vec![head], Some(0))
+        let mut afc = Self::assemble(AfcLayout::BoxTurtle, lanes, vec![head], Some(0));
+        afc.buffer = Some(BUFFER_NAME);
+        afc
     }
 
     /// `AFC_Toolchanger Tools` with `AFC_extruder e0` to `e3`, each with its own `AFC_lane` (the template
@@ -221,6 +260,8 @@ impl Afc {
             tool_stn: 50.0,
             tool_stn_unload: 60.0,
             tool_start: None,
+            tool_end: None,
+            buffer: None,
             lane_loaded: None,
         };
         let lane = |number: usize| {
@@ -239,7 +280,7 @@ impl Afc {
 
     fn assemble(layout: AfcLayout, lanes: Vec<Lane>, heads: Vec<Head>, shuttle: Option<usize>) -> Self {
         let maps = lanes.iter().map(|lane| lane.map.clone()).collect();
-        Self { layout, lanes, heads, maps, shuttle }
+        Self { layout, lanes, heads, maps, shuttle, buffer: None }
     }
 
     /// The Klipper extruder of the head on the shuttle of a tool changer; `None` for the Box Turtle.
@@ -473,6 +514,13 @@ impl Afc {
         for head in 0..self.heads.len() {
             objects.insert(format!("AFC_extruder {}", self.heads[head].name), self.head_json(head));
         }
+        if let Some(buffer) = self.buffer {
+            objects.insert(format!("AFC_buffer {buffer}"), self.buffer_json());
+        }
+        for (name, detected) in self.switch_sensors() {
+            objects
+                .insert(format!("{SWITCH_SENSOR} {name}"), json!({ "enabled": true, "filament_detected": detected }));
+        }
         match self.layout {
             AfcLayout::BoxTurtle => {
                 objects.insert(format!("AFC_hub {BOX_TURTLE_UNIT}"), self.hub_json());
@@ -490,6 +538,82 @@ impl Afc {
             AfcLayout::BoxTurtle => (BOX_TURTLE_TYPE, BOX_TURTLE_UNIT),
             AfcLayout::Toolchanger => (TOOLCHANGER_TYPE, TOOLCHANGER_UNIT),
         }
+    }
+
+    fn buffer_names(&self) -> Vec<&'static str> {
+        self.buffer.into_iter().collect()
+    }
+
+    /// A lane of the buffer is in the toolhead: the buffer is enabled then (`AFC_buffer.enable_buffer`, L310-317).
+    fn buffer_active_lane(&self) -> Option<&str> {
+        self.lanes.iter().find(|lane| lane.tool_loaded).map(|lane| lane.name.as_str())
+    }
+
+    /// `AFC_buffer.last_state`. The fake does not keep the last state: `Advancing` while a lane feeds from the buffer,
+    /// else the state before any switch moved. A buffer that was used keeps its last state in AFC.
+    fn buffer_state(&self) -> &'static str {
+        if self.buffer_active_lane().is_some() {
+            BUFFER_STATE_ADVANCING
+        } else {
+            BUFFER_STATE_IDLE
+        }
+    }
+
+    /// The switch sensors AFC registers (`AFC_utils.add_filament_switch`) with the AFC state the fake keeps, named
+    /// without the object prefix. Only what the config has pins for: the Box Turtle template has `prep` and `load` for
+    /// every lane (`templates/AFC_Turtle_1.cfg` L35-36, ...; `AFC_lane.py` L257-282), a hub with a `switch_pin` (L123;
+    /// `AFC_hub.py` L69-70), a TurtleNeck buffer (`AFC_buffer.py` L97-108) and the head's tool sensors
+    /// (`AFC_extruder.py` L295-322; none for `pin_tool_start: buffer`). The U1 template has none of these pins
+    /// (`templates/AFC_Hardware_U1.cfg`: no `prep`, `load`, `switch_pin`, only `u1_filament_sensor_name`).
+    fn switch_sensors(&self) -> Vec<(String, bool)> {
+        let mut sensors = Vec::new();
+        if self.layout == AfcLayout::BoxTurtle {
+            for lane in &self.lanes {
+                sensors.push((format!("{}_prep", lane.name), lane.loaded));
+                sensors.push((format!("{}_load", lane.name), lane.loaded));
+            }
+            sensors.push((format!("{BOX_TURTLE_UNIT}_Hub"), self.hub_state()));
+        }
+        if let Some(buffer) = self.buffer {
+            // Neither switch is pressed while the buffer sits between them; the fake does not move it.
+            sensors.push((format!("{buffer}_expanded"), false));
+            sensors.push((format!("{buffer}_compressed"), false));
+        }
+        for head in &self.heads {
+            if head.tool_start.is_some_and(|pin| pin != "buffer") {
+                sensors.push((format!("{}_tool_start", head.name), head.tool_start_status()));
+            }
+            if head.tool_end.is_some() {
+                sensors.push((format!("{}_tool_end", head.name), head.tool_end_status()));
+            }
+        }
+        sensors
+    }
+
+    /// The switch of the hub sees the filament of a lane in the toolhead.
+    fn hub_state(&self) -> bool {
+        self.lanes.iter().any(|lane| lane.tool_loaded)
+    }
+
+    /// `AFC_buffer.get_status` (`AFC_buffer.py` L664-702) of a buffer of type `switched` with the defaults of the
+    /// options (L68-73, L90-92): no fault detection, no fault tracking. The rotation distance of the lane's stepper
+    /// is not simulated.
+    fn buffer_json(&self) -> Value {
+        let active = self.buffer_active_lane();
+        json!({
+            "state": self.buffer_state(),
+            "lanes": self.lane_names(),
+            "enabled": active.is_some(),
+            "rotation_distance": null,
+            "active_lane": active,
+            "multiplier_high": 1.1,
+            "multiplier_low": 0.9,
+            "multiplier": 1,
+            "fault_detection_enabled": false,
+            "error_sensitivity": 0,
+            "fault_timer": null,
+            "distance_to_fault": null,
+        })
     }
 
     fn lane_names(&self) -> Vec<&str> {
@@ -527,7 +651,7 @@ impl Afc {
             "maps": self.maps,
             "extruders": self.heads.iter().map(|head| head.name.as_str()).collect::<Vec<_>>(),
             "hubs": self.hub_names(),
-            "buffers": [],
+            "buffers": self.buffer_names(),
             "message": { "message": "", "type": "" },
             "led_state": true,
         })
@@ -547,8 +671,8 @@ impl Afc {
             "unit": self.unit().1,
             "hub": lane.hub,
             "extruder": self.heads[lane.head].name,
-            "buffer": null,
-            "buffer_status": null,
+            "buffer": self.buffer,
+            "buffer_status": self.buffer.map(|_| self.buffer_state()),
             "lane": lane.index,
             "map": lane.map,
             "load": lane.loaded,
@@ -592,20 +716,18 @@ impl Afc {
             AfcLayout::BoxTurtle => true,
             AfcLayout::Toolchanger => self.shuttle == Some(index),
         };
-        // A switch reports the filament in the toolhead; the `buffer` start needs none and stays false.
-        let tool_start_status = head.lane_loaded.is_some() && head.tool_start != Some("buffer");
         json!({
             "tool_stn": head.tool_stn,
             "tool_stn_unload": head.tool_stn_unload,
             "tool_sensor_after_extruder": 0.0,
             "tool_unload_speed": 25.0,
             "tool_load_speed": 25.0,
-            "buffer": null,
+            "buffer": head.buffer,
             "lane_loaded": head.lane_loaded,
             "tool_start": head.tool_start,
-            "tool_start_status": tool_start_status,
-            "tool_end": null,
-            "tool_end_status": false,
+            "tool_start_status": head.tool_start_status(),
+            "tool_end": head.tool_end,
+            "tool_end_status": head.tool_end_status(),
             "lanes": lanes,
             "on_shuttle": on_shuttle,
             "is_standalone": false,
@@ -617,7 +739,7 @@ impl Afc {
     /// `afc_hub.get_status` (`AFC_hub.py` L193-209); the switch sees the filament of a lane in the toolhead.
     fn hub_json(&self) -> Value {
         json!({
-            "state": self.lanes.iter().any(|lane| lane.tool_loaded),
+            "state": self.hub_state(),
             "cut": false,
             "cut_cmd": "AFC",
             "cut_dist": 50.0,
@@ -637,7 +759,7 @@ impl Afc {
             "lanes": self.lane_names(),
             "extruders": self.heads.iter().map(|head| head.name.as_str()).collect::<Vec<_>>(),
             "hubs": self.hub_names(),
-            "buffers": [],
+            "buffers": self.buffer_names(),
         })
     }
 
@@ -647,7 +769,7 @@ impl Afc {
     pub fn config_sections(&self) -> Vec<(String, Value)> {
         let mut sections = vec![
             // `AFC.py` L228: without `auto_home` a tool load on an unhomed printer is refused.
-            ("afc".to_owned(), json!({ "auto_home": false })),
+            ("afc".to_owned(), json!({ "auto_home": false, "enable_sensors_in_gui": true })),
         ];
         match self.layout {
             AfcLayout::BoxTurtle => self.box_turtle_sections(&mut sections),
@@ -659,7 +781,7 @@ impl Afc {
     fn box_turtle_sections(&self, sections: &mut Vec<(String, Value)>) {
         sections.push((
             format!("afc_boxturtle {}", BOX_TURTLE_UNIT.to_lowercase()),
-            json!({ "hub": BOX_TURTLE_UNIT, "extruder": "extruder" }),
+            json!({ "hub": BOX_TURTLE_UNIT, "extruder": "extruder", "buffer": BUFFER_NAME }),
         ));
         for lane in &self.lanes {
             sections.push((
@@ -674,12 +796,24 @@ impl Afc {
         }
         sections.push((
             format!("afc_hub {}", BOX_TURTLE_UNIT.to_lowercase()),
+            // `templates/AFC_Turtle_1.cfg` L123.
             json!({
+                "switch_pin": format!("^{BOX_TURTLE_UNIT}:HUB"),
                 "afc_bowden_length": HUB_BOWDEN_LENGTH,
                 "move_dis": 75.0,
                 "cut": false,
             }),
         ));
+        if let Some(buffer) = self.buffer {
+            sections.push((
+                format!("afc_buffer {}", buffer.to_lowercase()),
+                json!({
+                    "type": "switched",
+                    "advance_pin": BUFFER_ADVANCE_PIN,
+                    "trailing_pin": BUFFER_TRAILING_PIN,
+                }),
+            ));
+        }
         for head in &self.heads {
             sections.push((format!("afc_extruder {}", head.name), head_settings(head)));
         }
@@ -711,6 +845,12 @@ fn head_settings(head: &Head) -> Value {
     });
     if let Some(pin) = head.tool_start {
         settings["pin_tool_start"] = json!(pin);
+    }
+    if let Some(pin) = head.tool_end {
+        settings["pin_tool_end"] = json!(pin);
+    }
+    if let Some(buffer) = head.buffer {
+        settings["buffer"] = json!(buffer);
     }
     settings
 }

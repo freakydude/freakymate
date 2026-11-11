@@ -472,6 +472,81 @@ Rejected: unit chips above the tiles (one more row), the unit name only in the t
 Tool offsets and their calibration, part fans per head (`tool.fan`), IDEX and the stages after it, an overview of
 heads on the print page. README wording about tool changers and AFC: Frank decides after D.
 
+## Units, lanes and the load path (draft for package D2, 2026-11-11)
+
+Same hardware, same screen: a BoxTurtle under Happy Hare and under AFC is one unit with a drive per lane, a hub and a
+buffer, and looks the same. The sources differ in names, not in what they measure.
+
+### Facts the model relies on
+
+Measuring points from the spool to the nozzle (read from the source on 2026-11-11: Happy Hare `main` 4.2.0, AFC
+of 2026-08):
+
+| Point | Happy Hare | AFC |
+| --- | --- | --- |
+| Entry (spool → lane) | `mmu_entry_<gate>` | `<lane>_prep`, `AFC_lane.prep` |
+| Lane exit | `mmu_exit_<gate>` | `<lane>_load`, `AFC_lane.load` |
+| Hub | `[<unit>:]mmu_shared_exit` | `<hub>_Hub`, `AFC_hub.state` (none with `hub: direct`) |
+| Buffer | `[<buffer>:]filament_tension` / `filament_compression`, `<buffer>:filament_proportional` | `<buffer>_expanded` / `_compressed`, `AFC_buffer.state` |
+| Extruder entry | `[<toolhead>:]extruder` | `<extruder>_tool_start`, `AFC_extruder.tool_start_status` |
+| After the extruder gears | `[<toolhead>:]toolhead` | `<extruder>_tool_end`, `AFC_extruder.tool_end_status` |
+| Encoder | `[<encoder>:]encoder` | – |
+
+- Every point is optional in both. A point that is not fitted is not drawn (as today).
+- **Ties are stated.** AFC names the effective `unit`, `hub`, `buffer` and `extruder` in every lane's status, and the
+  extruder sensors sit on the `AFC_extruder`. Happy Hare names the owner as the prefix of the sensor object (unit,
+  buffer, encoder or toolhead, dropped with a single unit), and the unit names its `toolhead`, `buffer`, `encoder`
+  and `extruder_name` in `configfile.config`. So every MMU or AFC sensor belongs to exactly one unit, lane or head.
+- **Position.** Happy Hare reports the position of the loaded filament along the path (`filament_pos`, eleven
+  steps). AFC reports it coarser per lane: at the hub (`loaded_to_hub`), in the tool (`tool_loaded`), plus the lane
+  `status` while it moves. The card shows what the source says, no interpolation for AFC.
+- **Buffer direction.** AFC's sensor objects say `expanded` (state `Advancing`) and `compressed` (`Trailing`); they
+  map to Happy Hare's tension and compression.
+
+### Model in the core
+
+```text
+Unit      name, source (Happy Hare | AFC), lanes, hub: Point?, buffer: Buffer?, encoder: Point?
+Lane      (as today) + entry: Point?, exit: Point?, hub and buffer of its unit or its own (AFC per lane)
+Head path per extruder: entry: Point?, after_gears: Point?
+LoadPath  the chain for one lane: entry, exit, hub, bowden (with buffer), extruder entry, after gears, nozzle,
+          plus the position on it and the direction
+Point     Free | Triggered | Disabled
+```
+
+- `domain/load_path.rs` builds the chain for a lane from the tree: lane → unit → head. Both sources fill the same
+  structs; the UI draws one card. `FilamentPath` of Happy Hare becomes one of its inputs.
+- Sensors owned by the filament changer leave the printer's sensor list (today only Happy Hare's do). What is left
+  (a runout sensor of the printer) belongs to the machine.
+- Lane actions become one set of intents that the core resolves per source, like the existing commands:
+
+| Intent | Happy Hare | AFC |
+| --- | --- | --- |
+| Load lane | `MMU_SELECT GATE=` + `MMU_LOAD` | `CHANGE_TOOL LANE=` |
+| Unload | `MMU_UNLOAD` | `TOOL_UNLOAD LANE=` |
+| Eject lane (not while printing) | `MMU_EJECT GATE=` | `LANE_UNLOAD LANE=` |
+| Assign spool | `MMU_GATE_MAP GATE= SPOOLID=` | `SET_SPOOL_ID LANE= SPOOL_ID=` |
+| Material, colour | `MMU_GATE_MAP GATE= MATERIAL= COLOR=` | `SET_MATERIAL LANE= MATERIAL=`, `SET_COLOR LANE= COLOR=` |
+
+### Screens
+
+- **Gates tab with AFC:** lanes as tiles, one page per unit (D6), the same tile and dialog as a Happy Hare gate with
+  all intents above (Load, Unload, Eject, spool, material and colour; decided 2026-11-11). Happy Hare-only rows
+  (tool map, EndlessSpool, Check gate, Preload) are not shown for AFC.
+- **Load path card** (decided 2026-11-11): below the tiles as today, the chain of the lane whose tile was tapped
+  last, through its unit to its head; until a tile is tapped, the loaded lane. A lane that is not loaded shows its
+  own points (entry, exit) and the shared ones (hub, buffer, head) as they are, with no filament drawn past its
+  exit. Rejected: always the loaded lane (hides the sensors of the other lanes).
+- **Extruder view of a head:** the head's part of the chain (extruder entry, after gears, nozzle) instead of all
+  filament sensors of the machine.
+- **Machine sensors** (no tie, decided 2026-11-11): with several heads on System only; with one head on the
+  Extruder view as today. Rejected: on every head's view as "Printer" (repeats per head, ties nothing).
+
+### Not in D2
+
+AFC service actions (`AFC_RESET`, `AFC_LANE_RESET`, `RESET_FAILURE`, buffer settings), runout lanes (`SET_RUNOUT`),
+the tool map of AFC (`SET_MAP`), encoder details.
+
 ## Open questions
 
 - **IDEX: which nozzle on which carriage.** Klipper's `[dual_carriage]` does not name an extruder; the link lives

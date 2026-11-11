@@ -56,7 +56,24 @@ pub enum SpoolHolder {
     ActiveSpool,
 }
 
+/// What the commands of a lane address: a gate of Happy Hare, its bypass, or a lane of AFC by its name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LaneId {
+    Gate(usize),
+    Bypass,
+    Afc(String),
+}
+
 impl Lane {
+    /// The lane as its commands address it; `None` for the direct feed, which has no commands of its own.
+    pub fn id(&self) -> Option<LaneId> {
+        match (self.gate, &self.name) {
+            (Some(gate), _) => Some(LaneId::Gate(gate)),
+            (None, Some(name)) => Some(LaneId::Afc(name.clone())),
+            (None, None) => None,
+        }
+    }
+
     /// Where a spool for this lane is assigned; `None` for a head that is not in use and keeps no spool of its own,
     /// and for an AFC lane without tool (AFC sets the active spool itself).
     pub fn spool_holder(&self) -> Option<SpoolHolder> {
@@ -255,12 +272,17 @@ fn gate_lanes(mmu: &MmuStatus) -> Vec<Lane> {
 
 /// A lane per lane of AFC, named with its unit when AFC has several. Its spool is assigned through its tool.
 fn afc_lanes(afc: &AfcStatus) -> Vec<Lane> {
+    let mut units: Vec<&str> = Vec::new();
     afc.lanes
         .iter()
         .map(|lane| Lane {
             gate: None,
             name: Some(lane.name.clone()),
-            unit: None,
+            // AFC's units have no number; their order of first appearance numbers them.
+            unit: Some(units.iter().position(|unit| *unit == lane.unit).unwrap_or_else(|| {
+                units.push(&lane.unit);
+                units.len() - 1
+            })),
             unit_name: afc.several_units.then(|| lane.unit.clone()),
             head: None,
             extruder: lane.extruder.clone(),

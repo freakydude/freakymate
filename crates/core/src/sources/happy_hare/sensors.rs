@@ -20,8 +20,9 @@ pub struct MmuSensor {
 
 /// The sensor where the filament enters the gate from the spool.
 const GATE_ENTRY_SENSOR: &str = "mmu_entry";
-/// Sensors where the filament leaves the gate, in order of preference: the gate's own exit, then a shared exit.
-const GATE_EXIT_SENSORS: [&str; 2] = ["mmu_exit", "mmu_shared_exit"];
+/// Where the filament leaves the gate, and where the gates of a unit meet.
+const GATE_EXIT_SENSOR: &str = "mmu_exit";
+const SHARED_EXIT_SENSOR: &str = "mmu_shared_exit";
 const EXTRUDER_PATH_SENSOR: &str = "extruder";
 const TOOLHEAD_PATH_SENSOR: &str = "toolhead";
 
@@ -35,8 +36,9 @@ pub enum PathSensor {
 }
 
 impl PathSensor {
-    fn of(sensors: &[MmuSensor], name: &str) -> Self {
-        match sensors.iter().find(|sensor| sensor.name == name).and_then(|sensor| sensor.triggered) {
+    /// A switch that is triggered or free; `None` for one that is not fitted or disabled.
+    pub fn of_switch(triggered: Option<bool>) -> Self {
+        match triggered {
             Some(true) => Self::Triggered,
             Some(false) => Self::Free,
             None => Self::Absent,
@@ -44,62 +46,19 @@ impl PathSensor {
     }
 }
 
-/// The way of the filament from the gate to the nozzle, as Happy Hare's console draws it (`log_visual`): the
-/// position on the way (`filament_pos`, -1 unknown, 0 parked in the gate up to 10 loaded to the nozzle, see
-/// `FILAMENT_POS_*` in `mmu_constants.py`), the direction and the sensors along it.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct FilamentPath {
-    pub position: i32,
-    pub direction: i32,
-    pub distance: f64,
-    /// 0 to 1 of the bowden while Happy Hare moves through it (`bowden_progress`), `None` otherwise.
-    pub bowden_progress: Option<f64>,
-    pub gate_entry_sensor: PathSensor,
-    pub gate_exit_sensor: PathSensor,
-    pub extruder_sensor: PathSensor,
-    pub toolhead_sensor: PathSensor,
-}
-
-impl FilamentPath {
-    pub(super) fn new(
-        sensors: &[MmuSensor],
-        position: i32,
-        direction: i32,
-        distance: f64,
-        bowden_progress: Option<f64>,
-    ) -> Self {
-        let gate_exit_sensor = GATE_EXIT_SENSORS
-            .into_iter()
-            .map(|name| PathSensor::of(sensors, name))
-            .find(|sensor| *sensor != PathSensor::Absent)
-            .unwrap_or(PathSensor::Absent);
-        Self {
-            position,
-            direction,
-            distance,
-            bowden_progress,
-            gate_entry_sensor: PathSensor::of(sensors, GATE_ENTRY_SENSOR),
-            gate_exit_sensor,
-            extruder_sensor: PathSensor::of(sensors, EXTRUDER_PATH_SENSOR),
-            toolhead_sensor: PathSensor::of(sensors, TOOLHEAD_PATH_SENSOR),
-        }
-    }
-}
-
 /// Names of the sensors the path draws, so they are not listed a second time.
-pub(super) fn path_sensor_names(sensors: &[MmuSensor]) -> Vec<&'static str> {
-    let exit = GATE_EXIT_SENSORS.into_iter().find(|name| PathSensor::of(sensors, name) != PathSensor::Absent);
-    [GATE_ENTRY_SENSOR].into_iter().chain(exit).chain([EXTRUDER_PATH_SENSOR, TOOLHEAD_PATH_SENSOR]).collect()
-}
+/// The load path (`domain::load_path`) draws the gate's entry and exit, the shared exit as the hub, and the sensors
+/// before and after the extruder gears.
+const PATH_SENSORS: [&str; 5] =
+    [GATE_ENTRY_SENSOR, GATE_EXIT_SENSOR, SHARED_EXIT_SENSOR, EXTRUDER_PATH_SENSOR, TOOLHEAD_PATH_SENSOR];
 
 /// The sensors to list on their own: without those the filament path draws, and without the buffer sensors when
 /// `has_buffer` says that the buffer (sync feedback) shows them.
 pub(super) fn listed_sensors(sensors: &[MmuSensor], has_buffer: bool) -> Vec<&MmuSensor> {
-    let on_path = path_sensor_names(sensors);
     sensors
         .iter()
         .filter(|sensor| !(has_buffer && BUFFER_SENSORS.contains(&sensor.name.as_str())))
-        .filter(|sensor| !on_path.contains(&sensor.name.as_str()))
+        .filter(|sensor| !PATH_SENSORS.contains(&sensor.name.as_str()))
         .collect()
 }
 

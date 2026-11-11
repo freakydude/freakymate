@@ -8,6 +8,7 @@ mod tests;
 
 pub use error::CommandError;
 
+use crate::domain::machine_tree::LaneId;
 use crate::moonraker::Call;
 use crate::sources::happy_hare::commands as mmu;
 use crate::sources::klipper::commands::{self as klipper, run_gcode};
@@ -247,6 +248,30 @@ pub enum Command {
         material: Option<String>,
         color: Option<[u8; 3]>,
     },
+    // A lane of Happy Hare or AFC alike (`docs/multi-tool.md`, D2); resolved into the commands of its source.
+    /// Loads the lane into the toolhead (unloading another one first where the source does that).
+    LoadLane {
+        lane: LaneId,
+    },
+    /// Unloads the lane from the toolhead.
+    UnloadLane {
+        lane: LaneId,
+    },
+    /// Ejects the filament of the lane out of its unit.
+    EjectLane {
+        lane: LaneId,
+    },
+    /// Puts a Spoolman spool into the lane; `None` takes it out.
+    AssignLaneSpool {
+        lane: LaneId,
+        spool_id: Option<u32>,
+    },
+    /// Sets material or colour of the lane where the source keeps them; `None` keeps the value.
+    SetLaneFilament {
+        lane: LaneId,
+        material: Option<String>,
+        color: Option<[u8; 3]>,
+    },
     // Spoolman
     /// The spool Moonraker tracks the filament use of; `None` for none.
     SetActiveSpool {
@@ -384,6 +409,11 @@ impl Command {
             | Self::ClearLayerPause
             | Self::SetGateFilament { .. }
             | Self::SetEndlessSpoolGroup { .. }
+            | Self::LoadLane { .. }
+            | Self::UnloadLane { .. }
+            | Self::EjectLane { .. }
+            | Self::AssignLaneSpool { .. }
+            | Self::SetLaneFilament { .. }
             | Self::AssignToolSpool { .. } => return None,
         };
         Some(call)
@@ -464,6 +494,9 @@ impl Command {
                 | Self::MmuServo { .. }
                 | Self::MmuSelectBypass
                 | Self::MmuLoadBypass
+                | Self::LoadLane { .. }
+                | Self::UnloadLane { .. }
+                | Self::EjectLane { .. }
         )
     }
 }
