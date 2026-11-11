@@ -175,8 +175,8 @@ The fields a fragment needs; the full lists are in each project's `get_status()`
 | Klipper | `toolhead`, `extruder*`, `extruder_stepper <name>`, `dual_carriage` | the extruders; the carriages | `toolhead.extruder`; per extruder `temperature`, `target`; `extruder_stepper.motion_queue`; carriage modes |
 | Tool changer ([viesturz], [KTC-easy]) | `toolchanger`, `tool <name>` | `tool_names`, `tool_numbers`; per tool `tool_number`, `extruder`, `fan`, `gcode_*_offset` | `status` (`ready`, `changing`, `error`, …), `tool`, `tool_number`, `detected_tool`; viesturz only: per tool `detect_state` (`mounted`, `absent`, `unavailable`) and `heater` |
 | KTC ([TypQxQ]) | `ktc`, `ktc_tool <name>`, `ktc_toolchanger <name>` | `tools`; per tool `number`, `heater_names`, `offset` | `active_tool`, `active_tool_n`, `state`; per tool `state`, `heater_state` |
-| Happy Hare v4 | `mmu`, `mmu_machine`, `mmu_extruder <name>` | `mmu_machine.num_units`, `unit_<n>` with `first_gate`, `num_gates`, `display_name`; extruder per unit from `configfile` | `mmu.unit`, `tool`, `gate`, `ttg_map`, the `gate_*` arrays (across all units), `filament`, `print_state` |
-| AFC | `AFC`, `AFC_lane <name>` / `AFC_stepper <name>`, `AFC_extruder <name>`, units such as `AFC_BoxTurtle <name>`, `AFC_Toolchanger <name>` | `AFC.units`, `lanes`, `extruders`; per lane `unit`, `extruder`, `map`; Klipper extruder per `AFC_extruder` from `configfile` | `AFC.current_load`, `current_state`; per lane `status`, `tool_loaded`, `spool_id`, `color`, `material`; per `AFC_extruder` `lane_loaded`, `on_shuttle`, `status` |
+| Happy Hare v4 | `mmu`, `mmu_machine`, `mmu_extruder <name>` | `mmu_machine.num_units`, `unit_<n>` with `name`, `first_gate`, `num_gates`, `display_name`; extruder per unit from `configfile` (`mmu_unit <name>`: `extruder_name`, default `extruder`) | `mmu.unit`, `tool`, `gate`, `ttg_map`, the `gate_*` arrays (across all units), `filament`, `print_state` |
+| AFC | `AFC`, `AFC_lane <name>` / `AFC_stepper <name>`, `AFC_extruder <name>`, units such as `AFC_BoxTurtle <name>`, `AFC_Toolchanger <name>` | `AFC.lanes`; per lane `unit`, `extruder` (the `AFC_extruder`), `map`; per `AFC_extruder` from `configfile` the Klipper extruder (`extruder_name`, default its own name) and `toolchanger_unit` (a head of AFC's tool changer) | `AFC.current_load`, `current_state`; per lane `status`, `tool_loaded`, `spool_id`, `color`, `material`; per `AFC_extruder` `lane_loaded`, `on_shuttle`, `status` |
 
 Setups built from macros only (INDX under Klipper, IDEX, several extruders) often follow the convention that
 Fluidd's tool buttons read: macros `T0` … `Tn` with the variables `active` and `color` (Fluidd
@@ -200,6 +200,9 @@ Notes:
 
 - KTC-easy drops viesturz's per-tool `detect_state` and `heater`; both stay optional.
 - An AFC lane reports an empty status until AFC has finished starting up.
+- Neither Happy Hare nor AFC was seen on a real printer with several units or heads; the fields above and the fake
+  profiles `happy-hare-units`, `toolchanger-mmu`, `afc` and `afc-toolchanger` come from their sources (Happy Hare
+  commit 7df830f, AFC-Klipper-Add-On commit 5ea84ea).
 - No Klipper object reports the offsets of a second nozzle. Only the tool changers do (`gcode_*_offset`, KTC
   `offset`); for IDEX and two nozzles on a head they live in macros.
 
@@ -250,6 +253,9 @@ never needed for setups the detection covers:
    head of a lane, the comparison before a print checks each tool against its head; a view of the heads follows
    later.
 3. **Combinations**: AFC (with its tool changer unit) and Happy Hare v4 with several units; the unit as a label.
+   Lanes of every source attach to the nozzle of their extruder, so a unit on the extruder of a head feeds that head.
+   An AFC lane takes its spool through its tool (`SET_SPOOL_ID LANE=`) and counts as empty without filament. In the
+   gate view and its dialogs a gate is looked up by its index, not its position.
 4. **IDEX**: carriages, copy and mirror as two active paths.
 5. **Two nozzles on one head, several extruders into one nozzle**: rare, generic Klipper objects only.
 
@@ -268,12 +274,12 @@ and 5.
 - **IDEX: which nozzle on which carriage.** Klipper's `[dual_carriage]` does not name an extruder; the link lives
   in the `T0`/`T1` macros. Options: the order convention (`extruder` on the first carriage), observing which
   carriage becomes primary when an extruder is activated, or a setting. Proposal: convention plus setting.
-- **Happy Hare v4 together with a tool changer**: Happy Hare handles `Tn` and switches units, but nothing in its
-  code or documentation swaps the head; that is up to the user's macros. Whether there is a common pattern for it
-  (and which object then knows the head) needs a look at real configurations.
-- **AFC with a tool changer**: AFC turns each head into a lane of the tool changer unit and calls `SELECT_TOOL`
-  itself; the tool changer's own objects are there as well. Which of the two the tree trusts for the head is to be
-  decided (proposal: `toolchanger` for the head, AFC for the lanes).
+- **Happy Hare v4 together with a tool changer** (decided 2026-11-11): Happy Hare handles `Tn` and switches units,
+  but never the head (no `ACTIVATE_EXTRUDER` in its code); that is up to the user's macros. The tree only joins: the
+  gates of a unit hang at the head whose extruder the unit names. Which head is mounted comes from the tool changer.
+- **AFC with a tool changer** (decided 2026-11-11): with viesturz's `toolchanger` object the heads come from it and
+  the lanes from AFC. AFC's own tool changer (`[AFC_Toolchanger]`, written for the Snapmaker U1) is no viesturz
+  object; there the `AFC_extruder`s with `toolchanger_unit` are the heads and `on_shuttle` tells the mounted one.
 - **Several extruders into one nozzle**: `extruder_stepper.motion_queue` shows which extruder a stepper is synced to
   right now, so the link is known while it is synced. Whether an unsynced stepper still counts as a lane of that
   nozzle (from its `extruder:` option in the configuration) is open.

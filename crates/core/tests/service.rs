@@ -777,3 +777,77 @@ async fn commands_fail_while_moonraker_wants_a_login() {
 
     next_event(&mut channels, |event| matches!(event, Event::CommandFailed { .. })).await;
 }
+
+/// Head, gate or AFC lane, unit, extruder and whether it is in use, for each lane of the tree.
+type LaneSummary = (Option<String>, Option<usize>, Option<String>, Option<String>, String, bool);
+
+async fn tree_of(profile: MachineProfile, lanes: usize) -> (Vec<LaneSummary>, Snapshot) {
+    let endpoint = start_fake_with(profile).await;
+    let (_service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+    let has_lanes = |snapshot: &Snapshot| {
+        ready(snapshot)
+            && snapshot
+                .tree
+                .lanes(&Default::default())
+                .iter()
+                .filter(|lane| lane.gate.is_some() || lane.name.is_some())
+                .count()
+                == lanes
+    };
+    let snapshot = wait_for(&mut channels, has_lanes).await;
+    let summary = snapshot
+        .tree
+        .lanes(&Default::default())
+        .into_iter()
+        .map(|lane| (lane.head, lane.gate, lane.name, lane.unit_name, lane.extruder, lane.active))
+        .collect();
+    (summary, snapshot)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_gates_of_two_happy_hare_units_are_named_with_their_unit() {
+    let (lanes, _) = tree_of(MachineProfile::happy_hare_units(), 8).await;
+
+    assert!(lanes.iter().all(|lane| lane.0.is_none() && lane.4 == "extruder"));
+    let units: Vec<_> = lanes.iter().map(|lane| lane.3.as_deref()).collect();
+    assert_eq!(units, [[Some("ERCF"); 4], [Some("Tradrack"); 4]].concat());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn each_happy_hare_unit_feeds_the_head_of_its_extruder() {
+    let (lanes, snapshot) = tree_of(MachineProfile::toolchanger_mmu(), 8).await;
+
+    assert_eq!(snapshot.tree.carriages[0].heads.len(), 2);
+    let heads: Vec<_> = lanes.iter().map(|lane| (lane.0.as_deref(), lane.4.as_str())).collect();
+    assert_eq!(heads, [[(Some("T0"), "extruder"); 4], [(Some("T1"), "extruder1"); 4]].concat());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_lanes_of_a_box_turtle_feed_the_one_nozzle() {
+    let (lanes, snapshot) = tree_of(MachineProfile::afc(), 4).await;
+
+    let names: Vec<_> = lanes.iter().map(|lane| (lane.2.as_deref(), lane.5)).collect();
+    assert_eq!(names, [(Some("lane1"), false), (Some("lane2"), true), (Some("lane3"), false), (Some("lane4"), false)]);
+    let tree_lanes = snapshot.tree.lanes(&Default::default());
+    assert_eq!(tree_lanes.iter().map(|lane| lane.empty).collect::<Vec<_>>(), [false, false, false, true]);
+    assert_eq!(tree_lanes[2].spool_holder(), Some(spools::SpoolHolder::Tool(2)));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_heads_of_afcs_tool_changer_each_carry_their_lane() {
+    let (lanes, snapshot) = tree_of(MachineProfile::afc_toolchanger(), 4).await;
+
+    let heads = &snapshot.tree.carriages[0].heads;
+    assert_eq!(heads.iter().map(|head| head.active).collect::<Vec<_>>(), [false, true, false, false]);
+    let placed: Vec<_> = lanes.iter().map(|lane| (lane.0.as_deref(), lane.2.as_deref(), lane.4.as_str())).collect();
+    assert_eq!(
+        placed,
+        [
+            (Some("e0"), Some("e0"), "extruder"),
+            (Some("e1"), Some("e1"), "extruder1"),
+            (Some("e2"), Some("e2"), "extruder2"),
+            (Some("e3"), Some("e3"), "extruder3"),
+        ]
+    );
+}

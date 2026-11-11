@@ -16,6 +16,7 @@ pub use sync_feedback::{
 };
 
 use super::fields::{count, flag, integer, text};
+use super::klipper::NOZZLE_HEATER;
 use super::objects::ObjectStore;
 use super::subscription::Subscription;
 use crate::sourced::Sourced;
@@ -100,10 +101,16 @@ pub struct MmuStatus {
 }
 
 /// One unit of a Happy Hare machine: a run of gates that share a selector.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct MmuUnit {
+    /// The name of its `[mmu_unit <name>]` section; empty before Happy Hare 4.
+    pub name: String,
+    /// The name to show (`display_name`, else `name`).
+    pub display_name: String,
     pub first_gate: usize,
     pub num_gates: usize,
+    /// The Klipper extruder the unit feeds (`extruder_name` of its section, `extruder` by default).
+    pub extruder: String,
 }
 
 impl MmuUnit {
@@ -112,12 +119,23 @@ impl MmuUnit {
     }
 }
 
-/// `unit_0`, `unit_1`, … of `mmu_machine`; units that lack a gate range are skipped.
-fn read_units(machine: &Value, num_units: usize) -> Vec<MmuUnit> {
+/// `unit_0`, `unit_1`, … of `mmu_machine`; units that lack a gate range are skipped. The extruder of a unit is only in
+/// the configuration (`mmu_unit.py`: `extruder_name`, read when the unit is set up, so `configfile.settings` has it).
+fn read_units(machine: &Value, num_units: usize, settings: &Value) -> Vec<MmuUnit> {
     (0..num_units)
         .filter_map(|index| {
             let unit = machine.get(format!("unit_{index}"))?;
-            Some(MmuUnit { first_gate: count(unit, "first_gate")?, num_gates: count(unit, "num_gates")? })
+            let name = text(unit, "name");
+            let display_name = Some(text(unit, "display_name")).filter(|shown| !shown.is_empty()).unwrap_or(name);
+            let section = settings.get(format!("mmu_unit {}", name.to_lowercase()));
+            let extruder = section.map(|section| text(section, "extruder_name")).filter(|name| !name.is_empty());
+            Some(MmuUnit {
+                name: name.to_owned(),
+                display_name: display_name.to_owned(),
+                first_gate: count(unit, "first_gate")?,
+                num_gates: count(unit, "num_gates")?,
+                extruder: extruder.unwrap_or(NOZZLE_HEATER).to_owned(),
+            })
         })
         .collect()
 }
@@ -217,7 +235,11 @@ pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
             .and_then(Value::as_str)
             .map(ServoPosition::parse),
         gates: read_gates(mmu, num_gates, &tool_to_gate),
-        units: read_units(machine, num_units),
+        units: read_units(
+            machine,
+            num_units,
+            store.object("configfile").and_then(|configfile| configfile.get("settings")).unwrap_or(&Value::Null),
+        ),
         tool_to_gate,
         endless_spool: flag(mmu, "endless_spool_enabled"),
         spoolman_support: text(mmu, "spoolman_support").to_owned(),
@@ -251,10 +273,32 @@ mod tests {
         let machine =
             json!({ "num_units": 2, "unit_0": { "first_gate": 0, "num_gates": 4 }, "unit_1": { "first_gate": 4 } });
 
-        let units = read_units(&machine, 2);
+        let units = read_units(&machine, 2, &Value::Null);
 
-        assert_eq!(units, [MmuUnit { first_gate: 0, num_gates: 4 }]);
+        assert_eq!(units, [MmuUnit { first_gate: 0, num_gates: 4, extruder: "extruder".into(), ..MmuUnit::default() }]);
         assert!(units[0].contains(3) && !units[0].contains(4));
+    }
+
+    /// Two units after `mmu_machine.py` and `mmu_unit.py` (Happy Hare 4, commit 7df830f): the second feeds the head of
+    /// `extruder1`, which only its configuration section tells (lowercased like every section in `configfile`).
+    #[test]
+    fn a_unit_feeds_the_extruder_of_its_configuration_section() {
+        let machine = json!({
+            "num_units": 2,
+            "unit_0": { "name": "ercf", "display_name": "ERCF", "first_gate": 0, "num_gates": 4 },
+            "unit_1": { "name": "Tradrack", "display_name": "", "first_gate": 4, "num_gates": 4 },
+        });
+        let settings = json!({
+            "mmu_unit ercf": { "num_gates": 4 },
+            "mmu_unit tradrack": { "extruder_name": "extruder1", "num_gates": 4 },
+        });
+
+        let units = read_units(&machine, 2, &settings);
+
+        assert_eq!(
+            units.iter().map(|unit| (unit.display_name.as_str(), unit.extruder.as_str())).collect::<Vec<_>>(),
+            [("ERCF", "extruder"), ("Tradrack", "extruder1")]
+        );
     }
 
     /// `mmu` and `mmu_machine` of a real single-gate machine with a proportional buffer and no encoder (Happy Hare 4.1.0).

@@ -129,6 +129,12 @@ impl Spoolman {
     }
 }
 
+/// A spool as Spoolman answers `GET /v1/spool/<id>` before anything was measured, for plugins that read it themselves
+/// (AFC); `None` for an id Spoolman does not know.
+pub(crate) fn initial_spool(id: u32) -> Option<Value> {
+    Spoolman::default().spool(id).ok()
+}
+
 /// The demo filament of a spool: the multi-colour spools 7 and 8 have their own, the others cycle through the basic ones.
 pub(crate) fn filament_index(id: u32) -> usize {
     match id {

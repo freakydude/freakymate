@@ -9,7 +9,8 @@ const DEFAULT_PORT: u16 = 7125;
 const DEFAULT_TIME_SCALE: f64 = 10.0;
 const DEFAULT_MMU_GATES: usize = 4;
 const USAGE: &str = "Usage: fake-moonraker [--port <port>] [--time-scale <factor>] \
-    [--profile basic|voron|happy-hare|ercf|toolchanger] [--gates <1-16>] [--auth <user>:<password>]";
+    [--profile basic|voron|happy-hare|ercf|toolchanger|happy-hare-units|toolchanger-mmu|afc|afc-toolchanger] \
+    [--gates <1-16>, only for happy-hare and ercf] [--auth <user>:<password>]";
 
 enum Profile {
     Basic,
@@ -17,6 +18,10 @@ enum Profile {
     HappyHare,
     Ercf,
     Toolchanger,
+    HappyHareUnits,
+    ToolchangerMmu,
+    Afc,
+    AfcToolchanger,
 }
 
 struct Options {
@@ -35,6 +40,10 @@ impl Options {
             Profile::HappyHare => MachineProfile::happy_hare(self.gates),
             Profile::Ercf => MachineProfile::ercf(self.gates),
             Profile::Toolchanger => MachineProfile::toolchanger(),
+            Profile::HappyHareUnits => MachineProfile::happy_hare_units(),
+            Profile::ToolchangerMmu => MachineProfile::toolchanger_mmu(),
+            Profile::Afc => MachineProfile::afc(),
+            Profile::AfcToolchanger => MachineProfile::afc_toolchanger(),
         }
     }
 }
@@ -76,6 +85,10 @@ fn parse_profile(value: &str) -> Result<Profile, String> {
         "happy-hare" => Ok(Profile::HappyHare),
         "ercf" => Ok(Profile::Ercf),
         "toolchanger" => Ok(Profile::Toolchanger),
+        "happy-hare-units" => Ok(Profile::HappyHareUnits),
+        "toolchanger-mmu" => Ok(Profile::ToolchangerMmu),
+        "afc" => Ok(Profile::Afc),
+        "afc-toolchanger" => Ok(Profile::AfcToolchanger),
         _ => Err(format!("unknown profile '{value}'")),
     }
 }

@@ -5,6 +5,7 @@
 //! Nothing can be switched off: what is detected is used. Happy Hare is detected from the state it reports (see
 //! [`PrinterStatus::happy_hare`]), Spoolman from Moonraker's components.
 
+pub mod afc;
 mod fields;
 pub mod happy_hare;
 pub mod klipper;
@@ -98,6 +99,7 @@ impl Sources {
         self.klipper.subscribe(&mut subscription);
         led_effect::subscribe(&self.led_effects, &mut subscription);
         happy_hare::subscribe(&mut subscription);
+        afc::subscribe(&mut subscription);
         toolchanger::subscribe(&mut subscription);
         tool_macros::subscribe(&self.klipper, &mut subscription);
         if self.layer_pause.is_some() {

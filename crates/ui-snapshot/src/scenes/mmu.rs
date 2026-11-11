@@ -136,7 +136,7 @@ pub(super) fn mmu_gate(session: &mut Session) -> Result<(), String> {
         let (x, y) = GATE_2_TILE;
         session.tap(x, y);
         session.pump(Duration::from_millis(500));
-        if session.window.global::<MmuDialogs>().get_gate() != 2 || selected_gate(session) != before {
+        if session.window.global::<MmuDialogs>().get_gate_row() != 2 || selected_gate(session) != before {
             return Err("a tap on the tile of gate 2 does not open its dialog, or it moves the selector".into());
         }
         session.show_page(Page::Filament, "filament-mmu-gate")?;
@@ -145,14 +145,14 @@ pub(super) fn mmu_gate(session: &mut Session) -> Result<(), String> {
         session.wait_until("gate 2 selected in its dialog", |snapshot| {
             snapshot.status.mmu.as_ref().is_some_and(|mmu| mmu.gate == 2)
         })?;
-        if session.window.global::<MmuDialogs>().get_gate() != -1 {
+        if session.window.global::<MmuDialogs>().get_gate_row() != -1 {
             return Err("the gate dialog stays open after Select".into());
         }
     }
     if session.window.global::<Printer>().get_has_spoolman() {
         return Ok(());
     }
-    session.window.global::<MmuDialogs>().set_gate(1);
+    session.window.global::<MmuDialogs>().set_gate_row(1);
     {
         let actions = session.window.global::<Actions>();
         actions.invoke_set_gate_material(1, "PETG".into());
@@ -163,7 +163,7 @@ pub(super) fn mmu_gate(session: &mut Session) -> Result<(), String> {
         gate.material == "PETG" && gate.color == Some([0xff, 0x80, 0x00, 0xff])
     })?;
     session.show_page(Page::Filament, "filament-mmu-gate-local")?;
-    session.window.global::<MmuDialogs>().set_gate(-1);
+    session.window.global::<MmuDialogs>().set_gate_row(-1);
     Ok(())
 }
 

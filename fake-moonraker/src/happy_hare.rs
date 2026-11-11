@@ -4,6 +4,7 @@
 //! elapsed time: `action` is always `Idle`, loading and unloading complete immediately.
 
 use crate::gcode::{CommandError, MmuCommand, ServoPosition};
+use crate::machine::MmuUnitSpec;
 use serde_json::{json, Map, Value};
 
 const VERSION: &str = "4.1.0";
@@ -119,7 +120,31 @@ pub struct HappyHare {
     boosting: bool,
     /// `mmu.selector.servo` of a linear selector with a servo, as on an ERCF.
     servo: &'static str,
+    /// The units of a v4 machine with several; empty for the older profiles, whose one unit is `unit0`.
+    units: Vec<MmuUnitSpec>,
+    /// `mmu.unit`: the unit of the selected gate, which stays when no gate is selected (`mmu_controller.py` L325-327,
+    /// L3865-3866). Only shown for `units`.
+    unit_selected: usize,
 }
+
+/// What a vendor's unit looks like by default (`MmuUnitProfile` in `mmu_unit.py` L96-125 at 7df830f): the ERCF has a
+/// selectable bypass and variable rotation distances, the Tradrack neither; both have a linear selector with a servo
+/// and a filament buffer.
+struct VendorProfile {
+    has_bypass: bool,
+    variable_rotation_distances: bool,
+}
+
+fn vendor_profile(vendor: &str) -> VendorProfile {
+    match vendor {
+        "ERCF" => VendorProfile { has_bypass: true, variable_rotation_distances: true },
+        _ => VendorProfile { has_bypass: false, variable_rotation_distances: false },
+    }
+}
+
+/// `mmu_extruder_wrapper.py` L36-39: what a fresh extruder wrapper reports (`UNKNOWN_FILAMENT_COLOR` of
+/// `mmu_constants.py` L341).
+const UNKNOWN_FILAMENT_COLOR: &str = "#808182E3";
 
 /// Material, colour (`rrggbb`) and temperature a gate got with `MMU_GATE_MAP`; `None` leaves that of its filament.
 #[derive(Debug, Clone, Default)]
@@ -142,6 +167,15 @@ fn hex_rgb(color: &str) -> Option<[f64; 3]> {
 impl HappyHare {
     /// Without `spoolman` the gates have no spools; Happy Hare keeps their filament in its own gate map.
     pub fn new(gates: usize, spoolman: bool) -> Self {
+        Self::build(gates, Vec::new(), spoolman)
+    }
+
+    /// A v4 machine of several units; their gates follow each other (`mmu_machine.py` L110-123).
+    pub fn with_units(units: &[MmuUnitSpec], spoolman: bool) -> Self {
+        Self::build(units.iter().map(|unit| unit.gates).sum(), units.to_vec(), spoolman)
+    }
+
+    fn build(gates: usize, units: Vec<MmuUnitSpec>, spoolman: bool) -> Self {
         // The last gate stays empty so the UI also has to show an empty slot.
         let mut gate_status = vec![GATE_AVAILABLE; gates];
         if gates > 2 {
@@ -168,7 +202,48 @@ impl HappyHare {
             spoolman,
             boosting: false,
             servo: SERVO_UP,
+            units,
+            unit_selected: 0,
         }
+    }
+
+    /// The units to describe: the profile's, or the one `unit0` of the older profiles.
+    fn has_units(&self) -> bool {
+        !self.units.is_empty()
+    }
+
+    /// The first gate of each unit.
+    fn first_gates(&self) -> Vec<usize> {
+        let mut first = 0;
+        self.units
+            .iter()
+            .map(|unit| {
+                let start = first;
+                first += unit.gates;
+                start
+            })
+            .collect()
+    }
+
+    fn unit_of_gate(&self, gate: usize) -> usize {
+        let first_gates = self.first_gates();
+        first_gates.iter().rposition(|first| *first <= gate).unwrap_or(0)
+    }
+
+    /// The unit that shows the bypass (`mmu_unit.py` L139: `show_bypass`; only one may).
+    fn bypass_unit(&self) -> Option<usize> {
+        self.units.iter().position(|unit| vendor_profile(unit.vendor).has_bypass)
+    }
+
+    /// The distinct extruders of the units in the order of the units (`mmu_unit.py` L325-332: one object each).
+    fn extruder_names(&self) -> Vec<&'static str> {
+        let mut names: Vec<&'static str> = Vec::new();
+        for unit in &self.units {
+            if !names.contains(&unit.extruder) {
+                names.push(unit.extruder);
+            }
+        }
+        names
     }
 
     /// `print_state` as in `print_stats`; some commands refuse while printing.
@@ -220,12 +295,46 @@ impl HappyHare {
         let mut objects = Map::new();
         objects.insert("mmu".to_owned(), self.mmu_json(print_state));
         objects.insert("mmu_machine".to_owned(), self.machine_json());
+        if self.has_units() {
+            for extruder in self.extruder_names() {
+                objects.insert(format!("mmu_extruder {extruder}"), extruder_wrapper_json(extruder));
+            }
+            for unit in &self.units {
+                objects.insert(format!("mmu_stepper {}_gear", unit.name), json!({}));
+            }
+            return objects;
+        }
         objects.insert("mmu_extruder extruder".to_owned(), json!({}));
         objects.insert(format!("mmu_stepper {UNIT_NAME}_gear"), json!({}));
         objects
     }
 
+    /// The settings of a v4 machine with units: `[mmu_machine] units` (Klipper reports a list option as a list, in
+    /// the order of the unit indexes; `config/base/mmu.cfg` L51) and one `[mmu_unit <name>]` each
+    /// (`mmu_hardware.cfg` L137-155, `mmu_unit.py` L323: `extruder_name` defaults to `extruder`).
+    fn unit_config_sections(&self) -> Vec<(String, Value)> {
+        let names: Vec<&str> = self.units.iter().map(|unit| unit.name).collect();
+        let mut sections =
+            vec![("mmu_machine".to_owned(), json!({ "units": names })), ("mmu".to_owned(), json!({ "enabled": true }))];
+        for unit in &self.units {
+            sections.push((
+                format!("mmu_unit {}", unit.name),
+                json!({
+                    "extruder_name": unit.extruder,
+                    "num_gates": unit.gates,
+                    "vendor": unit.vendor,
+                    "display_name": unit.display_name,
+                }),
+            ));
+            sections.push((format!("mmu_stepper {}_gear", unit.name), json!({})));
+        }
+        sections
+    }
+
     pub fn config_sections(&self) -> Vec<(String, Value)> {
+        if self.has_units() {
+            return self.unit_config_sections();
+        }
         vec![
             ("mmu_machine".to_owned(), json!({ "num_units": 1 })),
             ("mmu".to_owned(), json!({ "enabled": true })),
@@ -251,6 +360,9 @@ impl HappyHare {
         }
         self.gate = BYPASS;
         self.tool = BYPASS;
+        if let Some(unit) = self.bypass_unit() {
+            self.unit_selected = unit;
+        }
         Ok(())
     }
 
@@ -412,6 +524,9 @@ impl HappyHare {
 
     fn select(&mut self, gate: usize) {
         self.gate = gate as i32;
+        if self.has_units() {
+            self.unit_selected = self.unit_of_gate(gate);
+        }
         self.tool =
             self.tool_to_gate.iter().position(|mapped| *mapped == gate).map_or(NONE_SELECTED, |tool| tool as i32);
     }
@@ -519,7 +634,7 @@ impl HappyHare {
             "num_gates": self.gates,
             "is_homed": self.homed,
             "print_state": print_state,
-            "unit": if self.gate == NONE_SELECTED { NONE_SELECTED } else { 0 },
+            "unit": self.unit_json(),
             "tool": self.tool,
             "gate": self.gate,
             "active_filament": self.active_filament(),
@@ -553,13 +668,34 @@ impl HappyHare {
             "spoolman_support": if self.spoolman { "push" } else { "off" },
             "pending_spool_id": -1,
             "encoder": null,
-            "selector": { "has_bypass": false, "servo": self.servo },
+            "selector": { "has_bypass": self.selected_unit_has_bypass(), "servo": self.servo },
         });
         let (Some(fields), Value::Object(buffer)) = (mmu.as_object_mut(), self.buffer_fields(printing)) else {
             unreachable!("both are JSON objects")
         };
         fields.extend(buffer);
+        if let Some(unit) = self.units.get(self.unit_selected) {
+            // `mmu_controller.py` L830-860 merges the extruder wrapper of the active unit into `mmu`.
+            if let Value::Object(wrapper) = extruder_wrapper_json(unit.extruder) {
+                fields.extend(wrapper);
+            }
+        }
         mmu
+    }
+
+    /// `mmu.unit`; the older profiles show 0 and, before any gate, -1.
+    fn unit_json(&self) -> i64 {
+        if self.has_units() {
+            self.unit_selected as i64
+        } else if self.gate == NONE_SELECTED {
+            i64::from(NONE_SELECTED)
+        } else {
+            0
+        }
+    }
+
+    fn selected_unit_has_bypass(&self) -> bool {
+        self.units.get(self.unit_selected).is_some_and(|unit| vendor_profile(unit.vendor).has_bypass)
     }
 
     /// The fields of a proportional buffer, as on the real device (no encoder), made up from the print state.
@@ -620,7 +756,45 @@ impl HappyHare {
         })
     }
 
+    /// `mmu_machine` of a machine with units: `happy_hare_version`, `num_units`, `num_gates` and a `unit_<i>` each,
+    /// with what `MmuUnit.get_status` returns (`mmu_unit.py` L1086-1145) for a unit without fans, heaters, NFC
+    /// readers or TD-1 scanners (`mmu_machine.py` L93-131, L179).
+    fn units_machine_json(&self) -> Value {
+        let mut machine = Map::new();
+        machine.insert("happy_hare_version".to_owned(), json!(VERSION));
+        machine.insert("num_units".to_owned(), json!(self.units.len()));
+        machine.insert("num_gates".to_owned(), json!(self.gates));
+        for (index, (unit, first_gate)) in self.units.iter().zip(self.first_gates()).enumerate() {
+            let profile = vendor_profile(unit.vendor);
+            machine.insert(
+                format!("unit_{index}"),
+                json!({
+                    "name": unit.name,
+                    "display_name": unit.display_name,
+                    "vendor": unit.vendor,
+                    "version": unit.version,
+                    "num_gates": unit.gates,
+                    "first_gate": first_gate,
+                    "selector_type": "LinearServoSelector",
+                    "is_homed": self.homed,
+                    "variable_rotation_distances": profile.variable_rotation_distances,
+                    "variable_bowden_lengths": false,
+                    "require_bowden_move": true,
+                    "filament_always_gripped": false,
+                    "has_bypass": profile.has_bypass,
+                    "can_crossload": false,
+                    "multi_gear": false,
+                    "filament_buffer": true,
+                }),
+            );
+        }
+        Value::Object(machine)
+    }
+
     fn machine_json(&self) -> Value {
+        if self.has_units() {
+            return self.units_machine_json();
+        }
         json!({
             "happy_hare_version": VERSION,
             "num_units": 1,
@@ -641,6 +815,19 @@ impl HappyHare {
             },
         })
     }
+}
+
+/// `mmu_extruder <name>` (`mmu_extruder_wrapper.py` L218-227) of an extruder that has not moved any filament yet:
+/// the values of L36-39. The same keys end up in `mmu` for the active unit.
+fn extruder_wrapper_json(extruder: &str) -> Value {
+    json!({
+        "extruder_name": extruder,
+        "extruder_filament_remaining": 0.0,
+        "filament_remaining": 0.0,
+        "filament_remaining_color": UNKNOWN_FILAMENT_COLOR,
+        "filament_remaining_material": "",
+        "filament_remaining_temp": 0,
+    })
 }
 
 #[cfg(test)]

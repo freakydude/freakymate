@@ -64,13 +64,20 @@ pub(crate) fn spool_rows(spools: &[Spool], lanes: &[Lane]) -> Vec<SpoolItem> {
         .collect()
 }
 
-/// Where a spool sits: the tool changer head, else the gate, else "In use".
+/// Where a spool sits: the tool changer head, the unit (with several) and the gate or AFC lane, as far as there are
+/// (a lane named like its head once); "In use" for the one direct feed.
 fn spool_place(lane: &Lane) -> String {
-    match (&lane.head, lane.gate) {
-        (Some(head), _) => head.clone(),
-        (None, Some(gate)) => format!("Gate {gate}"),
-        (None, None) => "In use".to_owned(),
+    let slot = lane
+        .gate
+        .map(|gate| format!("Gate {gate}"))
+        .or_else(|| lane.name.clone())
+        .filter(|slot| lane.head.as_ref() != Some(slot));
+    let parts: Vec<&str> =
+        [lane.head.as_deref(), lane.unit_name.as_deref(), slot.as_deref()].into_iter().flatten().collect();
+    if parts.is_empty() {
+        return "In use".to_owned();
     }
+    parts.join(" · ")
 }
 
 pub(crate) fn color_of([red, green, blue, alpha]: Rgba) -> slint::Color {
@@ -244,6 +251,7 @@ pub(crate) fn tool_match_item(tool: usize, gate: Option<usize>, matches: &[ToolM
     let mut item = ToolMatchItem {
         tool: tool as i32,
         gate: id_or_none(gate),
+        gate_row: -1,
         spool_pick: SPOOL_PICK_NONE,
         spool_id: -1,
         ..ToolMatchItem::default()
@@ -294,16 +302,16 @@ pub(crate) fn compared_tool_items(
 /// The tool macro that holds the spool in use, -1 when the spool in use is not kept by a tool macro.
 pub(crate) fn spool_tool(lanes: &[Lane]) -> i32 {
     match lanes.iter().find(|lane| lane.active).and_then(Lane::spool_holder) {
-        Some(SpoolHolder::ToolMacro(tool)) => id_or_none(Some(tool)),
+        Some(SpoolHolder::Tool(tool)) => id_or_none(Some(tool)),
         _ => -1,
     }
 }
 
 /// Which spool a tool without gate can be assigned: the spool of its tool macro or the spool in use; none otherwise.
 fn fill_spool_pick(item: &mut ToolMatchItem, lanes: &[Lane]) {
-    let lane = usize::try_from(item.tool).ok().and_then(|tool| spools::direct_lane(lanes, tool));
+    let lane = usize::try_from(item.tool).ok().and_then(|tool| spools::tool_lane(lanes, tool));
     (item.spool_pick, item.spool_id) = match lane.and_then(Lane::spool_holder) {
-        Some(SpoolHolder::ToolMacro(tool)) => (id_or_none(Some(tool)), id_or_none(lane.and_then(|lane| lane.spool_id))),
+        Some(SpoolHolder::Tool(tool)) => (id_or_none(Some(tool)), id_or_none(lane.and_then(|lane| lane.spool_id))),
         Some(SpoolHolder::ActiveSpool) => (SPOOL_PICK_ACTIVE, id_or_none(lane.and_then(|lane| lane.spool_id))),
         Some(SpoolHolder::Gate(_)) | None => (SPOOL_PICK_NONE, -1),
     };
@@ -351,13 +359,16 @@ mod tests {
     fn lane(gate: Option<usize>, head: Option<&str>, spool_id: Option<u32>) -> Lane {
         Lane {
             gate,
+            name: None,
             unit: None,
+            unit_name: None,
             head: head.map(str::to_owned),
             extruder: "extruder".into(),
             tool: Some(1),
             spool_id,
-            tool_macro_spool: head.is_some(),
+            spool_by_tool: head.is_some(),
             spool: None,
+            empty: false,
             active: false,
         }
     }
@@ -374,6 +385,21 @@ mod tests {
         assert_eq!(place(2).as_deref(), Some("Gate 2"));
         assert_eq!(place(3).as_deref(), Some("In use"));
         assert_eq!(place(4).as_deref(), Some(""));
+    }
+
+    #[test]
+    fn a_spool_names_the_unit_with_several_and_an_afc_lane_once() {
+        let spools: Vec<Spool> = (1..=3).map(|id| Spool { id, ..Spool::default() }).collect();
+        let unit_gate = Lane { unit_name: Some("Tradrack".into()), ..lane(Some(5), Some("T1"), Some(1)) };
+        let afc_lane = Lane { name: Some("lane2".into()), ..lane(None, None, Some(2)) };
+        let head_lane = Lane { name: Some("e0".into()), ..lane(None, Some("e0"), Some(3)) };
+
+        let rows = spool_rows(&spools, &[unit_gate, afc_lane, head_lane]);
+        let place = |id: i32| rows.iter().find(|row| row.id == id).map(|row| row.place.to_string());
+
+        assert_eq!(place(1).as_deref(), Some("T1 · Tradrack · Gate 5"));
+        assert_eq!(place(2).as_deref(), Some("lane2"));
+        assert_eq!(place(3).as_deref(), Some("e0"));
     }
 
     #[test]

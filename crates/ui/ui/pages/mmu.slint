@@ -57,13 +57,13 @@ export component MmuGatesTab inherits Rectangle {
             tiles := Rectangle {
                 horizontal-stretch: 1;
                 property <length> cell-width: (self.width - (root.slots-per-page - 1) * Theme.spacing) / root.slots-per-page;
-                for item in Printer.mmu-gates: GateTile {
-                    visible: item.index >= root.first && item.index < root.first + root.slots-per-page;
-                    x: mod(item.index, root.slots-per-page) * (tiles.cell-width + Theme.spacing);
+                for item[row] in Printer.mmu-gates: GateTile {
+                    visible: row >= root.first && row < root.first + root.slots-per-page;
+                    x: mod(row, root.slots-per-page) * (tiles.cell-width + Theme.spacing);
                     width: tiles.cell-width;
                     height: tiles.height;
                     gate: item;
-                    clicked => { MmuDialogs.gate = item.index; }
+                    clicked => { MmuDialogs.gate-row = row; }
                 }
                 if root.bypass-slot >= root.first && root.bypass-slot < root.first + root.slots-per-page: BypassTile {
                     x: mod(root.bypass-slot, root.slots-per-page) * (tiles.cell-width + Theme.spacing);

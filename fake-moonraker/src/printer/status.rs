@@ -15,6 +15,7 @@ impl Printer {
         self.add_modules(&mut objects);
         self.add_sensors(&mut objects);
         self.add_toolchanger_status(&mut objects);
+        self.add_afc_status(&mut objects);
         if let Some(retraction) = self.retraction {
             objects.insert("firmware_retraction".to_owned(), retraction_json(retraction));
         }

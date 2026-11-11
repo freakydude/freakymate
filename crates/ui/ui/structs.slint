@@ -121,6 +121,8 @@ export struct ToolMatchItem {
     tool: int,
     // -1: Happy Hare maps no gate to the tool (a tool of the file beyond the printer's tools).
     gate: int,
+    // Row of that gate in `Printer.mmu-gates` (gate indices need not be positions), -1 without gate.
+    gate-row: int,
     // What the file of the job asks of the tool (see `Printer.mmu-match-file`); empty when it does not use the tool.
     used: bool,
     // The slicer's colour with its alpha, one at most (`count` 0 without).

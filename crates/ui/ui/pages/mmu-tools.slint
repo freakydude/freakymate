@@ -402,14 +402,16 @@ component LoadedLine inherits FilamentLine {
 
 // Opens the gate of a tool on the Gates tab.
 component OpenGateButton inherits IconButton {
+    // The gate's index (its name) and its row in `Printer.mmu-gates`.
     in property <int> gate;
+    in property <int> gate-row;
     callback opened;
 
     icon: Icons.mmu-gate-map;
     text: @tr("Open gate {}", root.gate);
     horizontal: true;
     clicked => {
-        MmuDialogs.gate = root.gate;
+        MmuDialogs.gate-row = root.gate-row;
         root.opened();
         Navigation.filament-tab = FilamentTab.gates;
     }
@@ -453,6 +455,7 @@ export component ToolDialog inherits Scrim {
                     width: 200px;
                     height: 48px;
                     gate: root.mapping.gate;
+                    gate-row: root.mapping.gate-row;
                     opened => { root.close(); }
                 }
                 if Printer.has-spoolman && root.mapping.gate >= 0: IconButton {
@@ -463,7 +466,7 @@ export component ToolDialog inherits Scrim {
                     horizontal: true;
                     clicked => {
                         root.close();
-                        SpoolPicker.show(root.mapping.gate, Printer.mmu-gates[root.mapping.gate].spool-id);
+                        SpoolPicker.show(root.mapping.gate, Printer.mmu-gates[root.mapping.gate-row].spool-id);
                     }
                 }
                 if Printer.mmu-gates.length > 1 && root.mapping.gate >= 0: IconButton {
@@ -569,6 +572,7 @@ export component ToolGateDialog inherits Scrim {
                 if root.mapping.gate >= 0: OpenGateButton {
                     height: 48px;
                     gate: root.mapping.gate;
+                    gate-row: root.mapping.gate-row;
                     opened => { root.close(); }
                 }
             }

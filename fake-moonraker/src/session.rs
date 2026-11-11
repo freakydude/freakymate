@@ -357,6 +357,10 @@ fn printer_info(backend: &Backend) -> Value {
 /// Commands the tool changer profile adds beside the tool macros `T<n>`.
 const TOOLCHANGER_COMMANDS: [&str; 4] = ["SELECT_TOOL", "UNSELECT_TOOL", "SET_GCODE_VARIABLE", "SAVE_VARIABLE"];
 
+/// Commands AFC registers for its lanes (the `T<n>` of the lanes come from `AFC.maps`).
+const AFC_COMMANDS: [&str; 8] =
+    ["CHANGE_TOOL", "TOOL_LOAD", "TOOL_UNLOAD", "LANE_UNLOAD", "SET_SPOOL_ID", "SET_COLOR", "SET_MATERIAL", "SET_MAP"];
+
 /// Klipper's command list: a few of its own commands, every macro, and Happy Hare's tool commands (one per gate).
 fn gcode_help(backend: &Backend) -> Value {
     let status = backend.with_printer(|printer| printer.status());
@@ -376,6 +380,14 @@ fn gcode_help(backend: &Backend) -> Value {
     let gates = status.pointer("/mmu/num_gates").and_then(Value::as_u64).unwrap_or(0);
     for tool in 0..gates {
         help.insert(format!("T{tool}"), json!("Change to tool"));
+    }
+    if let Some(maps) = status.pointer("/AFC/maps").and_then(Value::as_array) {
+        for command in AFC_COMMANDS {
+            help.insert(command.to_owned(), json!("Klipper command"));
+        }
+        for map in maps.iter().filter_map(Value::as_str) {
+            help.insert(map.to_owned(), json!("Change to tool"));
+        }
     }
     Value::Object(help)
 }
@@ -614,6 +626,71 @@ mod tests {
         for command in ["T0", "T1", "T2", "SELECT_TOOL", "UNSELECT_TOOL", "SET_GCODE_VARIABLE", "SAVE_VARIABLE"] {
             assert!(reply["result"].get(command).is_some(), "missing {command}");
         }
+    }
+
+    #[test]
+    fn afc_profiles_list_their_commands_in_gcode_help() {
+        for profile in [MachineProfile::afc(), MachineProfile::afc_toolchanger()] {
+            let backend = Backend::with_profile(1.0, profile);
+            let mut session = Session::new(1);
+
+            let reply = exchange(&mut session, &backend, call("printer.gcode.help", json!({})));
+
+            for command in
+                ["T0", "T3", "CHANGE_TOOL", "TOOL_LOAD", "SET_SPOOL_ID", "SET_COLOR", "SET_MAP", "LANE_UNLOAD"]
+            {
+                assert!(reply["result"].get(command).is_some(), "missing {command}");
+            }
+            assert!(reply["result"].get("T4").is_none());
+            assert!(reply["result"].get("SELECT_TOOL").is_none());
+        }
+    }
+
+    #[test]
+    fn happy_hare_units_list_a_tool_command_per_gate_in_gcode_help() {
+        let backend = Backend::with_profile(1.0, MachineProfile::happy_hare_units());
+        let mut session = Session::new(1);
+
+        let reply = exchange(&mut session, &backend, call("printer.gcode.help", json!({})));
+
+        assert!(reply["result"].get("T7").is_some());
+        assert!(reply["result"].get("T8").is_none());
+    }
+
+    #[test]
+    fn an_afc_tool_change_sets_the_active_spool_of_moonraker_and_unloading_clears_it() {
+        let backend = Backend::with_profile(1.0, MachineProfile::afc());
+        let mut session = Session::new(1);
+        let script = |text: &str| call("printer.gcode.script", json!({ "script": text }));
+
+        let reply = exchange(&mut session, &backend, script("G28\nT2"));
+        assert_eq!(reply["result"], "ok");
+        let status = exchange(&mut session, &backend, call("server.spoolman.status", json!({})));
+        assert_eq!(status["result"]["spool_id"], 3);
+
+        exchange(&mut session, &backend, script("TOOL_UNLOAD"));
+        let status = exchange(&mut session, &backend, call("server.spoolman.status", json!({})));
+        assert_eq!(status["result"]["spool_id"], Value::Null);
+        let queried =
+            exchange(&mut session, &backend, call("printer.objects.query", json!({ "objects": { "AFC": null } })));
+        assert_eq!(queried["result"]["status"]["AFC"]["current_load"], Value::Null);
+    }
+
+    #[test]
+    fn afc_state_changes_reach_subscribers() {
+        let backend = Backend::with_profile(1.0, MachineProfile::afc_toolchanger());
+        let mut session = Session::new(1);
+        let objects = json!({ "objects": { "AFC": ["current_load"], "toolhead": ["extruder"] } });
+
+        let reply = exchange(&mut session, &backend, call("printer.objects.subscribe", objects));
+        assert_eq!(reply["result"]["status"]["AFC"]["current_load"], "e1");
+        assert_eq!(reply["result"]["status"]["toolhead"]["extruder"], "extruder1");
+
+        exchange(&mut session, &backend, call("printer.gcode.script", json!({ "script": "G28\nT0" })));
+        let update: Value = serde_json::from_str(&session.status_notification(&backend).unwrap()).unwrap();
+        assert_eq!(update["method"], "notify_status_update");
+        assert_eq!(update["params"][0]["AFC"]["current_load"], "e0");
+        assert_eq!(update["params"][0]["toolhead"]["extruder"], "extruder");
     }
 
     #[test]

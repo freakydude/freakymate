@@ -11,9 +11,20 @@ const TOOL_OFFSETS: [[f64; 3]; 3] = [[0.0, 0.0, 0.0], [0.12, -0.05, 0.3], [-0.08
 const START_SPOOL_IDS: [Option<u32>; 3] = [Some(1), Some(3), None];
 const SPOOL_ID_VARIABLE: &str = "spool_id";
 
+/// Which plugin runs the tool changer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    /// viesturz/klipper-toolchanger: the objects `toolchanger` and `tool T<n>` and the macros `T<n>`.
+    Viesturz,
+    /// AFC's `AFC_Toolchanger`: Klipper only sees the extruders; the heads and lanes are AFC's objects, which the
+    /// printer keeps in step (`toolhead.extruder` follows the head on the shuttle).
+    Afc,
+}
+
 /// The state of the tool changer; the heater of `extruder` (the first tool) stays in the printer.
 #[derive(Debug, Clone)]
 pub(super) struct Toolchanger {
+    kind: Kind,
     tool_count: usize,
     mounted: Option<usize>,
     /// Index of the extruder `toolhead.extruder` names; `UNSELECT_TOOL` leaves it as it was.
@@ -35,12 +46,38 @@ impl Toolchanger {
             })
             .collect();
         Self {
+            kind: Kind::Viesturz,
             tool_count,
             mounted: Some(0),
             active_extruder: 0,
             extra_extruders: vec![Heater::cold(); tool_count.saturating_sub(1)],
             macro_variables,
             saved_variables: Map::new(),
+        }
+    }
+
+    /// The extruders of the heads of an AFC tool changer; `active_extruder` is the one on the shuttle. None of the
+    /// plugin's objects exist, so `status` and the macros stay empty.
+    pub(super) fn afc_heads(head_count: usize, active_extruder: usize) -> Self {
+        Self {
+            kind: Kind::Afc,
+            tool_count: head_count,
+            mounted: None,
+            active_extruder,
+            extra_extruders: vec![Heater::cold(); head_count.saturating_sub(1)],
+            macro_variables: BTreeMap::new(),
+            saved_variables: Map::new(),
+        }
+    }
+
+    pub(super) fn has_tool(&self, tool: usize) -> bool {
+        tool < self.tool_count
+    }
+
+    /// Makes the extruder with this Klipper name the active one; an unknown name changes nothing.
+    pub(super) fn activate_extruder(&mut self, name: &str) {
+        if let Some(index) = self.extruder_index(name) {
+            self.active_extruder = index;
         }
     }
 
@@ -72,6 +109,11 @@ impl Toolchanger {
     }
 
     pub(super) fn apply(&mut self, command: ToolchangerCommand) -> Result<(), CommandError> {
+        // Without the plugin `SELECT_TOOL` and the macro commands do not exist; only Klipper's own `ACTIVATE_EXTRUDER`
+        // does.
+        if self.kind == Kind::Afc && !matches!(command, ToolchangerCommand::ActivateExtruder { .. }) {
+            return Ok(());
+        }
         match command {
             ToolchangerCommand::SelectTool(selector) => {
                 let tool = self.resolve(&selector)?;
@@ -134,6 +176,9 @@ impl Toolchanger {
     /// The objects of the tool changer: `toolchanger`, `tool T<n>`, `gcode_macro T<n>` and `save_variables`.
     pub(super) fn status(&self) -> Map<String, Value> {
         let mut objects = Map::new();
+        if self.kind == Kind::Afc {
+            return objects;
+        }
         objects.insert("toolchanger".to_owned(), self.toolchanger_json());
         for tool in 0..self.tool_count {
             objects.insert(tool_object_name(tool), self.tool_json(tool));
@@ -201,7 +246,7 @@ impl Toolchanger {
 
 /// Klipper's error for a mux command whose key matches no registered value (`gcode.py`, `_cmd_mux`). The fake knows
 /// only its own values, so the options list just those.
-fn mux_error(value: &str, key: &str, values: &[String]) -> CommandError {
+pub(crate) fn mux_error(value: &str, key: &str, values: &[String]) -> CommandError {
     let guess = match values.iter().find(|candidate| !value.is_empty() && candidate.contains(value)) {
         Some(candidate) => format!(". Did you mean '{candidate}'?"),
         None => {

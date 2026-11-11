@@ -53,9 +53,11 @@ pub fn nozzle_spool<'a>(lanes: &'a [Lane], extruder: &str) -> Option<&'a Spool> 
     lane.spool.as_ref()
 }
 
-/// The direct feed of `tool` (the head of a tool changer, or tool 0 without MMU); `None` with Happy Hare's gates.
-pub fn direct_lane(lanes: &[Lane], tool: usize) -> Option<&Lane> {
-    lanes.iter().find(|lane| lane.gate.is_none() && lane.tool == Some(tool))
+/// The lane `tool` prints from outside Happy Hare's gates: the AFC lane mapped to it, else its direct feed (the head of
+/// a tool changer, or tool 0 without MMU). AFC's map comes first, since it registers the `T<n>` commands.
+pub fn tool_lane(lanes: &[Lane], tool: usize) -> Option<&Lane> {
+    let mut of_tool = lanes.iter().filter(|lane| lane.gate.is_none() && lane.tool == Some(tool));
+    of_tool.clone().find(|lane| lane.name.is_some()).or_else(|| of_tool.next())
 }
 
 /// What the spools recommend for `heater`: at the nozzle of an extruder its spool's nozzle temperature, at the bed the
@@ -176,13 +178,16 @@ mod tests {
     fn each_nozzle_shows_the_spool_of_its_lane_in_use_or_of_its_only_lane() {
         let lane = |extruder: &str, id: u32, active: bool| Lane {
             gate: None,
+            name: None,
             unit: None,
+            unit_name: None,
             head: None,
             extruder: extruder.into(),
             tool: None,
             spool_id: Some(id),
-            tool_macro_spool: false,
+            spool_by_tool: false,
             spool: Some(test_spool(id, "PLA", 500.0, [0, 0, 0])),
+            empty: false,
             active,
         };
         let heads = [lane("extruder", 1, false), lane("extruder1", 2, true)];

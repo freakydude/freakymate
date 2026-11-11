@@ -117,6 +117,42 @@
         "args": ["build", "-p", "fake-moonraker"]
       },
       "args": ["--port", "7125", "--time-scale", "10", "--profile", "toolchanger"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: fake-moonraker (Happy Hare units)",
+      "cargo": {
+        "args": ["build", "-p", "fake-moonraker"]
+      },
+      "args": ["--port", "7125", "--time-scale", "10", "--profile", "happy-hare-units"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: fake-moonraker (Tool changer + Happy Hare)",
+      "cargo": {
+        "args": ["build", "-p", "fake-moonraker"]
+      },
+      "args": ["--port", "7125", "--time-scale", "10", "--profile", "toolchanger-mmu"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: fake-moonraker (AFC)",
+      "cargo": {
+        "args": ["build", "-p", "fake-moonraker"]
+      },
+      "args": ["--port", "7125", "--time-scale", "10", "--profile", "afc"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: fake-moonraker (AFC tool changer)",
+      "cargo": {
+        "args": ["build", "-p", "fake-moonraker"]
+      },
+      "args": ["--port", "7125", "--time-scale", "10", "--profile", "afc-toolchanger"]
     }
   ]
 }

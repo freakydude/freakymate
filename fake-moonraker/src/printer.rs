@@ -1,9 +1,12 @@
 //! Simulated printer: heaters, toolhead and print job.
 
+use crate::afc::Afc;
 use crate::calibration::Calibration;
 use crate::devices::{DeviceInputs, Devices};
 use crate::files::{GcodeFile, LAYER_HEIGHT};
-use crate::gcode::{Axis, Command, CommandError, DeviceCommand, MmuCommand, Move, RetractionChange, VelocityLimit};
+use crate::gcode::{
+    AfcCommand, Axis, Command, CommandError, DeviceCommand, MmuCommand, Move, RetractionChange, VelocityLimit,
+};
 use crate::happy_hare::HappyHare;
 use crate::history::{Sample, TemperatureStore};
 use crate::layer_pause::LayerPause;
@@ -12,11 +15,15 @@ use crate::print_objects::{self, Definitions};
 use serde_json::{json, Map, Value};
 use std::time::Duration;
 
+mod afc;
 mod config;
 mod status;
 #[cfg(test)]
 mod tests;
 mod toolchanger;
+#[cfg(test)]
+mod units_tests;
+pub(crate) use toolchanger::mux_error;
 
 const AMBIENT_TEMPERATURE: f64 = 24.0;
 const HEAT_RATE_PER_SECOND: f64 = 3.0;
@@ -200,6 +207,8 @@ pub struct Printer {
     uptime: f64,
     profile: MachineProfile,
     mmu: Option<HappyHare>,
+    /// `None` without AFC.
+    afc: Option<Afc>,
     /// `None` without a tool changer; the heaters of its extra extruders live in there.
     toolchanger: Option<toolchanger::Toolchanger>,
     klippy: KlippyState,
@@ -241,22 +250,38 @@ impl Printer {
         Self::with_profile(time_scale, MachineProfile::default())
     }
 
-    /// The Spoolman spool of the selected gate; `None` without Happy Hare or a gate.
+    /// The Spoolman spool that Happy Hare (the selected gate) or AFC (the lane in the toolhead) makes the active one;
+    /// `None` without either or without a spool.
     pub fn selected_gate_spool(&self) -> Option<u32> {
-        self.mmu.as_ref().and_then(HappyHare::selected_spool)
+        match &self.afc {
+            Some(afc) => afc.active_spool(),
+            None => self.mmu.as_ref().and_then(HappyHare::selected_spool),
+        }
     }
 
+    /// Whether a filament changer tells Moonraker the active spool.
     pub fn has_mmu(&self) -> bool {
-        self.mmu.is_some()
+        self.mmu.is_some() || self.afc.is_some()
     }
 
     pub fn with_profile(time_scale: f64, profile: MachineProfile) -> Self {
-        Self {
+        let afc = profile.afc.map(Afc::new);
+        let mut printer = Self {
             time_scale,
             uptime: 0.0,
             profile,
-            mmu: profile.mmu_gates.map(|gates| HappyHare::new(gates, profile.spoolman)),
-            toolchanger: (profile.tools > 0).then(|| toolchanger::Toolchanger::new(profile.tools)),
+            mmu: match (profile.mmu_units, profile.mmu_gates) {
+                (Some(units), _) => Some(HappyHare::with_units(units, profile.spoolman)),
+                (None, gates) => gates.map(|gates| HappyHare::new(gates, profile.spoolman)),
+            },
+            toolchanger: if profile.tools > 0 {
+                Some(toolchanger::Toolchanger::new(profile.tools))
+            } else {
+                afc.as_ref()
+                    .filter(|afc| afc.is_toolchanger())
+                    .map(|afc| toolchanger::Toolchanger::afc_heads(afc.head_count(), 0))
+            },
+            afc,
             klippy: KlippyState::Ready,
             extruder: Heater::cold(),
             bed: Heater::cold(),
@@ -286,7 +311,9 @@ impl Printer {
             excluded_objects: Vec::new(),
             layer_pause: LayerPause::default(),
             inactive_seconds: BUSY_SECONDS,
-        }
+        };
+        printer.follow_afc_shuttle();
+        printer
     }
 
     /// The file of a running or paused job; Moonraker does not delete it.
@@ -425,6 +452,7 @@ impl Printer {
             Command::QuadGantryLevel => self.level_gantry()?,
             Command::Mmu(command) => self.apply_mmu(command)?,
             Command::Toolchanger(command) => self.apply_toolchanger(command)?,
+            Command::Afc(command) => self.apply_afc(command)?,
             Command::LayerPause(command) => self.layer_pause.apply(command),
             Command::FakePrintError => self.fail_print()?,
             // The session delays the answer of a dwell; the printer itself does nothing.
@@ -549,10 +577,17 @@ impl Printer {
     }
 
     fn apply_mmu(&mut self, command: MmuCommand) -> Result<(), CommandError> {
-        // With a tool changer `T<n>` mounts a tool instead of changing a gate.
         if let MmuCommand::ChangeTool { tool } = command {
-            if let Some(result) = self.select_tool(tool) {
+            // AFC registers `T<n>` for its lanes.
+            if let Some(result) = self.afc_change_tool(tool) {
                 return result;
+            }
+            // With a tool changer `T<n>` mounts a tool instead of changing a gate; with Happy Hare as well only the
+            // numbers of its tools do, the others are gates.
+            if self.mmu.is_none() || self.toolchanger_has_tool(tool) {
+                if let Some(result) = self.select_tool(tool) {
+                    return result;
+                }
             }
         }
         match self.mmu.as_mut() {

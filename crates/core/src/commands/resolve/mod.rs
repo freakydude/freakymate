@@ -8,7 +8,7 @@ mod lighting;
 mod mmu;
 
 use super::{Command, CommandError};
-use crate::sources::{tool_macros, PrinterStatus, Sources};
+use crate::sources::{afc, tool_macros, PrinterStatus, Sources};
 
 impl Command {
     /// Turns an intent into the commands this printer needs; every other command stays as it is. `status` shows the
@@ -48,13 +48,18 @@ impl Command {
     }
 }
 
-/// `spool_id` goes into the tool macro under the name Klipper reports, so `SET_GCODE_VARIABLE` finds it.
+/// `spool_id` goes into the AFC lane mapped to the tool, else into the tool macro under the name Klipper reports, so
+/// `SET_GCODE_VARIABLE` finds it.
 fn assign_tool_spool(
     sources: &Sources,
     status: &PrinterStatus,
     tool: usize,
     spool_id: Option<u32>,
 ) -> Result<Command, CommandError> {
+    let afc_lane = status.afc.iter().flat_map(|afc| &afc.lanes).find(|lane| lane.tool == Some(tool));
+    if let Some(lane) = afc_lane {
+        return Ok(Command::RunGcode { script: afc::assign_spool(&lane.name, spool_id) });
+    }
     let declared = status.tool_spools.iter().find(|spool| spool.tool == tool);
     let macro_name = &declared.ok_or(CommandError::NoToolSpoolVariable(tool))?.macro_name;
     let script = tool_macros::assign_spool(macro_name, spool_id, sources.klipper.save_variables);

@@ -112,7 +112,9 @@ impl MmuView {
             .enumerate()
             .map(|(row, (tool, gate, found))| {
                 let mut item = tool_match_item(tool, gate, matches);
-                if let Some(state) = gate.and_then(|gate| mmu.gates.iter().find(|state| state.index == gate)) {
+                let gate_row = gate.and_then(|gate| mmu.gates.iter().position(|state| state.index == gate));
+                item.gate_row = id_or_none(gate_row);
+                if let Some(state) = gate_row.map(|row| &mmu.gates[row]) {
                     // A tool of the file shares the reserve with the other tools of its group.
                     let reserve = found.map_or_else(
                         || filament_match::endless_spool_reserve(state.index, &busy, status, lanes),

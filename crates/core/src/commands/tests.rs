@@ -389,3 +389,18 @@ fn a_tool_spool_goes_into_the_macro_under_its_reported_name_and_is_saved_where_p
     );
     assert_eq!(assign(&[], 0), Err(CommandError::NoToolSpoolVariable(0)));
 }
+
+#[test]
+fn a_tool_spool_goes_into_the_afc_lane_mapped_to_the_tool() {
+    use crate::sources::afc::{AfcLane, AfcStatus};
+    let lane = AfcLane { name: "lane2".into(), tool: Some(1), ..AfcLane::default() };
+    let status = PrinterStatus {
+        afc: Some(AfcStatus { lanes: vec![lane], ..AfcStatus::default() }),
+        ..PrinterStatus::default()
+    };
+
+    let assign = |spool_id| Command::AssignToolSpool { tool: 1, spool_id }.resolve(&printer(&[]), &status);
+
+    assert_eq!(assign(Some(4)), Ok(vec![Command::RunGcode { script: "SET_SPOOL_ID LANE=lane2 SPOOL_ID=4".into() }]));
+    assert_eq!(assign(None), Ok(vec![Command::RunGcode { script: "SET_SPOOL_ID LANE=lane2".into() }]));
+}

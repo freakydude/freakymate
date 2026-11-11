@@ -68,6 +68,9 @@ impl Printer {
         if let Some(mmu) = &self.mmu {
             sections.extend(mmu.config_sections());
         }
+        if let Some(afc) = &self.afc {
+            sections.extend(afc.config_sections());
+        }
         if let Some(devices) = &self.devices {
             sections.extend(devices.config_sections());
         }
