@@ -86,6 +86,7 @@ export component MmuGatesTab inherits Rectangle {
                     x: slot * (tiles.cell-width + Theme.spacing);
                     width: tiles.cell-width;
                     height: tiles.height;
+                    compact: root.compact;
                     gate: Printer.mmu-gates[root.current.first-row + slot];
                     clicked => {
                         Actions.lane-tapped(root.current.first-row + slot);
