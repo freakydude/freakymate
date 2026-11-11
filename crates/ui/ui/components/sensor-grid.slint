@@ -1,0 +1,26 @@
+// The filament sensors of the machine (`Printer.filament-sensors`) in a grid with equal columns, so every name gets the
+// same width; shared by the Extruder tab and the System page.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Printer, Severity } from "../state.slint";
+import { StateIcons } from "../state-icons.slint";
+import { IconLabel } from "controls.slint";
+
+export component FilamentSensorGrid inherits Rectangle {
+    property <int> columns: max(1, min(Printer.filament-sensors.length, floor(self.width / 180px)));
+    property <length> cell-width: (self.width - (self.columns - 1) * Theme.spacing) / self.columns;
+    property <length> row-height: 26px;
+
+    height: ceil(Printer.filament-sensors.length / self.columns) * self.row-height;
+    for sensor[index] in Printer.filament-sensors: IconLabel {
+        x: mod(index, root.columns) * (root.cell-width + Theme.spacing);
+        y: floor(index / root.columns) * root.row-height;
+        width: root.cell-width;
+        height: root.row-height;
+        icon: !sensor.enabled ? Icons.ui-minus : sensor.detected ? Icons.ui-check : Icons.filament-runout;
+        text: sensor.label;
+        color: !sensor.enabled ? Theme.muted : StateIcons.ok-color(sensor.detected, StateIcons.severity-color(Severity.attention));
+        font-size: Theme.font-small;
+    }
+}

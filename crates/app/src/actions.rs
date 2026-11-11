@@ -3,6 +3,7 @@
 use crate::presenter::Presenter;
 use crate::settings_controller::SettingsController;
 use crate::{Actions, AppWindow};
+use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::sources::happy_hare::commands::{Gates, ServoCommand};
 use freakymate_core::sources::klipper::tuning::TuningKey;
 use freakymate_core::sources::klipper::{Axis, TestZ};
@@ -24,6 +25,7 @@ pub fn bind(
     bind_calibration(&actions, service, presenter);
     bind_filament(&actions, service);
     bind_mmu(&actions, service);
+    bind_lanes(&actions, service, presenter);
     bind_spools(&actions, service, presenter);
     bind_files_and_print(&actions, service, presenter);
     bind_layer_pause(&actions, service, presenter);
@@ -72,10 +74,11 @@ fn bind_temperatures(
     actions.on_step_heater(move |heater, step| {
         step_service.send(Command::StepHeater { heater: heater.into(), step: f64::from(step) });
     });
-    let (preset_service, preset_settings) = (service.clone(), Rc::clone(settings));
+    let (preset_presenter, preset_settings) = (Rc::clone(presenter), Rc::clone(settings));
     actions.on_apply_preset(move |index| {
         let Some(preset) = usize::try_from(index).ok().and_then(|index| preset_settings.preset(index)) else { return };
-        preset_service.send(Command::ApplyPreset { extruder: preset.extruder, bed: preset.bed });
+        let command = Command::ApplyPreset { extruder: preset.extruder, bed: preset.bed };
+        preset_presenter.send_preset(command, &preset_presenter.snapshot());
     });
     actions.on_cool_down(send(service, || Command::CoolDown));
     let fan_service = service.clone();
@@ -148,16 +151,22 @@ fn bind_filament(actions: &Actions, service: &PrinterService) {
     });
     actions.on_load_filament(send(service, || Command::LoadFilament));
     actions.on_unload_filament(send(service, || Command::UnloadFilament));
+    actions.on_pick_up_head(with(service, |service, head: SharedString| {
+        service.send(Command::PickUpHead { head: head.into() })
+    }));
+    actions.on_drop_head(send(service, || Command::DropHead));
+    let initialize_service = service.clone();
+    actions.on_initialize_toolchanger(move |recover| {
+        initialize_service.send(Command::InitializeToolchanger { recover });
+    });
 }
 
 /// Happy Hare: gates, tools, endless spool, bypass and the filament of a gate.
 fn bind_mmu(actions: &Actions, service: &PrinterService) {
     actions.on_mmu_select_gate(with_gate(service, |gate| Command::MmuSelectGate { gate }));
     actions.on_mmu_load(send(service, || Command::MmuLoad));
-    actions.on_mmu_load_gate(with_gate(service, |gate| Command::MmuLoadGate { gate }));
     actions.on_mmu_unload(send(service, || Command::MmuUnload));
     actions.on_mmu_home(send(service, || Command::MmuHome));
-    actions.on_mmu_eject(with_gate(service, |gate| Command::MmuEject { gate: Some(gate) }));
     actions.on_mmu_recover(send(service, || Command::MmuRecover));
     actions.on_mmu_unlock(send(service, || Command::MmuUnlock));
     actions.on_mmu_motors_off(send(service, || Command::MmuMotorsOff));
@@ -184,17 +193,36 @@ fn bind_mmu(actions: &Actions, service: &PrinterService) {
             group_service.send(Command::SetEndlessSpoolGroup { gate, group });
         }
     });
-    let material_service = service.clone();
-    actions.on_set_gate_material(move |gate, material| {
-        if let Ok(gate) = usize::try_from(gate) {
-            material_service.send(Command::SetGateFilament { gate, material: Some(material.into()), color: None });
+}
+
+/// The tiles of the Gates tab, a gate of Happy Hare or a lane of AFC: the core resolves each intent for its source.
+fn bind_lanes(actions: &Actions, service: &PrinterService, presenter: &Rc<Presenter>) {
+    actions.on_lane_tapped(with_presenter(presenter, |presenter, row: i32| {
+        if let Some(lane) = lane_of_row(presenter, row) {
+            presenter.show_lane(lane);
+        }
+    }));
+    actions.on_bypass_tapped(run_presenter(presenter, |presenter| presenter.show_lane(LaneId::Bypass)));
+    actions.on_lane_load(with_lane(service, presenter, |lane| Command::LoadLane { lane }));
+    actions.on_lane_unload(with_lane(service, presenter, |lane| Command::UnloadLane { lane }));
+    actions.on_lane_eject(with_lane(service, presenter, |lane| Command::EjectLane { lane }));
+    let (service_for_spool, presenter_for_spool) = (service.clone(), Rc::clone(presenter));
+    actions.on_assign_lane_spool(move |row, id| {
+        if let Some(lane) = lane_of_row(&presenter_for_spool, row) {
+            service_for_spool.send(Command::AssignLaneSpool { lane, spool_id: u32::try_from(id).ok() });
         }
     });
-    let color_service = service.clone();
-    actions.on_set_gate_color(move |gate, color| {
-        if let Ok(gate) = usize::try_from(gate) {
+    let (service_for_material, presenter_for_material) = (service.clone(), Rc::clone(presenter));
+    actions.on_set_lane_material(move |row, material| {
+        if let Some(lane) = lane_of_row(&presenter_for_material, row) {
+            service_for_material.send(Command::SetLaneFilament { lane, material: Some(material.into()), color: None });
+        }
+    });
+    let (service_for_color, presenter_for_color) = (service.clone(), Rc::clone(presenter));
+    actions.on_set_lane_color(move |row, color| {
+        if let Some(lane) = lane_of_row(&presenter_for_color, row) {
             let color = Some([color.red(), color.green(), color.blue()]);
-            color_service.send(Command::SetGateFilament { gate, material: None, color });
+            service_for_color.send(Command::SetLaneFilament { lane, material: None, color });
         }
     });
 }
@@ -209,6 +237,12 @@ fn bind_spools(actions: &Actions, service: &PrinterService, presenter: &Rc<Prese
     actions.on_assign_gate_spool(move |gate, id| {
         if let Ok(gate) = usize::try_from(gate) {
             assign_service.send(Command::AssignGateSpool { gate, spool_id: u32::try_from(id).ok() });
+        }
+    });
+    let tool_service = service.clone();
+    actions.on_assign_tool_spool(move |tool, id| {
+        if let Ok(tool) = usize::try_from(tool) {
+            tool_service.send(Command::AssignToolSpool { tool, spool_id: u32::try_from(id).ok() });
         }
     });
     let (measure_service, measure_presenter) = (service.clone(), Rc::clone(presenter));
@@ -371,6 +405,25 @@ fn with_gate(service: &PrinterService, command: fn(usize) -> Command) -> impl Fn
             service.send(command(gate));
         }
     })
+}
+
+/// The lane of the tile in `row` of the Gates tab.
+fn lane_of_row(presenter: &Presenter, row: i32) -> Option<LaneId> {
+    usize::try_from(row).ok().and_then(|row| presenter.lane_id(row))
+}
+
+/// Callback with the row of a tile that sends the command for its lane; a row without lane sends nothing.
+fn with_lane(
+    service: &PrinterService,
+    presenter: &Rc<Presenter>,
+    command: fn(LaneId) -> Command,
+) -> impl Fn(i32) + 'static {
+    let (service, presenter) = (service.clone(), Rc::clone(presenter));
+    move |row| {
+        if let Some(lane) = lane_of_row(&presenter, row) {
+            service.send(command(lane));
+        }
+    }
 }
 
 /// Callback with one argument that receives the presenter.

@@ -1,6 +1,7 @@
 //! Heaters with a target (`extruder`, `heater_bed`, `heater_generic`, `temperature_fan`, additional extruders) and
 //! temperatures without one (`temperature_sensor`, drivers that measure their own).
 
+use super::setup::is_additional_extruder;
 use super::status::label;
 use crate::sources::fields::number;
 use crate::sources::objects::ObjectStore;
@@ -25,6 +26,11 @@ pub struct Heater {
 }
 
 impl Heater {
+    /// The heater of a nozzle: Klipper's `extruder`, or `extruder1`, `extruder2`, … of a printer with several.
+    pub fn is_nozzle(&self) -> bool {
+        self.object == NOZZLE_HEATER || is_additional_extruder(&self.object)
+    }
+
     /// Target after pressing + or − (`step` with sign): jumps over the forbidden range between off and
     /// `min_temp` and stops at `max_temp`.
     pub fn stepped_target(&self, step: f64) -> f64 {
@@ -91,10 +97,11 @@ fn heater(object: &str, value: &Value, settings: Option<&Value>) -> Heater {
     }
 }
 
-/// Object kinds that are only a temperature; `tmc2240` reports the temperature of the driver. Not
+/// Object kinds that are only a temperature; `tmc2240` and `tmc5262` report the temperature of the driver (the other
+/// TMC drivers have no temperature register, their `temperature` is always null). Not
 /// `temperature_host`/`temperature_combined`: Klipper adds them beside the section that uses the sensor type, so they
 /// would show the same sensor twice (see `Setup::temperature_sensors`).
-const SENSOR_KINDS: [&str; 2] = ["temperature_sensor", "tmc2240"];
+const SENSOR_KINDS: [&str; 3] = ["temperature_sensor", "tmc2240", "tmc5262"];
 
 /// In the order of [`SENSOR_KINDS`], each kind in name order.
 pub(super) fn read_sensors(store: &ObjectStore) -> Vec<TemperatureSensor> {
@@ -116,6 +123,14 @@ pub(super) fn read_sensors(store: &ObjectStore) -> Vec<TemperatureSensor> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_extruder_heats_a_nozzle() {
+        let heater = |object: &str| Heater { object: object.into(), ..Heater::default() };
+
+        assert!(heater("extruder").is_nozzle() && heater("extruder2").is_nozzle());
+        assert!(!heater("heater_bed").is_nozzle() && !heater("heater_generic extruder_box").is_nozzle());
+    }
     use crate::sources::PrinterStatus;
     use serde_json::json;
 

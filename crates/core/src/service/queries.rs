@@ -12,7 +12,6 @@ use crate::sources::moonraker_server::power;
 use crate::sources::moonraker_server::temperature_store;
 use crate::sources::moonraker_server::update_manager;
 use crate::sources::spoolman;
-use crate::sources::PrinterStatus;
 use serde_json::Value;
 
 impl Session<'_> {
@@ -32,7 +31,7 @@ impl Session<'_> {
             authorized: self.access.is_authorized(),
         };
         let events = self.outputs.events.clone();
-        let gate_spools = self.spoolman_gate_spools.clone().unwrap_or_default();
+        let lane_spools = self.spoolman_lane_spools.clone().unwrap_or_default();
         let permits = matches!(query, Query::FileDetails { .. }).then(|| self.file_details.clone());
         tokio::spawn(async move {
             // The timeout starts once it is this query's turn.
@@ -41,7 +40,7 @@ impl Session<'_> {
                 None => None,
             };
             let fetched =
-                tokio::time::timeout(QUERY_TIMEOUT, fetch(&connection, &downloads, &query, &gate_spools)).await;
+                tokio::time::timeout(QUERY_TIMEOUT, fetch(&connection, &downloads, &query, &lane_spools)).await;
             match fetched {
                 Ok(Ok(results)) => results.into_iter().for_each(|event| {
                     let _ = events.send(event);
@@ -77,7 +76,7 @@ async fn fetch(
     connection: &Connection,
     downloads: &Downloads,
     query: &Query,
-    gate_spools: &[u32],
+    lane_spools: &[u32],
 ) -> Result<Vec<Event>, String> {
     let call =
         |call: Call| async move { connection.call(call.method, call.params).await.map_err(|error| error.to_string()) };
@@ -102,7 +101,7 @@ async fn fetch(
         Query::PrintHistory => {
             vec![Event::PrintHistory(history::parse_print_history(&call(history::list_call()).await?))]
         }
-        Query::Spoolman => vec![Event::Spoolman(Box::new(spoolman::fetch_state(connection, gate_spools).await?))],
+        Query::Spoolman => vec![Event::Spoolman(Box::new(spoolman::fetch_state(connection, lane_spools).await?))],
         Query::SpoolList => vec![Event::SpoolList(spoolman::fetch_spool_list(connection).await?)],
         Query::PowerDevices => {
             vec![Event::PowerDevices(power::parse_power_devices(&call(power::devices_call()).await?))]
@@ -127,12 +126,4 @@ pub(super) fn update_status_events(status: &Value) -> Vec<Event> {
         Event::Updates(update_manager::parse_update_status(status)),
         Event::UpdateManagerBusy(update_manager::is_busy(status)),
     ]
-}
-/// The spools of the gates, without duplicates.
-pub(super) fn gate_spool_ids(status: &PrinterStatus) -> Vec<u32> {
-    let mut ids: Vec<u32> =
-        status.happy_hare().iter().flat_map(|mmu| mmu.gates.iter()).filter_map(|gate| gate.spool_id).collect();
-    ids.sort_unstable();
-    ids.dedup();
-    ids
 }

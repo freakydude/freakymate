@@ -364,3 +364,152 @@ fn tuning_steps_from_the_current_value_and_resets_to_the_configuration() {
 fn a_heater_target_is_never_negative() {
     assert_eq!(resolved(set("heater_bed", -5.0), &["heater_bed"]), Ok(vec![set("heater_bed", 0.0)]));
 }
+
+#[test]
+fn a_tool_spool_goes_into_the_macro_under_its_reported_name_and_is_saved_where_possible() {
+    let status = PrinterStatus {
+        tool_spools: vec![crate::sources::tool_macros::ToolSpool { tool: 1, macro_name: "t1".into(), spool_id: None }],
+        ..PrinterStatus::default()
+    };
+    let assign = |objects: &[&str], tool| {
+        Command::AssignToolSpool { tool, spool_id: Some(4) }.resolve(&printer(objects), &status)
+    };
+
+    assert_eq!(
+        assign(&["gcode_macro t1"], 1),
+        Ok(vec![Command::RunGcode { script: "SET_GCODE_VARIABLE MACRO=t1 VARIABLE=spool_id VALUE=4".into() }])
+    );
+    assert_eq!(
+        assign(&["gcode_macro t1", "save_variables"], 1),
+        Ok(vec![Command::RunGcode {
+            script:
+                "SET_GCODE_VARIABLE MACRO=t1 VARIABLE=spool_id VALUE=4\nSAVE_VARIABLE VARIABLE=t1__spool_id VALUE=4"
+                    .into()
+        }])
+    );
+    assert_eq!(assign(&[], 0), Err(CommandError::NoToolSpoolVariable(0)));
+}
+
+#[test]
+fn a_tool_spool_goes_into_the_afc_lane_mapped_to_the_tool() {
+    use crate::sources::afc::{AfcLane, AfcStatus};
+    let lane = AfcLane { name: "lane2".into(), tool: Some(1), ..AfcLane::default() };
+    let status = PrinterStatus {
+        afc: Some(AfcStatus { lanes: vec![lane], ..AfcStatus::default() }),
+        ..PrinterStatus::default()
+    };
+
+    let assign = |spool_id| Command::AssignToolSpool { tool: 1, spool_id }.resolve(&printer(&[]), &status);
+
+    assert_eq!(assign(Some(4)), Ok(vec![Command::RunGcode { script: "SET_SPOOL_ID LANE=lane2 SPOOL_ID=4".into() }]));
+    assert_eq!(assign(None), Ok(vec![Command::RunGcode { script: "SET_SPOOL_ID LANE=lane2".into() }]));
+}
+
+#[test]
+fn a_lane_command_becomes_the_g_code_of_its_source() {
+    use crate::sources::afc::{AfcLane, AfcStatus};
+    use crate::sources::happy_hare::MmuStatus;
+    let lane = AfcLane { name: "lane2".into(), ..AfcLane::default() };
+    let status = PrinterStatus {
+        afc: Some(AfcStatus { lanes: vec![lane], ..AfcStatus::default() }),
+        mmu: Some(MmuStatus::default()),
+        ..PrinterStatus::default()
+    };
+    let resolve = |command: Command| command.resolve(&printer(&[]), &status);
+    let gcode = |script: &str| Ok(vec![Command::RunGcode { script: script.into() }]);
+    let afc = || LaneId::Afc("lane2".into());
+
+    assert_eq!(resolve(Command::LoadLane { lane: afc() }), gcode("CHANGE_TOOL LANE=lane2"));
+    assert_eq!(resolve(Command::UnloadLane { lane: afc() }), gcode("TOOL_UNLOAD LANE=lane2"));
+    assert_eq!(resolve(Command::EjectLane { lane: afc() }), gcode("LANE_UNLOAD LANE=lane2"));
+    assert_eq!(
+        resolve(Command::AssignLaneSpool { lane: afc(), spool_id: Some(4) }),
+        gcode("SET_SPOOL_ID LANE=lane2 SPOOL_ID=4")
+    );
+    assert_eq!(
+        resolve(Command::SetLaneFilament { lane: afc(), material: Some("PETG".into()), color: Some([255, 16, 0]) }),
+        gcode("SET_MATERIAL LANE=lane2 MATERIAL=PETG\nSET_COLOR LANE=lane2 COLOR=FF1000")
+    );
+    assert_eq!(resolve(Command::SetLaneFilament { lane: afc(), material: None, color: None }), Ok(Vec::new()));
+    assert_eq!(resolve(Command::LoadLane { lane: LaneId::Gate(3) }), Ok(vec![Command::MmuLoadGate { gate: 3 }]));
+    assert_eq!(resolve(Command::UnloadLane { lane: LaneId::Gate(3) }), Ok(vec![Command::MmuUnload]));
+    assert_eq!(resolve(Command::EjectLane { lane: LaneId::Gate(3) }), Ok(vec![Command::MmuEject { gate: Some(3) }]));
+    assert_eq!(resolve(Command::LoadLane { lane: LaneId::Bypass }), Ok(vec![Command::MmuLoadBypass]));
+    assert_eq!(resolve(Command::EjectLane { lane: LaneId::Bypass }), Err(CommandError::NotForBypass));
+    assert_eq!(
+        resolve(Command::LoadLane { lane: LaneId::Afc("lane9".into()) }),
+        Err(CommandError::UnknownLane("lane9".into()))
+    );
+    assert!(Command::EjectLane { lane: afc() }.moves_machine());
+    assert!(!Command::AssignLaneSpool { lane: afc(), spool_id: None }.moves_machine());
+    assert_eq!(resolve(Command::MapToolToLane { tool: 3, lane: afc() }), gcode("SET_MAP LANE=lane2 MAP=T3"));
+    assert_eq!(
+        resolve(Command::MapToolToLane { tool: 3, lane: LaneId::Gate(1) }),
+        Ok(vec![Command::MmuMapTool { tool: 3, gate: 1 }])
+    );
+    assert_eq!(resolve(Command::MapToolToLane { tool: 0, lane: LaneId::Bypass }), Err(CommandError::NotForBypass));
+    assert_eq!(resolve(Command::AfcResetFailure), gcode("RESET_FAILURE"));
+    assert_eq!(resolve(Command::AfcResetLane { lane: "lane2".into() }), gcode("AFC_LANE_RESET LANE=lane2"));
+    assert!(Command::AfcResetLane { lane: "lane2".into() }.moves_machine());
+    assert!(!Command::MapToolToLane { tool: 0, lane: afc() }.moves_machine());
+}
+
+#[test]
+fn the_tool_map_resets_in_the_source_in_charge() {
+    use crate::sources::afc::AfcStatus;
+    let afc_only = PrinterStatus { afc: Some(AfcStatus::default()), ..PrinterStatus::default() };
+
+    let reset = Command::ResetToolMap.resolve(&printer(&[]), &afc_only);
+
+    assert_eq!(reset, Ok(vec![Command::RunGcode { script: "RESET_AFC_MAPPING RUNOUT=no".into() }]));
+    assert_eq!(Command::ResetToolMap.resolve(&printer(&[]), &PrinterStatus::default()), Err(CommandError::NoAfc));
+}
+
+fn status_with_heads(mounted: Option<&str>) -> PrinterStatus {
+    use crate::sources::toolchanger::{ToolHead, ToolchangerStatus};
+    let head = |name: &str, extruder: &str| ToolHead {
+        name: name.into(),
+        number: name.strip_prefix('T').and_then(|number| number.parse().ok()),
+        extruder: Some(extruder.into()),
+        active: mounted == Some(name),
+    };
+    PrinterStatus {
+        toolchanger: Some(ToolchangerStatus {
+            status: "ready".into(),
+            heads: vec![head("T0", "extruder"), head("T1", "extruder1")],
+            ..ToolchangerStatus::default()
+        }),
+        ..status_with_targets(&[("extruder", 0.0), ("extruder1", 0.0), ("heater_bed", 0.0)])
+    }
+}
+
+#[test]
+fn a_preset_heats_the_nozzle_of_the_mounted_head() {
+    let preset = Command::ApplyPreset { extruder: 210.0, bed: 60.0 };
+
+    let commands = preset.resolve(&printer(&[]), &status_with_heads(Some("T1")));
+
+    assert_eq!(commands, Ok(vec![set("extruder1", 210.0), set("heater_bed", 60.0)]));
+}
+
+#[test]
+fn a_preset_heats_only_the_bed_while_no_head_is_mounted() {
+    let preset = Command::ApplyPreset { extruder: 210.0, bed: 60.0 };
+
+    let commands = preset.resolve(&printer(&[]), &status_with_heads(None));
+
+    assert_eq!(commands, Ok(vec![set("heater_bed", 60.0)]));
+}
+
+#[test]
+fn head_commands_become_the_plugins_g_code() {
+    let script = |command: Command| match command.to_call(&Motion::default()).unwrap().params {
+        Some(params) => params["script"].as_str().unwrap().to_owned(),
+        None => String::new(),
+    };
+
+    assert_eq!(script(Command::PickUpHead { head: "left".into() }), "SELECT_TOOL TOOL=left");
+    assert_eq!(script(Command::DropHead), "UNSELECT_TOOL");
+    assert_eq!(script(Command::InitializeToolchanger { recover: true }), "INITIALIZE_TOOLCHANGER RECOVER=1");
+    assert!(Command::PickUpHead { head: "two words".into() }.to_call(&Motion::default()).is_none());
+}

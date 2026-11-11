@@ -320,3 +320,336 @@ fn restart_keeps_the_machine_profile() {
 
     assert_eq!(printer.status()["mmu"]["is_homed"], false);
 }
+
+fn toolchanger_printer() -> Printer {
+    Printer::with_profile(1.0, MachineProfile::toolchanger())
+}
+
+#[test]
+fn toolchanger_profile_lists_its_objects() {
+    let names = toolchanger_printer().object_names();
+
+    for expected in [
+        "extruder",
+        "extruder1",
+        "extruder2",
+        "toolchanger",
+        "tool T0",
+        "tool T1",
+        "tool T2",
+        "gcode_macro T0",
+        "gcode_macro T1",
+        "gcode_macro T2",
+        "save_variables",
+    ] {
+        assert!(names.iter().any(|name| name == expected), "missing {expected}");
+    }
+    assert!(!Printer::with_profile(1.0, MachineProfile::voron()).object_names().contains(&"toolchanger".to_owned()));
+}
+
+#[test]
+fn toolchanger_starts_uninitialized_with_tool_0_on_the_carriage_and_known_spools() {
+    let status = toolchanger_printer().status();
+
+    // `_handle_connect`: status `uninitialized`, no active tool; the detection still sees T0.
+    assert_eq!(status["toolchanger"]["status"], "uninitialized");
+    assert_eq!(status["toolchanger"]["tool"], Value::Null);
+    assert_eq!(status["toolchanger"]["tool_number"], -1);
+    assert_eq!(status["toolchanger"]["detected_tool"], "tool T0");
+    assert_eq!(status["toolchanger"]["detected_tool_number"], 0);
+    assert_eq!(status["configfile"]["settings"]["toolchanger"]["initialize_on"], "first-use");
+    assert_eq!(status["configfile"]["settings"]["toolchanger"]["require_tool_present"], false);
+    assert!(status["configfile"]["settings"]["toolchanger"].get("error_gcode").is_none());
+    assert_eq!(status["toolchanger"]["tool_names"], json!(["tool T0", "tool T1", "tool T2"]));
+    assert_eq!(status["tool T0"]["detect_state"], "mounted");
+    assert_eq!(status["tool T1"]["gcode_z_offset"], 0.3);
+    assert_eq!(status["toolhead"]["extruder"], "extruder");
+    assert_eq!(status["gcode_macro T0"]["spool_id"], 1);
+    assert_eq!(status["gcode_macro T1"]["spool_id"], 3);
+    assert_eq!(status["gcode_macro T2"]["spool_id"], Value::Null);
+}
+
+#[test]
+fn tool_macro_switches_the_tool_and_the_toolhead_extruder() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "T1").unwrap();
+
+    let status = printer.status();
+    assert_eq!(status["toolchanger"]["tool"], "tool T1");
+    assert_eq!(status["toolchanger"]["detected_tool_number"], 1);
+    assert_eq!(status["tool T1"]["active"], true);
+    assert_eq!(status["tool T1"]["detect_state"], "mounted");
+    assert_eq!(status["tool T0"]["detect_state"], "absent");
+    assert_eq!(status["toolhead"]["extruder"], "extruder1");
+}
+
+#[test]
+fn select_tool_accepts_number_and_name_and_rejects_unknown_tools() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "SELECT_TOOL T=2").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 2);
+    run(&mut printer, "SELECT_TOOL T=1").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 1);
+
+    assert_eq!(run(&mut printer, "SELECT_TOOL T=7").unwrap_err().message(), "Select tool: T7 not found");
+    assert_eq!(run(&mut printer, "SELECT_TOOL TOOL=T1").unwrap_err().message(), "Unknown config object 'T1'");
+    assert_eq!(
+        run(&mut printer, "SELECT_TOOL").unwrap_err().message(),
+        "Select tool: Either TOOL or T needs to be specified"
+    );
+}
+
+#[test]
+fn unselect_tool_leaves_no_tool_but_keeps_the_toolhead_extruder() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "T2\nUNSELECT_TOOL").unwrap();
+
+    let status = printer.status();
+    assert_eq!(status["toolchanger"]["tool"], Value::Null);
+    assert_eq!(status["toolchanger"]["tool_number"], -1);
+    assert_eq!(status["tool T2"]["detect_state"], "absent");
+    assert_eq!(status["toolhead"]["extruder"], "extruder2");
+}
+
+#[test]
+fn m104_with_t_heats_that_extruder_whichever_is_active() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "T1\nM104 T0 S190\nM104 T2 S180").unwrap();
+
+    let status = printer.status();
+    assert_eq!(status["extruder"]["target"], 190.0);
+    assert_eq!(status["extruder1"]["target"], 0.0);
+    assert_eq!(status["extruder2"]["target"], 180.0);
+    assert!(run(&mut printer, "M104 T5 S180").is_err());
+}
+
+#[test]
+fn heating_follows_the_active_extruder() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "T1\nM104 S200").unwrap();
+    printer.advance(Duration::from_secs(10));
+
+    let status = printer.status();
+    assert_eq!(status["extruder1"]["target"], 200.0);
+    assert_eq!(status["extruder"]["target"], 0.0);
+    assert!(status["extruder1"]["temperature"].as_f64().unwrap() > 30.0);
+
+    run(&mut printer, "SET_HEATER_TEMPERATURE HEATER=extruder2 TARGET=180").unwrap();
+    assert_eq!(printer.status()["extruder2"]["target"], 180.0);
+}
+
+#[test]
+fn set_gcode_variable_changes_a_macro_variable() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "SET_GCODE_VARIABLE MACRO=T2 VARIABLE=spool_id VALUE=5").unwrap();
+    assert_eq!(printer.status()["gcode_macro T2"]["spool_id"], 5);
+
+    run(&mut printer, "SET_GCODE_VARIABLE MACRO=T1 VARIABLE=spool_id VALUE=None").unwrap();
+    assert_eq!(printer.status()["gcode_macro T1"]["spool_id"], Value::Null);
+}
+
+#[test]
+fn set_gcode_variable_rejects_unknown_macros_and_variables() {
+    let mut printer = toolchanger_printer();
+
+    let macro_error = run(&mut printer, "SET_GCODE_VARIABLE MACRO=T9 VARIABLE=spool_id VALUE=5").unwrap_err();
+    let variable_error = run(&mut printer, "SET_GCODE_VARIABLE MACRO=T0 VARIABLE=colour VALUE=5").unwrap_err();
+
+    assert_eq!(macro_error.message(), "The value 'T9' is not valid for MACRO. Options: 'T0', 'T1', 'T2'");
+    assert_eq!(variable_error.message(), "Unknown gcode_macro variable 'colour'");
+    assert!(run(&mut printer, "SET_GCODE_VARIABLE MACRO=T0 VARIABLE=SPOOL_ID VALUE=5").is_err(), "names are exact");
+    assert_eq!(
+        run(&mut printer, "SAVE_VARIABLE VARIABLE=T0__spool_id VALUE=5").unwrap_err().message(),
+        "VARIABLE must not contain upper case"
+    );
+}
+
+#[test]
+fn save_variable_shows_in_save_variables() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "SAVE_VARIABLE VARIABLE=t0__spool_id VALUE=4").unwrap();
+
+    assert_eq!(printer.status()["save_variables"]["variables"]["t0__spool_id"], 4);
+}
+
+#[test]
+fn activate_extruder_sets_the_toolhead_extruder() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "ACTIVATE_EXTRUDER EXTRUDER=extruder2").unwrap();
+
+    assert_eq!(printer.status()["toolhead"]["extruder"], "extruder2");
+    assert!(run(&mut printer, "ACTIVATE_EXTRUDER EXTRUDER=extruder9").is_err());
+}
+
+#[test]
+fn other_profiles_report_no_tool_changer_details() {
+    let mut printer = Printer::with_profile(1.0, MachineProfile::voron());
+
+    run(&mut printer, "SELECT_TOOL T=1").unwrap();
+
+    let status = printer.status();
+    assert!(status["toolhead"].get("extruder").is_none());
+    assert!(status.get("extruder1").is_none());
+    assert!(status.get("save_variables").is_none());
+}
+
+#[test]
+fn toolchanger_status_follows_the_fake_state_hook() {
+    let mut printer = toolchanger_printer();
+    assert_eq!(printer.status()["toolchanger"]["status"], "uninitialized");
+
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=ready").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["status"], "ready");
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=error").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["status"], "error");
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=uninitialized").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["status"], "uninitialized");
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=ready").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["status"], "ready");
+    assert!(run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=bogus").is_err());
+}
+
+#[test]
+fn first_use_initializes_on_the_first_tool_selection() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "T1").unwrap();
+
+    let status = printer.status();
+    assert_eq!(status["toolchanger"]["status"], "ready");
+    assert_eq!(status["toolchanger"]["tool_number"], 1);
+}
+
+#[test]
+fn an_error_refuses_tool_changes_with_its_reason_until_initialize_toolchanger_heals() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=ready\nT1\nFAKE_TOOLCHANGER_STATE STATE=error").unwrap();
+
+    let error = run(&mut printer, "T2").unwrap_err();
+
+    assert_eq!(
+        error.message(),
+        "Cannot select tool, toolchanger status is error, reason: Expected tool tool T1 but active is None"
+    );
+    // The rejected command reset the plugin (`gcode:command_error`); the reason stays.
+    assert_eq!(printer.status()["toolchanger"]["status"], "uninitialized");
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], -1);
+    // `first-use` initialises by itself at the next selection.
+    run(&mut printer, "T2").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 2);
+}
+
+#[test]
+fn any_rejected_command_resets_the_plugin() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "T1").unwrap();
+
+    assert!(run(&mut printer, "SET_HEATER_TEMPERATURE HEATER=nothing TARGET=1").is_err());
+
+    let status = printer.status();
+    assert_eq!(status["toolchanger"]["status"], "uninitialized");
+    assert_eq!(status["toolchanger"]["tool_number"], -1);
+    assert_eq!(status["toolchanger"]["detected_tool_number"], 1);
+}
+
+#[test]
+fn a_manual_changer_refuses_tool_changes_until_it_is_initialized() {
+    let mut printer = Printer::with_profile(
+        1.0,
+        MachineProfile { initialize_on: crate::machine::InitializeOn::Manual, ..MachineProfile::toolchanger() },
+    );
+
+    let error = run(&mut printer, "T1").unwrap_err();
+    assert_eq!(error.message(), "Cannot select tool, toolchanger status is uninitialized, reason: ");
+    run(&mut printer, "INITIALIZE_TOOLCHANGER").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 0);
+    run(&mut printer, "T1").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 1);
+}
+
+#[test]
+fn unselect_tool_without_an_active_tool_does_nothing() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "UNSELECT_TOOL").unwrap();
+
+    assert_eq!(printer.status()["toolchanger"]["status"], "uninitialized");
+}
+
+#[test]
+fn initialize_toolchanger_makes_the_detected_tool_active() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "INITIALIZE_TOOLCHANGER").unwrap();
+
+    let status = printer.status();
+    assert_eq!(status["toolchanger"]["status"], "ready");
+    assert_eq!(status["toolchanger"]["tool_number"], 0);
+}
+
+#[test]
+fn initialize_toolchanger_with_recover_heals_an_error() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=error\nINITIALIZE_TOOLCHANGER RECOVER=1").unwrap();
+
+    assert_eq!(printer.status()["toolchanger"]["status"], "ready");
+}
+
+#[test]
+fn recover_without_a_tool_fails() {
+    let mut printer = toolchanger_printer();
+    run(&mut printer, "T1\nUNSELECT_TOOL\nFAKE_TOOLCHANGER_STATE STATE=error").unwrap();
+
+    let error = run(&mut printer, "INITIALIZE_TOOLCHANGER RECOVER=1").unwrap_err();
+
+    assert_eq!(error.message(), "Cannot recover, no tool");
+}
+
+#[test]
+fn an_error_pauses_a_running_print_only_with_error_gcode_pause() {
+    let file = Catalog::demo().find("benchy.gcode").unwrap().clone();
+    for (profile, expected) in
+        [(MachineProfile::toolchanger(), "printing"), (MachineProfile::toolchanger_required(), "paused")]
+    {
+        let mut printer = Printer::with_profile(1.0, profile);
+        printer.start_print(&file).unwrap();
+
+        run(&mut printer, "FAKE_TOOLCHANGER_STATE STATE=error").unwrap();
+
+        assert_eq!(printer.status()["print_stats"]["state"], expected);
+        assert_eq!(printer.status()["toolchanger"]["status"], "error");
+    }
+}
+
+#[test]
+fn require_tool_present_removes_unselect_tool() {
+    let mut printer = Printer::with_profile(1.0, MachineProfile::toolchanger_required());
+
+    let error = run(&mut printer, "UNSELECT_TOOL").unwrap_err();
+
+    assert_eq!(error.message(), "Unknown command:\"UNSELECT_TOOL\"");
+    run(&mut printer, "G28").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 0);
+    run(&mut printer, "T1").unwrap();
+}
+
+#[test]
+fn initialize_on_home_waits_for_the_homing() {
+    let mut printer = Printer::with_profile(1.0, MachineProfile::toolchanger_required());
+    let settings = printer.status()["configfile"]["settings"]["toolchanger"].clone();
+    assert_eq!(settings["initialize_on"], "home");
+    assert_eq!(settings["require_tool_present"], true);
+    assert_eq!(settings["error_gcode"], "PAUSE");
+
+    let error = run(&mut printer, "T1").unwrap_err();
+    assert_eq!(error.message(), "Cannot select tool, toolchanger status is uninitialized, reason: ");
+
+    run(&mut printer, "G28").unwrap();
+    assert_eq!(printer.status()["toolchanger"]["status"], "ready");
+    assert_eq!(printer.status()["toolchanger"]["tool_number"], 0);
+}

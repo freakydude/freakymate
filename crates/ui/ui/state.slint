@@ -2,10 +2,10 @@
 
 import { Icons } from "icons.slint";
 import { Theme } from "theme.slint";
-import { Severity, Page, HeaterItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 import { Actions } from "actions.slint";
 
-export { Severity, Page, HeaterItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 export { Actions } from "actions.slint";
 
 
@@ -78,6 +78,23 @@ export global Printer {
     // Temperatures and fans
     in property <[HeaterItem]> heaters;
     in property <[SensorItem]> sensors;
+    // The swappable heads of a tool changer for the Filament page; empty without them (then the page shows no head level).
+    in property <[HeadItem]> heads;
+    // The row of the mounted head in `heads`, -1 while none is mounted.
+    in property <int> mounted-head: -1;
+    // The deviation of the tool changer worth a line: "" | "uninitialized" | "error" | "mismatch" (`changer-selected`
+    // and `changer-detected` name the heads of a mismatch).
+    in property <string> changer-note;
+    in property <string> changer-selected;
+    in property <string> changer-detected;
+    // The changer can change heads now (`ready`).
+    in property <bool> changer-ready: true;
+    // The mounted head can be dropped (`UNSELECT_TOOL` exists).
+    in property <bool> has-drop;
+    // The name of the head whose nozzle the status bar shows (`T1`); empty without swappable heads.
+    in property <string> nozzle-head;
+    // False while the printer has heads but none is mounted: no nozzle to show.
+    in property <bool> nozzle-selected: true;
     in property <float> nozzle-temperature;
     in property <float> nozzle-target;
     in property <bool> has-bed;
@@ -107,14 +124,22 @@ export global Printer {
     // Lengths for extruding by hand that Klipper accepts (`max_extrude_only_distance`).
     in property <[float]> extrude-lengths: [5, 10, 25, 50];
     in property <[FilamentSensorItem]> filament-sensors;
+    // A switched-on filament sensor reports no filament; the Sensors tab of a tool changer shows a dot.
+    in property <bool> filament-sensor-runout;
     // Objects of the running print; excluded ones cannot be printed again.
     in property <[PrintObjectItem]> print-objects;
     // The bed the objects lie on; not shown if the slicer did not tell where they are.
     in property <BedMapItem> bed-map;
     // Happy Hare (4.1 or newer). Without it the Filament page has no MMU tabs.
     in property <bool> has-mmu;
+    // The Gates tab has tiles: the gates of Happy Hare or the lanes of AFC (then only the tabs Gates and Extruder).
+    in property <bool> has-lanes;
     in property <bool> mmu-unsupported;
     in property <[MmuGateItem]> mmu-gates;
+    // The pages of the Gates tab, all views one after the other; `mmu-page-ranges` says which belong to a view: one
+    // range per head (a row of `heads`), a single one without heads.
+    in property <[MmuGatePage]> mmu-pages;
+    in property <[MmuPageRange]> mmu-page-ranges;
     in property <[MmuSensorItem]> mmu-sensors;
     // loaded | unloaded | unknown
     in property <string> mmu-filament;
@@ -207,6 +232,10 @@ export global Printer {
     in property <bool> has-spool;
     // Spoolman id of the spool in use, -1 for none.
     in property <int> spool-id: -1;
+    // The tool macro that keeps the spool in use (tool changer), -1 when none does.
+    in property <int> spool-tool: -1;
+    // The head or AFC lane that keeps the spool in use, for the picker title; empty when none is named.
+    in property <string> spool-target;
     in property <string> spool-title;
     in property <string> spool-material;
     // What is left of the spool, for example "613 g".
@@ -214,6 +243,11 @@ export global Printer {
     in property <BarColors> spool-colors;
     // Where the filament of the selected gate is, for the drawing of its way.
     in property <FilamentPathItem> mmu-path;
+    // The load path card of the Gates tab: the lane whose tile was tapped last, else the loaded one.
+    in property <FilamentPathItem> lane-path;
+    // The buffer on the way of that lane: "" none, tension | neutral | compressed | unknown. With Happy Hare the
+    // gauge (`mmu-buffer-*`) shows the state; AFC has the word only.
+    in property <string> lane-buffer;
     in property <bool> spool-low;
     // Heating to what the spool in use recommends.
     in property <bool> has-spool-preset;
@@ -221,6 +255,8 @@ export global Printer {
     in property <[SpoolItem]> spools;
     in property <bool> spools-loading;
     in property <[FileItem]> files;
+    // The newest files (at most four), offered on the print page while there is no job.
+    in property <[FileItem]> recent-files;
     // The file prepared in the app as the job of the print page, empty for none; only the app knows it. A started
     // print, a deleted file or a restart drops it.
     in property <string> prepared-path;
@@ -256,6 +292,9 @@ export global Printer {
     out property <bool> is-printing: print-state == "printing" || print-state == "paused";
     // Moving and extruding are allowed while paused, e.g. to change the filament; a running print locks them.
     out property <bool> motion-locked: print-state == "printing";
+    // Homing, leveling, calibrating and motors off would change the position a paused print resumes from; the core
+    // refuses them for the whole print (`Command::loses_print_position`).
+    out property <bool> position-locked: is-printing;
     // Moonraker's update manager looks for or installs updates, from here or another client.
     in property <bool> updates-busy;
     // Restarts, reboots and updates would abort a print or a running command (idle_timeout "Printing"), or an update
@@ -347,18 +386,57 @@ export global SpoolPicker {
     in-out property <int> gate: -1;
     // The spool the gate (or the printer) has now, -1 for none; the dialog opens with it selected.
     in-out property <int> current: -1;
+    // The tool macro of a tool changer head to assign a spool to, -1 for none (a gate or the active spool).
+    in-out property <int> tool: -1;
+    // What the tool belongs to (a head such as `T1`, an AFC lane), for the title; empty for none.
+    in-out property <string> target;
+    // The tile (row of `Printer.mmu-gates`) to assign a spool to, -1 for none; the same for a gate and a lane of AFC.
+    in-out property <int> lane: -1;
 
     public function show(gate: int, current: int) {
         self.gate = gate;
+        self.lane = -1;
+        self.tool = -1;
+        self.target = "";
         self.current = current;
         self.open = true;
         Actions.load-spools();
     }
+
+    public function show-lane(row: int, current: int, target: string) {
+        self.gate = -1;
+        self.tool = -1;
+        self.lane = row;
+        self.target = target;
+        self.current = current;
+        self.open = true;
+        Actions.load-spools();
+    }
+
+    public function show-tool(tool: int, current: int, target: string) {
+        self.gate = -1;
+        self.lane = -1;
+        self.tool = tool;
+        self.target = target;
+        self.current = current;
+        self.open = true;
+        Actions.load-spools();
+    }
+
+    // The spool in use: that of its tool macro when it has one, else the active spool.
+    public function show-in-use() {
+        if (Printer.spool-tool >= 0) {
+            self.show-tool(Printer.spool-tool, Printer.spool-id, Printer.spool-target);
+        } else {
+            self.show(-1, Printer.spool-id);
+        }
+    }
 }
 
-// The dialogs of the Gates and Tools tabs: the gate a tap opened (-1 for none), the bypass, or the tool.
+// The dialogs of the Gates and Tools tabs: the gate a tap opened (its row in `Printer.mmu-gates`, -1 for none), the
+// bypass, or the tool.
 export global MmuDialogs {
-    in-out property <int> gate: -1;
+    in-out property <int> gate-row: -1;
     in-out property <bool> bypass-open;
     // The dialog of a tool on the Tools tab: its index in `Printer.mmu-tools`, -1 for none.
     in-out property <int> tool: -1;
@@ -369,7 +447,7 @@ export global MmuDialogs {
 }
 
 // Tabs of the Filament page; without an MMU it shows the extruder alone.
-export enum FilamentTab { gates, extruder, tools, service }
+export enum FilamentTab { gates, extruder, tools, service, sensors }
 
 // Tabs of the Move page; without anything to calibrate it shows the axes alone.
 export enum MoveTab { axes, calibrate }
@@ -386,8 +464,10 @@ export global Navigation {
     out property <bool> messages-open;
     // Filament page; with an MMU it opens on the Gates tab.
     in-out property <FilamentTab> filament-tab;
-    // Page of gate tiles the Gates tab shows, counted from 0.
-    in-out property <int> mmu-page;
+    // The head the Filament page shows, a row of `Printer.heads`; -1 follows the mounted head.
+    in-out property <int> filament-head: -1;
+    // Page of gate tiles the Gates tab shows, counted from 0 within its view; -1 opens on the unit of the loaded gate.
+    in-out property <int> mmu-page: -1;
     in-out property <HeatTab> heat-tab;
     // The navigation rail opens the basics.
     in-out property <TuneTab> tune-tab;
@@ -466,7 +546,8 @@ export global Confirm {
         if (self.action == "cancel-print") { Actions.cancel-print(); }
         if (self.action == "emergency-stop") { Actions.emergency-stop(); }
         if (self.action == "run-macro") { Actions.run-macro(self.argument); }
-        if (self.action == "mmu-eject") { Actions.mmu-eject(self.argument.to-float()); }
+        if (self.action == "recover-toolchanger") { Actions.initialize-toolchanger(true); }
+        if (self.action == "lane-eject") { Actions.lane-eject(self.argument.to-float()); }
         if (self.action == "mmu-motors-off") { Actions.mmu-motors-off(); }
         if (self.action == "mmu-check-gate") { Actions.mmu-check-gate(self.argument.to-float()); }
         if (self.action == "mmu-check-all-gates") { Actions.mmu-check-all-gates(); }
@@ -506,7 +587,7 @@ export global Dialogs {
         Navigation.close-messages();
         Confirm.open = false;
         SpoolPicker.open = false;
-        MmuDialogs.gate = -1;
+        MmuDialogs.gate-row = -1;
         MmuDialogs.bypass-open = false;
         MmuDialogs.tool = -1;
         MeshDialogs.map-open = false;

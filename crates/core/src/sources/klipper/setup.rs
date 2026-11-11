@@ -24,7 +24,7 @@ pub struct Setup {
     pub calibration: CalibrationSetup,
     /// Additional heaters with a target temperature (`heater_generic`, `temperature_fan`, additional extruders).
     pub extra_heaters: Vec<String>,
-    /// Temperatures without a target: `temperature_sensor` and the drivers that measure their own (`tmc2240`).
+    /// Temperatures without a target: `temperature_sensor` and the drivers that measure their own (`tmc2240`, `tmc5262`).
     /// Klipper adds a `temperature_host` or `temperature_combined` object next to the section that uses that sensor
     /// type (`temperature_sensor cb1` brings `temperature_host cb1`); those are the same sensor and left out.
     pub temperature_sensors: Vec<String>,
@@ -46,6 +46,10 @@ pub struct Setup {
     /// The tool numbers Klipper has a `T<n>` command for (macros, Happy Hare, toolchanger plugins alike), from
     /// `printer.gcode.help`; `None` until asked or when the answer failed.
     pub tool_commands: Option<Vec<usize>>,
+    /// Klipper has the command `UNSELECT_TOOL` (a tool changer without `require_tool_present`); from the same answer.
+    pub has_unselect_tool: bool,
+    /// `[save_variables]` is configured, so `SAVE_VARIABLE` keeps values across restarts.
+    pub save_variables: bool,
 }
 
 impl Setup {
@@ -58,10 +62,13 @@ impl Setup {
             match (kind, instance) {
                 (_, None) if Leveling::objects().contains(&kind) => leveling_objects.push(kind),
                 ("probe" | "bltouch" | "smart_effector" | "probe_eddy_current", _) => setup.probe = true,
+                ("save_variables", None) => setup.save_variables = true,
                 // What is only shown leaves out helpers; what changes behaviour (probe, leveling) counts above.
                 _ if devices::is_hidden(name) => {}
                 ("heater_generic" | "temperature_fan", Some(_)) => setup.extra_heaters.push(name.to_owned()),
-                ("temperature_sensor" | "tmc2240", Some(_)) => setup.temperature_sensors.push(name.to_owned()),
+                ("temperature_sensor" | "tmc2240" | "tmc5262", Some(_)) => {
+                    setup.temperature_sensors.push(name.to_owned())
+                }
                 _ if FanKind::of(name).is_some() => setup.fans.push(name.to_owned()),
                 _ if devices::is_led(name) => setup.leds.push(name.to_owned()),
                 (_, Some(_)) if is_filament_sensor(kind) => setup.filament_sensors.push(name.to_owned()),
@@ -177,9 +184,14 @@ impl Setup {
     }
 }
 
-fn is_additional_extruder(name: &str) -> bool {
+pub(super) fn is_additional_extruder(name: &str) -> bool {
     name.strip_prefix("extruder")
         .is_some_and(|number| !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()))
+}
+
+/// Whether the answer of `printer.gcode.help` lists `command`.
+pub fn lists_command(help: &Value, command: &str) -> bool {
+    help.as_object().is_some_and(|commands| commands.keys().any(|key| key.eq_ignore_ascii_case(command)))
 }
 
 /// The tool numbers of the `T<n>` commands in the answer of `printer.gcode.help` (command → help text), sorted.
@@ -268,5 +280,7 @@ mod tests {
 
         assert_eq!(tool_commands(&help), [0, 2]);
         assert_eq!(tool_commands(&Value::Null), Vec::<usize>::new());
+        assert!(lists_command(&help, "T0"));
+        assert!(!lists_command(&help, "UNSELECT_TOOL"));
     }
 }

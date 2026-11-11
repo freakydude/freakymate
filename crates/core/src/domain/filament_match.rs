@@ -2,10 +2,11 @@
 //! both sides have are compared, and everything here is a hint: nothing forbids anything.
 //!
 //! Where the filament of a tool comes from depends on what the printer has: with Happy Hare the gate of the tool
-//! (`ttg_map`), its spool from Spoolman first, otherwise what Happy Hare knows of the gate; without Happy Hare only
-//! tool 0 and the active spool of Spoolman. Without either there is nothing to compare. Tools that share a gate share
-//! its spool, so their planned weights add up. Without Happy Hare a tool beyond 0 needs a command `T<n>` in Klipper's
-//! command list (a toolchanger, a blackbox here); a file that calls a missing one stops at an unknown command.
+//! (`ttg_map`), its spool from Spoolman first, otherwise what Happy Hare knows of the gate; with AFC the spool of the
+//! lane mapped to the tool; with a tool changer the spool of the tool's head; otherwise only tool 0 and the active
+//! spool of Spoolman. Without either there is nothing to compare. Tools that share a gate share its spool, so their planned weights add up. Without Happy Hare a tool
+//! beyond 0 needs a command `T<n>` in Klipper's command list (AFC's, a tool changer's or a macro); a file that calls a missing
+//! one stops at an unknown command.
 //!
 //! Slicers know one colour per tool (with alpha), so a multi-colour spool is compared by its first colour. With
 //! EndlessSpool on, the other gates of a gate's group add their weight, except those a tool of the file uses; gates of
@@ -308,7 +309,8 @@ fn match_tool(
 }
 
 /// What a tool of the file prints with, as far as it is known: with Happy Hare's gates what its gate holds, without
-/// them the spool in use for tool 0. `None` when there is nothing to show (no gate, no spool, a tool beyond 0).
+/// them the spool of the lane of that tool (see [`super::spools::tool_lane`]), or that the lane is empty.
+/// `None` when there is nothing to show (no gate, no spool, no lane for the tool).
 pub fn tool_supply(found: &ToolMatch, status: &PrinterStatus, lanes: &[Lane]) -> Option<Supply> {
     supply_of(found.request.tool, found.gate, status, lanes)
 }
@@ -319,7 +321,13 @@ fn supply_of(tool: usize, gate: Option<usize>, status: &PrinterStatus, lanes: &[
             let gate = gate?;
             mmu.gates.iter().find(|candidate| candidate.index == gate).map(|state| gate_supply(state, lanes))
         }
-        None => lanes.first().filter(|_| tool == 0)?.spool.as_ref().map(Supply::of_spool),
+        None => {
+            let lane = super::spools::tool_lane(lanes, tool)?;
+            if lane.empty {
+                return Some(Supply { empty: true, ..Supply::default() });
+            }
+            lane.spool.as_ref().map(Supply::of_spool)
+        }
     }
 }
 
@@ -335,7 +343,7 @@ pub struct Supply {
     pub name: Option<String>,
     /// Grams left on the spool; only Spoolman knows.
     pub left: Option<f64>,
-    /// Happy Hare reports the gate as empty.
+    /// Happy Hare reports the gate as empty, or AFC the lane.
     pub empty: bool,
 }
 
@@ -636,6 +644,70 @@ mod tests {
 
         // A second tool without MMU is a toolchanger's macro nobody reports on.
         assert_eq!(found.iter().map(|found| &found.verdict).collect::<Vec<_>>(), [&Verdict::Fits, &Verdict::Unknown]);
+    }
+
+    #[test]
+    fn with_a_tool_changer_each_tool_is_compared_with_the_spool_of_its_head() {
+        use crate::sources::tool_macros::ToolSpool;
+        use crate::sources::toolchanger::{ToolHead, ToolchangerStatus};
+        let head = |number: usize, extruder: &str| ToolHead {
+            name: format!("T{number}"),
+            number: Some(number),
+            extruder: Some(extruder.into()),
+            active: number == 0,
+        };
+        let status = PrinterStatus {
+            toolchanger: Some(ToolchangerStatus {
+                status: "ready".into(),
+                heads: vec![head(0, "extruder"), head(1, "extruder1")],
+                ..ToolchangerStatus::default()
+            }),
+            tool_spools: vec![ToolSpool { tool: 1, macro_name: "T1".into(), spool_id: Some(6) }],
+            ..PrinterStatus::default()
+        };
+        let spools = spoolman(
+            &[test_spool(5, "PLA", 800.0, [0x26, 0xA6, 0x9A]), test_spool(6, "PETG", 800.0, [0, 0, 0])],
+            Some(5),
+        );
+        let metadata = FileMetadata {
+            referenced_tools: vec![0, 1],
+            ..file(&[5.0, 5.0], &["PLA", "PLA"], &["#26A69A", "#000000"])
+        };
+
+        let found = match_tools(&metadata, &status, &lanes(&status, &spools), &Setup::with_tool_commands(&[0, 1]));
+
+        assert_eq!(found[0].verdict, Verdict::Fits);
+        assert!(matches!(&found[1].verdict, Verdict::Differs(differences) if differences.len() == 1));
+    }
+
+    #[test]
+    fn with_afc_each_tool_is_compared_with_the_lane_mapped_to_it() {
+        use crate::sources::afc::{AfcLane, AfcStatus};
+        let lane = |name: &str, tool: usize, spool_id: Option<u32>, filled: bool| AfcLane {
+            name: name.into(),
+            extruder: "extruder".into(),
+            tool: Some(tool),
+            spool_id,
+            filled,
+            ..AfcLane::default()
+        };
+        // Lanes in another order than their tools, as `map` allows.
+        let afc = AfcStatus {
+            lanes: vec![lane("lane1", 1, Some(5), true), lane("lane2", 0, Some(6), false)],
+            ..AfcStatus::default()
+        };
+        let status = PrinterStatus { afc: Some(afc), ..PrinterStatus::default() };
+        let spools =
+            spoolman(&[test_spool(5, "PLA", 800.0, [0x26, 0xA6, 0x9A]), test_spool(6, "PLA", 800.0, [0, 0, 0])], None);
+        let metadata = FileMetadata {
+            referenced_tools: vec![0, 1],
+            ..file(&[5.0, 5.0], &["PLA", "PLA"], &["#000000", "#26A69A"])
+        };
+
+        let found = match_tools(&metadata, &status, &lanes(&status, &spools), &Setup::with_tool_commands(&[0, 1]));
+
+        assert_eq!(found[0].verdict, Verdict::GateEmpty, "lane2 holds no filament");
+        assert_eq!(found[1].verdict, Verdict::Fits);
     }
 
     #[test]

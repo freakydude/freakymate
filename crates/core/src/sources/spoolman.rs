@@ -181,9 +181,9 @@ pub async fn fetch_spool_list(connection: &Connection) -> Result<Vec<Spool>, Str
     Ok(parse_spool_list(&spools))
 }
 
-/// The state of Spoolman and the spools the printer needs now: those of the gates and the active one. A spool that
-/// cannot be read is left out; the rest still arrives.
-pub async fn fetch_state(connection: &Connection, gate_spools: &[u32]) -> Result<SpoolmanState, String> {
+/// The state of Spoolman and the spools the printer needs now: those the lanes keep (gates, tool macros) and the
+/// active one. A spool that cannot be read is left out; the rest still arrives.
+pub async fn fetch_state(connection: &Connection, lane_spools: &[u32]) -> Result<SpoolmanState, String> {
     let call = status_call();
     let status = connection.call(call.method, call.params).await.map_err(|error| error.to_string())?;
     let (connected, pending_reports, active_spool_id) = parse_status(&status);
@@ -191,7 +191,7 @@ pub async fn fetch_state(connection: &Connection, gate_spools: &[u32]) -> Result
     if !connected {
         return Ok(state);
     }
-    let mut ids = gate_spools.to_vec();
+    let mut ids = lane_spools.to_vec();
     ids.extend(active_spool_id);
     ids.sort_unstable();
     ids.dedup();

@@ -28,7 +28,7 @@ export component SpoolDialog inherits Scrim {
             padding: Theme.dialog-padding;
             spacing: Theme.spacing;
             DialogHeader {
-                title: SpoolPicker.gate >= 0 ? @tr("Spool for gate {}", SpoolPicker.gate) : @tr("Spool in use");
+                title: SpoolPicker.gate >= 0 ? @tr("Spool for gate {}", SpoolPicker.gate) : SpoolPicker.target != "" ? @tr("Spool for {}", SpoolPicker.target) : @tr("Spool in use");
                 close => { SpoolPicker.open = false; }
                 if Printer.spoolman-offline: IconLabel {
                     icon: Icons.ui-warning;
@@ -98,12 +98,18 @@ export component SpoolDialog inherits Scrim {
                 spacing: Theme.spacing;
                 height: Theme.touch;
                 // Takes only the link to Spoolman away; Happy Hare keeps material and colour of the gate.
-                if SpoolPicker.gate >= 0: IconButton {
+                if SpoolPicker.gate >= 0 || SpoolPicker.tool >= 0 || SpoolPicker.lane >= 0: IconButton {
                     text: @tr("Unlink");
                     horizontal: true;
                     enabled: SpoolPicker.current >= 0;
                     clicked => {
-                        Actions.assign-gate-spool(SpoolPicker.gate, -1);
+                        if (SpoolPicker.tool >= 0) {
+                            Actions.assign-tool-spool(SpoolPicker.tool, -1);
+                        } else if (SpoolPicker.lane >= 0) {
+                            Actions.assign-lane-spool(SpoolPicker.lane, -1);
+                        } else {
+                            Actions.assign-gate-spool(SpoolPicker.gate, -1);
+                        }
                         SpoolPicker.open = false;
                     }
                 }
@@ -119,12 +125,16 @@ export component SpoolDialog inherits Scrim {
                 }
                 IconButton {
                     icon: Icons.ui-check;
-                    text: SpoolPicker.gate >= 0 ? @tr("Assign") : @tr("Use");
+                    text: SpoolPicker.gate >= 0 || SpoolPicker.tool >= 0 || SpoolPicker.lane >= 0 ? @tr("Assign") : @tr("Use");
                     horizontal: true;
                     kind: ButtonKind.accent;
                     enabled: root.selected >= 0;
                     clicked => {
-                        if (SpoolPicker.gate >= 0) {
+                        if (SpoolPicker.tool >= 0) {
+                            Actions.assign-tool-spool(SpoolPicker.tool, root.selected);
+                        } else if (SpoolPicker.lane >= 0) {
+                            Actions.assign-lane-spool(SpoolPicker.lane, root.selected);
+                        } else if (SpoolPicker.gate >= 0) {
                             Actions.assign-gate-spool(SpoolPicker.gate, root.selected);
                         } else {
                             Actions.set-active-spool(root.selected);

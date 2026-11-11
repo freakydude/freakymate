@@ -17,10 +17,12 @@ export struct HeaterItem {
     can-raise: bool,
     // The targets Klipper takes (min_temp to max_temp), as a note for typing one; empty without max_temp.
     target-range: string,
-    // The temperature the spool in use recommends, when the target is off from it; empty otherwise.
+    // The temperature the spool recommends ("210°"), when the target is off from it; empty otherwise.
     spool-hint: string,
     // Moonraker keeps its temperature history, so a tap can show it.
     has-history: bool,
+    // The heater of a nozzle (`extruder`, `extruder1`, …).
+    nozzle: bool,
 }
 
 export struct SensorItem {
@@ -92,8 +94,70 @@ export struct BarColors {
     longitudinal: bool,
 }
 
-// One gate of the MMU. `availability`: unknown | empty | available | buffered.
+// The way of the filament of a gate or lane on Happy Hare's `filament_pos` scale (see `FilamentPath`). Sensors: -1 not
+// fitted, 0 free, 1 triggered; in order along the way: gate entry, gate exit, hub, extruder, toolhead. `bowden-progress`
+// is 0 to 1 during a move through the bowden, -1 otherwise. The colours are those of the spool, as for `FilamentSwatch`.
+export struct FilamentPathItem {
+    position: int,
+    direction: int,
+    distance: string,
+    gate-label: string,
+    bowden-progress: float,
+    gate-entry-sensor: int,
+    gate-sensor: int,
+    extruder-sensor: int,
+    toolhead-sensor: int,
+    // Where the lanes of a unit meet; -1 for none (drawn only when fitted).
+    hub-sensor: int,
+    colors: BarColors,
+}
+
+// A swappable head of a tool changer on the Filament page: its nozzle, the spool it carries and how it is brought
+// to the carriage.
+export struct HeadItem {
+    // The name of the head's section (what its commands take), such as `T1` or `left`.
+    name: string,
+    // What names the head on screen: `T<n>` of its tool number, the name for a head without one.
+    label: string,
+    // The section name as a second line when it differs from the label, else "".
+    subtitle: string,
+    // The nozzle of the head's extruder; `has-nozzle` is false for a head without one.
+    has-nozzle: bool,
+    temperature: float,
+    target: float,
+    // The changer selected this head.
+    mounted: bool,
+    // The detection pins find this head on the carriage.
+    detected: bool,
+    // Lanes on the nozzle; more than one is a unit of its own.
+    lanes: int,
+    // How a head that is not mounted is picked up: "" none, "macro" (`pick-up-macro`, such as "T2") or "head"
+    // (`SELECT_TOOL` with the name).
+    pick-up: string,
+    pick-up-macro: string,
+    // The spool of the head's lane in use (Spoolman), as on the spool strip.
+    has-spool: bool,
+    spool-title: string,
+    spool-material: string,
+    spool-weight: string,
+    spool-low: bool,
+    spool-colors: BarColors,
+    // Spoolman id of that spool, -1 for none.
+    spool-id: int,
+    // Where a tap on the spool assigns another one: the tool macro `T<n>`, -1 when the spool is not assigned there
+    // (then `can-pick-spool` says whether the spool in use is).
+    spool-tool: int,
+    can-pick-spool: bool,
+    // The head's part of the filament path: its extruder sensors, the extruder and the nozzle (`FilamentPath.head-only`).
+    path: FilamentPathItem,
+}
+
+// One tile of the Gates tab: a gate of Happy Hare or a lane of AFC. `availability`: unknown | empty | available |
+// buffered (a lane of AFC is empty or available).
 export struct MmuGateItem {
+    // What names the tile: "Gate 3", or the name of the lane ("lane1").
+    title: string,
+    // The gate number (its name for Happy Hare's commands); -1 for a lane of AFC.
     index: int,
     availability: string,
     name: string,
@@ -107,6 +171,8 @@ export struct MmuGateItem {
     // EndlessSpool group of the gate, -1 if Happy Hare reports none.
     group: int,
     selected: bool,
+    // The filament of this tile is in the toolhead (what Unload acts on).
+    loaded: bool,
     // Remaining filament of the spool in the gate (for example "613 g"), empty without Spoolman or spool.
     spool-text: string,
     spool-low: bool,
@@ -114,11 +180,35 @@ export struct MmuGateItem {
     spool-id: int,
 }
 
+// A page of tiles on the Gates tab: a run of rows of `Printer.mmu-gates` (the gates of one unit, at most five), the
+// bypass after them when it belongs on this page.
+export struct MmuGatePage {
+    first-row: int,
+    count: int,
+    bypass: bool,
+    // Caption line above the tiles: the unit and its head, empty without (one unit or none, then no caption).
+    unit: string,
+    head: string,
+    // Gate numbers of the first and the last tile; -1 for a page with the bypass only.
+    first-gate: int,
+    last-gate: int,
+}
+
+// The pages a view of the Gates tab has in `Printer.mmu-pages` (all gates, or one head's): where they start, how many
+// there are and the one it opens on.
+export struct MmuPageRange {
+    first: int,
+    count: int,
+    start: int,
+}
+
 // A tool of the MMU and the gate it takes its filament from (Happy Hare's tool-to-gate map).
 export struct ToolMatchItem {
     tool: int,
     // -1: Happy Hare maps no gate to the tool (a tool of the file beyond the printer's tools).
     gate: int,
+    // Row of that gate in `Printer.mmu-gates` (gate indices need not be positions), -1 without gate.
+    gate-row: int,
     // What the file of the job asks of the tool (see `Printer.mmu-match-file`); empty when it does not use the tool.
     used: bool,
     // The slicer's colour with its alpha, one at most (`count` 0 without).
@@ -157,28 +247,19 @@ export struct ToolMatchItem {
     // Only in `Printer.prepared-tools`: the tool's row in `Printer.mmu-tools`, so that a tap opens its dialog on the
     // Tools tab; -1 when it has none there.
     tools-row: int,
+    // Which spool a tap on the tool picks, for a tool without gate: -2 none, -1 the spool in use, 0 and up the tool
+    // macro of that tool (tool changer head).
+    spool-pick: int,
+    // The head or AFC lane the tool's spool is assigned to, for the picker title; empty when there is none to name.
+    spool-target: string,
+    // Spoolman id of the spool of that tool macro, -1 for none.
+    spool-id: int,
 }
 
 // A label of the temperature chart at `position`, a share from 0 to 1 along its axis.
 export struct ChartLabel {
     text: string,
     position: float,
-}
-
-// The way of the filament of the selected gate (Happy Hare's `filament_pos`, see `FilamentPath`). Sensors: -1 not
-// fitted, 0 free, 1 triggered; in order along the way: gate entry, gate exit, extruder, toolhead. `bowden-progress`
-// is 0 to 1 during a move through the bowden, -1 otherwise. The colours are those of the spool, as for `FilamentSwatch`.
-export struct FilamentPathItem {
-    position: int,
-    direction: int,
-    distance: string,
-    gate-label: string,
-    bowden-progress: float,
-    gate-entry-sensor: int,
-    gate-sensor: int,
-    extruder-sensor: int,
-    toolhead-sensor: int,
-    colors: BarColors,
 }
 
 // A spool of Spoolman in the picker. `place`: where it sits ("Gate 2", "In use") or empty.

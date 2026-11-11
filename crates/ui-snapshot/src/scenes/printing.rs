@@ -83,6 +83,13 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
     session.window.global::<Navigation>().set_page(Page::Print);
     pause_at_next_layer(session)?;
     session.capture("print-paused")?;
+    // Jogging stays possible, homing, leveling and motors off do not (the paused print resumes from its position).
+    if !session.window.global::<Printer>().get_position_locked() {
+        return Err("position-locked off while the print is paused".into());
+    }
+    session.show_page(Page::Move, "move-paused")?;
+    session.show_page(Page::Filament, "printing-paused-filament")?;
+    session.window.global::<Navigation>().set_page(Page::Print);
     exclude_object(session)?;
     session.service.send(Command::ResumePrint);
     session.wait_until("print resumed", |snapshot| snapshot.status.job.state == PrintState::Printing)?;

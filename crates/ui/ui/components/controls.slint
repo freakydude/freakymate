@@ -206,13 +206,18 @@ export component StepSelector inherits HorizontalLayout {
             }
         }
 
-        Text {
-            text: value + root.unit;
-            color: Theme.foreground;
-            font-size: Theme.font-small;
-            font-weight: 600;
-            horizontal-alignment: center;
-            vertical-alignment: center;
+        // A layout, not a bare Text: the button grows with its text and keeps the padding on a narrow row.
+        HorizontalLayout {
+            padding-left: Theme.padding;
+            padding-right: Theme.padding;
+            Text {
+                text: value + root.unit;
+                color: Theme.foreground;
+                font-size: Theme.font-small;
+                font-weight: 600;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
         }
     }
 }
@@ -226,6 +231,8 @@ export component TabButton inherits Rectangle {
     in property <bool> enabled: true;
     // Waiting items (updates), as a small badge after the text.
     in property <int> count;
+    // Something needs a look: a small dot in the top right corner.
+    in property <bool> warn;
     callback clicked;
 
     property <color> content: !root.enabled ? Theme.disabled-foreground : root.checked ? Theme.accent : Theme.muted;
@@ -280,6 +287,15 @@ export component TabButton inherits Rectangle {
                 vertical-alignment: center;
             }
         }
+    }
+
+    if root.warn: Rectangle {
+        x: parent.width - self.width - 8px;
+        y: 10px;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background: Theme.warning;
     }
 
     Rectangle {
@@ -453,7 +469,8 @@ export component ScrollList inherits Rectangle {
     out property <length> row-width: list.width;
     in-out property <length> offset <=> list.content-y;
     property <length> range: max(0px, list.content-height - list.height);
-    property <bool> scrollable: root.content-height > root.height;
+    // The content does not fit, so the bar is shown and the rows are narrower.
+    out property <bool> scrollable: root.content-height > root.height;
     property <length> bar-width: 36px;
 
     // Fixed geometry instead of a layout: the bar must not change the size of the list's container.

@@ -51,6 +51,10 @@ export global Actions {
     callback load-filament();
     callback unload-filament();
     callback run-macro(string);
+    // Tool changer: pick up the head with this name, park the mounted one, initialise (`true`: recover after an error).
+    callback pick-up-head(string);
+    callback drop-head();
+    callback initialize-toolchanger(bool);
     callback exclude-object(string);
     // User and password; only Moonraker sees the password.
     callback log-in(string, string);
@@ -58,13 +62,21 @@ export global Actions {
     // The index of the print object under a tap on the bed map, or -1: position and the finger's reach as shares of
     // the map's width and height, from the top left.
     callback print-object-at(float, float, float) -> int;
+    // Tiles of the Gates tab, a gate of Happy Hare or a lane of AFC alike; the argument is the row in
+    // `Printer.mmu-gates`. A tap on a tile makes its lane the one the load path card shows.
+    callback lane-tapped(int);
+    callback bypass-tapped();
+    callback lane-load(int);
+    callback lane-unload(int);
+    callback lane-eject(int);
+    callback assign-lane-spool(int, int);
+    // Material or colour in Happy Hare's gate map or in the lane of AFC, for a tile without a spool of Spoolman.
+    callback set-lane-material(int, string);
+    callback set-lane-color(int, color);
     callback mmu-select-gate(int);
     callback mmu-load();
-    // Selects the gate and loads it.
-    callback mmu-load-gate(int);
     callback mmu-unload();
     callback mmu-home();
-    callback mmu-eject(int);
     callback mmu-recover();
     callback mmu-unlock();
     callback mmu-motors-off();
@@ -82,9 +94,6 @@ export global Actions {
     callback mmu-set-endless-spool(bool);
     // Moves a gate into an EndlessSpool group: (gate, group).
     callback mmu-set-endless-spool-group(int, int);
-    // Material or colour of a gate in Happy Hare's gate map, for printers without Spoolman.
-    callback set-gate-material(int, string);
-    callback set-gate-color(int, color);
     callback run-gcode(string);
     callback refresh-files();
     callback toggle-file-mark(string);
@@ -126,6 +135,7 @@ export global Actions {
     callback load-spools();
     callback set-active-spool(int);
     callback assign-gate-spool(int, int);
+    callback assign-tool-spool(int, int);
     // Spool id and the gross weight in grams as typed.
     callback measure-spool(int, string);
     callback apply-spool-preset();

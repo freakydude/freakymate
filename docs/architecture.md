@@ -212,7 +212,8 @@ history).
   wiring in `actions.rs`, control on the page.
 - **New source** (a plugin, a Moonraker component, a macro convention): its own module in `sources/` with detection
   (a field in `Sources`, `Option` or a list), its objects in `Sources::subscription`, its reader and tests; property
-  in `Printer` and assignment in `presenter.rs`. An existing source grows inside its module.
+  in `Printer` and assignment in `presenter.rs`. An existing source grows inside its module. A source of tools,
+  heads, nozzles or lanes (tool changer, filament changer, IDEX) follows the draft in [multi-tool.md](multi-tool.md).
 - **New question across sources** or **derived value** (e.g. a measurement and a slicer estimate): one function in
   `domain/`, which decides the order of the sources, returns a `Sourced` value where it names its source, and gets a
   test per source. `view.rs` only formats it (a prediction gets a `~`).

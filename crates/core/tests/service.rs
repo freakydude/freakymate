@@ -5,9 +5,11 @@ use fake_moonraker::machine::MachineProfile;
 use fake_moonraker::server::{serve, ServerConfig};
 use freakymate_core::credentials::Credential;
 use freakymate_core::domain::filament::{self, FilamentHandling};
+use freakymate_core::domain::load_path::{head_path, load_path, BufferSide, LOADED};
+use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::domain::{job_end, light, pause, spools};
 use freakymate_core::sources::happy_hare::commands::{Gates, ServoCommand};
-use freakymate_core::sources::happy_hare::{GateAvailability, LoadedFilament, ServoPosition};
+use freakymate_core::sources::happy_hare::{GateAvailability, LoadedFilament, PathSensor, ServoPosition};
 use freakymate_core::sources::klipper::tuning::TuningKey;
 use freakymate_core::sources::klipper::{Axis, FanKind, KlippyState, Leveling, PrintState, WhiteChannel};
 use freakymate_core::sources::moonraker_server::files::ThumbnailImage;
@@ -205,6 +207,59 @@ async fn sets_the_filament_of_a_gate_and_loads_it() {
     let gate = &snapshot.status.mmu.unwrap().gates[1];
     assert_eq!((gate.material.as_str(), gate.color), ("PETG", Some([0xff, 0x80, 0x00, 0xff])));
     assert_eq!(gate.temperature, temperature);
+}
+
+/// A gate of the second unit on the second head: its load path reads the gate, the unit's shared exit and the
+/// toolhead the unit names; the first head's toolhead stays free.
+#[tokio::test(flavor = "multi_thread")]
+async fn follows_the_load_path_of_a_unit_on_its_head() {
+    let endpoint = start_fake_with(MachineProfile::toolchanger_mmu()).await;
+    let (service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+    wait_for(&mut channels, |snapshot| ready(snapshot) && snapshot.status.mmu.is_some()).await;
+
+    service.send(Command::MmuHome);
+    service.send(Command::LoadLane { lane: LaneId::Gate(5) });
+    let snapshot = wait_for(&mut channels, |snapshot| {
+        snapshot.status.mmu.as_ref().is_some_and(|mmu| mmu.gate == 5 && mmu.filament == LoadedFilament::Loaded)
+    })
+    .await;
+
+    let path = load_path(&snapshot.status, &LaneId::Gate(5)).unwrap();
+    assert_eq!((path.hub, path.toolhead, path.position), (PathSensor::Triggered, PathSensor::Triggered, Some(10)));
+    let other = load_path(&snapshot.status, &LaneId::Gate(4)).unwrap();
+    assert_eq!((other.entry, other.exit, other.position), (PathSensor::Triggered, PathSensor::Free, Some(0)));
+    assert_eq!(load_path(&snapshot.status, &LaneId::Gate(1)).unwrap().hub, PathSensor::Absent);
+    assert_eq!(head_path(&snapshot.status, "extruder1").toolhead, PathSensor::Triggered);
+    assert_eq!(head_path(&snapshot.status, "extruder").toolhead, PathSensor::Free);
+    assert!(filament::printer_sensors(&snapshot.status).all(|sensor| !sensor.object.contains(':')));
+}
+
+/// A lane of a Box Turtle loaded through the lane command: hub, toolhead switch and buffer on its way; AFC's switches
+/// are not the printer's.
+#[tokio::test(flavor = "multi_thread")]
+async fn follows_the_load_path_of_an_afc_lane() {
+    let endpoint = start_fake_with(MachineProfile::afc()).await;
+    let (service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+    wait_for(&mut channels, |snapshot| ready(snapshot) && snapshot.status.afc.is_some()).await;
+
+    service.send(Command::Home { x: true, y: true, z: true });
+    service.send(Command::LoadLane { lane: LaneId::Afc("lane3".into()) });
+    let snapshot = wait_for(&mut channels, |snapshot| {
+        snapshot.status.afc.as_ref().is_some_and(|afc| afc.current_load.as_deref() == Some("lane3"))
+    })
+    .await;
+
+    let path = load_path(&snapshot.status, &LaneId::Afc("lane3".into())).unwrap();
+    assert_eq!(
+        (path.entry, path.exit, path.hub),
+        (PathSensor::Triggered, PathSensor::Triggered, PathSensor::Triggered)
+    );
+    // The Box Turtle's buffer stands in for the switch before the extruder (`pin_tool_start: buffer`).
+    assert_eq!((path.extruder, path.toolhead), (PathSensor::Absent, PathSensor::Triggered));
+    assert_eq!((path.position, path.buffer), (Some(LOADED), Some(BufferSide::Tension)));
+    assert!(filament::printer_sensors(&snapshot.status).all(|sensor| !sensor.object.contains("lane")));
 }
 
 /// Commands sent one after another must reach the printer in that order; a heater target is absolute, so a
@@ -415,6 +470,11 @@ async fn a_deleted_file_comes_back_as_a_new_file_list_without_asking() {
     let (service, mut channels) =
         PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
     wait_for(&mut channels, ready).await;
+    // The list comes once on connecting, for the print page without a job.
+    let Event::Files(on_connect) = next_event(&mut channels, |event| matches!(event, Event::Files(_))).await else {
+        unreachable!()
+    };
+    assert!(on_connect.iter().any(|file| file.path == "calibration_cube.gcode"));
 
     service.send(Command::DeleteFile { path: "calibration_cube.gcode".into() });
     let Event::Files(files) = next_event(&mut channels, |event| matches!(event, Event::Files(_))).await else {
@@ -474,6 +534,11 @@ async fn a_layer_pause_pauses_and_the_history_tells_when_the_job_ended() {
     service.send(Command::PauseAtLayer { layer: offer.current_layer + 1 });
     let paused = wait_for(&mut channels, |snapshot| snapshot.status.job.state == PrintState::Paused).await;
     assert!(pause::interruption(&paused.status).is_some_and(|interruption| !interruption.failed));
+    service.send(Command::Home { x: true, y: true, z: true });
+    let refused = next_event(&mut channels, |event| matches!(event, Event::CommandFailed { .. })).await;
+    assert!(
+        matches!(refused, Event::CommandFailed { error, .. } if error.to_string().contains("resume from a wrong position"))
+    );
 
     service.send(Command::CancelPrint);
     let cancelled = wait_for(&mut channels, |snapshot| snapshot.status.job.state == PrintState::Cancelled).await;
@@ -776,4 +841,78 @@ async fn commands_fail_while_moonraker_wants_a_login() {
     service.send(Command::Home { x: true, y: true, z: true });
 
     next_event(&mut channels, |event| matches!(event, Event::CommandFailed { .. })).await;
+}
+
+/// Head, gate or AFC lane, unit, extruder and whether it is in use, for each lane of the tree.
+type LaneSummary = (Option<String>, Option<usize>, Option<String>, Option<String>, String, bool);
+
+async fn tree_of(profile: MachineProfile, lanes: usize) -> (Vec<LaneSummary>, Snapshot) {
+    let endpoint = start_fake_with(profile).await;
+    let (_service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+    let has_lanes = |snapshot: &Snapshot| {
+        ready(snapshot)
+            && snapshot
+                .tree
+                .lanes(&Default::default())
+                .iter()
+                .filter(|lane| lane.gate.is_some() || lane.name.is_some())
+                .count()
+                == lanes
+    };
+    let snapshot = wait_for(&mut channels, has_lanes).await;
+    let summary = snapshot
+        .tree
+        .lanes(&Default::default())
+        .into_iter()
+        .map(|lane| (lane.head, lane.gate, lane.name, lane.unit_name, lane.extruder, lane.active))
+        .collect();
+    (summary, snapshot)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_gates_of_two_happy_hare_units_are_named_with_their_unit() {
+    let (lanes, _) = tree_of(MachineProfile::happy_hare_units(), 8).await;
+
+    assert!(lanes.iter().all(|lane| lane.0.is_none() && lane.4 == "extruder"));
+    let units: Vec<_> = lanes.iter().map(|lane| lane.3.as_deref()).collect();
+    assert_eq!(units, [[Some("ERCF"); 4], [Some("Tradrack"); 4]].concat());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn each_happy_hare_unit_feeds_the_head_of_its_extruder() {
+    let (lanes, snapshot) = tree_of(MachineProfile::toolchanger_mmu(), 8).await;
+
+    assert_eq!(snapshot.tree.carriages[0].heads.len(), 2);
+    let heads: Vec<_> = lanes.iter().map(|lane| (lane.0.as_deref(), lane.4.as_str())).collect();
+    assert_eq!(heads, [[(Some("T0"), "extruder"); 4], [(Some("T1"), "extruder1"); 4]].concat());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_lanes_of_a_box_turtle_feed_the_one_nozzle() {
+    let (lanes, snapshot) = tree_of(MachineProfile::afc(), 4).await;
+
+    let names: Vec<_> = lanes.iter().map(|lane| (lane.2.as_deref(), lane.5)).collect();
+    assert_eq!(names, [(Some("lane1"), false), (Some("lane2"), true), (Some("lane3"), false), (Some("lane4"), false)]);
+    let tree_lanes = snapshot.tree.lanes(&Default::default());
+    assert_eq!(tree_lanes.iter().map(|lane| lane.empty).collect::<Vec<_>>(), [false, false, false, true]);
+    assert_eq!(tree_lanes[2].spool_holder(), Some(spools::SpoolHolder::Tool(2)));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_heads_of_afcs_tool_changer_each_carry_their_lane() {
+    let (lanes, snapshot) = tree_of(MachineProfile::afc_toolchanger(), 4).await;
+
+    let heads = &snapshot.tree.carriages[0].heads;
+    assert_eq!(heads.iter().map(|head| head.active).collect::<Vec<_>>(), [false, true, false, false]);
+    let placed: Vec<_> = lanes.iter().map(|lane| (lane.0.as_deref(), lane.2.as_deref(), lane.4.as_str())).collect();
+    assert_eq!(
+        placed,
+        [
+            (Some("e0"), Some("e0"), "extruder"),
+            (Some("e1"), Some("e1"), "extruder1"),
+            (Some("e2"), Some("e2"), "extruder2"),
+            (Some("e3"), Some("e3"), "extruder3"),
+        ]
+    );
 }

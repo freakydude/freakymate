@@ -9,6 +9,7 @@ mod session;
 
 use crate::commands::{Command, CommandError};
 use crate::credentials::CredentialStore;
+use crate::domain::machine_tree::MachineTree;
 pub use crate::moonraker::ConnectionState;
 use crate::moonraker::Endpoint;
 use crate::sources::moonraker_server::files::{FileEntry, FileMetadata, ThumbnailImage};
@@ -68,6 +69,8 @@ pub struct Snapshot {
     pub connection: ConnectionState,
     pub access: Access,
     pub status: PrinterStatus,
+    /// The machine from carriage to lane, built from `status` with every update.
+    pub tree: MachineTree,
     /// What this printer has; detected again with every subscription.
     pub sources: Sources,
 }

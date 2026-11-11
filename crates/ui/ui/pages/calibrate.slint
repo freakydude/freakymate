@@ -61,11 +61,13 @@ component BedScrewsCard inherits Card {
         if Printer.has-screws-tilt: CardButton {
             icon: Icons.calibration-probe;
             text: @tr("Measure");
+            enabled: !Printer.position-locked;
             clicked => { Actions.calculate-screws-tilt(); }
         }
         if Printer.has-bed-screws: CardButton {
             icon: Icons.calibration-bed-screws;
             text: @tr("Paper test");
+            enabled: !Printer.position-locked;
             clicked => { Actions.adjust-bed-screws(); }
         }
     }
@@ -90,17 +92,20 @@ component LevelCard inherits Card {
         icon: Icons.motion-home;
         text: @tr("Home all");
         done: Printer.homed-xy && Printer.homed-z;
+        enabled: !Printer.position-locked;
         clicked => { Actions.home(true, true, true); }
     }
     if Printer.can-quad-gantry-level || Printer.can-z-tilt: ActionButton {
         icon: Icons.calibration-gantry-level;
         text: Printer.can-quad-gantry-level ? @tr("QGL") : @tr("Z tilt");
         done: Printer.leveling-state == "applied";
+        enabled: !Printer.position-locked;
         clicked => { Actions.level(); }
     }
     if Printer.z-calibration != "": ActionButton {
         icon: Printer.z-calibration == "probe" ? Icons.calibration-probe : Icons.calibration-z-offset;
         text: Printer.z-calibration == "probe" ? @tr("Probe Z offset") : @tr("Z endstop");
+        enabled: !Printer.position-locked;
         clicked => { Actions.calibrate-z(); }
     }
     Rectangle { vertical-stretch: 1; }
@@ -186,6 +191,7 @@ component BedMeshCard inherits Card {
         CardButton {
             icon: Icons.calibration-bed-mesh;
             text: @tr("Measure");
+            enabled: !Printer.position-locked;
             clicked => { Actions.calibrate-bed-mesh(); }
         }
         CardButton {

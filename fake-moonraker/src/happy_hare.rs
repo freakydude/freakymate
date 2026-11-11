@@ -4,6 +4,7 @@
 //! elapsed time: `action` is always `Idle`, loading and unloading complete immediately.
 
 use crate::gcode::{CommandError, MmuCommand, ServoPosition};
+use crate::machine::MmuUnitSpec;
 use serde_json::{json, Map, Value};
 
 const VERSION: &str = "4.1.0";
@@ -119,7 +120,59 @@ pub struct HappyHare {
     boosting: bool,
     /// `mmu.selector.servo` of a linear selector with a servo, as on an ERCF.
     servo: &'static str,
+    /// The units of a v4 machine with several; empty for the older profiles, whose one unit is `unit0`.
+    units: Vec<MmuUnitSpec>,
+    /// `mmu.unit`: the unit of the selected gate, which stays when no gate is selected (`mmu_controller.py` L325-327,
+    /// L3865-3866). Only shown for `units`.
+    unit_selected: usize,
 }
+
+/// What a vendor's unit looks like by default (`MmuUnitProfile` in `mmu_unit.py` L96-125 at 7df830f): the ERCF has a
+/// selectable bypass and variable rotation distances, the Tradrack neither; both have a linear selector with a servo
+/// and a filament buffer.
+struct VendorProfile {
+    has_bypass: bool,
+    variable_rotation_distances: bool,
+    /// The unit has a `mmu_shared_exit` sensor: `installer/mmu_types/Kconfig.tradrack` L9 selects
+    /// `MMU_HAS_SENSOR_SHARED_EXIT` for the Tradrack. `Kconfig.ercf` does not (only the optional entry sensors, L32
+    /// and L43).
+    shared_exit_sensor: bool,
+}
+
+fn vendor_profile(vendor: &str) -> VendorProfile {
+    match vendor {
+        "ERCF" => VendorProfile { has_bypass: true, variable_rotation_distances: true, shared_exit_sensor: false },
+        "Tradrack" => VendorProfile { has_bypass: false, variable_rotation_distances: false, shared_exit_sensor: true },
+        _ => VendorProfile { has_bypass: false, variable_rotation_distances: false, shared_exit_sensor: false },
+    }
+}
+
+/// The sensor names (`mmu_constants.py` L160-178) and the prefix of the Klipper object of a Happy Hare switch sensor
+/// (`mmu_sensor_utils.py` L395).
+const SENSOR_PREFIX: &str = "filament_switch_sensor ";
+const SENSOR_ENTRY: &str = "mmu_entry";
+const SENSOR_EXIT: &str = "mmu_exit";
+const SENSOR_SHARED_EXIT: &str = "mmu_shared_exit";
+const SENSOR_EXTRUDER: &str = "extruder";
+const SENSOR_TOOLHEAD: &str = "toolhead";
+const SENSOR_COMPRESSION: &str = "filament_compression";
+const SENSOR_TENSION: &str = "filament_tension";
+
+/// What `filament_sensors` needs of a unit. Profile choices: every gate has an entry and an exit sensor (as on the
+/// recorded single-lane machine; `Kconfig.ercf` and `Kconfig.tradrack` make both optional), and every unit has a
+/// buffer with compression and tension sensors but no proportional one.
+struct SensorUnit {
+    first_gate: usize,
+    gates: usize,
+    /// The unit name if the unit has a shared exit sensor: the owner of `<unit>:mmu_shared_exit`.
+    shared_exit: Option<&'static str>,
+    toolhead: &'static str,
+    buffer: Option<&'static str>,
+}
+
+/// `mmu_extruder_wrapper.py` L36-39: what a fresh extruder wrapper reports (`UNKNOWN_FILAMENT_COLOR` of
+/// `mmu_constants.py` L341).
+const UNKNOWN_FILAMENT_COLOR: &str = "#808182E3";
 
 /// Material, colour (`rrggbb`) and temperature a gate got with `MMU_GATE_MAP`; `None` leaves that of its filament.
 #[derive(Debug, Clone, Default)]
@@ -142,6 +195,15 @@ fn hex_rgb(color: &str) -> Option<[f64; 3]> {
 impl HappyHare {
     /// Without `spoolman` the gates have no spools; Happy Hare keeps their filament in its own gate map.
     pub fn new(gates: usize, spoolman: bool) -> Self {
+        Self::build(gates, Vec::new(), spoolman)
+    }
+
+    /// A v4 machine of several units; their gates follow each other (`mmu_machine.py` L110-123).
+    pub fn with_units(units: &[MmuUnitSpec], spoolman: bool) -> Self {
+        Self::build(units.iter().map(|unit| unit.gates).sum(), units.to_vec(), spoolman)
+    }
+
+    fn build(gates: usize, units: Vec<MmuUnitSpec>, spoolman: bool) -> Self {
         // The last gate stays empty so the UI also has to show an empty slot.
         let mut gate_status = vec![GATE_AVAILABLE; gates];
         if gates > 2 {
@@ -168,7 +230,70 @@ impl HappyHare {
             spoolman,
             boosting: false,
             servo: SERVO_UP,
+            units,
+            unit_selected: 0,
         }
+    }
+
+    /// The units to describe: the profile's, or the one `unit0` of the older profiles.
+    fn has_units(&self) -> bool {
+        !self.units.is_empty()
+    }
+
+    /// The first gate of each unit.
+    fn first_gates(&self) -> Vec<usize> {
+        let mut first = 0;
+        self.units
+            .iter()
+            .map(|unit| {
+                let start = first;
+                first += unit.gates;
+                start
+            })
+            .collect()
+    }
+
+    fn unit_of_gate(&self, gate: usize) -> usize {
+        let first_gates = self.first_gates();
+        first_gates.iter().rposition(|first| *first <= gate).unwrap_or(0)
+    }
+
+    /// The unit that shows the bypass (`mmu_unit.py` L139: `show_bypass`; only one may).
+    fn bypass_unit(&self) -> Option<usize> {
+        self.units.iter().position(|unit| vendor_profile(unit.vendor).has_bypass)
+    }
+
+    /// The distinct extruders of the units in the order of the units (`mmu_unit.py` L325-332: one object each).
+    fn extruder_names(&self) -> Vec<&'static str> {
+        let mut names: Vec<&'static str> = Vec::new();
+        for unit in &self.units {
+            if !names.contains(&unit.extruder) {
+                names.push(unit.extruder);
+            }
+        }
+        names
+    }
+
+    /// The distinct `[mmu_toolhead]` sections of the units, in the order of the units.
+    fn toolhead_names(&self) -> Vec<&'static str> {
+        let mut names: Vec<&'static str> = Vec::new();
+        for unit in &self.units {
+            if !names.contains(&unit.toolhead) {
+                names.push(unit.toolhead);
+            }
+        }
+        names
+    }
+
+    /// The distinct `[mmu_buffer]` sections of the units, in the order of the units.
+    fn buffer_names(&self) -> Vec<&'static str> {
+        let mut names: Vec<&'static str> = Vec::new();
+        for buffer in self.units.iter().filter_map(|unit| unit.buffer) {
+            if !names.contains(&buffer) {
+                names.push(buffer);
+            }
+        }
+        names
     }
 
     /// `print_state` as in `print_stats`; some commands refuse while printing.
@@ -220,12 +345,63 @@ impl HappyHare {
         let mut objects = Map::new();
         objects.insert("mmu".to_owned(), self.mmu_json(print_state));
         objects.insert("mmu_machine".to_owned(), self.machine_json());
+        if self.has_units() {
+            for extruder in self.extruder_names() {
+                objects.insert(format!("mmu_extruder {extruder}"), extruder_wrapper_json(extruder));
+            }
+            for unit in &self.units {
+                objects.insert(format!("mmu_stepper {}_gear", unit.name), json!({}));
+            }
+            // `mmu_unit.py` L469 and L540 register the toolhead and buffer sections as objects; their own status
+            // (`mmu_toolhead_wrapper.py` L275, `mmu_buffer.py` L353) is not simulated.
+            for toolhead in self.toolhead_names() {
+                objects.insert(format!("mmu_toolhead {toolhead}"), json!({}));
+            }
+            for buffer in self.buffer_names() {
+                objects.insert(format!("mmu_buffer {buffer}"), json!({}));
+            }
+            return objects;
+        }
         objects.insert("mmu_extruder extruder".to_owned(), json!({}));
         objects.insert(format!("mmu_stepper {UNIT_NAME}_gear"), json!({}));
         objects
     }
 
+    /// The settings of a v4 machine with units: `[mmu_machine] units` (Klipper reports a list option as a list, in
+    /// the order of the unit indexes; `config/base/mmu.cfg` L51) and one `[mmu_unit <name>]` each
+    /// (`mmu_hardware.cfg` L137-155, `mmu_unit.py` L323: `extruder_name` defaults to `extruder`).
+    fn unit_config_sections(&self) -> Vec<(String, Value)> {
+        let names: Vec<&str> = self.units.iter().map(|unit| unit.name).collect();
+        let mut sections =
+            vec![("mmu_machine".to_owned(), json!({ "units": names })), ("mmu".to_owned(), json!({ "enabled": true }))];
+        for unit in &self.units {
+            let mut options = json!({
+                "extruder_name": unit.extruder,
+                "toolhead": unit.toolhead,
+                "num_gates": unit.gates,
+                "vendor": unit.vendor,
+                "display_name": unit.display_name,
+            });
+            if let (Some(buffer), Some(options)) = (unit.buffer, options.as_object_mut()) {
+                options.insert("buffer".to_owned(), json!(buffer));
+            }
+            sections.push((format!("mmu_unit {}", unit.name), options));
+            sections.push((format!("mmu_stepper {}_gear", unit.name), json!({})));
+        }
+        // The sections the units name: `mmu_unit.py` L463 (toolhead) and L534 (buffer).
+        for toolhead in self.toolhead_names() {
+            sections.push((format!("mmu_toolhead {toolhead}"), json!({})));
+        }
+        for buffer in self.buffer_names() {
+            sections.push((format!("mmu_buffer {buffer}"), json!({})));
+        }
+        sections
+    }
+
     pub fn config_sections(&self) -> Vec<(String, Value)> {
+        if self.has_units() {
+            return self.unit_config_sections();
+        }
         vec![
             ("mmu_machine".to_owned(), json!({ "num_units": 1 })),
             ("mmu".to_owned(), json!({ "enabled": true })),
@@ -251,6 +427,9 @@ impl HappyHare {
         }
         self.gate = BYPASS;
         self.tool = BYPASS;
+        if let Some(unit) = self.bypass_unit() {
+            self.unit_selected = unit;
+        }
         Ok(())
     }
 
@@ -412,6 +591,9 @@ impl HappyHare {
 
     fn select(&mut self, gate: usize) {
         self.gate = gate as i32;
+        if self.has_units() {
+            self.unit_selected = self.unit_of_gate(gate);
+        }
         self.tool =
             self.tool_to_gate.iter().position(|mapped| *mapped == gate).map_or(NONE_SELECTED, |tool| tool as i32);
     }
@@ -519,7 +701,7 @@ impl HappyHare {
             "num_gates": self.gates,
             "is_homed": self.homed,
             "print_state": print_state,
-            "unit": if self.gate == NONE_SELECTED { NONE_SELECTED } else { 0 },
+            "unit": self.unit_json(),
             "tool": self.tool,
             "gate": self.gate,
             "active_filament": self.active_filament(),
@@ -553,13 +735,34 @@ impl HappyHare {
             "spoolman_support": if self.spoolman { "push" } else { "off" },
             "pending_spool_id": -1,
             "encoder": null,
-            "selector": { "has_bypass": false, "servo": self.servo },
+            "selector": { "has_bypass": self.selected_unit_has_bypass(), "servo": self.servo },
         });
         let (Some(fields), Value::Object(buffer)) = (mmu.as_object_mut(), self.buffer_fields(printing)) else {
             unreachable!("both are JSON objects")
         };
         fields.extend(buffer);
+        if let Some(unit) = self.units.get(self.unit_selected) {
+            // `mmu_controller.py` L830-860 merges the extruder wrapper of the active unit into `mmu`.
+            if let Value::Object(wrapper) = extruder_wrapper_json(unit.extruder) {
+                fields.extend(wrapper);
+            }
+        }
         mmu
+    }
+
+    /// `mmu.unit`; the older profiles show 0 and, before any gate, -1.
+    fn unit_json(&self) -> i64 {
+        if self.has_units() {
+            self.unit_selected as i64
+        } else if self.gate == NONE_SELECTED {
+            i64::from(NONE_SELECTED)
+        } else {
+            0
+        }
+    }
+
+    fn selected_unit_has_bypass(&self) -> bool {
+        self.units.get(self.unit_selected).is_some_and(|unit| vendor_profile(unit.vendor).has_bypass)
     }
 
     /// The fields of a proportional buffer, as on the real device (no encoder), made up from the print state.
@@ -607,7 +810,7 @@ impl HappyHare {
             .and_then(|gate| self.gate_status.get(gate))
             .is_some_and(|status| *status == GATE_AVAILABLE);
         let past = |sensor: i32| self.filament_position() >= sensor;
-        json!({
+        let mut sensors = json!({
             "mmu_entry": at_entry,
             "mmu_exit": past(FILAMENT_POSITION_GATE_SENSOR),
             "extruder": past(FILAMENT_POSITION_EXTRUDER_SENSOR),
@@ -617,10 +820,134 @@ impl HappyHare {
             "filament_compression": false,
             "filament_tension": printing && self.boosting,
             "filament_proportional": false,
-        })
+        });
+        // The active map holds the sensors of the selected gate's unit, its shared exit too (`mmu_sensor_manager.py`
+        // L190-206, generic names without owner).
+        let selected = usize::try_from(self.gate).ok();
+        let unit = self
+            .sensor_units()
+            .into_iter()
+            .find(|unit| selected.is_some_and(|gate| (unit.first_gate..unit.first_gate + unit.gates).contains(&gate)));
+        if unit.is_some_and(|unit| unit.shared_exit.is_some()) {
+            sensors[SENSOR_SHARED_EXIT] = json!(past(FILAMENT_POSITION_GATE_SENSOR));
+        }
+        sensors
+    }
+
+    /// The Klipper objects `filament_switch_sensor <name>` of the machine with their `filament_detected`, named like
+    /// `MmuSensorManager` and the sensor classes do (`mmu_sensor_manager.py` L23-90): gate sensors with the global
+    /// gate number and no prefix, the others with their owner (unit, toolhead or buffer) in front, which is dropped
+    /// with exactly one unit. The older profiles have one unit like the recorded single-lane type-B machine: gate 0
+    /// only, a buffer and the toolhead. The sensors follow the simulated filament like `mmu.sensors`; entry sensors
+    /// stay on while their gate holds filament, the others only for the unit of the selected gate.
+    pub fn filament_sensors(&self, print_state: &str) -> Vec<(String, bool)> {
+        let printing = print_state == "printing";
+        let selected_gate = usize::try_from(self.gate).ok();
+        let past = |sensor: i32| self.filament_position() >= sensor;
+        // `mmu_sensor_utils.py` L363-368: the registered name loses the owner prefix with exactly one unit.
+        let owned = |owner: &str, sensor: &str| {
+            let name = if self.units.len() >= 2 { format!("{owner}:{sensor}") } else { sensor.to_owned() };
+            format!("{SENSOR_PREFIX}{name}")
+        };
+        let mut sensors: Vec<(String, bool)> = Vec::new();
+        let mut add = |name: String, detected: bool| {
+            // Units may share a toolhead or a buffer (`mmu_unit.py` L463-473, L534-546): one sensor, which sees the
+            // filament of any of them.
+            match sensors.iter_mut().find(|(known, _)| *known == name) {
+                Some((_, known_detected)) => *known_detected |= detected,
+                None => sensors.push((name, detected)),
+            }
+        };
+        for unit in self.sensor_units() {
+            let gates = unit.first_gate..unit.first_gate + unit.gates;
+            let active = selected_gate.is_some_and(|gate| gates.contains(&gate));
+            for gate in gates {
+                let holds_filament = self.gate_status.get(gate) == Some(&GATE_AVAILABLE);
+                add(format!("{SENSOR_PREFIX}{SENSOR_ENTRY}_{gate}"), holds_filament);
+                add(
+                    format!("{SENSOR_PREFIX}{SENSOR_EXIT}_{gate}"),
+                    selected_gate == Some(gate) && past(FILAMENT_POSITION_GATE_SENSOR),
+                );
+            }
+            if let Some(owner) = unit.shared_exit {
+                add(owned(owner, SENSOR_SHARED_EXIT), active && past(FILAMENT_POSITION_GATE_SENSOR));
+            }
+            // The extruder and toolhead sensors belong to the `[mmu_toolhead]` (`mmu_toolhead_wrapper.py` L86, L102).
+            // Same order as the recorded machine lists them (toolhead before extruder).
+            add(owned(unit.toolhead, SENSOR_TOOLHEAD), active && past(FILAMENT_POSITION_TOOLHEAD_SENSOR));
+            add(owned(unit.toolhead, SENSOR_EXTRUDER), active && past(FILAMENT_POSITION_EXTRUDER_SENSOR));
+            if let Some(buffer) = unit.buffer {
+                // `mmu_buffer.py` L64, L77: compression and tension belong to the buffer.
+                add(owned(buffer, SENSOR_COMPRESSION), false);
+                add(owned(buffer, SENSOR_TENSION), active && printing && self.boosting);
+            }
+        }
+        sensors
+    }
+
+    /// The units as far as their sensors go: the units of the profile, or the one legacy unit.
+    fn sensor_units(&self) -> Vec<SensorUnit> {
+        if !self.has_units() {
+            return vec![SensorUnit {
+                first_gate: 0,
+                gates: 1,
+                shared_exit: None,
+                toolhead: "default",
+                buffer: Some(UNIT_NAME),
+            }];
+        }
+        self.units
+            .iter()
+            .zip(self.first_gates())
+            .map(|(unit, first_gate)| SensorUnit {
+                first_gate,
+                gates: unit.gates,
+                shared_exit: vendor_profile(unit.vendor).shared_exit_sensor.then_some(unit.name),
+                toolhead: unit.toolhead,
+                buffer: unit.buffer,
+            })
+            .collect()
+    }
+
+    /// `mmu_machine` of a machine with units: `happy_hare_version`, `num_units`, `num_gates` and a `unit_<i>` each,
+    /// with what `MmuUnit.get_status` returns (`mmu_unit.py` L1086-1145) for a unit without fans, heaters, NFC
+    /// readers or TD-1 scanners (`mmu_machine.py` L93-131, L179).
+    fn units_machine_json(&self) -> Value {
+        let mut machine = Map::new();
+        machine.insert("happy_hare_version".to_owned(), json!(VERSION));
+        machine.insert("num_units".to_owned(), json!(self.units.len()));
+        machine.insert("num_gates".to_owned(), json!(self.gates));
+        for (index, (unit, first_gate)) in self.units.iter().zip(self.first_gates()).enumerate() {
+            let profile = vendor_profile(unit.vendor);
+            machine.insert(
+                format!("unit_{index}"),
+                json!({
+                    "name": unit.name,
+                    "display_name": unit.display_name,
+                    "vendor": unit.vendor,
+                    "version": unit.version,
+                    "num_gates": unit.gates,
+                    "first_gate": first_gate,
+                    "selector_type": "LinearServoSelector",
+                    "is_homed": self.homed,
+                    "variable_rotation_distances": profile.variable_rotation_distances,
+                    "variable_bowden_lengths": false,
+                    "require_bowden_move": true,
+                    "filament_always_gripped": false,
+                    "has_bypass": profile.has_bypass,
+                    "can_crossload": false,
+                    "multi_gear": false,
+                    "filament_buffer": true,
+                }),
+            );
+        }
+        Value::Object(machine)
     }
 
     fn machine_json(&self) -> Value {
+        if self.has_units() {
+            return self.units_machine_json();
+        }
         json!({
             "happy_hare_version": VERSION,
             "num_units": 1,
@@ -641,6 +968,19 @@ impl HappyHare {
             },
         })
     }
+}
+
+/// `mmu_extruder <name>` (`mmu_extruder_wrapper.py` L218-227) of an extruder that has not moved any filament yet:
+/// the values of L36-39. The same keys end up in `mmu` for the active unit.
+fn extruder_wrapper_json(extruder: &str) -> Value {
+    json!({
+        "extruder_name": extruder,
+        "extruder_filament_remaining": 0.0,
+        "filament_remaining": 0.0,
+        "filament_remaining_color": UNKNOWN_FILAMENT_COLOR,
+        "filament_remaining_material": "",
+        "filament_remaining_temp": 0,
+    })
 }
 
 #[cfg(test)]
@@ -931,6 +1271,24 @@ mod tests {
         hare.apply(MmuCommand::Servo { position: Some(ServoPosition::Down) }, IDLE).unwrap();
         hare.apply(MmuCommand::Servo { position: Some(ServoPosition::Off) }, IDLE).unwrap();
         assert_eq!(mmu(&hare)["selector"]["servo"], SERVO_DOWN);
+    }
+
+    #[test]
+    fn one_unit_generates_the_six_sensors_of_the_recorded_single_lane_machine() {
+        let names: Vec<String> =
+            HappyHare::new(4, false).filament_sensors("standby").into_iter().map(|(name, _)| name).collect();
+
+        assert_eq!(
+            names,
+            [
+                "filament_switch_sensor mmu_entry_0",
+                "filament_switch_sensor mmu_exit_0",
+                "filament_switch_sensor toolhead",
+                "filament_switch_sensor extruder",
+                "filament_switch_sensor filament_compression",
+                "filament_switch_sensor filament_tension",
+            ]
+        );
     }
 
     #[test]

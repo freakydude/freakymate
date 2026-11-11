@@ -4,11 +4,13 @@ use crate::calibration::{CalibrationCommand, TestZ};
 use crate::layer_pause::LayerPauseCommand;
 use std::fmt;
 
+mod afc;
 mod calibration;
 mod happy_hare;
 mod heating;
 mod macros;
 mod motion;
+mod toolchanger;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Axis {
@@ -50,7 +52,11 @@ impl Move {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
     Home(Vec<Axis>),
-    SetExtruderTarget(f64),
+    /// `M104`: the extruder of tool `T<n>` (`extruder`, `extruder1`, …), or the active one without `T`.
+    SetExtruderTarget {
+        tool: Option<usize>,
+        target: f64,
+    },
     SetBedTarget(f64),
     SetFanSpeed(f64),
     AbsolutePositioning,
@@ -87,6 +93,10 @@ pub enum Command {
     /// `G4 P<milliseconds>`: waits; the fake answers the script only afterwards, like Klipper.
     Dwell(std::time::Duration),
     Mmu(MmuCommand),
+    /// Tool changer and the macro variable commands.
+    Toolchanger(ToolchangerCommand),
+    /// AFC's lane commands; a printer without AFC ignores them, as Klipper would not know them.
+    Afc(AfcCommand),
     /// Mainsail's layer pause macros.
     LayerPause(LayerPauseCommand),
     /// Probe, bed screws and bed mesh, and the commands within their helpers.
@@ -95,6 +105,80 @@ pub enum Command {
     /// Klipper).
     FakePrintError,
     Ignored,
+}
+
+/// Which tool `SELECT_TOOL` means: `T=<number>` or `TOOL=<name>`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ToolSelector {
+    Number(usize),
+    Name(String),
+}
+
+/// `toolchanger.status` of klipper-toolchanger (viesturz `klipper/extras/toolchanger.py`, `STATUS_*`). The plugin also
+/// knows `initializing` and `changing`; the fake never rests in them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolchangerState {
+    Uninitialized,
+    Ready,
+    Error,
+}
+
+impl ToolchangerState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Uninitialized => "uninitialized",
+            Self::Ready => "ready",
+            Self::Error => "error",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ToolchangerCommand {
+    SelectTool(ToolSelector),
+    UnselectTool,
+    /// `INITIALIZE_TOOLCHANGER [RECOVER=1]`; the fake treats both alike.
+    Initialize {
+        recover: bool,
+    },
+    /// `FAKE_TOOLCHANGER_STATE STATE=...`: test hook of the fake, not in the plugin.
+    FakeState(ToolchangerState),
+    ActivateExtruder {
+        extruder: String,
+    },
+    /// `SET_GCODE_VARIABLE`: a macro variable; `None` is `null`.
+    SetGcodeVariable {
+        macro_name: String,
+        variable: String,
+        value: serde_json::Value,
+    },
+    /// `SAVE_VARIABLE`: Klipper's `save_variables`.
+    SaveVariable {
+        variable: String,
+        value: serde_json::Value,
+    },
+}
+
+/// The commands of AFC (AFC-Klipper-Add-On at 5ea84ea) with their parameters as written; AFC checks them, not the
+/// parser. `T<n>` is a [`MmuCommand::ChangeTool`] as for Happy Hare.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AfcCommand {
+    /// `CHANGE_TOOL LANE=` (`AFC.py` L2293).
+    ChangeTool { lane: Option<String> },
+    /// `TOOL_LOAD LANE=` (L1427).
+    ToolLoad { lane: Option<String> },
+    /// `TOOL_UNLOAD [LANE=]` (L1828).
+    ToolUnload { lane: Option<String> },
+    /// `LANE_UNLOAD LANE=` (L1321).
+    LaneUnload { lane: Option<String> },
+    /// `SET_SPOOL_ID LANE= SPOOL_ID=` (`AFC_spool.py` L325).
+    SetSpoolId { lane: Option<String>, spool_id: Option<String> },
+    /// `SET_COLOR LANE= COLOR=` (L197).
+    SetColor { lane: Option<String>, color: Option<String> },
+    /// `SET_MATERIAL LANE= MATERIAL=` (L261).
+    SetMaterial { lane: Option<String>, material: Option<String> },
+    /// `SET_MAP LANE= MAP=` (L148).
+    SetMap { lane: Option<String>, map: Option<String> },
 }
 
 /// `SET_VELOCITY_LIMIT`; every value is optional, as in Klipper.
@@ -286,7 +370,15 @@ fn parse_line(line: &str) -> Result<Command, CommandError> {
     let name = words.next().unwrap_or_default().to_ascii_uppercase();
     let args: Vec<&str> = words.collect();
 
-    let groups = [motion::parse, heating::parse, macros::parse, calibration::parse, happy_hare::parse];
+    let groups = [
+        motion::parse,
+        heating::parse,
+        macros::parse,
+        calibration::parse,
+        happy_hare::parse,
+        toolchanger::parse,
+        afc::parse,
+    ];
     for parse in groups {
         if let Some(command) = parse(&name, &args)? {
             return Ok(command);
@@ -420,7 +512,7 @@ mod tests {
     fn ignores_comments_and_blank_lines() {
         let commands = parse_script("; nur Kommentar\n\nM104 S200 ; Duese\n").unwrap();
 
-        assert_eq!(commands, vec![Command::SetExtruderTarget(200.0)]);
+        assert_eq!(commands, vec![Command::SetExtruderTarget { tool: None, target: 200.0 }]);
     }
 
     #[test]

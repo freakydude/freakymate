@@ -11,15 +11,20 @@ export component FilamentMmuEightPreview inherits AppWindow {
         Navigation.filament-tab = FilamentTab.gates;
         Navigation.mmu-page = 1;
         Printer.mmu-gates = [
-            { index: 0, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", selected: false },
-            { index: 1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", selected: false },
-            { index: 2, availability: "available", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", selected: false },
-            { index: 3, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", selected: false },
-            { index: 4, availability: "available", name: "Black ASA", material: "ASA", colors: { first: #212529, count: 1 }, has-color: true, tools: "T4 T5 T6", selected: true },
-            { index: 5, availability: "available", name: "Natural PLA", material: "PLA", colors: { first: #f1f3f5, count: 1 }, has-color: true, tools: "", selected: false },
-            { index: 6, availability: "unknown", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "", selected: false },
-            { index: 7, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T7", selected: false },
+            { title: "Gate 0", index: 0, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", selected: false },
+            { title: "Gate 1", index: 1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", selected: false },
+            { title: "Gate 2", index: 2, availability: "available", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", selected: false },
+            { title: "Gate 3", index: 3, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", selected: false },
+            { title: "Gate 4", index: 4, availability: "available", name: "Black ASA", material: "ASA", colors: { first: #212529, count: 1 }, has-color: true, tools: "T4 T5 T6", selected: true },
+            { title: "Gate 5", index: 5, availability: "available", name: "Natural PLA", material: "PLA", colors: { first: #f1f3f5, count: 1 }, has-color: true, tools: "", selected: false },
+            { title: "Gate 6", index: 6, availability: "unknown", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "", selected: false },
+            { title: "Gate 7", index: 7, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T7", selected: false },
         ];
+        Printer.mmu-pages = [
+            { first-row: 0, count: 5, bypass: false, unit: "", head: "", first-gate: 0, last-gate: 4 },
+            { first-row: 5, count: 3, bypass: true, unit: "", head: "", first-gate: 5, last-gate: 7 },
+        ];
+        Printer.mmu-page-ranges = [{ first: 0, count: 2, start: 0 }];
         Printer.mmu-filament = "loaded";
         Printer.mmu-action = "Loading";
         Printer.mmu-buffer-state = "neutral";

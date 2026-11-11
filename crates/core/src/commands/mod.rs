@@ -8,6 +8,7 @@ mod tests;
 
 pub use error::CommandError;
 
+use crate::domain::machine_tree::LaneId;
 use crate::moonraker::Call;
 use crate::sources::happy_hare::commands as mmu;
 use crate::sources::klipper::commands::{self as klipper, run_gcode};
@@ -15,7 +16,7 @@ use crate::sources::klipper::tuning::TuningKey;
 use crate::sources::klipper::{Axis, Motion, TestZ};
 use crate::sources::moonraker_server::wled::{self, StripAction};
 use crate::sources::moonraker_server::{files, machine, power, update_manager};
-use crate::sources::{led_effect, spoolman};
+use crate::sources::{led_effect, spoolman, toolchanger};
 
 /// A command triggered by a person. The UI only knows this level, not G-code or JSON-RPC.
 ///
@@ -207,6 +208,16 @@ pub enum Command {
     MmuServo {
         position: mmu::ServoCommand,
     },
+    /// Picks up the head with this name (`SELECT_TOOL`) on a tool changer.
+    PickUpHead {
+        head: String,
+    },
+    /// Parks the mounted head (`UNSELECT_TOOL`).
+    DropHead,
+    /// Initialises the tool changer; `recover` also restores the position after an error.
+    InitializeToolchanger {
+        recover: bool,
+    },
     /// Selects the bypass for filament fed by hand past the gates.
     MmuSelectBypass,
     /// Selects the bypass and loads the filament fed into it.
@@ -237,9 +248,52 @@ pub enum Command {
         material: Option<String>,
         color: Option<[u8; 3]>,
     },
+    // A lane of Happy Hare or AFC alike (`docs/multi-tool.md`, D2); resolved into the commands of its source.
+    /// Loads the lane into the toolhead (unloading another one first where the source does that).
+    LoadLane {
+        lane: LaneId,
+    },
+    /// Unloads the lane from the toolhead.
+    UnloadLane {
+        lane: LaneId,
+    },
+    /// Ejects the filament of the lane out of its unit.
+    EjectLane {
+        lane: LaneId,
+    },
+    /// Puts a Spoolman spool into the lane; `None` takes it out.
+    AssignLaneSpool {
+        lane: LaneId,
+        spool_id: Option<u32>,
+    },
+    /// Sets material or colour of the lane where the source keeps them; `None` keeps the value.
+    SetLaneFilament {
+        lane: LaneId,
+        material: Option<String>,
+        color: Option<[u8; 3]>,
+    },
+    /// Maps the slicer tool `T<tool>` to the lane; AFC swaps it with the lane that had it.
+    MapToolToLane {
+        tool: usize,
+        lane: LaneId,
+    },
+    /// Back to the configured tool map of the source in charge.
+    ResetToolMap,
+    /// Clears AFC's error state (`RESET_FAILURE`); moves nothing and does not resume.
+    AfcResetFailure,
+    /// Pulls the filament of an AFC lane back out of the hub (`AFC_LANE_RESET`).
+    AfcResetLane {
+        lane: String,
+    },
     // Spoolman
     /// The spool Moonraker tracks the filament use of; `None` for none.
     SetActiveSpool {
+        spool_id: Option<u32>,
+    },
+    /// Puts a Spoolman spool into the variable `spool_id` of the tool macro `T<n>` (the convention of Fluidd and
+    /// Mainsail); `None` takes it out. Resolved into G-code that also saves it where `[save_variables]` exists.
+    AssignToolSpool {
+        tool: usize,
         spool_id: Option<u32>,
     },
     /// Sets the weight of a spool from a measurement; `weight` is the gross weight of the spool in grams.
@@ -320,6 +374,9 @@ impl Command {
             Self::ExcludeObject { name } => run_gcode(klipper::exclude_object(name)?),
             // Klipper plugins
             Self::SetLedEffect { effect, on } => run_gcode(led_effect::set_effect(effect, *on)),
+            Self::PickUpHead { head } => run_gcode(toolchanger::commands::pick_up(head)?),
+            Self::DropHead => run_gcode(toolchanger::commands::DROP),
+            Self::InitializeToolchanger { recover } => run_gcode(toolchanger::commands::initialize(*recover)),
             Self::MmuSelectGate { gate } => run_gcode(mmu::select_gate(*gate)),
             Self::MmuLoad => run_gcode(mmu::LOAD),
             Self::MmuLoadGate { gate } => run_gcode(mmu::load_gate(*gate)),
@@ -364,7 +421,17 @@ impl Command {
             | Self::PauseAtLayer { .. }
             | Self::ClearLayerPause
             | Self::SetGateFilament { .. }
-            | Self::SetEndlessSpoolGroup { .. } => return None,
+            | Self::SetEndlessSpoolGroup { .. }
+            | Self::LoadLane { .. }
+            | Self::UnloadLane { .. }
+            | Self::EjectLane { .. }
+            | Self::AssignLaneSpool { .. }
+            | Self::SetLaneFilament { .. }
+            | Self::MapToolToLane { .. }
+            | Self::ResetToolMap
+            | Self::AfcResetFailure
+            | Self::AfcResetLane { .. }
+            | Self::AssignToolSpool { .. } => return None,
         };
         Some(call)
     }
@@ -388,6 +455,26 @@ impl Command {
         )
     }
 
+    /// Changes the position or the leveling a paused print resumes from (homing, leveling, probing, motors off); refused
+    /// for the whole print, pause included. What a pause is for (moving away, extruding, the MMU, the heads) stays
+    /// allowed.
+    pub fn loses_print_position(&self) -> bool {
+        matches!(
+            self,
+            Self::Home { .. }
+                | Self::DisableMotors
+                | Self::Level
+                | Self::QuadGantryLevel
+                | Self::ZTiltAdjust
+                | Self::CalibrateZ
+                | Self::ProbeCalibrate
+                | Self::ZEndstopCalibrate
+                | Self::CalibrateBedMesh
+                | Self::CalculateScrewsTilt
+                | Self::AdjustBedScrews
+        )
+    }
+
     /// Moves the axes, the extruder or the MMU on its own; refused while the print moves the machine
     /// ([`PrinterStatus::print_moving`](crate::sources::PrinterStatus::print_moving)), allowed while it is paused.
     /// The Move and Filament pages are locked then, too; G-code typed in the console is up to the person.
@@ -403,6 +490,9 @@ impl Command {
                 | Self::CalibrateZ
                 | Self::ProbeCalibrate
                 | Self::ZEndstopCalibrate
+                | Self::PickUpHead { .. }
+                | Self::DropHead
+                | Self::InitializeToolchanger { .. }
                 | Self::CalibrateBedMesh
                 | Self::CalculateScrewsTilt
                 | Self::AdjustBedScrews
@@ -421,6 +511,10 @@ impl Command {
                 | Self::MmuServo { .. }
                 | Self::MmuSelectBypass
                 | Self::MmuLoadBypass
+                | Self::LoadLane { .. }
+                | Self::UnloadLane { .. }
+                | Self::EjectLane { .. }
+                | Self::AfcResetLane { .. }
         )
     }
 }

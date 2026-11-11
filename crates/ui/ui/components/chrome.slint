@@ -11,6 +11,8 @@ component TemperatureReading inherits Rectangle {
     in property <image> icon;
     in property <string> text;
     in property <bool> heating;
+    // The name of the head this reading belongs to, shown before the icon; empty for none.
+    in property <string> head;
     min-width: reading.min-width;
     preferred-width: reading.preferred-width;
 
@@ -23,6 +25,14 @@ component TemperatureReading inherits Rectangle {
 
     reading := HorizontalLayout {
         spacing: Theme.spacing-small;
+        if root.head != "": Text {
+            text: root.head;
+            color: Theme.muted;
+            font-size: Theme.font-normal;
+            vertical-alignment: center;
+            overflow: elide;
+            max-width: 56px;
+        }
         Image {
             cross-axis-self-alignment: center;
             source: root.icon;
@@ -215,8 +225,9 @@ export component StatusBar inherits Rectangle {
         TemperatureReading {
             visible: Printer.ready;
             icon: Icons.thermal-nozzle;
-            heating: Printer.nozzle-target > 0;
-            text: round(Printer.nozzle-temperature) + "°" + (Printer.nozzle-target > 0 ? " / " + round(Printer.nozzle-target) + "°" : "");
+            head: Printer.nozzle-head;
+            heating: Printer.nozzle-selected && Printer.nozzle-target > 0;
+            text: !Printer.nozzle-selected ? @tr("No head") : round(Printer.nozzle-temperature) + "°" + (Printer.nozzle-target > 0 ? " / " + round(Printer.nozzle-target) + "°" : "");
         }
         if Printer.has-bed: TemperatureReading {
             visible: Printer.ready;

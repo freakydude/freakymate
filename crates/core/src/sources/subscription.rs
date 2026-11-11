@@ -27,6 +27,13 @@ impl<'a> Subscription<'a> {
         }
     }
 
+    /// Subscribes every object the printer lists under `prefix` (the sections `[tool <name>]`, say) with `fields`.
+    pub(in crate::sources) fn add_each(&mut self, prefix: &str, fields: Option<&[&str]>) {
+        for name in self.available.iter().filter(|candidate| candidate.starts_with(prefix)) {
+            self.objects.insert(name.clone(), fields.map_or(Value::Null, |fields| json!(fields)));
+        }
+    }
+
     pub(in crate::sources) fn into_parameters(self) -> Value {
         json!({ "objects": self.objects })
     }

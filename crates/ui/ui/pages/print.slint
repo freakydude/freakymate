@@ -2,7 +2,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Navigation, Printer } from "../state.slint";
+import { Actions, Confirm, FileItem, Navigation, Printer } from "../state.slint";
 import { ButtonKind, IconButton, ProgressBar, ValueTile } from "../components/controls.slint";
 import { ExcludeObjectsDialog, LayerPauseDialog } from "../components/print-dialogs.slint";
 import { Thumbnail } from "../components/thumbnail.slint";
@@ -71,10 +71,67 @@ component ActionTile inherits IconButton {
     height: 96px;
 }
 
+// One of the newest files: preview, name and print time; a tap prepares it like the choice in the file list.
+component RecentFileTile inherits Rectangle {
+    in property <FileItem> file;
+
+    background: touch.pressed ? Theme.surface-active : Theme.surface;
+    border-radius: Theme.radius;
+    accessible-role: button;
+    accessible-label: root.file.name;
+    touch := TouchArea {
+        clicked => { Actions.prepare-file(root.file.path); }
+    }
+
+    VerticalLayout {
+        padding: Theme.spacing-medium;
+        spacing: Theme.spacing-small;
+        Thumbnail {
+            height: self.width;
+            source: root.file.thumbnail;
+            available: root.file.has-thumbnail;
+        }
+        // Names keep what matters at the end (a version): break anywhere, two lines at most.
+        Text {
+            height: 2 * Theme.font-label * 1.3;
+            text: root.file.name;
+            color: Theme.foreground;
+            font-size: Theme.font-label;
+            font-weight: 600;
+            wrap: char-wrap;
+            overflow: elide;
+        }
+        Text {
+            text: root.file.time;
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            overflow: elide;
+        }
+    }
+}
+
+// The newest files, offered while there is no job; as wide as four tiles, fewer files leave room on the right.
+// Placed by hand, not in a layout: the tile width follows the width the page gives, which a layout would ask back.
+component RecentFiles inherits Rectangle {
+    property <length> tile-width: (self.width - 3 * Theme.spacing) / 4;
+
+    // The square preview plus name (two lines) and time, as the tile's layout stacks them.
+    height: root.tile-width + 64px;
+    for file[index] in Printer.recent-files: RecentFileTile {
+        x: index * (root.tile-width + Theme.spacing);
+        y: 0;
+        width: root.tile-width;
+        height: root.height;
+        file: file;
+    }
+}
+
 export component PrintPage inherits Rectangle {
     property <bool> has-job: Printer.filename != "";
     // A prepared file is the job until a print starts; then the running file is.
     property <bool> prepared: Printer.prepared-path != "" && !Printer.is-printing;
+    // No job and nothing prepared: the newest files instead of an empty preview.
+    property <bool> idle: !root.prepared && !root.has-job;
     property <bool> finished: Printer.print-state == "complete" || Printer.print-state == "cancelled" || Printer.print-state == "error";
     property <length> side-width: 220px;
 
@@ -82,7 +139,7 @@ export component PrintPage inherits Rectangle {
         padding: Theme.padding;
         spacing: Theme.spacing;
 
-        VerticalLayout {
+        if !root.idle: VerticalLayout {
             width: root.side-width;
             spacing: Theme.spacing;
             Thumbnail {
@@ -118,8 +175,8 @@ export component PrintPage inherits Rectangle {
             // (a version): break anywhere, two lines at most.
             Text {
                 height: 48px;
-                text: root.prepared ? Printer.prepared.name : root.has-job ? Printer.job-name : @tr("No print loaded");
-                color: Theme.foreground;
+                text: root.prepared ? Printer.prepared.name : root.has-job ? Printer.job-name : Printer.recent-files.length > 0 ? @tr("Recent files") : @tr("No print loaded");
+                color: root.idle ? Theme.muted : Theme.foreground;
                 font-size: Theme.font-normal;
                 font-weight: 600;
                 wrap: char-wrap;
@@ -127,6 +184,7 @@ export component PrintPage inherits Rectangle {
                 vertical-alignment: center;
             }
             if root.prepared: PreparedJob { }
+            if root.idle: RecentFiles { }
             // Without a job there is nothing to show (no empty tiles); the file list is the way on.
             if !root.prepared && root.has-job: VerticalLayout {
                 spacing: Theme.spacing;

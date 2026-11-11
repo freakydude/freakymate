@@ -33,6 +33,14 @@ pub enum CommandError {
     UnknownHeater(String),
     #[error("gate {0} does not exist")]
     UnknownGate(usize),
+    #[error("this printer has no AFC")]
+    NoAfc,
+    #[error("AFC has no lane {0}")]
+    UnknownLane(String),
+    #[error("the bypass has no spool, material or ejection of its own")]
+    NotForBypass,
+    #[error("the macro T{0} declares no spool_id")]
+    NoToolSpoolVariable(usize),
     /// A source or Klipper did not accept the command or a value in it; their reason.
     #[error("{0}")]
     Rejected(String),
@@ -40,6 +48,8 @@ pub enum CommandError {
     PrintMovesMachine,
     #[error("not possible while a print is running")]
     PrintRunning,
+    #[error("not possible during a print, also when paused: the print would resume from a wrong position")]
+    PrintNeedsPosition,
     #[error("connection to Moonraker closed")]
     ConnectionClosed,
     #[error("not connected to Moonraker")]

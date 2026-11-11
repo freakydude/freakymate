@@ -62,8 +62,14 @@ impl Printer {
             sections.insert(format!("gcode_macro {name}"), section);
         }
         sections.extend(self.calibration.config_sections());
+        if let Some(toolchanger) = &self.toolchanger {
+            sections.extend(toolchanger.config_sections());
+        }
         if let Some(mmu) = &self.mmu {
             sections.extend(mmu.config_sections());
+        }
+        if let Some(afc) = &self.afc {
+            sections.extend(afc.config_sections());
         }
         if let Some(devices) = &self.devices {
             sections.extend(devices.config_sections());

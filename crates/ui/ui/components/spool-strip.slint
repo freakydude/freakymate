@@ -1,12 +1,20 @@
 // The spool in use, in one line; a tap opens the picker. Only for a printer without MMU: with one, the gate says it.
+// On a tool changer the strip shows the spool of the head that is looked at (`head`).
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Printer, SpoolPicker } from "../state.slint";
+import { HeadItem, Printer, SpoolPicker } from "../state.slint";
 import { TextWithValue } from "controls.slint";
 import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
 
 export component SpoolStrip inherits Rectangle {
+    // The head whose spool the strip shows; `for-head` false shows the spool in use.
+    in property <bool> for-head;
+    in property <HeadItem> head;
+
+    property <bool> has-spool: root.for-head ? root.head.has-spool : Printer.has-spool;
+    property <bool> can-pick: !root.for-head || root.head.can-pick-spool;
+
     height: Theme.row-height-small;
     background: Theme.surface;
     border-radius: Theme.radius;
@@ -22,33 +30,44 @@ export component SpoolStrip inherits Rectangle {
             width: 14px;
             height: 34px;
             radius: 4px;
-            colors: FilamentColors.generic(Printer.spool-colors);
+            colors: FilamentColors.generic(root.for-head ? root.head.spool-colors : Printer.spool-colors);
         }
         VerticalLayout {
             alignment: center;
             horizontal-stretch: 1;
+            min-width: 0px;
             Text {
-                text: Printer.has-spool ? Printer.spool-title : @tr("No spool selected");
-                color: Printer.has-spool ? Theme.foreground : Theme.muted;
+                min-width: 0px;
+                text: root.has-spool ? (root.for-head ? root.head.spool-title : Printer.spool-title) : @tr("No spool selected");
+                color: root.has-spool ? Theme.foreground : Theme.muted;
                 font-size: Theme.font-normal;
                 font-weight: 600;
                 overflow: elide;
             }
-            if Printer.has-spool: TextWithValue {
-                text: Printer.spool-material;
-                value: Printer.spool-weight;
-                color: Printer.spool-low ? Theme.warning : Theme.muted;
+            if root.has-spool: TextWithValue {
+                text: root.for-head ? root.head.spool-material : Printer.spool-material;
+                value: root.for-head ? root.head.spool-weight : Printer.spool-weight;
+                color: (root.for-head ? root.head.spool-low : Printer.spool-low) ? Theme.warning : Theme.muted;
             }
         }
         Image {
             cross-axis-self-alignment: center;
             source: Icons.filament-spool;
-            colorize: Theme.muted;
+            colorize: root.can-pick ? Theme.muted : Theme.disabled-foreground;
             width: Theme.icon-medium;
             height: Theme.icon-medium;
         }
     }
     TouchArea {
-        clicked => { SpoolPicker.show(-1, Printer.spool-id); }
+        enabled: root.can-pick;
+        clicked => {
+            if (!root.for-head) {
+                SpoolPicker.show-in-use();
+            } else if (root.head.spool-tool >= 0) {
+                SpoolPicker.show-tool(root.head.spool-tool, root.head.spool-id, root.head.label);
+            } else {
+                SpoolPicker.show(-1, root.head.spool-id);
+            }
+        }
     }
 }

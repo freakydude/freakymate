@@ -1,0 +1,32 @@
+// Preview: Filament page of a tool changer with five heads (long names), Happy Hare's Tools and Service beside them, the
+// third head looked at and not mounted, with the line of a mismatch between selected and detected head. Open in the Slint
+// preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component FilamentHeadsFivePreview inherits AppWindow {
+    init => {
+        Sample.mmu();
+        Printer.has-load-macro = true;
+        Printer.has-unload-macro = true;
+        Printer.has-spoolman = true;
+        Printer.has-mmu = true;
+        Printer.has-lanes = true;
+        Printer.has-drop = true;
+        Printer.heads = [
+            { name: "Toolhead_A", label: "T0", subtitle: "Toolhead_A", has-nozzle: true, temperature: 215, mounted: true, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T0", has-spool: true, spool-title: "Red PLA", spool-material: "PLA", spool-weight: "812 g", spool-colors: { first: #e03131, count: 1 }, spool-id: 1, spool-tool: 0, can-pick-spool: true },
+            { name: "Toolhead_B", label: "T1", subtitle: "Toolhead_B", has-nozzle: true, temperature: 24, mounted: false, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T1", has-spool: true, spool-title: "Blue PETG", spool-material: "PETG", spool-weight: "905 g", spool-colors: { first: #1c7ed6, count: 1 }, spool-id: 2, spool-tool: 1, can-pick-spool: true },
+            { name: "Toolhead_C", label: "T2", subtitle: "Toolhead_C", has-nozzle: true, temperature: 24, mounted: false, detected: true, lanes: 1, pick-up: "macro", pick-up-macro: "T2", has-spool: false, spool-id: -1, spool-tool: 2, can-pick-spool: true },
+            { name: "Toolhead_D", label: "T3", subtitle: "Toolhead_D", has-nozzle: true, temperature: 150, mounted: false, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T3", has-spool: true, spool-title: "Black ABS", spool-material: "ABS", spool-weight: "613 g", spool-colors: { first: #212529, count: 1 }, spool-id: 3, spool-tool: 3, can-pick-spool: true },
+            { name: "Toolhead_E", label: "T4", subtitle: "Toolhead_E", has-nozzle: true, temperature: 24, mounted: false, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T4", has-spool: false, spool-id: -1, spool-tool: 4, can-pick-spool: true },
+        ];
+        Printer.mounted-head = 0;
+        Printer.changer-note = "mismatch";
+        Printer.changer-selected = "T0";
+        Printer.changer-detected = "T2";
+        Navigation.filament-head = 2;
+        Navigation.page = Page.filament;
+    }
+}

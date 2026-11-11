@@ -123,6 +123,7 @@ export global Sample {
     public function mmu() {
         self.ready-printer();
         Printer.has-mmu = true;
+        Printer.has-lanes = true;
         Printer.mmu-gate-map-local = true;
         Printer.mmu-homed = true;
         Printer.mmu-filament = "unloaded";
@@ -130,11 +131,13 @@ export global Sample {
         Printer.mmu-gate = 0;
         Printer.mmu-tool = 0;
         Printer.mmu-gates = [
-            { index: 0, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", group: 0, selected: true },
-            { index: 1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", group: 1, selected: false },
-            { index: 2, availability: "buffered", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", group: 2, selected: false },
-            { index: 3, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", group: 3, selected: false },
+            { title: "Gate 0", index: 0, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", group: 0, selected: true },
+            { title: "Gate 1", index: 1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", group: 1, selected: false },
+            { title: "Gate 2", index: 2, availability: "buffered", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", group: 2, selected: false },
+            { title: "Gate 3", index: 3, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", group: 3, selected: false },
         ];
+        Printer.mmu-pages = [{ first-row: 0, count: 4, bypass: true, unit: "", head: "", first-gate: 0, last-gate: 3 }];
+        Printer.mmu-page-ranges = [{ first: 0, count: 1, start: 0 }];
         Printer.mmu-tools = [
             { tool: 0, gate: 0, loaded-material: "PLA", loaded-colors: { first: #e03131, count: 1 }, loaded-name: "Red PLA" },
             { tool: 1, gate: 1, loaded-material: "PETG", loaded-colors: { first: #37b24d, count: 1 }, loaded-name: "Green PETG" },
@@ -149,9 +152,15 @@ export global Sample {
         Printer.mmu-has-buffer = true;
         Printer.mmu-path = {
             bowden-progress: -1, position: 10, direction: 1, distance: "1712.4 mm", gate-label: "Gate 2",
-            gate-entry-sensor: 1, gate-sensor: 1, extruder-sensor: 1, toolhead-sensor: 1,
+            gate-entry-sensor: 1, gate-sensor: 1, hub-sensor: -1, extruder-sensor: 1, toolhead-sensor: 1,
             colors: { first: #4dabf7, count: 1, longitudinal: false },
         };
+        Printer.lane-path = {
+            bowden-progress: -1, position: 10, direction: 1, distance: "1712.4 mm", gate-label: "Gate 2",
+            gate-entry-sensor: 1, gate-sensor: 1, hub-sensor: 1, extruder-sensor: 1, toolhead-sensor: 1,
+            colors: { first: #4dabf7, count: 1, longitudinal: false },
+        };
+        Printer.lane-buffer = "tension";
         Printer.mmu-buffer-state = "tension";
         Printer.mmu-buffer-bias = -0.9;
         Printer.mmu-flowguard-state = "ready";

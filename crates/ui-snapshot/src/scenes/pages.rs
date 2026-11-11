@@ -109,6 +109,7 @@ pub(super) fn pages(session: &mut Session) -> Result<(), String> {
         if page == Page::Filament && session.presenter.snapshot().status.mmu.is_some() {
             session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
             session.show_page(Page::Filament, "filament-mmu")?;
+            unit_pages(session)?;
             mmu_service(session)?;
             mmu_gate(session)?;
             mmu_tools_and_groups(session)?;
@@ -163,5 +164,29 @@ pub(super) fn messages(session: &mut Session) -> Result<(), String> {
     // The scenes after it should not show this made-up error in the status bar.
     session.presenter.clear_messages();
     session.pump(Duration::from_millis(200));
+    Ok(())
+}
+
+/// With several units the Gates tab has a page per unit: the tab opens on the unit of the loaded gate, a chevron
+/// leads over the unit's boundary; `filament-units-<n>` is page n. Skipped for one unit and with heads (see the
+/// scene `toolchanger`).
+fn unit_pages(session: &mut Session) -> Result<(), String> {
+    let printer = session.window.global::<Printer>();
+    let ranges = printer.get_mmu_page_ranges();
+    let pages = printer.get_mmu_pages();
+    let Some(range) = ranges.row_data(0).filter(|_| ranges.row_count() == 1 && printer.get_heads().row_count() == 0)
+    else {
+        return Ok(());
+    };
+    let first = usize::try_from(range.first).unwrap_or_default();
+    let unit_of = |page: i32| pages.row_data(first + page as usize).map(|page| page.unit.to_string());
+    if (0..range.count).filter_map(unit_of).all(|unit| unit.is_empty()) {
+        return Ok(());
+    }
+    for page in 0..range.count {
+        session.window.global::<Navigation>().set_mmu_page(page);
+        session.capture(&format!("filament-units-{page}"))?;
+    }
+    session.window.global::<Navigation>().set_mmu_page(-1);
     Ok(())
 }

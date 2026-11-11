@@ -1,5 +1,6 @@
 //! The whole printer state as the subscription reports it: Klipper's own objects and those of its plugins.
 
+use super::afc::{self, AfcStatus};
 use super::happy_hare::{self, MmuStatus};
 use super::klipper::{
     Activity, CalibrationState, ExtruderState, Fan, FilamentSensor, Heater, KlipperParts, KlippyState, Led, Motion,
@@ -8,6 +9,8 @@ use super::klipper::{
 use super::led_effect::{self, LedEffect};
 use super::mainsail_config::{self, PlannedLayerPause};
 use super::objects::ObjectStore;
+use super::tool_macros::{self, ToolSpool};
+use super::toolchanger::{self, ToolchangerStatus};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PrinterStatus {
@@ -37,8 +40,14 @@ pub struct PrinterStatus {
     pub print_objects: Vec<PrintObject>,
     /// Happy Hare; `None` without the `mmu` object.
     pub mmu: Option<MmuStatus>,
+    /// AFC; `None` without the `AFC` object.
+    pub afc: Option<AfcStatus>,
     /// The pause planned with Mainsail's layer macros; `None` if the plan is not known.
     pub layer_pause_plan: Option<PlannedLayerPause>,
+    /// The tool changer with its heads; `None` without one.
+    pub toolchanger: Option<ToolchangerStatus>,
+    /// The spools the tool macros `T<n>` hold, for those that declare `spool_id`.
+    pub tool_spools: Vec<ToolSpool>,
 }
 
 impl PrinterStatus {
@@ -63,7 +72,10 @@ impl PrinterStatus {
             filament_sensors: klipper.filament_sensors,
             print_objects: klipper.print_objects,
             mmu: happy_hare::read_mmu(store),
+            afc: afc::read_afc(store),
             layer_pause_plan: mainsail_config::read_plan(store),
+            toolchanger: toolchanger::read_toolchanger(store),
+            tool_spools: tool_macros::read_spools(store),
         }
     }
 

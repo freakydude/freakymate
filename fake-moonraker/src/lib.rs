@@ -1,6 +1,7 @@
 //! Fake-Moonraker: simulated Klipper/Moonraker for UI development and tests without a printer.
 
 pub mod access;
+pub mod afc;
 pub mod backend;
 pub mod calibration;
 pub mod devices;
