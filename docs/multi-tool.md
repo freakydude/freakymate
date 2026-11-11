@@ -304,6 +304,153 @@ A device is tied to a tree node only where the printer states it; everything els
   stated devices. System: the rest, grouped by kind. A warning (a hot driver) is a hint at the device and, where the
   tie is stated, at its head; never a block.
 
+## Screens (draft for package D, 2026-11-11)
+
+Sketches before code; Frank's decisions of 2026-11-11 are marked, rejected variants named in one line. Content area
+right of the navigation: about 724 x 436 px. A printer with one nozzle and no head level looks exactly as today;
+everything below appears only when the tree has more than one head or more than one unit.
+
+### Facts the screens rely on
+
+Read from the sources' code on 2026-11-11 (viesturz `klipper/extras/toolchanger.py`, `tool.py`; KTC-easy
+jwellman80/klipper-toolchanger-easy; AFCProject/AFC-Klipper-Add-On `AFC.py`, `AFC_Toolchanger.py`, `AFC_unit.py`;
+Happy Hare v4 `mmu_unit.py`, `mmu_controller.py`; Klipper `extruder.py`, `heaters.py`):
+
+- **Mounted head.** `toolchanger.tool_number` (-1: none) says which head the changer selected. Where detection pins
+  exist (`has_detection`), `detected_tool_number` says which head is really on the carriage (-1 with none or more
+  than one). viesturz also reports `detect_state` per tool (`"unavailable"`, `"absent"`, `"mounted"`); KTC-easy has
+  no `detect_state` on the tool (and uses integers internally), so the screens read only the two numbers on
+  `toolchanger`. AFC's own changer: `AFC_extruder.on_shuttle`.
+- **Changer state.** `toolchanger.status`: `uninitialized`, `initializing`, `ready`, `changing`, `error`. A tool
+  change needs `ready`. `INITIALIZE_TOOLCHANGER` initialises, with `RECOVER=1` after an error it also restores the
+  position. The error text is not in the status (only in the console).
+- **Commands.** `T<n>` exists on every changer (registered by viesturz unless a macro of that name exists, by AFC,
+  by Happy Hare). `SELECT_TOOL TOOL=<object name>` picks up a head; `UNSELECT_TOOL` exists only when
+  `require_tool_present` is off, so it is offered only if `gcode.help` lists it. AFC's changer: `AFC_SELECT_TOOL
+  TOOL=` (swaps through a lane) and `AFC_UNSELECT_TOOL`.
+- **Names.** A viesturz tool has only its object name (`tool T0` → shown as `T0`; it may be `tool left`). Happy Hare
+  v4 gives each unit a `display_name` (default: the vendor) and the selected unit in `mmu.unit`. An AFC unit has no
+  name field; its name is the object suffix (`AFC_BoxTurtle Turtle_1` → `Turtle_1`).
+- **Heating a nozzle that is not active.** `SET_HEATER_TEMPERATURE HEATER=extruder1 TARGET=…` (or `M104 T1 S…`,
+  which does not change the active extruder).
+
+### D1 Filament page: a selector per level (decided 2026-11-11)
+
+**Every level with more than one node gets a selector, below it today's view of the chosen path.** Rejected: a tab
+"Heads" beside Gates and Extruder (heads as one more topic instead of a level), a strip of heads above the Extruder
+view, a head dialog. Today's Extruder view is the tree reduced to one path (one head, one nozzle, one lane), so it
+stays the leaf view at every size. A level with one node shows no selector; one head and one lane look exactly as
+today.
+
+```text
+One head, one lane (today, unchanged: no selector, no tabs)
+ │ ┌▌Fake Black ABS                  ◎ ┐ ┌  Load  ┐
+ │ ┌ ▽ Nozzle  24.0 / 0 °C             ┐ ┌ Unload ┐
+ │ ┌ Retract ┐ ┌ Extrude ┐ …
+
+Four heads, no MMU: the heads are the tabs
+ │  ▌T0 24°   [▌T1 190°]   ╎T2 24°   ▌T3 150°
+ │ ┌▌Blue PETG · 905 g               ◎ ┐ ┌  Load  ┐
+ │ ┌ ▽ Nozzle T1  190 / 190 °C         ┐ ┌ Unload ┐
+ │ ┌ Retract ┐ ┌ Extrude ┐ …            ┌ ⏏ Drop ┐
+   (viewing T2, not mounted: extruding disabled, hint "T2 is not mounted",
+    top right "▶ Select T2")
+
+One head with Happy Hare (today, unchanged): Gates | Extruder ┊ Tools | Service;
+   several units on the same nozzle are grouped in Gates (D6)
+
+Heads with a unit of their own (rare): heads and machine tabs above, the path tabs of the chosen head below
+ │  ▌T0 24°  [▌T1 190°]  ▌T2 24°  ▌T3 150°  ┊  Tools   Service
+ │  [Gates]   Extruder
+ │  Tradrack · on T1                                        Gates 4–7
+ │ ‹ ┌Gate 4┐ ┌Gate 5┐ ┌Gate 6┐ ┌Gate 7┐ ┌Bypass┐ ›
+```
+
+**Two kinds of tabs.** Today's four tabs are of two kinds, and the levels sort them:
+
+| Kind | Tabs | Where |
+| --- | --- | --- |
+| Views of the chosen path | Gates (the lanes of the chosen nozzle), Extruder (the nozzle itself) | under the chosen head |
+| Views of the machine | Tools (the `Tn` map, it spans all heads), Service (the filament changer as a whole) | beside the heads, after a gap |
+
+- A tab exists only where it has content: Gates only with more than one lane on the nozzle, Tools only where the
+  map can be changed (Happy Hare; for a tool changer without MMU `Tn` is the head number, nothing to change),
+  Service only with a filament changer. The tool changer gets no Service tab: its few actions sit on the head view.
+- **Fit:** four to five heads, gates or tools fit without paging; from six on the row pages with chevrons left and
+  right, like the gate tiles today. A head tab shows a colour edge, the name and the nozzle temperature (about
+  90 px). Five heads plus Tools and Service is the widest row; check with the longest names in the fake.
+
+**Head view.**
+
+- Choosing a head only changes what the page shows; the page opens on the mounted head.
+- Top right on a head that is not mounted: "Select T2" (accent). A head with one lane sends its `T<n>`; a head with a
+  unit of its own has several `T<n>` and gets "Pick up" with `SELECT_TOOL TOOL=<object>` (viesturz, KTC-easy). AFC's
+  changer has no bare pick-up, so no button there (lanes are selected in Gates). Extruding stays disabled with the
+  hint "T2 is not mounted".
+- On the mounted head: "Drop" (`UNSELECT_TOOL`, AFC `AFC_UNSELECT_TOOL`), only where the command exists.
+- "Mounted" (success icon) at the head tab only with detection; no word for absent (the normal case).
+- Deviations of the changer replace nothing on the page, they are one hint line under the tabs, with the button that
+  helps: `uninitialized` → "Not initialized" (info) + "Initialize"; `error` → "Tool changer error, see console"
+  (danger) + "Recover" (`INITIALIZE_TOOLCHANGER RECOVER=1`, with confirmation); selected ≠ detected → "T1 selected,
+  T2 detected" (warning), no button.
+- The spool card's ◎ opens the picker for this head's `T<n>` macro (D5). Heating a parked head: Thermal.
+- Select, Pick up, Drop and Recover are disabled while printing (the page is locked then anyway) and while the
+  changer is not `ready`, with the reason as hint.
+- No overview of all heads at once: temperatures of all heads are on Thermal, the spools per tool on the print page.
+
+### D3 Status bar: the nozzle of the selected head (decided 2026-11-11: A)
+
+| Variant | Normal | No head selected |
+| --- | --- | --- |
+| **A (chosen)** | `T1 ▽ 190°/190°`: head name before the nozzle icon, at most 56 px, elided | `▽ No head` |
+| B | `▽ 190°/190°` of the selected head, no name | `▽ –` |
+| C | as today, always `extruder` | as today |
+
+A has a place for IDEX later (`T0 190° · T1 190°`). Tap opens Thermal as today. Without heads it is unchanged. The
+nozzle is the selected head's (`tool_number`); without a head level `toolhead.extruder`.
+
+### D4 Presets and the spool in use heat the selected head (core rule)
+
+- `ApplyPreset` targets the nozzle of the selected head (or `toolhead.extruder`) instead of the fixed `extruder`; the
+  rule lives in `commands/resolve/heating.rs`. The spool button at the top of the presets heats with the spool of
+  that head.
+- **No head selected (decided 2026-11-11: a):** only the bed heats and an info message says "No head selected,
+  nozzle not heated". Rejected: all nozzles heat; presets disabled.
+- Heating a parked head goes through its Thermal row; no tappable spool hint in the Thermal
+  rows (it would be smaller than `Theme.touch`).
+
+### D5 Names on existing screens
+
+- **Thermal:** nozzle rows named after their head, in head order before the bed: "Nozzle T0", "Nozzle T1" instead of
+  "Nozzle", "Extruder1". Without heads unchanged.
+- **Spool picker title:** gate → "Spool for gate 5" (as today); AFC lane → "Spool for lane2"; `T<n>` macro of a head
+  → "Spool for T1"; one nozzle → "Spool in use" (as today).
+
+### D6 Units as groups in the gate view
+
+Happy Hare v4 units (`display_name`) and AFC units (object suffix). The gate tiles keep their five-per-page pager.
+
+**One page per unit (decided 2026-11-11).** Pages break at unit boundaries (a unit with 9 gates gets two pages); a
+caption line above the tiles names the unit, its head when it sits on one, and the page within the unit. The tab
+opens on the unit of the loaded gate (`mmu.unit`, AFC: the unit of `current_load`). A unit's bypass (`has_bypass`)
+is its last tile.
+
+```text
+ │   [Gates]     Extruder      Tools      Service
+ │  Tradrack · on T1                                        Gates 4–7
+ │ ‹ ┌Gate 4┐ ┌Gate 5┐ ┌Gate 6┐ ┌Gate 7┐ ┌Bypass┐ ›
+ │   │ PLA  │ │ PETG │ │ ABS  │ │ PLA  │ │  ∩   │
+ │   └──────┘ └──────┘ └──────┘ └──────┘ └──────┘
+ │  ┌ Filament path ───────────────────────────────────────────┐
+```
+
+Rejected: unit chips above the tiles (one more row), the unit name only in the tile (no visible boundary).
+
+### Not in this package
+
+Tool offsets and their calibration, part fans per head (`tool.fan`), IDEX and the stages after it, an overview of
+heads on the print page. README wording about tool changers and AFC: Frank decides after D.
+
 ## Open questions
 
 - **IDEX: which nozzle on which carriage.** Klipper's `[dual_carriage]` does not name an extruder; the link lives
