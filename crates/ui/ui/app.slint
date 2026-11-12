@@ -11,10 +11,10 @@ import { HistoryDialog } from "components/history.slint";
 import { BedMeshDialog, BedMeshProfilesDialog } from "components/bed-mesh.slint";
 import { LightPanel } from "components/light.slint";
 import { PrintPage } from "pages/print.slint";
-import { MovePage } from "pages/move.slint";
+import { MotionPage } from "pages/motion.slint";
 import { TemperaturePage } from "pages/temperature.slint";
-import { TunePage } from "pages/tune.slint";
 import { FilamentPage } from "pages/filament.slint";
+import { ChangerPage } from "pages/changer.slint";
 import { ConsolePage } from "pages/console.slint";
 import { SystemPage } from "pages/system.slint";
 import { UpdatesPage } from "pages/updates.slint";
@@ -23,7 +23,7 @@ import { NetworkPage } from "pages/network-page.slint";
 import { ConnectionPage } from "pages/connection.slint";
 
 export { Actions, Backlight, Confirm, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, UiSettings }
-export { ChartLabel, FilamentPathItem, FileItem, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem, SpoolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, ScrewItem, WifiItem, WiredItem, HostInterfaceItem } from "state.slint";
+export { ChartLabel, FilamentPathItem, FileItem, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem, AfcHubReturnItem, AfcToolItem, SpoolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, ScrewItem, WifiItem, WiredItem, HostInterfaceItem } from "state.slint";
 
 export component AppWindow inherits Window {
     title: "FreakyMate";
@@ -49,11 +49,14 @@ export component AppWindow inherits Window {
     property <bool> motion-locked: Printer.motion-locked;
 
     changed network-visible => { Network.watch(self.network-visible); }
-    // A print that starts (here or elsewhere) while Move or Filament is open must not get their moves, nor an open
-    // confirmation of theirs: the navigation locks both pages, so leave them for the print page.
+    // A print that starts (here or elsewhere) while Filament is open must not get its moves, nor an open confirmation of
+    // it: the navigation locks the page, so leave it for the print page. The Motion page stays, showing Tune only, but
+    // a confirmation of the axes (motors off) closes.
     changed motion-locked => {
-        if (self.motion-locked && (Navigation.page == Page.move || Navigation.page == Page.filament)) {
+        if (self.motion-locked && (Navigation.page == Page.filament || Navigation.page == Page.motion)) {
             Dialogs.dismiss();
+        }
+        if (self.motion-locked && Navigation.page == Page.filament) {
             Navigation.page = Page.print;
         }
     }
@@ -73,10 +76,10 @@ export component AppWindow inherits Window {
             Rectangle {
                 horizontal-stretch: 1;
                 if Navigation.page == Page.print: PrintPage { }
-                if Navigation.page == Page.move: MovePage { }
+                if Navigation.page == Page.motion: MotionPage { }
                 if Navigation.page == Page.temperature: TemperaturePage { }
-                if Navigation.page == Page.tune: TunePage { }
                 if Navigation.page == Page.filament: FilamentPage { }
+                if Navigation.page == Page.changer: ChangerPage { }
                 if Navigation.page == Page.console: ConsolePage { }
                 if Navigation.page == Page.system: SystemPage { }
                 if Navigation.page == Page.updates: UpdatesPage { }

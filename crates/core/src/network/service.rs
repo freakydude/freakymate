@@ -152,7 +152,9 @@ impl Outputs {
                 }
             }
             Err(error) => {
-                log::info!("network command {} failed: {error}", describe(&command));
+                // The error names the network, so it only goes to the verbose log.
+                log::info!("network command {} failed", describe(&command));
+                log::debug!("network command {} failed: {error}", describe_in_full(&command));
                 self.notice(error.to_string(), true);
             }
         }
@@ -215,7 +217,17 @@ fn success_text(command: &NetworkCommand) -> Option<String> {
 }
 
 /// Description for the log without secrets.
+/// The command for the normal log, without the name of a network.
 fn describe(command: &NetworkCommand) -> String {
+    match command {
+        NetworkCommand::Connect { hidden, .. } => format!("connect (hidden network: {hidden})"),
+        NetworkCommand::Forget { .. } => "forget".to_owned(),
+        other => format!("{other:?}"),
+    }
+}
+
+/// The command for the verbose log, with the name of a network but never its password.
+fn describe_in_full(command: &NetworkCommand) -> String {
     match command {
         NetworkCommand::Connect { ssid, hidden, .. } => format!("connect to '{ssid}' (hidden: {hidden})"),
         other => format!("{other:?}"),

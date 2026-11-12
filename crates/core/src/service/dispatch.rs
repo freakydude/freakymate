@@ -1,6 +1,7 @@
 //! Carrying out commands: an intent becomes concrete calls that go to Moonraker in the order they were sent.
 
 use super::session::Session;
+use super::trail;
 use super::{Event, LONG_COMMAND, NEXT_COMMAND_ID};
 use crate::commands::{Command, CommandError};
 use crate::moonraker::{Call, CallError, PendingCall};
@@ -15,19 +16,20 @@ use tokio::sync::mpsc;
 impl Session<'_> {
     /// Carries out a command; an intent first becomes the commands this printer needs.
     pub(super) fn execute(&mut self, command: Command) {
+        log::debug!("command {command:?}");
         let status = self.current_status();
         if command.moves_machine() && status.print_moving() {
-            self.outputs.event(Event::CommandFailed { command, error: CommandError::PrintMovesMachine });
+            self.refuse(command, CommandError::PrintMovesMachine);
             return;
         }
         if command.loses_print_position() && status.print_running() {
-            self.outputs.event(Event::CommandFailed { command, error: CommandError::PrintNeedsPosition });
+            self.refuse(command, CommandError::PrintNeedsPosition);
             return;
         }
         let commands = match command.clone().resolve(&self.sources, &status) {
             Ok(commands) => commands,
             Err(error) => {
-                self.outputs.event(Event::CommandFailed { command, error });
+                self.refuse(command, error);
                 return;
             }
         };
@@ -43,10 +45,12 @@ impl Session<'_> {
     /// Sends one concrete command; true if it set a heater target, which the snapshot shows at once.
     fn dispatch(&mut self, command: Command, status: &PrinterStatus) -> bool {
         if command.interrupts_print() && status.print_running() {
-            self.outputs.event(Event::CommandFailed { command, error: CommandError::PrintRunning });
+            self.refuse(command, CommandError::PrintRunning);
             return false;
         }
         let Some(call) = command.to_call(&status.motion) else { return false };
+        let method = call.method;
+        log::debug!("call {method} {}", call.params.as_ref().map(trail::brief).unwrap_or_default());
         // Every G-code script goes to the console, as Moonraker stores it in the console history: typed commands,
         // macros and the scripts behind the buttons alike.
         if let Some(script) = gcode_script(&call) {
@@ -75,13 +79,18 @@ impl Session<'_> {
                 CallError::Rpc(rpc) => CommandError::Rejected(rpc.message),
                 CallError::Closed => CommandError::ConnectionClosed,
             };
+            log::info!("{method} failed: {error}");
             let _ = events.send(Event::CommandFailed { command, error });
         };
         // Sent here, in the order of the commands; a task per command could overtake an earlier one.
         match self.connection.start_call(call.method, call.params) {
             Ok(pending) => {
+                let sent = Instant::now();
                 tokio::spawn(async move {
                     let answer = answer_or_report_running(pending, running, &running_events).await;
+                    if answer.is_ok() {
+                        log::debug!("{method} answered after {} ms", sent.elapsed().as_millis());
+                    }
                     if update_manager_call {
                         let _ = running_events.send(Event::UpdateManagerBusy(false));
                     }
@@ -101,6 +110,12 @@ impl Session<'_> {
             Err(error) => failed(error),
         }
         target_set
+    }
+
+    /// Reports a command that is not carried out, and why.
+    fn refuse(&self, command: Command, error: CommandError) {
+        log::debug!("command {command:?} refused: {error}");
+        self.outputs.event(Event::CommandFailed { command, error });
     }
 }
 

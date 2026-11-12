@@ -1,0 +1,13 @@
+// Preview: the Tune tab of the Motion page. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { MotionTab, Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component MotionTunePreview inherits AppWindow {
+    init => {
+        Sample.printing();
+        Navigation.page = Page.motion;
+        Navigation.motion-tab = MotionTab.tune;
+    }
+}

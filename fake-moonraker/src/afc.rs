@@ -77,6 +77,9 @@ struct Lane {
     loaded: bool,
     tool_loaded: bool,
     loaded_to_hub: bool,
+    /// The filament reaches past the hub switch without being in the toolhead (a load that stopped on the way; only
+    /// `FAKE_AFC_ERROR` leaves it), until `AFC_LANE_RESET` pulls it back.
+    past_hub: bool,
     material: String,
     spool_id: Option<u32>,
     color: String,
@@ -101,6 +104,7 @@ impl Lane {
             loaded: false,
             tool_loaded: false,
             loaded_to_hub: false,
+            past_hub: false,
             material: String::new(),
             spool_id: None,
             color: String::new(),
@@ -203,6 +207,9 @@ pub struct Afc {
     shuttle: Option<usize>,
     /// The `AFC_buffer` of the unit (`buffer` of `AFC_BoxTurtle`, `AFC_unit.py` L78); the lanes use it.
     buffer: Option<&'static str>,
+    /// `AFC.error_state`; `current_state` is `Error` while it is set and `Idle` otherwise (`set_error_state`,
+    /// `AFC_error.py` L154-160).
+    error: bool,
 }
 
 impl Afc {
@@ -280,7 +287,7 @@ impl Afc {
 
     fn assemble(layout: AfcLayout, lanes: Vec<Lane>, heads: Vec<Head>, shuttle: Option<usize>) -> Self {
         let maps = lanes.iter().map(|lane| lane.map.clone()).collect();
-        Self { layout, lanes, heads, maps, shuttle, buffer: None }
+        Self { layout, lanes, heads, maps, shuttle, buffer: None, error: false }
     }
 
     /// The Klipper extruder of the head on the shuttle of a tool changer; `None` for the Box Turtle.
@@ -356,7 +363,88 @@ impl Afc {
                 Ok(())
             }
             AfcCommand::SetMap { lane, map } => self.set_map(lane.as_deref(), map.as_deref()),
+            AfcCommand::ResetMapping => {
+                self.reset_mapping();
+                Ok(())
+            }
+            AfcCommand::ResetFailure => {
+                self.error = false;
+                Ok(())
+            }
+            AfcCommand::LaneReset { lane } => self.lane_reset(lane.as_deref()),
+            AfcCommand::UnselectTool => {
+                self.unselect_tool();
+                Ok(())
+            }
+            AfcCommand::FakeError { lane } => self.fake_error(lane.as_deref()),
         }
+    }
+
+    /// `AFC_spool.cmd_RESET_AFC_MAPPING` (L527-566) without lanes mapped in the configuration (the fake has none): the
+    /// commands of all lanes in numerical order, handed out to the lanes in their order.
+    fn reset_mapping(&mut self) {
+        let mut maps: Vec<String> = self.lanes.iter().map(|lane| lane.map.clone()).collect();
+        maps.sort_by_key(|map| map.trim_start_matches('T').parse::<u32>().unwrap_or(u32::MAX));
+        for (lane, map) in self.lanes.iter_mut().zip(maps) {
+            lane.map = map;
+        }
+    }
+
+    /// `AFC_functions.cmd_AFC_LANE_RESET` (L1640-1735) with AFC's messages. AFC only logs that the toolhead is loaded and
+    /// goes on; the fake stops there. Pulling back a lane whose filament is not the one in the hub never clears the
+    /// hub, so AFC gives up after the bowden length.
+    fn lane_reset(&mut self, lane: Option<&str>) -> Result<(), CommandError> {
+        let name =
+            lane.ok_or_else(|| CommandError::new("No lane selected to reset, please provide a lane to reset."))?;
+        let index = self.lane_index(name).ok_or_else(|| CommandError::new(format!("'{name}' is not a valid lane")))?;
+        // A lane without hub has a stand-in hub that is always clear (`AFC_lane.py` L611-615).
+        if self.lanes[index].hub == DIRECT_HUB || !self.hub_state() {
+            return Err(CommandError::new(format!("Hub is already clear while trying to reset '{name}'")));
+        }
+        if let Some(loaded) = self.current() {
+            let loaded = &self.lanes[loaded].name;
+            return Err(CommandError::new(format!(
+                "Toolhead is loaded with '{loaded}', unload or check sensor before resetting lane"
+            )));
+        }
+        if !self.lanes[index].loaded {
+            return Err(CommandError::new(format!(
+                "'{name}' failed to reset to hub, load switch became false during reset"
+            )));
+        }
+        self.lanes[index].past_hub = false;
+        if self.hub_state() {
+            return Err(CommandError::new(format!("'{name}' failed to reset to hub")));
+        }
+        self.lanes[index].loaded_to_hub = true;
+        Ok(())
+    }
+
+    /// `AFC_Toolchanger.cmd_AFC_UNSELECT_TOOL` (L153-190): the head on the shuttle goes to its dock and keeps its
+    /// filament. Without AFC's tool changer the command does not exist and the fake ignores it. AFC leaves
+    /// `current_state` at `ToolDock`; the fake keeps `Idle`.
+    fn unselect_tool(&mut self) {
+        if self.is_toolchanger() {
+            self.shuttle = None;
+        }
+    }
+
+    /// The test hook `FAKE_AFC_ERROR [LANE=]`: the error state of AFC; with a lane as after a load that stopped past the
+    /// hub, the toolhead empty.
+    fn fake_error(&mut self, lane: Option<&str>) -> Result<(), CommandError> {
+        if let Some(name) = lane {
+            let index = self.mux_lane(Some(name))?;
+            if self.lanes[index].hub == DIRECT_HUB || !self.lanes[index].loaded {
+                return Err(CommandError::new(format!("FAKE_AFC_ERROR: '{name}' has no filament or no hub")));
+            }
+            if let Some(current) = self.current() {
+                self.unload_from_tool(current);
+            }
+            self.lanes[index].past_hub = true;
+            self.lanes[index].loaded_to_hub = true;
+        }
+        self.error = true;
+        Ok(())
     }
 
     /// `T<n>`: the lane behind the command (`AFC_functions.py` L270-302, `AFC.cmd_CHANGE_TOOL` L2293-2380).
@@ -590,9 +678,9 @@ impl Afc {
         sensors
     }
 
-    /// The switch of the hub sees the filament of a lane in the toolhead.
+    /// The switch of the hub sees the filament of a lane in the toolhead or of one stopped past the hub.
     fn hub_state(&self) -> bool {
-        self.lanes.iter().any(|lane| lane.tool_loaded)
+        self.lanes.iter().any(|lane| lane.tool_loaded || lane.past_hub)
     }
 
     /// `AFC_buffer.get_status` (`AFC_buffer.py` L664-702) of a buffer of type `switched` with the defaults of the
@@ -636,13 +724,13 @@ impl Afc {
             "current_load": self.current().map(|lane| self.lanes[lane].name.as_str()),
             "current_lane": null,
             "next_lane": null,
-            "current_state": "Idle",
+            "current_state": if self.error { "Error" } else { "Idle" },
             "current_toolchange": 0,
             "number_of_toolchanges": 0,
             "spoolman": SPOOLMAN_SERVER,
             "td1_present": false,
             "lane_data_enabled": false,
-            "error_state": false,
+            "error_state": self.error,
             "bypass_state": false,
             "quiet_mode": false,
             "position_saved": false,
@@ -990,5 +1078,96 @@ mod tests {
         assert_eq!(status["AFC_extruder e1"]["on_shuttle"], false);
         assert_eq!(status["AFC_extruder e1"]["lane_loaded"], Value::Null);
         assert_eq!(status["AFC_lane e0"]["status"], "Tooled");
+    }
+
+    fn run(afc: &mut Afc, command: AfcCommand) -> Result<(), String> {
+        afc.apply(command, true, false).map_err(|error| error.message().to_owned())
+    }
+
+    fn reset(lane: &str) -> AfcCommand {
+        AfcCommand::LaneReset { lane: Some(lane.into()) }
+    }
+
+    #[test]
+    fn an_error_shows_in_the_state_until_reset_failure() {
+        let mut afc = box_turtle();
+
+        run(&mut afc, AfcCommand::FakeError { lane: None }).unwrap();
+        assert_eq!(
+            (afc.status()["AFC"]["error_state"].clone(), afc.status()["AFC"]["current_state"].clone()),
+            (json!(true), json!("Error"))
+        );
+        // Without a lane the toolhead keeps its filament.
+        assert_eq!(afc.status()["AFC"]["current_load"], "lane2");
+
+        run(&mut afc, AfcCommand::ResetFailure).unwrap();
+        assert_eq!(
+            (afc.status()["AFC"]["error_state"].clone(), afc.status()["AFC"]["current_state"].clone()),
+            (json!(false), json!("Idle"))
+        );
+    }
+
+    #[test]
+    fn a_lane_stopped_past_the_hub_goes_back_with_afc_lane_reset() {
+        let mut afc = box_turtle();
+        run(&mut afc, AfcCommand::FakeError { lane: Some("lane3".into()) }).unwrap();
+        let hub = |afc: &Afc| afc.status()["AFC_hub Turtle_1"]["state"].clone();
+        assert_eq!(afc.status()["AFC"]["current_load"], Value::Null);
+        assert_eq!(hub(&afc), true);
+
+        // Another lane cannot clear the hub that lane3 holds.
+        assert_eq!(run(&mut afc, reset("lane1")), Err("'lane1' failed to reset to hub".into()));
+        run(&mut afc, reset("lane3")).unwrap();
+
+        assert_eq!(hub(&afc), false);
+        assert_eq!(lane(&afc, "lane3")["loaded_to_hub"], true);
+        assert_eq!(lane(&afc, "lane3")["load"], true);
+        assert_eq!(run(&mut afc, reset("lane3")), Err("Hub is already clear while trying to reset 'lane3'".into()));
+    }
+
+    #[test]
+    fn afc_lane_reset_refuses_like_afc() {
+        let mut afc = box_turtle();
+
+        assert_eq!(
+            run(&mut afc, reset("lane1")),
+            Err("Toolhead is loaded with 'lane2', unload or check sensor before resetting lane".into())
+        );
+        assert_eq!(run(&mut afc, reset("lane9")), Err("'lane9' is not a valid lane".into()));
+        assert_eq!(
+            run(&mut afc, AfcCommand::LaneReset { lane: None }),
+            Err("No lane selected to reset, please provide a lane to reset.".into())
+        );
+        let mut changer = Afc::new(AfcLayout::Toolchanger);
+        assert_eq!(run(&mut changer, reset("e0")), Err("Hub is already clear while trying to reset 'e0'".into()));
+    }
+
+    #[test]
+    fn reset_afc_mapping_hands_the_commands_out_in_order_again() {
+        let mut afc = box_turtle();
+        run(&mut afc, AfcCommand::SetMap { lane: Some("lane1".into()), map: Some("T3".into()) }).unwrap();
+        assert_eq!(lane(&afc, "lane4")["map"], "T0");
+
+        run(&mut afc, AfcCommand::ResetMapping).unwrap();
+
+        let maps: Vec<Value> =
+            ["lane1", "lane2", "lane3", "lane4"].iter().map(|name| lane(&afc, name)["map"].clone()).collect();
+        assert_eq!(maps, [json!("T0"), json!("T1"), json!("T2"), json!("T3")]);
+    }
+
+    #[test]
+    fn afc_unselect_tool_docks_the_head_of_the_tool_changer_only() {
+        let mut changer = Afc::new(AfcLayout::Toolchanger);
+        run(&mut changer, AfcCommand::UnselectTool).unwrap();
+
+        let status = changer.status();
+        assert!((0..4).all(|head| status[&format!("AFC_extruder e{head}")]["on_shuttle"] == false));
+        assert_eq!(status["AFC"]["current_load"], Value::Null);
+        // The docked head keeps its filament.
+        assert_eq!(status["AFC_lane e1"]["tool_loaded"], true);
+
+        let mut afc = box_turtle();
+        run(&mut afc, AfcCommand::UnselectTool).unwrap();
+        assert_eq!(afc.status()["AFC"]["current_load"], "lane2");
     }
 }

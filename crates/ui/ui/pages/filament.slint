@@ -1,4 +1,4 @@
-// Filament: the gates of the MMU or the lanes of AFC, extrude by hand, load and unload, the tools of the MMU and its service commands.
+// Filament: the path of one head: the gates of the MMU or the lanes of AFC, extrude by hand, load and unload.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
@@ -8,11 +8,10 @@ import { ButtonKind, Card, IconButton, IconLabel, StepSelector, TabBar, TabButto
 import { FilamentSensorGrid } from "../components/sensor-grid.slint";
 import { FilamentPath } from "../components/filament-path.slint";
 import { SpoolStrip } from "../components/spool-strip.slint";
-import { HeadTabs } from "../components/head-tabs.slint";
+import { AfcHint, ChangerHint, HeadChip } from "../components/head-chip.slint";
+import { HeadPicker } from "../components/head-picker.slint";
 import { MmuGatesTab } from "mmu.slint";
 import { BypassDialog, GateDialog } from "mmu-dialogs.slint";
-import { MmuServiceTab } from "mmu-service.slint";
-import { EndlessSpoolDialog, MmuToolsTab, ToolDialog, ToolGateDialog } from "mmu-tools.slint";
 
 component LengthSelector inherits StepSelector {
     label: @tr("Length");
@@ -37,15 +36,8 @@ component ExtruderTab inherits Rectangle {
 
     property <bool> has-head: root.head-index >= 0 && root.head-index < Printer.heads.length;
     property <HeadItem> head: Printer.heads[root.head-index];
-    // The head is not on the carriage: extruding, loading and unloading act on the mounted one.
+    // The head is not on the carriage: extruding, loading and unloading act on the mounted one (the picker selects it).
     property <bool> parked: root.has-head && !root.head.mounted;
-    // Changing heads waits while a print runs (not while it is paused: the plugin recommends pausing on an error and
-    // initialising before the resume) and for a changer that is ready.
-    property <bool> can-change: !Printer.motion-locked && Printer.changer-ready;
-    property <bool> has-select: root.parked && root.head.pick-up != "";
-    property <bool> has-drop: root.has-head && root.head.mounted && Printer.has-drop;
-    property <bool> has-head-action: root.has-select || root.has-drop;
-    property <string> change-blocked: Printer.motion-locked ? @tr("not while printing") : !Printer.changer-ready ? @tr("tool changer not ready") : "";
     property <float> nozzle-temperature: root.has-head ? root.head.temperature : Printer.nozzle-temperature;
     property <float> nozzle-target: root.has-head ? root.head.target : Printer.nozzle-target;
     property <bool> can-extrude: Printer.can-extrude && !root.parked;
@@ -90,7 +82,7 @@ component ExtruderTab inherits Rectangle {
                         Rectangle { horizontal-stretch: 1; }
                         if root.parked: IconLabel {
                             icon: Icons.ui-info;
-                            text: root.change-blocked != "" && root.has-select ? @tr("{} is not mounted, {}", root.head.label, root.change-blocked) : @tr("{} is not mounted", root.head.label);
+                            text: @tr("{} is not mounted", root.head.label);
                             color: Theme.info;
                             font-size: Theme.font-small;
                         }
@@ -137,27 +129,8 @@ component ExtruderTab inherits Rectangle {
 
             VerticalLayout {
                 // With Happy Hare, loading and unloading belong to the Gates tab; without buttons the column goes away.
-                width: Printer.has-load-macro || Printer.has-unload-macro || root.has-head-action ? 120px : 0px;
+                width: Printer.has-load-macro || Printer.has-unload-macro ? 120px : 0px;
                 spacing: Theme.spacing;
-                if root.has-select: IconButton {
-                    icon: Icons.mmu-tool-change;
-                    text: root.head.pick-up == "macro" ? @tr("Select {}", root.head.label) : @tr("Pick up");
-                    kind: ButtonKind.accent;
-                    enabled: root.can-change;
-                    clicked => {
-                        if (root.head.pick-up == "macro") {
-                            Actions.run-macro(root.head.pick-up-macro);
-                        } else {
-                            Actions.pick-up-head(root.head.name);
-                        }
-                    }
-                }
-                if root.has-drop: IconButton {
-                    icon: Icons.motion-park;
-                    text: @tr("Drop");
-                    enabled: root.can-change;
-                    clicked => { Actions.drop-head(); }
-                }
                 if Printer.has-load-macro: IconButton {
                     icon: Icons.filament-load;
                     text: @tr("Load");
@@ -174,7 +147,7 @@ component ExtruderTab inherits Rectangle {
             }
         }
 
-        // The head tabs take a row; with them length and speed share one.
+        // The chip takes a row; with it length and speed share one.
         if !root.has-head: LengthSelector { }
         if !root.has-head: SpeedSelector { }
         if root.has-head: HorizontalLayout {
@@ -185,83 +158,64 @@ component ExtruderTab inherits Rectangle {
     }
 }
 
-// The filament sensors of the machine with several heads: they are not at one extruder, so they have a tab of their own.
-component SensorsTab inherits VerticalLayout {
-    padding: Theme.padding;
-    Card {
-        vertical-stretch: 0;
-        title: @tr("Filament sensors");
-        icon: Icons.filament-sensor;
-        VerticalLayout {
-            spacing: Theme.spacing;
-            FilamentSensorGrid { }
-            Text {
-                text: @tr("Not tied to a head");
-                color: Theme.muted;
-                font-size: Theme.font-small;
-            }
-        }
-    }
-    Rectangle { vertical-stretch: 1; }
-}
-
-// With Happy Hare or AFC the gates (lanes) come first, then the extruder by hand, the tools with EndlessSpool and the service
-// commands of the MMU (AFC has the first two tabs only); without either the extruder alone. The dialogs of a gate, the bypass and a tool cover the whole
-// page. A tool changer adds the head level on top: a tab per head, the path tabs below the chosen head, and the tabs
-// of the machine (Tools, Service) beside the heads; a printer with one head looks as before.
+// With Happy Hare or AFC the gates (lanes) come first, then the extruder by hand; without either the extruder alone. The
+// dialogs of a gate and the bypass cover the whole page. A tool changer adds a chip for the head at the right end of
+// the tab row (the picker opens from it); the map of the tools, the service commands and the sensors of the machine are
+// on the Changer page. A printer with one head looks as before.
 export component FilamentPage inherits Rectangle {
     property <bool> has-heads: Printer.heads.length > 0;
     property <int> head-index: Navigation.filament-head >= 0 && Navigation.filament-head < Printer.heads.length ? Navigation.filament-head : max(0, Printer.mounted-head);
     // Gates only where the head has several lanes.
-    property <bool> path-tabs: root.has-heads && Printer.heads[root.head-index].lanes > 1;
-    property <FilamentTab> raw-tab: Navigation.filament-tab;
-    property <bool> machine-tab: root.raw-tab == FilamentTab.tools || root.raw-tab == FilamentTab.service || root.raw-tab == FilamentTab.sensors;
-    property <FilamentTab> tab: root.has-heads
-        ? (root.raw-tab == FilamentTab.sensors && Printer.filament-sensors.length > 0 ? FilamentTab.sensors : root.machine-tab && Printer.has-mmu && root.raw-tab != FilamentTab.sensors ? root.raw-tab : root.path-tabs && !root.machine-tab ? root.raw-tab : root.path-tabs ? FilamentTab.gates : FilamentTab.extruder)
-        : Printer.has-mmu ? root.raw-tab : Printer.has-lanes ? (root.machine-tab ? FilamentTab.gates : root.raw-tab) : FilamentTab.extruder;
+    property <bool> path-tabs: root.has-heads ? Printer.heads[root.head-index].lanes > 1 : Printer.has-lanes;
+    property <FilamentTab> tab: root.path-tabs ? Navigation.filament-tab : FilamentTab.extruder;
+    // Beside the chip the two tabs keep to their width.
+    property <length> tab-width: root.has-heads ? 124px : 130px;
 
     VerticalLayout {
-        if root.has-heads: HeadTabs {
-            head-index: root.head-index;
-            tab: root.tab;
-            path-tabs: root.path-tabs;
-            head-chosen(index) => {
-                Navigation.filament-head = index;
-                Navigation.mmu-page = -1;
-                if (root.machine-tab) {
-                    Navigation.filament-tab = FilamentTab.gates;
+        if root.has-heads || Printer.has-lanes || Printer.afc-error: Rectangle {
+            height: Theme.touch + Theme.padding;
+            TabBar {
+                if root.path-tabs: TabButton {
+                    min-width: root.tab-width;
+                    max-width: root.has-heads ? root.tab-width : 190px;
+                    icon: Icons.mmu-unit;
+                    text: @tr("Gates");
+                    checked: root.tab == FilamentTab.gates;
+                    clicked => { Navigation.filament-tab = FilamentTab.gates; }
+                }
+                if root.path-tabs: TabButton {
+                    min-width: root.tab-width;
+                    max-width: root.has-heads ? root.tab-width : 190px;
+                    icon: Icons.filament-extruder-gears;
+                    text: @tr("Extruder");
+                    checked: root.tab == FilamentTab.extruder;
+                    clicked => { Navigation.filament-tab = FilamentTab.extruder; }
                 }
             }
-            tab-chosen(tab) => { Navigation.filament-tab = tab; }
-        }
-        if !root.has-heads && Printer.has-lanes: TabBar {
-            TabButton {
-                icon: Icons.mmu-unit;
-                text: @tr("Gates");
-                checked: root.tab == FilamentTab.gates;
-                clicked => { Navigation.filament-tab = FilamentTab.gates; }
+            // What the tool changer does differently takes the room between the tabs and the chip.
+            if Printer.afc-error: AfcHint {
+                x: root.path-tabs ? 2 * root.tab-width + 3 * Theme.spacing + Theme.padding : Theme.padding;
+                y: Theme.padding;
+                width: parent.width - self.x - Theme.padding - (root.has-heads ? 160px + Theme.padding + Theme.spacing : 0px);
+                height: Theme.touch;
             }
-            TabButton {
-                icon: Icons.filament-extruder-gears;
-                text: @tr("Extruder");
-                checked: root.tab == FilamentTab.extruder;
-                clicked => { Navigation.filament-tab = FilamentTab.extruder; }
+            if root.has-heads && Printer.changer-note != "" && !Printer.afc-error: ChangerHint {
+                x: root.path-tabs ? 2 * root.tab-width + 3 * Theme.spacing + Theme.padding : Theme.padding;
+                y: Theme.padding;
+                width: parent.width - self.x - 160px - 2 * Theme.padding - Theme.spacing;
+                height: Theme.touch;
+                narrow: root.path-tabs;
             }
-            if Printer.has-mmu: TabButton {
-                icon: Icons.mmu-ttg-map;
-                text: @tr("Tools");
-                checked: root.tab == FilamentTab.tools;
-                clicked => { Navigation.filament-tab = FilamentTab.tools; }
-            }
-            if Printer.has-mmu: TabButton {
-                icon: Icons.mmu-maintenance;
-                text: @tr("Service");
-                checked: root.tab == FilamentTab.service;
-                clicked => { Navigation.filament-tab = FilamentTab.service; }
+            // At the right end of the row (a layout with `alignment: start` has no stretch for it).
+            if root.has-heads: HeadChip {
+                x: parent.width - self.width - Theme.padding;
+                y: Theme.padding;
+                head: Printer.heads[root.head-index];
+                open: Navigation.head-picker-open;
+                clicked => { Navigation.head-picker-open = true; }
             }
         }
         if root.tab == FilamentTab.gates: MmuGatesTab {
-            compact: root.path-tabs;
             head-index: root.has-heads ? root.head-index : -1;
             vertical-stretch: 1;
         }
@@ -269,20 +223,11 @@ export component FilamentPage inherits Rectangle {
             head-index: root.has-heads ? root.head-index : -1;
             vertical-stretch: 1;
         }
-        if root.tab == FilamentTab.sensors: SensorsTab {
-            vertical-stretch: 1;
-        }
-        if root.tab == FilamentTab.tools: MmuToolsTab {
-            vertical-stretch: 1;
-        }
-        if root.tab == FilamentTab.service: MmuServiceTab {
-            vertical-stretch: 1;
-        }
     }
 
     if root.tab == FilamentTab.gates: GateDialog { }
     if root.tab == FilamentTab.gates: BypassDialog { }
-    if root.tab == FilamentTab.tools: ToolDialog { }
-    if root.tab == FilamentTab.tools: ToolGateDialog { }
-    if root.tab == FilamentTab.tools: EndlessSpoolDialog { }
+    if root.has-heads: HeadPicker {
+        head-index: root.head-index;
+    }
 }

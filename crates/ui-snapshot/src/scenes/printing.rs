@@ -4,7 +4,7 @@ use super::ask;
 use super::temperature::{nozzle_history, temperature_leads_to_heaters};
 use super::STATUS_BAR_LIGHT;
 use crate::session::Session;
-use freakymate::{Actions, Confirm, FilamentTab, MmuDialogs, Navigation, Page, Printer};
+use freakymate::{Actions, ChangerTab, Confirm, MmuDialogs, Navigation, Page, Printer};
 use freakymate_core::sources::klipper::PrintState;
 use freakymate_core::Command;
 use slint::{ComponentHandle, Model};
@@ -28,19 +28,17 @@ const EXCLUDE_BUTTON: (f32, f32) = (560.0, 432.0);
 
 const CLOSE_OBJECTS_BUTTON: (f32, f32) = (752.0, 92.0);
 
-/// With Happy Hare the Tools tab compares the tools with the file being printed.
+/// With Happy Hare Changer > Tools compares the tools with the file being printed.
 pub(super) fn tools_match_the_job(session: &mut Session) -> Result<(), String> {
     if session.presenter.snapshot().status.happy_hare().is_none() {
         return Ok(());
     }
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Tools);
-    session.show_page(Page::Filament, "filament-mmu-tools-match")?;
+    session.window.global::<Navigation>().set_changer_tab(ChangerTab::Tools);
+    session.show_page(Page::Changer, "changer-mmu-tools-match")?;
     if session.window.global::<Printer>().get_mmu_match_file().is_empty() {
-        session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
         return Err("the Tools tab does not compare with the file being printed".into());
     }
     tool_compare(session)?;
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
     Ok(())
 }
 
@@ -52,10 +50,10 @@ fn tool_compare(session: &mut Session) -> Result<(), String> {
     session.window.global::<Actions>().invoke_mmu_map_tool(0, 3);
     session.wait_until("T0 on gate 3", |snapshot| tool_0_gate(snapshot) == Some(3))?;
     session.window.global::<MmuDialogs>().set_tool(0);
-    session.show_page(Page::Filament, "filament-mmu-tool-compare")?;
+    session.show_page(Page::Changer, "changer-mmu-tool-compare")?;
     session.window.global::<MmuDialogs>().set_tool(-1);
     session.window.global::<MmuDialogs>().set_tool_gate(0);
-    session.show_page(Page::Filament, "filament-mmu-tool-gate-compare")?;
+    session.show_page(Page::Changer, "changer-mmu-tool-gate-compare")?;
     session.window.global::<MmuDialogs>().set_tool_gate(-1);
     let tool = session.window.global::<Printer>().get_mmu_tools().row_data(0).unwrap_or_default();
     session.window.global::<Actions>().invoke_mmu_map_tool(0, 0);
@@ -79,6 +77,8 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
     tangle_boost(session)?;
     session.show_page(Page::Temperature, "temperature-printing")?;
     session.show_page(Page::System, "system-printing")?;
+    // The axes stand still: Axes and Calibrate are greyed out and the page shows Tune.
+    session.show_page(Page::Motion, "motion-printing")?;
 
     session.window.global::<Navigation>().set_page(Page::Print);
     pause_at_next_layer(session)?;
@@ -87,7 +87,7 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
     if !session.window.global::<Printer>().get_position_locked() {
         return Err("position-locked off while the print is paused".into());
     }
-    session.show_page(Page::Move, "move-paused")?;
+    session.show_page(Page::Motion, "motion-paused")?;
     session.show_page(Page::Filament, "printing-paused-filament")?;
     session.window.global::<Navigation>().set_page(Page::Print);
     exclude_object(session)?;

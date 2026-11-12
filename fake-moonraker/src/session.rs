@@ -359,9 +359,24 @@ fn printer_info(backend: &Backend) -> Value {
     })
 }
 
-/// Commands AFC registers for its lanes (the `T<n>` of the lanes come from `AFC.maps`).
-const AFC_COMMANDS: [&str; 8] =
-    ["CHANGE_TOOL", "TOOL_LOAD", "TOOL_UNLOAD", "LANE_UNLOAD", "SET_SPOOL_ID", "SET_COLOR", "SET_MATERIAL", "SET_MAP"];
+/// Commands AFC registers for its lanes, its map and its errors (the `T<n>` of the lanes come from `AFC.maps`).
+const AFC_COMMANDS: [&str; 11] = [
+    "CHANGE_TOOL",
+    "TOOL_LOAD",
+    "TOOL_UNLOAD",
+    "LANE_UNLOAD",
+    "SET_SPOOL_ID",
+    "SET_COLOR",
+    "SET_MATERIAL",
+    "SET_MAP",
+    "RESET_AFC_MAPPING",
+    "RESET_FAILURE",
+    "AFC_LANE_RESET",
+];
+/// AFC's tool changer adds `AFC_UNSELECT_TOOL` (`AFC_Toolchanger.py` L51); with `show_macros` (the default) Klipper
+/// lists it as the macro of that name.
+const AFC_TOOLCHANGER_PREFIX: &str = "AFC_Toolchanger ";
+const AFC_TOOLCHANGER_COMMANDS: [&str; 1] = ["AFC_UNSELECT_TOOL"];
 
 /// Klipper's command list: a few of its own commands, every macro, and Happy Hare's tool commands (one per gate).
 fn gcode_help(backend: &Backend) -> Value {
@@ -387,6 +402,12 @@ fn gcode_help(backend: &Backend) -> Value {
         }
         for map in maps.iter().filter_map(Value::as_str) {
             help.insert(map.to_owned(), json!("Change to tool"));
+        }
+    }
+    let objects = status.as_object().into_iter().flat_map(|objects| objects.keys());
+    if objects.into_iter().any(|key| key.starts_with(AFC_TOOLCHANGER_PREFIX)) {
+        for command in AFC_TOOLCHANGER_COMMANDS {
+            help.insert(command.to_owned(), json!("G-Code macro"));
         }
     }
     Value::Object(help)
@@ -646,19 +667,30 @@ mod tests {
 
     #[test]
     fn afc_profiles_list_their_commands_in_gcode_help() {
-        for profile in [MachineProfile::afc(), MachineProfile::afc_toolchanger()] {
+        for (profile, has_unselect) in [(MachineProfile::afc(), false), (MachineProfile::afc_toolchanger(), true)] {
             let backend = Backend::with_profile(1.0, profile);
             let mut session = Session::new(1);
 
             let reply = exchange(&mut session, &backend, call("printer.gcode.help", json!({})));
 
-            for command in
-                ["T0", "T3", "CHANGE_TOOL", "TOOL_LOAD", "SET_SPOOL_ID", "SET_COLOR", "SET_MAP", "LANE_UNLOAD"]
-            {
+            for command in [
+                "T0",
+                "T3",
+                "CHANGE_TOOL",
+                "TOOL_LOAD",
+                "SET_SPOOL_ID",
+                "SET_COLOR",
+                "SET_MAP",
+                "LANE_UNLOAD",
+                "RESET_AFC_MAPPING",
+                "RESET_FAILURE",
+                "AFC_LANE_RESET",
+            ] {
                 assert!(reply["result"].get(command).is_some(), "missing {command}");
             }
             assert!(reply["result"].get("T4").is_none());
             assert!(reply["result"].get("SELECT_TOOL").is_none());
+            assert_eq!(reply["result"].get("AFC_UNSELECT_TOOL").is_some(), has_unselect);
         }
     }
 

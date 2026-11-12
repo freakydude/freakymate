@@ -39,6 +39,8 @@ pub enum CommandError {
     UnknownLane(String),
     #[error("the bypass has no spool, material or ejection of its own")]
     NotForBypass,
+    #[error("the tool changer of this printer has no command to drop the head")]
+    NoDropCommand,
     #[error("the macro T{0} declares no spool_id")]
     NoToolSpoolVariable(usize),
     /// A source or Klipper did not accept the command or a value in it; their reason.

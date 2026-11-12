@@ -2,10 +2,10 @@
 
 import { Icons } from "icons.slint";
 import { Theme } from "theme.slint";
-import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 import { Actions } from "actions.slint";
 
-export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 export { Actions } from "actions.slint";
 
 
@@ -91,6 +91,14 @@ export global Printer {
     in property <bool> changer-ready: true;
     // The mounted head can be dropped (`UNSELECT_TOOL` exists).
     in property <bool> has-drop;
+    // A tool changer (`toolchanger` object) with its state: `status` (uninitialized, initializing, ready, changing,
+    // error), `initialize_on` of its configuration ("" while unknown) and the heads it selected and the detection
+    // found (`T<n>`, "" for none).
+    in property <bool> has-toolchanger;
+    in property <string> changer-status;
+    in property <string> changer-initialize-on;
+    in property <string> changer-head;
+    in property <string> changer-head-detected;
     // The name of the head whose nozzle the status bar shows (`T1`); empty without swappable heads.
     in property <string> nozzle-head;
     // False while the printer has heads but none is mounted: no nozzle to show.
@@ -100,7 +108,7 @@ export global Printer {
     in property <bool> has-bed;
     in property <float> bed-temperature;
     in property <float> bed-target;
-    // Part fan first, then the other fans.
+    // The part fan of the nozzle in use first (the mounted head's, else `fan`), then the other fans.
     in property <[FanItem]> fans;
     in property <[LedItem]> leds;
     in property <[LedEffectItem]> led-effects;
@@ -108,6 +116,8 @@ export global Printer {
     in property <bool> has-light;
     in property <string> light-name;
     in property <bool> light-on;
+    // The flow factor for the Basics of the Tune page; `tuning` holds the expert values without it.
+    in property <TuningItem> flow-factor;
     in property <[TuningItem]> tuning;
     // Temperature history of one heater or sensor, drawn as SVG path commands in a 1000 x 1000 view box.
     in property <string> history-title;
@@ -126,12 +136,24 @@ export global Printer {
     in property <[FilamentSensorItem]> filament-sensors;
     // A switched-on filament sensor reports no filament; the Sensors tab of a tool changer shows a dot.
     in property <bool> filament-sensor-runout;
+    // What the tabs of the Changer page have to show; the page and its entry exist when one of them has.
+    out property <bool> has-changer-tools: self.has-mmu || self.afc-tools.length > 0;
+    out property <bool> has-changer-service: self.has-mmu || self.has-toolchanger || self.has-afc;
+    out property <bool> has-changer-sensors: self.heads.length > 0 && self.filament-sensors.length > 0;
+    out property <bool> has-changer: self.has-changer-tools || self.has-changer-service || self.has-changer-sensors;
     // Objects of the running print; excluded ones cannot be printed again.
     in property <[PrintObjectItem]> print-objects;
     // The bed the objects lie on; not shown if the slicer did not tell where they are.
     in property <BedMapItem> bed-map;
     // Happy Hare (4.1 or newer). Without it the Filament page has no MMU tabs.
     in property <bool> has-mmu;
+    // AFC (Armored Turtle): its state, its tool map and the lanes it can pull back out of their hub. `afc-error` is
+    // AFC's error state (what "Clear error" clears); `afc-state` is its `current_state` ("Idle", "Error", ...).
+    in property <bool> has-afc;
+    in property <bool> afc-error;
+    in property <string> afc-state;
+    in property <[AfcHubReturnItem]> afc-hub-returns;
+    in property <[AfcToolItem]> afc-tools;
     // The Gates tab has tiles: the gates of Happy Hare or the lanes of AFC (then only the tabs Gates and Extruder).
     in property <bool> has-lanes;
     in property <bool> mmu-unsupported;
@@ -442,21 +464,23 @@ export global MmuDialogs {
     in-out property <int> tool: -1;
     // The choice of gate for a tool, same index; -1 for none.
     in-out property <int> tool-gate: -1;
+    // The choice of lane for a tool of AFC: its index in `Printer.afc-tools`, -1 for none.
+    in-out property <int> afc-tool: -1;
     // EndlessSpool and its groups, opened from the Tools tab.
     in-out property <bool> endless-spool-open;
 }
 
-// Tabs of the Filament page; without an MMU it shows the extruder alone.
-export enum FilamentTab { gates, extruder, tools, service, sensors }
+// Tabs of the Filament page (the path of one head); without lanes it shows the extruder alone.
+export enum FilamentTab { gates, extruder }
 
-// Tabs of the Move page; without anything to calibrate it shows the axes alone.
-export enum MoveTab { axes, calibrate }
+// Tabs of the Changer page (the machine: map, service, filament sensors that no head owns); each only with content.
+export enum ChangerTab { tools, service, sensors }
+
+// Tabs of the Motion page; a tab the printer has nothing for falls back, and while printing only Tune and Expert work.
+export enum MotionTab { axes, tune, expert, calibrate }
 
 // Tabs of the Thermal page; a tab the printer has nothing for falls back to the heaters.
 export enum HeatTab { heaters, fans, sensors }
-
-// Tabs of the Tune page; without expert values it shows the basics alone.
-export enum TuneTab { basics, expert }
 
 export global Navigation {
     in-out property <Page> page: Page.print;
@@ -464,14 +488,17 @@ export global Navigation {
     out property <bool> messages-open;
     // Filament page; with an MMU it opens on the Gates tab.
     in-out property <FilamentTab> filament-tab;
+    // Changer page; a tab without content falls back to the first one that has some.
+    in-out property <ChangerTab> changer-tab;
+    // The head picker over the Filament page.
+    in-out property <bool> head-picker-open;
     // The head the Filament page shows, a row of `Printer.heads`; -1 follows the mounted head.
     in-out property <int> filament-head: -1;
     // Page of gate tiles the Gates tab shows, counted from 0 within its view; -1 opens on the unit of the loaded gate.
     in-out property <int> mmu-page: -1;
     in-out property <HeatTab> heat-tab;
-    // The navigation rail opens the basics.
-    in-out property <TuneTab> tune-tab;
-    in-out property <MoveTab> move-tab;
+    // Motion page; the page shows Tune instead while a print locks the axes, so the choice comes back afterwards.
+    in-out property <MotionTab> motion-tab;
     in-out property <bool> history-open;
     // Width to height of the drawing area of the temperature chart; the chart's lines are drawn for this shape.
     in-out property <float> history-aspect: 2;
@@ -527,6 +554,12 @@ export global Confirm {
         self.open = true;
     }
 
+    // Recover the tool changer after an error: initialise it and restore the position.
+    public function ask-recover-toolchanger() {
+        self.ask(@tr("Recover tool changer"), @tr("Initializes the tool changer and restores the position after the error."), "recover-toolchanger", "", false);
+        self.confirm-text = @tr("Recover");
+    }
+
     public function ask-for-items(title: string, message: string, items: [string], action: string, argument: string, danger: bool) {
         self.ask(title, message, action, argument, danger);
         self.items = items;
@@ -552,6 +585,7 @@ export global Confirm {
         if (self.action == "mmu-check-gate") { Actions.mmu-check-gate(self.argument.to-float()); }
         if (self.action == "mmu-check-all-gates") { Actions.mmu-check-all-gates(); }
         if (self.action == "mmu-reset-tool-map") { Actions.mmu-reset-tool-map(); }
+        if (self.action == "afc-reset-lane") { Actions.afc-reset-lane(self.argument); }
         if (self.action == "save-config") { Actions.save-config(); }
         if (self.action == "remove-bed-mesh") { Actions.remove-bed-mesh(self.argument); }
         if (self.action == "reboot-host") { Actions.reboot-host(); }
@@ -590,6 +624,9 @@ export global Dialogs {
         MmuDialogs.gate-row = -1;
         MmuDialogs.bypass-open = false;
         MmuDialogs.tool = -1;
+        MmuDialogs.tool-gate = -1;
+        MmuDialogs.afc-tool = -1;
+        Navigation.head-picker-open = false;
         MeshDialogs.map-open = false;
         MeshDialogs.profiles-open = false;
         if (Navigation.history-open) { Actions.close-history(); }

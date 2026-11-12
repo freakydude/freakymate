@@ -27,8 +27,9 @@ probe still counts as the probe).
     "No gate". Tools that share a gate share its spool, so their planned weights add up against what the spool has
     left; with EndlessSpool the rest of its group is shown as its own line. The question before the start shows the
     same comparison, compact, for each tool that does not fit.
-- **Move**: jog X/Y/Z with selectable steps, home (all/XY/Z), motors off, Quad Gantry Level or Z-Tilt when configured.
-  Move and Filament are locked while a print runs; the screen leaves them when a print starts.
+- **Motion**: the **Axes** tab jogs X/Y/Z with selectable steps, homes (all/XY/Z), turns motors off, runs Quad Gantry Level
+  or Z-Tilt when configured. Filament is locked while a print runs and the screen leaves it when a print starts; on
+  Motion the Axes and Calibrate tabs are greyed out then and the page shows the Tune tab.
   - **Calibrate** tab: Klipper's own calibration commands, with their results. Bed screws
     (`SCREWS_TILT_CALCULATE` with the turns per screw, or the paper test `BED_SCREWS_ADJUST`), Z offset of the probe or
     the Z endstop, bed mesh (measure, a coloured map of the active mesh, load, save and remove profiles, clear) and
@@ -38,7 +39,7 @@ probe still counts as the probe).
   respect `min_temp`/`max_temp` from the Klipper configuration. Tapping a heater or sensor shows its temperature
   history with a grid: the last 20 minutes of Moonraker's temperature store, asked again every five seconds while it
   is open. Moonraker keeps heaters and `temperature_sensor` objects there; the others have no history. Further tabs when the printer has them:
-  - **Fans**: part fan and `fan_generic` fans (filter, exhaust) with a slider, `heater_fan` and `controller_fan` as a
+  - **Fans**: part fan (the one of the nozzle in use first) and `fan_generic` fans (filter, exhaust) with a slider, `heater_fan` and `controller_fan` as a
     bar, speed in rpm where there is a tachometer. A fan turns red when its tachometer has reported 0 rpm for a few
     seconds at a speed where it measured before (many tachometers report nothing at a low speed although the fan
     turns); what it learned is forgotten when Klipper restarts.
@@ -46,7 +47,7 @@ probe still counts as the probe).
 - **Light**: the light symbol in the status bar opens a panel with the main (chamber) light as a switch, every LED
   (`neopixel`, `led`, `dotstar`, …) on, off and dimmed as white light, and the effects of the
   [led_effect](https://github.com/julianschill/klipper-led_effect) plugin when it is installed.
-- **Tune**: what one corrects while watching a print: Z offset (babysteps, apply to probe/endstop, save config) and
+- **Tune** tab of Motion: what one corrects while watching a print: Z offset (babysteps, apply to probe/endstop, save config) and
   the speed factor, with a quiet note that layer times then differ from the slicer's plan. The **Expert** tab holds
   the calibration values until the next restart: flow factor, pressure advance and smooth time, velocity and
   acceleration limits, square corner velocity, minimum cruise ratio and firmware retraction; it shows where a value
@@ -77,8 +78,8 @@ probe still counts as the probe).
 
 ## Happy Hare (MMU)
 
-Needs Happy Hare 4.1 or newer. The Filament page then opens on the **Gates** tab, next to **Extruder**, **Tools** and
-**Service**. The Gates tab and a strip on the print page show:
+Needs Happy Hare 4.1 or newer. The Filament page then opens on the **Gates** tab, next to **Extruder**; the **Changer** page
+holds **Tools** and **Service**. The Gates tab and a strip on the print page show:
 
 - the gates and the bypass (five at a time): status, material, colour and the tools that take their filament from each
   gate; unload what is loaded, home, recover and unlock after a pause;
@@ -92,7 +93,7 @@ Needs Happy Hare 4.1 or newer. The Filament page then opens on the **Gates** tab
 A tap on a gate opens what can be done with it: select, load, preload, check or eject it, and pick its spool. Without
 Spoolman the dialog sets material and colour of the gate in Happy Hare's gate map instead, from a set of common
 materials and colours. A tap on a gate never moves the selector by itself. The bypass takes filament fed by hand past
-the gates; its dialog selects and loads it. The **Tools** tab is the one place to set which gate each tool takes its
+the gates; its dialog selects and loads it. **Changer > Tools** is the one place to set which gate each tool takes its
 filament from (Happy Hare's tool-to-gate map): one row per tool with what its gate holds (material, colour, spool, grams
 left and, with EndlessSpool, what its group can still give), and a tap on a tool offers the gates with their colour and
 material. With a file prepared (or the file of the current job), each row shows on its left what the file asks of the
@@ -106,8 +107,8 @@ gates and, on selectors with a servo, servo up and down.
 | ![Gates tab](screenshots/mmu.png)                                    | ![FlowGuard line while tangle prevention raises the gear current](screenshots/print-tangle-boost.png) |
 | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | The Gates tab: gates, sensors, buffer                                | The print page while tangle prevention raises the gear current (the FlowGuard line turns yellow)      |
-| ![Gate dialog](screenshots/gate-dialog.png)                          | ![Tools tab](screenshots/mmu-tools.png)                                                               |
-| A tap on a gate: select, load, preload, check, eject, pick its spool | The Tools tab: T3 moved to gate 1, what each gate holds, EndlessSpool on                              |
+| ![Gate dialog](screenshots/gate-dialog.png)                          | ![Changer > Tools](screenshots/mmu-tools.png)                                                               |
+| A tap on a gate: select, load, preload, check, eject, pick its spool | Changer > Tools: T3 moved to gate 1, what each gate holds, EndlessSpool on                              |
 
 **Quieter console (recommended).** FreakyMate shows Klipper's console messages in its status bar. Happy Hare prints a
 lot there by default: the gate table at startup, a picture of the filament path and statistics after every tool
@@ -130,11 +131,11 @@ This changes the console for every client, Mainsail and Fluidd included.
 Appears when Moonraker has the `spoolman` component, with or without an MMU:
 
 - the spool in use and what is left of it on the print page and at each gate, with a colour bar for multi-colour
-  filaments: side by side for coaxial ones (silk), taking turns for longitudinal ones (gradient); on the Tools tab a
+  filaments: side by side for coaxial ones (silk), taking turns for longitudinal ones (gradient); on Changer > Tools a
   colour field split diagonally for coaxial ones and blending for longitudinal ones (up to six colours, a rainbow);
 - a picker lists the spools (the ones in a gate first, then the most recently used): assign a spool to a gate or, without
   an MMU, choose the active spool, and correct the remaining weight by weighing;
-- a filament colour with transparency (alpha) shows over a checkerboard in the gate bars, dialogs and the Tools tab;
+- a filament colour with transparency (alpha) shows over a checkerboard in the gate bars, dialogs and Changer > Tools;
 - the temperature page offers a preset for the spool in use and notes quietly when the target is off from it;
 - before a print the confirmation names what differs between the file and the spools (material, weight, colour), only as
   a hint.

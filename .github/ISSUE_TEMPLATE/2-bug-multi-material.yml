@@ -1,0 +1,137 @@
+name: Bug with multi-material or a tool changer
+description: A problem with Happy Hare, AFC, a tool changer or IDEX
+title: "[Bug]: "
+labels: [bug, multi-material, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! The more of the fields below you fill in, the faster a bug can be fixed without follow-up questions.
+        Issues in German are welcome too.
+
+        This form is for Happy Hare, AFC, tool changers and IDEX. FreakyMate only reads these systems and starts their commands; the question about Mainsail/Fluidd below helps to separate FreakyMate bugs from bugs in those projects.
+
+        Please search the existing issues first. Questions and help are best asked on [Discord](https://discord.gg/Ja2cxCcmJQ).
+  - type: input
+    id: version
+    attributes:
+      label: FreakyMate version
+      description: Shown on the Settings page and at the top of `freakymate.log`.
+      placeholder: "0.5.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How was FreakyMate installed?
+      options:
+        - install.sh
+        - .deb package
+        - Built from source
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Board and OS
+      placeholder: "Raspberry Pi 4, Raspberry Pi OS Bookworm 64-bit"
+    validations:
+      required: true
+  - type: input
+    id: display
+    attributes:
+      label: Display and resolution
+      placeholder: "BTT HDMI5, 800x480"
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: Which system?
+      options:
+        - Happy Hare
+        - AFC
+        - Klipper tool changer
+        - IDEX
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware
+      description: Unit type (e.g. ERCF, Tradrack, Box Turtle, Night Owl), number of gates or lanes, number of tool heads, buffers and sensors.
+    validations:
+      required: true
+  - type: dropdown
+    id: elsewhere
+    attributes:
+      label: Does the same happen in Mainsail/Fluidd or the console?
+      description: If yes, the bug is likely in the other project. Please report it there as well (see the links on the new-issue page).
+      options:
+        - Yes, also there
+        - No, only in FreakyMate
+        - Not checked
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps, starting from a fresh start of FreakyMate if possible.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: |
+        Drag the configuration files into this field.
+        Happy Hare: `mmu/base/mmu_parameters.cfg` and `mmu/base/mmu_hardware.cfg`. AFC: the files in `config/AFC/`. Tool changer: the tool sections.
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Diagnostic report
+      description: |
+        On the printer host run `~/freakymate/freakymate --report` (installed with `install.sh`) or `freakymate --report` (`.deb` package).
+        This writes `freakymate-report.json` to `printer_data/logs`, so you can download it in Mainsail or Fluidd under Machine → logs.
+        Drag the file into this field (drag and drop).
+
+        The report contains versions, system and setup, the Klipper configuration and object status, the last console lines and what FreakyMate detects.
+        It leaves out Moonraker's configuration (API keys, passwords), network addresses, host name, serial numbers and user names.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Verbose log and klippy.log
+      description: |
+        Set `verbose_log = true` in `freakymate.conf` (Mainsail: Machine → config) and restart FreakyMate (`sudo systemctl restart freakymate`, with the `.deb` `sudo systemctl restart freakymate@<user>`).
+        Reproduce the bug once, then drag `freakymate.log` (Machine → logs) into this field. Set `verbose_log` back to `false` afterwards.
+        Also attach `klippy.log` (required here), and `moonraker.log` when Moonraker shows errors.
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Photo or screenshot
+      description: Optional. Drag an image of the screen into this field.

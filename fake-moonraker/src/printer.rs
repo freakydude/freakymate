@@ -437,7 +437,7 @@ impl Printer {
                 self.extruder_of_tool_mut(tool)?.set_target(target, MAX_EXTRUDER_TARGET)?
             }
             Command::SetBedTarget(target) => self.bed.set_target(target, MAX_BED_TARGET)?,
-            Command::SetFanSpeed(speed) => self.fan_speed = speed,
+            Command::SetFanSpeed(speed) => self.set_part_fan_speed(speed),
             Command::AbsolutePositioning => self.relative_positioning = false,
             Command::RelativePositioning => self.relative_positioning = true,
             Command::Move(movement) => self.move_toolhead(movement)?,
@@ -582,6 +582,14 @@ impl Printer {
     }
 
     fn apply_device(&mut self, command: DeviceCommand) -> Result<(), CommandError> {
+        // `SET_FAN_SPEED` of a head's fan (`toolchanger.py` Z.837-838) is no device of the machine.
+        if let DeviceCommand::SetFanSpeed { fan, speed } = &command {
+            if let Some(toolchanger) = self.toolchanger.as_mut() {
+                if toolchanger.set_head_fan_speed(fan, *speed).is_some() {
+                    return Ok(());
+                }
+            }
+        }
         match self.devices.as_mut() {
             Some(devices) => devices.apply(command),
             None => Err(CommandError::new("Unknown command for this machine")),

@@ -79,8 +79,8 @@ export component SlotTile inherits Rectangle {
 export component VerdictIcon inherits Image {
     in property <string> verdict;
 
-    width: 18px;
-    height: 18px;
+    width: Theme.icon-compact;
+    height: Theme.icon-compact;
     visible: root.verdict != "";
     source: root.verdict == "fits" ? Icons.ui-check : Icons.ui-warning;
     colorize: root.verdict == "fits" ? Theme.success : Theme.warning;
@@ -91,8 +91,6 @@ export component VerdictIcon inherits Image {
 // what is left of it, and whether the gate has filament.
 export component GateTile inherits SlotTile {
     in property <MmuGateItem> gate;
-    // A low tile (under the head tabs) gives the name one line, otherwise the content outgrows the tile.
-    in property <bool> compact;
 
     property <bool> has-filament: root.gate.availability == "available" || root.gate.availability == "buffered";
     property <bool> shows-spool: Printer.has-spoolman && root.has-filament;
@@ -158,7 +156,7 @@ export component GateTile inherits SlotTile {
             // one in the gate's dialog. A spool that Happy Hare knows but Spoolman does not tell about (not
             // reachable) shows its number. The name takes two lines, then `…`.
             Text {
-                height: Theme.font-small * (root.compact ? 1.2 : 2.3);
+                height: Theme.font-small * 2.3;
                 text: root.gate.name;
                 color: Theme.muted;
                 font-size: Theme.font-small;

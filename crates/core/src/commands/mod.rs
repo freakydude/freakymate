@@ -212,7 +212,7 @@ pub enum Command {
     PickUpHead {
         head: String,
     },
-    /// Parks the mounted head (`UNSELECT_TOOL`).
+    /// Parks the mounted head with the command of its changer (`UNSELECT_TOOL`, AFC `AFC_UNSELECT_TOOL`).
     DropHead,
     /// Initialises the tool changer; `recover` also restores the position after an error.
     InitializeToolchanger {
@@ -375,7 +375,6 @@ impl Command {
             // Klipper plugins
             Self::SetLedEffect { effect, on } => run_gcode(led_effect::set_effect(effect, *on)),
             Self::PickUpHead { head } => run_gcode(toolchanger::commands::pick_up(head)?),
-            Self::DropHead => run_gcode(toolchanger::commands::DROP),
             Self::InitializeToolchanger { recover } => run_gcode(toolchanger::commands::initialize(*recover)),
             Self::MmuSelectGate { gate } => run_gcode(mmu::select_gate(*gate)),
             Self::MmuLoad => run_gcode(mmu::LOAD),
@@ -422,6 +421,7 @@ impl Command {
             | Self::ClearLayerPause
             | Self::SetGateFilament { .. }
             | Self::SetEndlessSpoolGroup { .. }
+            | Self::DropHead
             | Self::LoadLane { .. }
             | Self::UnloadLane { .. }
             | Self::EjectLane { .. }

@@ -5,7 +5,7 @@
 // What a state or a message means; each meaning has one colour (`StateIcons.severity-color`).
 export enum Severity { neutral, calm, fine, running, attention, error, info }
 
-export enum Page { print, move, temperature, tune, filament, console, system, settings, updates, network }
+export enum Page { print, motion, temperature, filament, changer, console, system, settings, updates, network }
 
 export struct HeaterItem {
     object: string,
@@ -200,6 +200,23 @@ export struct MmuPageRange {
     first: int,
     count: int,
     start: int,
+}
+
+// A lane AFC can pull back out of its hub ("Back to hub"); `reason` says why not while `enabled` is false.
+export struct AfcHubReturnItem {
+    lane: string,
+    // The unit of the lane where AFC has several, else "".
+    unit: string,
+    enabled: bool,
+    reason: string,
+}
+
+// A tool of AFC and the lane it takes its filament from (`map` of the lane).
+export struct AfcToolItem {
+    tool: int,
+    lane: string,
+    // Row of the lane's tile in `Printer.mmu-gates`, -1 without tile.
+    lane-row: int,
 }
 
 // A tool of the MMU and the gate it takes its filament from (Happy Hare's tool-to-gate map).

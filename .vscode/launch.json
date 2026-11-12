@@ -6,79 +6,255 @@
       "request": "launch",
       "name": "debug: freakymate (fake Moonraker)",
       "cargo": {
-        "args": ["build", "-p", "freakymate", "--bin", "freakymate"]
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
       },
-      "args": ["--moonraker", "http://127.0.0.1:7125"],
-      "env": { "RUST_LOG": "info,freakymate_core=debug" },
-      "preLaunchTask": "run: fake-moonraker"
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker",
+      "postDebugTask": "stop: fake-moonraker"
     },
     {
       "type": "lldb",
       "request": "launch",
       "name": "debug: freakymate (fake Moonraker, Happy Hare)",
       "cargo": {
-        "args": ["build", "-p", "freakymate", "--bin", "freakymate"]
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
       },
-      "args": ["--moonraker", "http://127.0.0.1:7125"],
-      "env": { "RUST_LOG": "info,freakymate_core=debug" },
-      "preLaunchTask": "run: fake-moonraker (Happy Hare)"
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (Happy Hare)",
+      "postDebugTask": "stop: fake-moonraker"
     },
     {
       "type": "lldb",
       "request": "launch",
       "name": "debug: freakymate (fake Moonraker, Basic)",
       "cargo": {
-        "args": ["build", "-p", "freakymate", "--bin", "freakymate"]
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
       },
-      "args": ["--moonraker", "http://127.0.0.1:7125"],
-      "env": { "RUST_LOG": "info,freakymate_core=debug" },
-      "preLaunchTask": "run: fake-moonraker (Basic)"
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (Basic)",
+      "postDebugTask": "stop: fake-moonraker"
     },
     {
       "type": "lldb",
       "request": "launch",
       "name": "debug: freakymate (fake Moonraker, ERCF)",
       "cargo": {
-        "args": ["build", "-p", "freakymate", "--bin", "freakymate"]
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
       },
-      "args": ["--moonraker", "http://127.0.0.1:7125"],
-      "env": { "RUST_LOG": "info,freakymate_core=debug" },
-      "preLaunchTask": "run: fake-moonraker (ERCF)"
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (ERCF)",
+      "postDebugTask": "stop: fake-moonraker"
     },
     {
       "type": "lldb",
       "request": "launch",
       "name": "debug: freakymate (fake Moonraker, Tool changer)",
       "cargo": {
-        "args": ["build", "-p", "freakymate", "--bin", "freakymate"]
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
       },
-      "args": ["--moonraker", "http://127.0.0.1:7125"],
-      "env": { "RUST_LOG": "info,freakymate_core=debug" },
-      "preLaunchTask": "run: fake-moonraker (Tool changer)"
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (Tool changer)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: freakymate (fake Moonraker, Happy Hare units)",
+      "cargo": {
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
+      },
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (Happy Hare units)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: freakymate (fake Moonraker, Tool changer + Happy Hare)",
+      "cargo": {
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
+      },
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (Tool changer + Happy Hare)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: freakymate (fake Moonraker, AFC)",
+      "cargo": {
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
+      },
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (AFC)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: freakymate (fake Moonraker, AFC tool changer)",
+      "cargo": {
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
+      },
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (AFC tool changer)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: freakymate (fake Moonraker, Tool changer, UNSELECT_TOOL absent)",
+      "cargo": {
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
+      },
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (Tool changer, UNSELECT_TOOL absent)",
+      "postDebugTask": "stop: fake-moonraker"
     },
     {
       "type": "lldb",
       "request": "launch",
       "name": "debug: freakymate (saved settings)",
       "cargo": {
-        "args": ["build", "-p", "freakymate", "--bin", "freakymate"]
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
       }
     },
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: fake-moonraker",
+      "name": "debug: fake-moonraker (choose profile)",
       "cargo": {
-        "args": ["build", "-p", "fake-moonraker"]
-      },
-      "args": ["--port", "7125", "--time-scale", "10", "--profile", "voron"]
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "debug: fake-moonraker (Happy Hare)",
-      "cargo": {
-        "args": ["build", "-p", "fake-moonraker"]
+        "args": [
+          "build",
+          "-p",
+          "fake-moonraker"
+        ]
       },
       "args": [
         "--port",
@@ -86,82 +262,28 @@
         "--time-scale",
         "10",
         "--profile",
-        "happy-hare",
-        "--gates",
-        "8"
+        "${input:fakeProfile}"
       ]
-    },
+    }
+  ],
+  "inputs": [
     {
-      "type": "lldb",
-      "request": "launch",
-      "name": "debug: fake-moonraker (Basic)",
-      "cargo": {
-        "args": ["build", "-p", "fake-moonraker"]
-      },
-      "args": ["--port", "7125", "--time-scale", "10", "--profile", "basic"]
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "debug: fake-moonraker (ERCF)",
-      "cargo": {
-        "args": ["build", "-p", "fake-moonraker"]
-      },
-      "args": ["--port", "7125", "--time-scale", "10", "--profile", "ercf", "--gates", "8"]
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "debug: fake-moonraker (Tool changer)",
-      "cargo": {
-        "args": ["build", "-p", "fake-moonraker"]
-      },
-      "args": ["--port", "7125", "--time-scale", "10", "--profile", "toolchanger"]
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "debug: fake-moonraker (Happy Hare units)",
-      "cargo": {
-        "args": ["build", "-p", "fake-moonraker"]
-      },
-      "args": ["--port", "7125", "--time-scale", "10", "--profile", "happy-hare-units"]
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "debug: fake-moonraker (Tool changer + Happy Hare)",
-      "cargo": {
-        "args": ["build", "-p", "fake-moonraker"]
-      },
-      "args": ["--port", "7125", "--time-scale", "10", "--profile", "toolchanger-mmu"]
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "debug: fake-moonraker (AFC)",
-      "cargo": {
-        "args": ["build", "-p", "fake-moonraker"]
-      },
-      "args": ["--port", "7125", "--time-scale", "10", "--profile", "afc"]
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "debug: fake-moonraker (AFC tool changer)",
-      "cargo": {
-        "args": ["build", "-p", "fake-moonraker"]
-      },
-      "args": ["--port", "7125", "--time-scale", "10", "--profile", "afc-toolchanger"]
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "debug: fake-moonraker (Tool changer, UNSELECT_TOOL absent)",
-      "cargo": {
-        "args": ["build", "-p", "fake-moonraker"]
-      },
-      "args": ["--port", "7125", "--time-scale", "10", "--profile", "toolchanger-required"]
+      "id": "fakeProfile",
+      "type": "pickString",
+      "description": "Fake-Moonraker profile",
+      "options": [
+        "voron",
+        "basic",
+        "happy-hare",
+        "ercf",
+        "toolchanger",
+        "toolchanger-required",
+        "happy-hare-units",
+        "toolchanger-mmu",
+        "afc",
+        "afc-toolchanger"
+      ],
+      "default": "voron"
     }
   ]
 }

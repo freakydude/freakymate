@@ -2,7 +2,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, Severity, TuneTab } from "../state.slint";
+import { Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, Severity } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
 import { BusyWheel } from "busy-wheel.slint";
 
@@ -37,8 +37,8 @@ component TemperatureReading inherits Rectangle {
             cross-axis-self-alignment: center;
             source: root.icon;
             colorize: root.heating ? Theme.accent : Theme.muted;
-            width: 20px;
-            height: 20px;
+            width: Theme.icon-small;
+            height: Theme.icon-small;
         }
         Text {
             text: root.text;
@@ -126,8 +126,8 @@ export component StatusBar inherits Rectangle {
                         cross-axis-self-alignment: center;
                         source: Printer.status-message-error ? Icons.ui-error : Icons.ui-info;
                         colorize: Printer.status-message-error ? Theme.danger : Theme.info;
-                        width: Theme.icon-medium;
-                        height: Theme.icon-medium;
+                        width: Theme.icon-large;
+                        height: Theme.icon-large;
                     }
                     Text {
                         horizontal-stretch: 1;
@@ -274,8 +274,8 @@ export component StatusBar inherits Rectangle {
                 Image {
                     source: Icons.system-emergency-stop;
                     colorize: Theme.foreground;
-                    width: 28px;
-                    height: 28px;
+                    width: Theme.icon;
+                    height: Theme.icon;
                 }
             }
         }
@@ -287,6 +287,8 @@ component NavItem inherits Rectangle {
     in property <string> label;
     in property <Page> page;
     in property <bool> enabled: true;
+    // Something needs a look: a small dot in the top right corner.
+    in property <bool> warn;
     // System stays marked on its pages below (console, settings, updates), so a tap leads back.
     property <bool> active: Navigation.page == root.page || (root.page == Page.system
         && (Navigation.page == Page.console || Navigation.page == Page.settings || Navigation.page == Page.updates
@@ -302,8 +304,6 @@ component NavItem inherits Rectangle {
     nav-touch := TouchArea {
         enabled: root.enabled;
         clicked => {
-            // The Tune page opens with the basics; the expert tab is one tap away.
-            if (root.page == Page.tune) { Navigation.tune-tab = TuneTab.basics; }
             Dialogs.dismiss();
             Navigation.page = root.page;
         }
@@ -315,8 +315,8 @@ component NavItem inherits Rectangle {
             cross-axis-self-alignment: center;
             source: root.icon;
             colorize: root.content;
-            width: 26px;
-            height: 26px;
+            width: Theme.icon-nav;
+            height: Theme.icon-nav;
         }
         Text {
             text: root.label;
@@ -326,6 +326,15 @@ component NavItem inherits Rectangle {
             horizontal-alignment: center;
             overflow: elide;
         }
+    }
+
+    if root.warn: Rectangle {
+        x: parent.width - self.width - 10px;
+        y: 6px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        background: Theme.warning;
     }
 }
 
@@ -337,10 +346,10 @@ export component NavRail inherits Rectangle {
         padding: 3px;
         spacing: 1px;
         NavItem { icon: Icons.nav-printer; label: @tr("Print"); page: Page.print; enabled: Printer.ready; }
-        NavItem { icon: Icons.nav-move; label: @tr("Move"); page: Page.move; enabled: Printer.ready && !Printer.motion-locked; }
+        NavItem { icon: Icons.nav-move; label: @tr("Motion"); page: Page.motion; enabled: Printer.ready; }
         NavItem { icon: Icons.nav-thermal; label: @tr("Thermal"); page: Page.temperature; enabled: Printer.ready; }
-        NavItem { icon: Icons.filament-extrude; label: @tr("Filament"); page: Page.filament; enabled: Printer.ready && !Printer.motion-locked; }
-        NavItem { icon: Icons.nav-tuning; label: @tr("Tune"); page: Page.tune; enabled: Printer.ready; }
+        NavItem { icon: Icons.nav-filament; label: @tr("Filament"); page: Page.filament; enabled: Printer.ready && !Printer.motion-locked; }
+        if Printer.has-changer: NavItem { icon: Icons.nav-changer; label: @tr("Changer"); page: Page.changer; enabled: Printer.ready; warn: Printer.has-changer-sensors && Printer.filament-sensor-runout; }
         NavItem { icon: Icons.nav-system; label: @tr("System"); page: Page.system; }
     }
 }

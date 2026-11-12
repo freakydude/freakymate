@@ -9,6 +9,7 @@ mod lighting;
 mod mmu;
 
 use super::{Command, CommandError};
+use crate::domain::heads;
 use crate::sources::{afc, tool_macros, PrinterStatus, Sources};
 
 impl Command {
@@ -34,6 +35,10 @@ impl Command {
             Self::ToggleLight => lighting::toggle(sources, status)?,
             Self::LoadFilament => filament::load(sources, status)?,
             Self::UnloadFilament => filament::unload(sources, status)?,
+            Self::DropHead => {
+                let script = heads::drop_command(setup, status).ok_or(CommandError::NoDropCommand)?;
+                vec![Self::RunGcode { script: script.to_owned() }]
+            }
             Self::PauseAtLayer { layer } => layer_pause::pause_at(sources, status, layer)?,
             Self::ClearLayerPause => layer_pause::clear(sources)?,
             Self::SetGateFilament { gate, material, color } => mmu::set_gate_filament(status, gate, material, color)?,

@@ -51,6 +51,16 @@ pub(super) struct Toolchanger {
     /// Variables of the user macros by upper-case macro name.
     macro_variables: BTreeMap<String, Map<String, Value>>,
     saved_variables: Map<String, Value>,
+    /// Speed of each head's fan, `fan_generic T<n>_partfan` (viesturz `tool.py` Z.126); empty for AFC.
+    fan_speeds: Vec<f64>,
+    /// `pending_speed` of the fan handling (`toolchanger.py` Z.796, 843): the speed `M106` set while no tool was
+    /// active, handed to the fan of the next tool.
+    pending_fan_speed: Option<f64>,
+}
+
+/// Name of the fan of a head: a `fan_generic` object, never `[fan]` (`toolchanger.py` Z.800-801).
+pub(super) fn head_fan_name(tool: usize) -> String {
+    format!("T{tool}_partfan")
 }
 
 impl Toolchanger {
@@ -78,6 +88,8 @@ impl Toolchanger {
             extra_extruders: vec![Heater::cold(); tool_count.saturating_sub(1)],
             macro_variables,
             saved_variables: Map::new(),
+            fan_speeds: vec![0.0; tool_count],
+            pending_fan_speed: None,
         }
     }
 
@@ -98,6 +110,8 @@ impl Toolchanger {
             extra_extruders: vec![Heater::cold(); head_count.saturating_sub(1)],
             macro_variables: BTreeMap::new(),
             saved_variables: Map::new(),
+            fan_speeds: Vec::new(),
+            pending_fan_speed: None,
         }
     }
 
@@ -117,6 +131,7 @@ impl Toolchanger {
     /// `initialize` (Z.368-404): the status becomes `ready` and the detected tool the active one. With
     /// `require_tool_present` and no tool on the carriage it fails.
     fn initialize(&mut self) -> Result<(), CommandError> {
+        self.activate_fan(self.active, self.mounted);
         self.active = self.mounted;
         if let Some(tool) = self.mounted {
             self.active_extruder = tool;
@@ -144,6 +159,7 @@ impl Toolchanger {
             )));
         }
         if self.active != tool {
+            self.activate_fan(self.active, tool);
             self.mounted = tool;
             self.active = tool;
             if let Some(tool) = tool {
@@ -151,6 +167,40 @@ impl Toolchanger {
             }
         }
         Ok(())
+    }
+
+    /// Whether the heads have their own fans, which replace `[fan]` (`toolchanger.py` Z.800-801).
+    pub(super) fn has_head_fans(&self) -> bool {
+        self.kind == Kind::Viesturz
+    }
+
+    /// `M106`/`M107` (`toolchanger.py` Z.837-843): the fan of the active tool follows; without an active tool the speed
+    /// waits for the next one.
+    pub(super) fn set_part_fan_speed(&mut self, speed: f64) {
+        match self.active {
+            Some(tool) => self.fan_speeds[tool] = speed,
+            None => self.pending_fan_speed = Some(speed),
+        }
+    }
+
+    /// `SET_FAN_SPEED FAN=T<n>_partfan`; `None` if the name is no head fan.
+    pub(super) fn set_head_fan_speed(&mut self, name: &str, speed: f64) -> Option<()> {
+        let tool = (0..self.fan_speeds.len()).find(|tool| head_fan_name(*tool) == name)?;
+        self.fan_speeds[tool] = speed.clamp(0.0, 1.0);
+        Some(())
+    }
+
+    /// `activate_fan` (Z.806-823, `transfer_fan_speed` on): the speed of the old fan moves to the new one and the old
+    /// one stops; without an old fan the pending speed goes to the new one. An unselect leaves the fans alone.
+    fn activate_fan(&mut self, from: Option<usize>, to: Option<usize>) {
+        let Some(to) = to.filter(|to| from != Some(*to) && *to < self.fan_speeds.len()) else { return };
+        let speed = match from.filter(|from| *from < self.fan_speeds.len()) {
+            Some(from) => Some(std::mem::take(&mut self.fan_speeds[from])),
+            None => self.pending_fan_speed.take(),
+        };
+        if let Some(speed) = speed {
+            self.fan_speeds[to] = speed;
+        }
     }
 
     /// `_handle_home_rails_begin` (Z.210-212): with `initialize_on: home` the first homing initialises.
@@ -320,6 +370,9 @@ impl Toolchanger {
         for tool in 0..self.tool_count {
             objects.insert(tool_object_name(tool), self.tool_json(tool));
         }
+        for (tool, speed) in self.fan_speeds.iter().enumerate() {
+            objects.insert(format!("fan_generic {}", head_fan_name(tool)), json!({ "speed": speed, "rpm": null }));
+        }
         for (name, variables) in &self.macro_variables {
             objects.insert(format!("gcode_macro {name}"), Value::Object(variables.clone()));
         }
@@ -353,7 +406,8 @@ impl Toolchanger {
             "extruder": extruder_name(tool),
             "heater": extruder_name(tool),
             "extruder_stepper": null,
-            "fan": null,
+            // `fan` is the name of the head's fan (`tool.py` Z.126).
+            "fan": head_fan_name(tool),
             "active": self.active == Some(tool),
             "gcode_x_offset": x,
             "gcode_y_offset": y,
@@ -377,6 +431,9 @@ impl Toolchanger {
         }
         for (name, _) in self.extra_extruders() {
             sections.insert(name, extruder_config());
+        }
+        for tool in 0..self.fan_speeds.len() {
+            sections.insert(format!("fan_generic {}", head_fan_name(tool)), json!({ "max_power": 1.0 }));
         }
         for (tool, (name, variables)) in self.macro_variables.iter().enumerate() {
             sections.insert(
@@ -489,6 +546,19 @@ impl Printer {
     /// `T<n>` of the tool changer; `None` if the printer has none.
     pub(super) fn select_tool(&mut self, tool: usize) -> Option<Result<(), CommandError>> {
         self.toolchanger.as_mut().map(|toolchanger| toolchanger.select(tool))
+    }
+
+    /// Whether `[fan]` and its object exist: not with the fans of the heads (`toolchanger.py` Z.800-801).
+    pub(super) fn has_printer_fan(&self) -> bool {
+        !self.toolchanger.as_ref().is_some_and(Toolchanger::has_head_fans)
+    }
+
+    /// `M106`/`M107`: the fan of the active head with a tool changer, `[fan]` otherwise.
+    pub(super) fn set_part_fan_speed(&mut self, speed: f64) {
+        match self.toolchanger.as_mut().filter(|toolchanger| toolchanger.has_head_fans()) {
+            Some(toolchanger) => toolchanger.set_part_fan_speed(speed),
+            None => self.fan_speed = speed,
+        }
     }
 
     /// The extra extruders and the tool changer's own objects.

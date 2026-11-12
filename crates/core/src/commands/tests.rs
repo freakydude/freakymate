@@ -471,6 +471,7 @@ fn status_with_heads(mounted: Option<&str>) -> PrinterStatus {
         name: name.into(),
         number: name.strip_prefix('T').and_then(|number| number.parse().ok()),
         extruder: Some(extruder.into()),
+        fan: None,
         active: mounted == Some(name),
     };
     PrinterStatus {
@@ -509,7 +510,25 @@ fn head_commands_become_the_plugins_g_code() {
     };
 
     assert_eq!(script(Command::PickUpHead { head: "left".into() }), "SELECT_TOOL TOOL=left");
-    assert_eq!(script(Command::DropHead), "UNSELECT_TOOL");
     assert_eq!(script(Command::InitializeToolchanger { recover: true }), "INITIALIZE_TOOLCHANGER RECOVER=1");
     assert!(Command::PickUpHead { head: "two words".into() }.to_call(&Motion::default()).is_none());
+}
+
+#[test]
+fn drop_head_uses_the_command_of_the_changer_the_heads_come_from() {
+    use crate::sources::afc::{AfcHead, AfcStatus};
+    let mut sources = printer(&[]);
+    sources.klipper.has_unselect_tool = true;
+    sources.klipper.has_afc_unselect_tool = true;
+    let afc_heads = AfcStatus {
+        heads: vec![AfcHead { name: "e0".into(), extruder: "extruder".into(), mounted: true }],
+        ..AfcStatus::default()
+    };
+    let afc_changer = PrinterStatus { afc: Some(afc_heads), ..PrinterStatus::default() };
+    let gcode = |script: &str| Ok(vec![Command::RunGcode { script: script.into() }]);
+
+    assert_eq!(Command::DropHead.resolve(&sources, &status_with_heads(Some("T0"))), gcode("UNSELECT_TOOL"));
+    assert_eq!(Command::DropHead.resolve(&sources, &afc_changer), gcode("AFC_UNSELECT_TOOL"));
+    assert_eq!(Command::DropHead.resolve(&printer(&[]), &afc_changer), Err(CommandError::NoDropCommand));
+    assert!(Command::DropHead.moves_machine());
 }

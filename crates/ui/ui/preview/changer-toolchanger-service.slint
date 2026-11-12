@@ -1,0 +1,15 @@
+// Preview: the Service tab of the Changer page of a tool changer without MMU (state card of the changer). The Tools tab does
+// not exist there (only MMU and AFC have tool maps). Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { ChangerTab, Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component ChangerToolchangerServicePreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Sample.toolchanger();
+        Navigation.page = Page.changer;
+        Navigation.changer-tab = ChangerTab.service;
+    }
+}

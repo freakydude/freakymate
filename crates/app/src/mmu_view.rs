@@ -6,13 +6,18 @@ use crate::items::{
     bar_colors, compared_tool_items, fill_loaded, id_or_none, lane_colors, load_path_item, no_path_item, replace_rows,
     reuse_flags, tool_match_item,
 };
-use crate::{view, FilamentPathItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem, Printer, ToolMatchItem};
+use crate::{
+    view, AfcHubReturnItem, AfcToolItem, FilamentPathItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem,
+    Printer, ToolMatchItem,
+};
+use freakymate_core::domain::changer;
 use freakymate_core::domain::filament_match::{self, ToolMatch, Verdict};
 use freakymate_core::domain::gate_pages::{self, BypassAt, GatePage};
 use freakymate_core::domain::heads::HeadRow;
 use freakymate_core::domain::load_path::{self, BufferSide, LoadPath};
 use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::domain::spools::{FilamentColors, Lane};
+use freakymate_core::sources::afc::HubReturnBlock;
 use freakymate_core::sources::happy_hare::{self, LoadedFilament, MmuStatus};
 use freakymate_core::sources::spoolman::Spool;
 use freakymate_core::sources::PrinterStatus;
@@ -27,6 +32,8 @@ pub struct MmuView {
     page_ranges: Rc<VecModel<MmuPageRange>>,
     sensors: Rc<VecModel<MmuSensorItem>>,
     tools: Rc<VecModel<ToolMatchItem>>,
+    afc_tools: Rc<VecModel<AfcToolItem>>,
+    afc_hub_returns: Rc<VecModel<AfcHubReturnItem>>,
     /// The tools of the file prepared for the print page.
     prepared_tools: Rc<VecModel<ToolMatchItem>>,
     /// The lane of each tile of `gates`, by row; what the dialog's actions address.
@@ -50,12 +57,19 @@ impl MmuView {
         printer.set_mmu_page_ranges(ModelRc::from(self.page_ranges.clone()));
         printer.set_mmu_sensors(ModelRc::from(self.sensors.clone()));
         printer.set_mmu_tools(ModelRc::from(self.tools.clone()));
+        printer.set_afc_tools(ModelRc::from(self.afc_tools.clone()));
+        printer.set_afc_hub_returns(ModelRc::from(self.afc_hub_returns.clone()));
         printer.set_prepared_tools(ModelRc::from(self.prepared_tools.clone()));
     }
 
     /// The lane of the tile in `row` of the Gates tab, as the commands address it.
     pub fn lane_id(&self, row: usize) -> Option<LaneId> {
         self.rows.borrow().get(row).cloned()
+    }
+
+    /// The row of the lane's tile on the Gates tab; -1 without tile.
+    pub fn row_of(&self, lane: &LaneId) -> i32 {
+        self.rows.borrow().iter().position(|id| id == lane).map_or(-1, |row| row as i32)
     }
 
     /// Makes the lane the load path card shows (a tap on its tile, or on the bypass).
@@ -82,6 +96,7 @@ impl MmuView {
         *self.rows.borrow_mut() = ids;
         replace_rows(&self.gates, items);
         self.show_lane_path(printer, status, lanes);
+        self.show_afc(printer, status);
         let Some(mmu) = in_charge else {
             replace_rows(&self.sensors, Vec::new());
             replace_rows(&self.tools, Vec::new());
@@ -116,6 +131,41 @@ impl MmuView {
             .collect();
         replace_rows(&self.sensors, sensors);
         show_state(printer, mmu);
+    }
+
+    /// What the Changer page shows of AFC: its state, the tool map and the lanes that can go back to the hub.
+    fn show_afc(&self, printer: &Printer, status: &PrinterStatus) {
+        let service = changer::afc_service(status);
+        printer.set_has_afc(service.is_some());
+        printer.set_afc_error(service.as_ref().is_some_and(|service| service.error));
+        printer.set_afc_state(service.as_ref().map_or("", |service| service.state.as_str()).into());
+        let returns = service.map_or_else(Vec::new, |service| {
+            service
+                .hub_returns
+                .into_iter()
+                .map(|lane| AfcHubReturnItem {
+                    enabled: lane.blocked.is_none(),
+                    reason: match &lane.blocked {
+                        Some(HubReturnBlock::ToolLoaded(loaded)) => format!("Unload {loaded} first"),
+                        Some(HubReturnBlock::HubClear) => "Hub is clear".to_owned(),
+                        None => String::new(),
+                    }
+                    .into(),
+                    unit: lane.unit.unwrap_or_default().into(),
+                    lane: lane.lane.into(),
+                })
+                .collect()
+        });
+        replace_rows(&self.afc_hub_returns, returns);
+        let tools = changer::afc_tool_map(status)
+            .into_iter()
+            .map(|entry| AfcToolItem {
+                tool: entry.tool as i32,
+                lane_row: self.row_of(&LaneId::Afc(entry.lane.clone())),
+                lane: entry.lane.into(),
+            })
+            .collect();
+        replace_rows(&self.afc_tools, tools);
     }
 
     /// The load path card: the lane tapped last while it is still there, else the lane in use.

@@ -25,7 +25,7 @@ component MacroTiles inherits Rectangle {
             height: root.tile-height;
             icon: Icons.nav-macros;
             text: macro;
-            icon-size: 20px;
+            icon-size: Theme.icon-small;
             horizontal: true;
             enabled: !Printer.is-printing || macro != Printer.print-start-macro;
             clicked => { root.run(macro); }

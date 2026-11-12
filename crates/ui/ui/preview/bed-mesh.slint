@@ -8,7 +8,7 @@ import { Sample } from "sample.slint";
 export component BedMeshPreview inherits AppWindow {
     init => {
         Sample.calibration();
-        Navigation.page = Page.move;
+        Navigation.page = Page.motion;
         MeshDialogs.map-open = true;
         Printer.bed-mesh-map = {
             shown: true, columns: 5, rows: 4, aspect: 1.25, range: "0.182 mm", lowest: "-0.071", highest: "0.111",

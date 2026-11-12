@@ -4,7 +4,7 @@
 import { Theme } from "../theme.slint";
 import { ToolLabel } from "../components/tool-label.slint";
 import { Icons } from "../icons.slint";
-import { FilamentTab, MmuDialogs, ToolMatchItem, Navigation, Page, Printer, SpoolPicker } from "../state.slint";
+import { ChangerTab, MmuDialogs, ToolMatchItem, Navigation, Page, Printer, SpoolPicker } from "../state.slint";
 import { Card, ScrollList, ValueTile } from "../components/controls.slint";
 import { VerdictIcon } from "../components/mmu-tiles.slint";
 import { FilamentColors, FilamentSwatch, FilamentText } from "../components/filament-swatch.slint";
@@ -101,8 +101,8 @@ component ToolChipGrid inherits ScrollList {
     }
 }
 
-// The tools of the file with their gates. A tap leads to the Tools tab, where the map is changed; a tap on a tool opens
-// its dialog there, which says what to do when it does not fit. Closing it leaves the Tools tab open.
+// The tools of the file with their gates. A tap leads to Changer > Tools, where the map is changed; a tap on a tool opens
+// its dialog there, which says what to do when it does not fit. Closing it leaves that tab open.
 component ToolMatchCard inherits Card {
     title: @tr("Tool-to-gate map");
     icon: Icons.mmu-ttg-map;
@@ -111,8 +111,8 @@ component ToolMatchCard inherits Card {
     clicked => { root.open-tools(); }
 
     function open-tools() {
-        Navigation.filament-tab = FilamentTab.tools;
-        Navigation.page = Page.filament;
+        Navigation.changer-tab = ChangerTab.tools;
+        Navigation.page = Page.changer;
     }
 
     HorizontalLayout {
@@ -135,8 +135,8 @@ component ToolMatchCard inherits Card {
             cross-axis-self-alignment: center;
             source: Icons.ui-chevron-right;
             colorize: Theme.muted;
-            width: 18px;
-            height: 18px;
+            width: Theme.icon-small;
+            height: Theme.icon-small;
         }
     }
     ToolChipGrid {
@@ -208,7 +208,7 @@ component ExtruderMatchCard inherits Card {
             }
         }
         if root.has-spool-side: Image {
-            width: 18px;
+            width: Theme.icon-small;
             source: Icons.ui-chevron-right;
             colorize: Theme.muted;
         }

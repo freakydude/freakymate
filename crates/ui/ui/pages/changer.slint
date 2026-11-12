@@ -1,0 +1,183 @@
+// Changer: the machine as a whole (docs/multi-tool.md, D7), the counterpart of the Filament page, which is the path of one
+// head. Tabs, each only with content: Tools (the map of tools to gates and EndlessSpool, or to lanes with AFC), Service (the commands of the MMU,
+// AFC's state and the state card of the tool changer) and Sensors (the filament sensors that no head owns). The dialogs of the Tools
+// tab cover the whole page. The page stays reachable during a print; the commands that move keep their locks.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, ChangerTab, Confirm, Navigation, Printer, Severity } from "../state.slint";
+import { StateIcons } from "../state-icons.slint";
+import { ButtonKind, Card, IconButton, IconLabel, TabBar, TabButton } from "../components/controls.slint";
+import { FilamentSensorGrid } from "../components/sensor-grid.slint";
+import { AfcServiceTab } from "afc-service.slint";
+import { AfcToolLaneDialog, AfcToolsTab } from "afc-tools.slint";
+import { MmuServiceTab } from "mmu-service.slint";
+import { EndlessSpoolDialog, MmuToolsTab, ToolDialog, ToolGateDialog } from "mmu-tools.slint";
+
+// The filament sensors of the machine with several heads: they are not at one extruder, so they have a tab of their own.
+component SensorsTab inherits VerticalLayout {
+    padding: Theme.padding;
+    Card {
+        vertical-stretch: 0;
+        title: @tr("Filament sensors");
+        icon: Icons.filament-sensor;
+        VerticalLayout {
+            spacing: Theme.spacing;
+            FilamentSensorGrid { }
+            Text {
+                text: @tr("Not tied to a head");
+                color: Theme.muted;
+                font-size: Theme.font-small;
+            }
+        }
+    }
+    Rectangle { vertical-stretch: 1; }
+}
+
+// The state of the tool changer: what the plugin reports, then the commands that act on it. The reason a command is
+// not offered stands above it.
+component ToolchangerCard inherits Card {
+    title: @tr("Tool changer");
+    icon: Icons.nav-changer;
+
+    property <string> status: Printer.changer-status;
+    property <Severity> severity: root.status == "error" ? Severity.error : root.status == "uninitialized" ? Severity.attention : root.status == "ready" ? Severity.fine : Severity.info;
+    property <string> status-text: root.status == "ready" ? @tr("Ready")
+        : root.status == "uninitialized" ? @tr("Not initialized")
+        : root.status == "initializing" ? @tr("Initializing")
+        : root.status == "changing" ? @tr("Changing heads")
+        : root.status == "error" ? @tr("Error, see console")
+        : root.status;
+    property <string> initialize-on-text: Printer.changer-initialize-on == "first-use" ? @tr("first use")
+        : Printer.changer-initialize-on == "home" ? @tr("homing")
+        : Printer.changer-initialize-on == "manual" ? @tr("manual only")
+        : Printer.changer-initialize-on;
+
+    HorizontalLayout {
+        spacing: Theme.spacing;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: Theme.spacing-small;
+            alignment: center;
+            IconLabel {
+                icon: root.status == "error" ? Icons.ui-error : root.status == "ready" ? Icons.ui-check : Icons.ui-info;
+                color: StateIcons.severity-color(root.severity);
+                text: root.status-text;
+            }
+            if Printer.changer-initialize-on != "": Text {
+                text: @tr("Initializes on: {}", root.initialize-on-text);
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                overflow: elide;
+            }
+            Text {
+                text: Printer.changer-head != "" ? @tr("Selected: {}", Printer.changer-head) : @tr("No head selected");
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                overflow: elide;
+            }
+            if Printer.changer-head-detected != "": Text {
+                text: @tr("Detected: {}", Printer.changer-head-detected);
+                color: Printer.changer-head-detected != Printer.changer-head && Printer.changer-head != "" ? Theme.warning : Theme.muted;
+                font-size: Theme.font-small;
+                overflow: elide;
+            }
+            if Printer.motion-locked: Text {
+                text: @tr("Not while printing");
+                color: Theme.muted;
+                font-size: Theme.font-small;
+            }
+        }
+        VerticalLayout {
+            width: 160px;
+            spacing: Theme.spacing;
+            IconButton {
+                icon: Icons.ui-refresh;
+                text: @tr("Initialize");
+                horizontal: true;
+                kind: root.status == "uninitialized" ? ButtonKind.accent : ButtonKind.normal;
+                enabled: !Printer.motion-locked;
+                clicked => { Actions.initialize-toolchanger(false); }
+            }
+            IconButton {
+                icon: Icons.mmu-recover;
+                text: @tr("Recover");
+                horizontal: true;
+                kind: root.status == "error" ? ButtonKind.accent : ButtonKind.normal;
+                enabled: !Printer.motion-locked;
+                clicked => { Confirm.ask-recover-toolchanger(); }
+            }
+        }
+    }
+}
+
+// The cards of every changer the printer has, in the order MMU, AFC, tool changer.
+component ServiceTab inherits VerticalLayout {
+    spacing: 0px;
+    if Printer.has-afc: AfcServiceTab {
+        vertical-stretch: 1;
+    }
+    if Printer.has-mmu: MmuServiceTab {
+        vertical-stretch: 1;
+    }
+    if Printer.has-toolchanger: VerticalLayout {
+        padding: Theme.padding;
+        padding-top: Printer.has-mmu || Printer.has-afc ? 0px : Theme.padding;
+        ToolchangerCard {
+            vertical-stretch: 0;
+            max-height: 160px;
+        }
+    }
+}
+
+export component ChangerPage inherits Rectangle {
+    property <ChangerTab> raw-tab: Navigation.changer-tab;
+    // The tab asked for, else the first one that has content.
+    property <ChangerTab> tab: root.raw-tab == ChangerTab.tools && Printer.has-changer-tools ? ChangerTab.tools
+        : root.raw-tab == ChangerTab.service && Printer.has-changer-service ? ChangerTab.service
+        : root.raw-tab == ChangerTab.sensors && Printer.has-changer-sensors ? ChangerTab.sensors
+        : Printer.has-changer-tools ? ChangerTab.tools
+        : Printer.has-changer-service ? ChangerTab.service
+        : ChangerTab.sensors;
+
+    VerticalLayout {
+        TabBar {
+            if Printer.has-changer-tools: TabButton {
+                icon: Icons.mmu-tool-head;
+                text: @tr("Tools");
+                checked: root.tab == ChangerTab.tools;
+                clicked => { Navigation.changer-tab = ChangerTab.tools; }
+            }
+            if Printer.has-changer-service: TabButton {
+                icon: Icons.mmu-maintenance;
+                text: @tr("Service");
+                checked: root.tab == ChangerTab.service;
+                clicked => { Navigation.changer-tab = ChangerTab.service; }
+            }
+            if Printer.has-changer-sensors: TabButton {
+                icon: Icons.filament-sensor;
+                text: @tr("Sensors");
+                warn: Printer.filament-sensor-runout;
+                checked: root.tab == ChangerTab.sensors;
+                clicked => { Navigation.changer-tab = ChangerTab.sensors; }
+            }
+        }
+        if root.tab == ChangerTab.tools && Printer.has-mmu: MmuToolsTab {
+            vertical-stretch: 1;
+        }
+        if root.tab == ChangerTab.tools && !Printer.has-mmu: AfcToolsTab {
+            vertical-stretch: 1;
+        }
+        if root.tab == ChangerTab.service: ServiceTab {
+            vertical-stretch: 1;
+        }
+        if root.tab == ChangerTab.sensors: SensorsTab {
+            vertical-stretch: 1;
+        }
+    }
+
+    if root.tab == ChangerTab.tools && Printer.has-mmu: ToolDialog { }
+    if root.tab == ChangerTab.tools && Printer.has-mmu: ToolGateDialog { }
+    if root.tab == ChangerTab.tools && Printer.has-mmu: EndlessSpoolDialog { }
+    if root.tab == ChangerTab.tools && !Printer.has-mmu: AfcToolLaneDialog { }
+}

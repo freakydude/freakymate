@@ -1,0 +1,11 @@
+// Preview: the picker of the heads over the Filament page, five heads with long section names, the mounted one with
+// detection, one without a spool. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { Navigation } from "../state.slint";
+import { FilamentHeadsFivePreview } from "filament-heads-five.slint";
+
+export component FilamentHeadPickerPreview inherits FilamentHeadsFivePreview {
+    init => {
+        Navigation.head-picker-open = true;
+    }
+}

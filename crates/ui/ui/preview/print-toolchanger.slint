@@ -1,0 +1,13 @@
+// Preview: the Print page while a job is running on a tool changer (three heads, T1 mounted). Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintToolchangerPreview inherits AppWindow {
+    init => {
+        Sample.printing();
+        Sample.toolchanger();
+        Navigation.page = Page.print;
+    }
+}

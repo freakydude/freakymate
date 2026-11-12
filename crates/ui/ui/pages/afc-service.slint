@@ -1,0 +1,96 @@
+// The AFC part of the Service tab of the Changer page: AFC's state with "Clear error" while it is in its error state, and
+// "Back to hub" for the lanes AFC can pull back until the hub is clear. A lane that cannot be pulled back now is
+// locked and says why. Without such lanes (a direct feed to the head) the second card is not there.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, Confirm, Printer, Severity } from "../state.slint";
+import { StateIcons } from "../state-icons.slint";
+import { AfcHubReturnItem } from "../structs.slint";
+import { ButtonKind, Card, IconButton, IconLabel, ScrollList } from "../components/controls.slint";
+
+// A lane with its button; the reason it is locked stands below its name.
+component HubReturnRow inherits Rectangle {
+    in property <AfcHubReturnItem> item;
+
+    HorizontalLayout {
+        spacing: Theme.spacing;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            Text {
+                text: root.item.unit != "" ? @tr("{} · {}", root.item.lane, root.item.unit) : root.item.lane;
+                color: Theme.foreground;
+                font-size: Theme.font-normal;
+                font-weight: 600;
+                overflow: elide;
+            }
+            if root.item.reason != "": Text {
+                text: root.item.reason;
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                overflow: elide;
+            }
+        }
+        IconButton {
+            width: 168px;
+            height: 48px;
+            cross-axis-self-alignment: center;
+            icon: Icons.mmu-unload;
+            icon-size: Theme.icon-small;
+            text: @tr("Back to hub");
+            horizontal: true;
+            enabled: root.item.enabled && !Printer.motion-locked;
+            clicked => {
+                Confirm.ask(@tr("Back to hub"), @tr("AFC pulls the filament of {} back until the hub is clear.", root.item.lane), "afc-reset-lane", root.item.lane, false);
+            }
+        }
+    }
+}
+
+export component AfcServiceTab inherits VerticalLayout {
+    padding: Theme.padding;
+    spacing: Theme.spacing;
+
+    property <bool> error: Printer.afc-error;
+
+    Card {
+        vertical-stretch: 0;
+        title: @tr("AFC");
+        icon: Icons.mmu-maintenance;
+        HorizontalLayout {
+            spacing: Theme.spacing;
+            height: Theme.touch;
+            IconLabel {
+                horizontal-stretch: 1;
+                icon: root.error ? Icons.ui-error : Printer.afc-state == "Idle" ? Icons.ui-check : Icons.ui-info;
+                color: StateIcons.severity-color(root.error ? Severity.error : Printer.afc-state == "Idle" ? Severity.fine : Severity.info);
+                text: Printer.afc-state == "" ? "-" : Printer.afc-state;
+            }
+            if root.error: IconButton {
+                width: 168px;
+                icon: Icons.mmu-recover;
+                text: @tr("Clear error");
+                horizontal: true;
+                kind: ButtonKind.accent;
+                clicked => { Actions.afc-reset-failure(); }
+            }
+        }
+    }
+    if Printer.afc-hub-returns.length > 0: Card {
+        vertical-stretch: 1;
+        title: @tr("Pull a lane back out of the hub");
+        icon: Icons.mmu-unload;
+        returns := ScrollList {
+            property <length> row-step: 52px + Theme.spacing-small;
+            content-height: Printer.afc-hub-returns.length * self.row-step - Theme.spacing-small;
+            for item[index] in Printer.afc-hub-returns: HubReturnRow {
+                y: index * returns.row-step;
+                width: returns.row-width;
+                height: 52px;
+                item: item;
+            }
+        }
+    }
+    if Printer.afc-hub-returns.length == 0: Rectangle { vertical-stretch: 1; }
+}

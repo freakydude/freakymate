@@ -261,8 +261,8 @@ export component TabButton inherits Rectangle {
             cross-axis-self-alignment: center;
             source: root.icon;
             colorize: root.content;
-            width: 20px;
-            height: 20px;
+            width: Theme.icon-small;
+            height: Theme.icon-small;
         }
         Text {
             text: root.text;
@@ -353,8 +353,8 @@ export component Card inherits Rectangle {
                 cross-axis-self-alignment: center;
                 source: root.icon;
                 colorize: Theme.muted;
-                width: 18px;
-                height: 18px;
+                width: Theme.icon-small;
+                height: Theme.icon-small;
             }
             Text {
                 text: root.title;
@@ -404,8 +404,8 @@ export component ValueTile inherits Rectangle {
             cross-axis-self-alignment: center;
             source: root.icon;
             colorize: root.icon-color;
-            width: Theme.icon-medium;
-            height: Theme.icon-medium;
+            width: Theme.icon-large;
+            height: Theme.icon-large;
         }
         VerticalLayout {
             alignment: center;
@@ -431,8 +431,8 @@ export component ValueTile inherits Rectangle {
                 horizontal-alignment: center;
                 source: root.action-icon;
                 colorize: root.action-note != "" ? Theme.accent : Theme.muted;
-                width: 18px;
-                height: 18px;
+                width: Theme.icon-small;
+                height: Theme.icon-small;
             }
             if root.action-note != "": Text {
                 text: root.action-note;
@@ -635,8 +635,8 @@ export component IconLabel inherits HorizontalLayout {
     in property <string> text;
     in property <color> color: Theme.foreground;
     in property <length> font-size: Theme.font-normal;
-    in property <length> icon-size: 20px;
-    spacing: Theme.spacing-medium;
+    in property <length> icon-size: Theme.icon-small;
+    spacing: root.icon-size <= Theme.icon-compact ? Theme.spacing-small : Theme.spacing;
 
     Image {
         cross-axis-self-alignment: center;
@@ -682,8 +682,8 @@ export component SliderRow inherits Rectangle {
             cross-axis-self-alignment: center;
             source: root.icon;
             colorize: root.icon-color;
-            width: 28px;
-            height: 28px;
+            width: Theme.icon;
+            height: Theme.icon;
         }
         VerticalLayout {
             alignment: center;

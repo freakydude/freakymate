@@ -1,7 +1,7 @@
 //! The Calibrate tab of the Move page and the bed mesh dialogs.
 
 use crate::session::Session;
-use freakymate::{Actions, MeshDialogs, MoveTab, Navigation, Page};
+use freakymate::{Actions, MeshDialogs, MotionTab, Navigation, Page};
 use freakymate_core::sources::klipper::{CalibrationMode, TestZ};
 use freakymate_core::{Command, Snapshot};
 use slint::ComponentHandle;
@@ -14,8 +14,8 @@ const NAV_MOVE: (f32, f32) = (38.0, 155.0);
 /// changes are saved, so the scenes after it start without pending ones.
 pub(super) fn calibrate(session: &mut Session) -> Result<(), String> {
     let offered = session.presenter.snapshot().sources.klipper.calibration;
-    session.window.global::<Navigation>().set_move_tab(MoveTab::Calibrate);
-    session.show_page(Page::Move, "calibrate")?;
+    session.window.global::<Navigation>().set_motion_tab(MotionTab::Calibrate);
+    session.show_page(Page::Motion, "calibrate")?;
     if offered.bed_mesh {
         session.service.send(Command::CalibrateBedMesh);
         session.wait_until("bed mesh", |snapshot| {
@@ -66,7 +66,7 @@ pub(super) fn calibrate(session: &mut Session) -> Result<(), String> {
     }
     session.service.send(Command::SaveConfig);
     session.wait_until("saved", |snapshot| !snapshot.status.save_config_pending)?;
-    session.window.global::<Navigation>().set_move_tab(MoveTab::Axes);
+    session.window.global::<Navigation>().set_motion_tab(MotionTab::Axes);
     Ok(())
 }
 

@@ -7,7 +7,8 @@ use freakymate_core::credentials::Credential;
 use freakymate_core::domain::filament::{self, FilamentHandling};
 use freakymate_core::domain::load_path::{head_path, load_path, BufferSide, LOADED};
 use freakymate_core::domain::machine_tree::LaneId;
-use freakymate_core::domain::{job_end, light, pause, spools};
+use freakymate_core::domain::{changer, heads, job_end, light, pause, spools};
+use freakymate_core::sources::afc::HubReturnBlock;
 use freakymate_core::sources::happy_hare::commands::{Gates, ServoCommand};
 use freakymate_core::sources::happy_hare::{GateAvailability, LoadedFilament, PathSensor, ServoPosition};
 use freakymate_core::sources::klipper::tuning::TuningKey;
@@ -915,4 +916,51 @@ async fn the_heads_of_afcs_tool_changer_each_carry_their_lane() {
             (Some("e3"), Some("e3"), "extruder3"),
         ]
     );
+}
+
+/// Drop on AFC's tool changer: Klipper lists `AFC_UNSELECT_TOOL`, the head leaves the shuttle and keeps its lane.
+#[tokio::test(flavor = "multi_thread")]
+async fn drops_the_head_of_afcs_tool_changer() {
+    let endpoint = start_fake_with(MachineProfile::afc_toolchanger()).await;
+    let (service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+    let mounted =
+        |snapshot: &Snapshot| snapshot.status.afc.as_ref().is_some_and(|afc| afc.heads.iter().any(|head| head.mounted));
+    let snapshot = wait_for(&mut channels, |snapshot| ready(snapshot) && mounted(snapshot)).await;
+    assert_eq!(heads::drop_command(&snapshot.sources.klipper, &snapshot.status), Some("AFC_UNSELECT_TOOL"));
+
+    service.send(Command::DropHead);
+    let snapshot = wait_for(&mut channels, |snapshot| snapshot.status.afc.is_some() && !mounted(snapshot)).await;
+
+    let afc = snapshot.status.afc.unwrap();
+    assert_eq!(afc.current_load, None);
+    assert!(afc.lane("e1").is_some_and(|lane| lane.in_tool));
+}
+
+/// AFC's service on a Box Turtle: a load stopped past the hub leaves the error and the hub switch triggered; "Back to
+/// hub" pulls the lane back, "Clear error" ends the error state.
+#[tokio::test(flavor = "multi_thread")]
+async fn pulls_an_afc_lane_back_to_its_hub_and_clears_the_error() {
+    let endpoint = start_fake_with(MachineProfile::afc()).await;
+    let (service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+    wait_for(&mut channels, |snapshot| ready(snapshot) && snapshot.status.afc.is_some()).await;
+    let hub_switch = |snapshot: &Snapshot| snapshot.status.afc.as_ref().and_then(|afc| afc.hub("Turtle_1")?.switch);
+
+    service.send(Command::RunGcode { script: "FAKE_AFC_ERROR LANE=lane3".into() });
+    let snapshot = wait_for(&mut channels, |snapshot| {
+        snapshot.status.afc.as_ref().is_some_and(|afc| afc.error && afc.current_load.is_none())
+    })
+    .await;
+    let offered = changer::afc_service(&snapshot.status).unwrap();
+    assert!(offered.hub_returns.iter().any(|entry| entry.lane == "lane3" && entry.blocked.is_none()));
+
+    service.send(Command::AfcResetLane { lane: "lane3".into() });
+    let snapshot = wait_for(&mut channels, |snapshot| hub_switch(snapshot) == Some(false)).await;
+    let offered = changer::afc_service(&snapshot.status).unwrap();
+    assert!(offered.hub_returns.iter().all(|entry| entry.blocked == Some(HubReturnBlock::HubClear)));
+
+    service.send(Command::AfcResetFailure);
+    let snapshot = wait_for(&mut channels, |snapshot| snapshot.status.afc.as_ref().is_some_and(|afc| !afc.error)).await;
+    assert_eq!(snapshot.status.afc.unwrap().state, "Idle");
 }

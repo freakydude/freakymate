@@ -1,0 +1,155 @@
+// The head of a tool changer on the Filament page (docs/multi-tool.md, D7): a chip at the right end of the tab row
+// with the colour of the head's spool, `T<n>`, its nozzle temperature and, where the detection found it on the
+// carriage, a check; a tap opens the picker (`head-picker.slint`). Beside it the hint says what the tool changer does
+// differently, with the button that helps.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, Confirm, HeadItem, Printer, Severity } from "../state.slint";
+import { StateIcons } from "../state-icons.slint";
+import { IconButton } from "controls.slint";
+import { FilamentSwatch } from "filament-swatch.slint";
+
+export component HeadChip inherits Rectangle {
+    in property <HeadItem> head;
+    in property <bool> open;
+    callback clicked;
+
+    width: 188px;
+    height: Theme.touch;
+    border-radius: Theme.radius;
+    background: touch.pressed ? Theme.surface-active : Theme.surface-raised;
+    border-width: root.open ? 2px : 0px;
+    border-color: Theme.accent;
+    accessible-role: button;
+    accessible-label: root.head.label;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: Theme.spacing-medium;
+        padding-right: Theme.spacing;
+        spacing: Theme.spacing-medium;
+        FilamentSwatch {
+            cross-axis-self-alignment: center;
+            width: 5px;
+            height: 32px;
+            radius: 2px;
+            empty: !root.head.has-spool;
+            colors: root.head.spool-colors;
+        }
+        Image {
+            cross-axis-self-alignment: center;
+            source: Icons.mmu-tool-head;
+            colorize: Theme.muted;
+            width: Theme.icon-small;
+            height: Theme.icon-small;
+        }
+        Text {
+            // A head without a number shows its name, cut at about 98 px.
+            max-width: 98px;
+            horizontal-stretch: 1;
+            text: root.head.label;
+            color: Theme.foreground;
+            font-size: Theme.font-normal;
+            font-weight: 700;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        if root.head.has-nozzle: Text {
+            text: round(root.head.temperature) + "°";
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            vertical-alignment: center;
+        }
+        if root.head.detected: Image {
+            cross-axis-self-alignment: center;
+            source: Icons.ui-check;
+            colorize: StateIcons.severity-color(Severity.fine);
+            width: Theme.icon-compact;
+            height: Theme.icon-compact;
+        }
+        Image {
+            cross-axis-self-alignment: center;
+            source: Icons.ui-chevron-down;
+            colorize: Theme.muted;
+            width: Theme.icon-compact;
+            height: Theme.icon-compact;
+        }
+    }
+}
+
+// What the tool changer does differently: the text and the button that helps, in the tab row between the tabs and the
+// chip (a line of its own would push the last row of the page out). Changing heads is for a printer whose print is not
+// running (a pause is fine) and a changer that is ready. The buttons send what the Service tab of the Changer page sends.
+export component ChangerHint inherits HorizontalLayout {
+    // Beside the path tabs there is room for two short lines only: smaller text that wraps, a narrower button.
+    in property <bool> narrow;
+    spacing: Theme.spacing;
+
+    Image {
+        cross-axis-self-alignment: center;
+        source: Printer.changer-note == "error" ? Icons.ui-error : Printer.changer-note == "mismatch" ? Icons.ui-warning : Icons.ui-info;
+        colorize: StateIcons.severity-color(Printer.changer-note == "error" ? Severity.error : Printer.changer-note == "mismatch" ? Severity.attention : Severity.info);
+        width: Theme.icon-small;
+        height: Theme.icon-small;
+    }
+    Text {
+        horizontal-stretch: 1;
+        text: Printer.changer-note == "error" ? (root.narrow ? @tr("Changer error, see console") : @tr("Tool changer error, see console"))
+            : Printer.changer-note == "mismatch" ? @tr("{} selected, {} detected", Printer.changer-selected, Printer.changer-detected)
+            : @tr("Not initialized");
+        color: StateIcons.severity-color(Printer.changer-note == "error" ? Severity.error : Printer.changer-note == "mismatch" ? Severity.attention : Severity.info);
+        font-size: root.narrow ? Theme.font-small : Theme.font-normal;
+        wrap: word-wrap;
+        overflow: elide;
+        vertical-alignment: center;
+    }
+    if Printer.changer-note == "uninitialized": IconButton {
+        icon: Icons.ui-refresh;
+        text: @tr("Initialize");
+        horizontal: true;
+        width: root.narrow ? 130px : 150px;
+        enabled: !Printer.motion-locked;
+        clicked => { Actions.initialize-toolchanger(false); }
+    }
+    if Printer.changer-note == "error": IconButton {
+        icon: Icons.mmu-recover;
+        text: @tr("Recover");
+        horizontal: true;
+        width: root.narrow ? 130px : 150px;
+        enabled: !Printer.motion-locked;
+        clicked => { Confirm.ask-recover-toolchanger(); }
+    }
+}
+
+// AFC is in its error state: the text and the button that clears it, in the tab row like the hint of the tool changer.
+// "Clear error" moves nothing and does not resume a print.
+export component AfcHint inherits HorizontalLayout {
+    spacing: Theme.spacing;
+
+    Image {
+        cross-axis-self-alignment: center;
+        source: Icons.ui-error;
+        colorize: StateIcons.severity-color(Severity.error);
+        width: Theme.icon-small;
+        height: Theme.icon-small;
+    }
+    Text {
+        horizontal-stretch: 1;
+        text: @tr("AFC error");
+        color: StateIcons.severity-color(Severity.error);
+        font-size: Theme.font-normal;
+        overflow: elide;
+        vertical-alignment: center;
+    }
+    IconButton {
+        icon: Icons.mmu-recover;
+        text: @tr("Clear error");
+        horizontal: true;
+        width: 150px;
+        clicked => { Actions.afc-reset-failure(); }
+    }
+}

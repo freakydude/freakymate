@@ -4,7 +4,8 @@
 //! `toolchanger-mmu` and `toolchanger`; what a profile does not have is skipped.
 
 use crate::session::Session;
-use freakymate::{Actions, FilamentTab, MmuDialogs, Navigation, Page, Printer};
+use freakymate::{Actions, ChangerTab, FilamentTab, MmuDialogs, Navigation, Page, Printer};
+use freakymate_core::domain::changer;
 use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::sources::happy_hare::LoadedFilament;
 use freakymate_core::Command;
@@ -24,6 +25,9 @@ pub(super) fn lanes(session: &mut Session) -> Result<(), String> {
         afc_heads(session)?;
     } else if snapshot.status.afc.is_some() {
         afc_lanes(session)?;
+    }
+    if snapshot.status.afc.is_some() {
+        afc_changer(session)?;
     }
     if snapshot.status.mmu.is_some() && snapshot.tree.has_swappable_heads() {
         units_on_heads(session)?;
@@ -93,7 +97,75 @@ fn afc_heads(session: &mut Session) -> Result<(), String> {
     session.window.global::<Navigation>().set_filament_head(0);
     session.show_page(Page::Filament, "afc-toolchanger-head-parked")?;
     session.window.global::<Navigation>().set_filament_head(-1);
+    // The mounted head can be dropped when AFC lists `AFC_UNSELECT_TOOL`: "Drop" in the picker.
+    session.window.global::<Navigation>().set_head_picker_open(true);
+    session.capture("afc-toolchanger-head-picker")?;
+    session.window.global::<Navigation>().set_head_picker_open(false);
+    if !session.window.global::<Printer>().get_has_drop() {
+        return Err("AFC's tool changer lists AFC_UNSELECT_TOOL, so the picker should offer Drop".into());
+    }
     Ok(())
+}
+
+/// The tools of AFC (a tap on a row chooses the lane; AFC swaps the lanes of two tools) and its service on the Changer
+/// page, then the error state: the hint on the Filament page, "Clear error" and "Back to hub" on Service.
+fn afc_changer(session: &mut Session) -> Result<(), String> {
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
+    session.window.global::<Navigation>().set_changer_tab(ChangerTab::Tools);
+    if session.window.global::<Printer>().get_afc_tools().row_count() == 0 {
+        return Err("AFC should give the Changer page a Tools tab with its tool map".into());
+    }
+    session.show_page(Page::Changer, "afc-changer-tools")?;
+    session.window.global::<MmuDialogs>().set_afc_tool(1);
+    session.capture("afc-changer-tool-lane")?;
+    session.window.global::<MmuDialogs>().set_afc_tool(-1);
+
+    let mapped = |snapshot: &freakymate_core::Snapshot, tool: usize, lane: &str| {
+        changer::afc_tool_map(&snapshot.status).iter().any(|entry| entry.tool == tool && entry.lane == lane)
+    };
+    // Without tiles (AFC's own changer has none) there is no lane to choose from by tile.
+    if let Some(row) = lane_row(session, "lane2") {
+        // AFC gives lane1 the tool lane2 had.
+        session.window.global::<Actions>().invoke_map_tool_to_lane(0, row);
+        session.wait_until("T0 on lane2", |snapshot| mapped(snapshot, 0, "lane2"))?;
+        session.pump(Duration::from_millis(300));
+        session.show_page(Page::Changer, "afc-changer-tools-swapped")?;
+        session.window.global::<Actions>().invoke_mmu_reset_tool_map();
+        session.wait_until("T0 on lane1", |snapshot| mapped(snapshot, 0, "lane1"))?;
+    }
+
+    session.window.global::<Navigation>().set_changer_tab(ChangerTab::Service);
+    session.show_page(Page::Changer, "afc-changer-service")?;
+    afc_error(session)
+}
+
+/// The tile row of a lane on the Gates tab.
+fn lane_row(session: &Session, lane: &str) -> Option<i32> {
+    let row = session.presenter.lane_row(&LaneId::Afc(lane.to_owned()));
+    (row >= 0).then_some(row)
+}
+
+/// `FAKE_AFC_ERROR LANE=lane3`: AFC in its error state with lane3's filament behind the hub. "Clear error" is on the
+/// Filament page and on Service, and every lane with filament can go back to the hub; `RESET_FAILURE` ends the state.
+fn afc_error(session: &mut Session) -> Result<(), String> {
+    // With lane3 of the Box Turtle (behind its hub); AFC's own changer has no hub, there the state alone.
+    let lanes = session.presenter.snapshot().status.afc.map(|afc| afc.lanes).unwrap_or_default();
+    let script =
+        if lanes.iter().any(|lane| lane.name == "lane3") { "FAKE_AFC_ERROR LANE=lane3" } else { "FAKE_AFC_ERROR" };
+    session.service.send(Command::RunGcode { script: script.into() });
+    session.wait_until("AFC error", |snapshot| snapshot.status.afc.as_ref().is_some_and(|afc| afc.error))?;
+    session.pump(Duration::from_millis(300));
+    if !session.window.global::<Printer>().get_afc_error() {
+        return Err("AFC's error state should reach the page".into());
+    }
+    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
+    session.show_page(Page::Filament, "afc-error-filament")?;
+    session.window.global::<Navigation>().set_changer_tab(ChangerTab::Service);
+    session.show_page(Page::Changer, "afc-error-service")?;
+    session.window.global::<Actions>().invoke_afc_reset_failure();
+    session.wait_until("AFC idle", |snapshot| snapshot.status.afc.as_ref().is_some_and(|afc| !afc.error))?;
+    session.pump(Duration::from_millis(300));
+    session.show_page(Page::Changer, "afc-error-cleared")
 }
 
 /// The second unit loaded on the second head: the path card of a gate of that unit, and the Extruder view of the head.
@@ -134,7 +206,7 @@ fn units_on_heads(session: &mut Session) -> Result<(), String> {
     Ok(())
 }
 
-/// A tool changer without lanes: the head's part of the path on its Extruder view, the machine's sensors on the Sensors tab.
+/// A tool changer without lanes: the head's part of the path on its Extruder view, the machine's sensors on Changer > Sensors.
 fn head_without_lanes(session: &mut Session) -> Result<(), String> {
     session.window.global::<Navigation>().set_filament_head(1);
     session.window.global::<Navigation>().set_filament_tab(FilamentTab::Extruder);
@@ -142,9 +214,9 @@ fn head_without_lanes(session: &mut Session) -> Result<(), String> {
     if session.window.global::<Printer>().get_filament_sensors().row_count() == 0 {
         return Err("the machine should have filament sensors for the Sensors tab".into());
     }
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Sensors);
-    session.show_page(Page::Filament, "lanes-sensors")?;
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Extruder);
+    session.window.global::<Navigation>().set_changer_tab(ChangerTab::Sensors);
+    session.show_page(Page::Changer, "lanes-sensors")?;
+    session.window.global::<Navigation>().set_changer_tab(ChangerTab::Tools);
     session.window.global::<Navigation>().set_filament_head(-1);
     Ok(())
 }

@@ -12,7 +12,7 @@ use freakymate_core::domain::load_path::{self, LoadPath};
 use freakymate_core::domain::machine_tree::MachineTree;
 use freakymate_core::domain::spools::{self, FilamentColors, Lane, SpoolHolder};
 use freakymate_core::sources::happy_hare::PathSensor;
-use freakymate_core::sources::klipper::tuning::TuningValue;
+use freakymate_core::sources::klipper::tuning::{TuningKey, TuningValue};
 use freakymate_core::sources::klipper::{Fan, Heater, Led, TemperatureSensor};
 use freakymate_core::sources::led_effect::LedEffect;
 use freakymate_core::sources::moonraker_server::machine::HostInterface;
@@ -271,6 +271,26 @@ pub(crate) fn fan_item(fan: &Fan) -> FanItem {
         rpm: view::fan_rpm(fan.rpm).into(),
         stalled: fan.stalled,
     }
+}
+
+/// The part cooling fan of the nozzle in use; see [`MachineTree::selected_part_fan`]. `None` where it states none or
+/// Klipper does not report it.
+pub(crate) fn selected_part_fan<'a>(tree: &MachineTree, fans: &'a [Fan]) -> Option<&'a Fan> {
+    let object = tree.selected_part_fan()?;
+    fans.iter().find(|fan| fan.object == object)
+}
+
+/// The fans of the Thermal page: the part fan of the nozzle in use first, the others in their order.
+pub(crate) fn fans_part_fan_first<'a>(tree: &MachineTree, fans: &'a [Fan]) -> Vec<&'a Fan> {
+    let part_fan = selected_part_fan(tree, fans);
+    part_fan.into_iter().chain(fans.iter().filter(|fan| Some(*fan) != part_fan)).collect()
+}
+
+/// The tuning values split into the Basics of the Tune page (the flow factor) and the expert tab (the rest).
+pub(crate) fn split_tuning(values: &[TuningValue]) -> (Option<&TuningValue>, Vec<&TuningValue>) {
+    let (basics, expert): (Vec<&TuningValue>, Vec<&TuningValue>) =
+        values.iter().partition(|value| value.key == TuningKey::FlowFactor);
+    (basics.first().copied(), expert)
 }
 
 pub(crate) fn led_item(led: &Led) -> LedItem {
@@ -562,6 +582,7 @@ mod tests {
             name: name.map(str::to_owned),
             active: *active,
             nozzles: vec![Nozzle { extruder: (*extruder).into(), lanes: Vec::new() }],
+            fan: None,
         };
         MachineTree { carriages: vec![Carriage { heads: heads.iter().map(head).collect() }] }
     }
@@ -587,6 +608,69 @@ mod tests {
                 })
             })
             .collect()
+    }
+
+    fn fan(object: &str) -> Fan {
+        Fan {
+            object: object.into(),
+            label: object.into(),
+            kind: freakymate_core::sources::klipper::FanKind::of(object).expect("a fan object in the test"),
+            speed: 0.4,
+            rpm: None,
+            off_below: 0.0,
+            kick_start_time: 0.1,
+            heaters: Vec::new(),
+            stalled: false,
+        }
+    }
+
+    #[test]
+    fn the_part_fan_is_the_fan_of_the_mounted_head_or_plain_fan_without_heads() {
+        let fans = [fan("fan"), fan("fan_generic T0_partfan"), fan("fan_generic T1_partfan")];
+        let mut heads = tree(&[(Some("T0"), false, "extruder"), (Some("T1"), true, "extruder1")]);
+        heads.carriages[0].heads[0].fan = Some("fan_generic T0_partfan".into());
+        heads.carriages[0].heads[1].fan = Some("fan_generic T1_partfan".into());
+
+        let shown = |tree: &MachineTree| selected_part_fan(tree, &fans).map(|fan| fan.object.clone());
+
+        assert_eq!(shown(&heads).as_deref(), Some("fan_generic T1_partfan"));
+        // The mounted head states no fan: none, although `fan` exists.
+        heads.carriages[0].heads[1].fan = None;
+        assert_eq!(shown(&heads), None);
+        assert_eq!(shown(&tree(&[(None, true, "extruder")])).as_deref(), Some("fan"));
+        // A stated fan Klipper does not report is not shown.
+        assert_eq!(selected_part_fan(&tree(&[(None, true, "extruder")]), &fans[1..]), None);
+    }
+
+    #[test]
+    fn the_fan_of_the_nozzle_in_use_comes_first_in_the_fan_list() {
+        let fans = [fan("fan"), fan("fan_generic T0_partfan"), fan("fan_generic T1_partfan"), fan("fan_generic case")];
+        let mut heads = tree(&[(Some("T0"), false, "extruder"), (Some("T1"), true, "extruder1")]);
+        heads.carriages[0].heads[0].fan = Some("fan_generic T0_partfan".into());
+        heads.carriages[0].heads[1].fan = Some("fan_generic T1_partfan".into());
+
+        let order = |tree: &MachineTree| {
+            fans_part_fan_first(tree, &fans).iter().map(|fan| fan.object.clone()).collect::<Vec<_>>()
+        };
+
+        assert_eq!(order(&heads), ["fan_generic T1_partfan", "fan", "fan_generic T0_partfan", "fan_generic case"]);
+        // Without a fan of the nozzle in use the order stays.
+        heads.carriages[0].heads[1].fan = None;
+        assert_eq!(order(&heads), ["fan", "fan_generic T0_partfan", "fan_generic T1_partfan", "fan_generic case"]);
+    }
+
+    #[test]
+    fn the_flow_factor_goes_to_the_basics_and_the_rest_stays_expert() {
+        let value = |key| TuningValue { key, current: 1.0, configured: None };
+        let values = [value(TuningKey::FlowFactor), value(TuningKey::PressureAdvance), value(TuningKey::MaxVelocity)];
+
+        let (basics, expert) = split_tuning(&values);
+
+        assert_eq!(basics.map(|value| value.key), Some(TuningKey::FlowFactor));
+        assert_eq!(
+            expert.iter().map(|value| value.key).collect::<Vec<_>>(),
+            [TuningKey::PressureAdvance, TuningKey::MaxVelocity]
+        );
     }
 
     fn heater(object: &str) -> Heater {

@@ -2,26 +2,27 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "stop: fake-moonraker",
+      "type": "shell",
+      "command": "pkill -f '[f]ake-moonraker.*--port 7125'; true",
+      "problemMatcher": []
+    },
+    {
       "label": "run: fake-moonraker",
       "type": "shell",
       "command": "cargo run -p fake-moonraker -- --port 7125 --time-scale 10 --profile voron",
       "isBackground": true,
       "problemMatcher": {
         "owner": "rust",
-        "pattern": { "regexp": "^__never__$" },
+        "pattern": {
+          "regexp": "^__never__$"
+        },
         "background": {
           "activeBegin": true,
           "beginsPattern": "^.*(Compiling|Finished|Running).*$",
           "endsPattern": "^Fake-Moonraker listening.*$"
         }
       }
-    },
-    {
-      "label": "run: freakymate (fake Moonraker)",
-      "type": "shell",
-      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
-      "dependsOn": "run: fake-moonraker",
-      "problemMatcher": ["$rustc"]
     },
     {
       "label": "run: fake-moonraker (Happy Hare)",
@@ -30,20 +31,15 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "rust",
-        "pattern": { "regexp": "^__never__$" },
+        "pattern": {
+          "regexp": "^__never__$"
+        },
         "background": {
           "activeBegin": true,
           "beginsPattern": "^.*(Compiling|Finished|Running).*$",
           "endsPattern": "^Fake-Moonraker listening.*$"
         }
       }
-    },
-    {
-      "label": "run: freakymate (fake Moonraker, Happy Hare)",
-      "type": "shell",
-      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
-      "dependsOn": "run: fake-moonraker (Happy Hare)",
-      "problemMatcher": ["$rustc"]
     },
     {
       "label": "run: fake-moonraker (Basic)",
@@ -52,20 +48,15 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "rust",
-        "pattern": { "regexp": "^__never__$" },
+        "pattern": {
+          "regexp": "^__never__$"
+        },
         "background": {
           "activeBegin": true,
           "beginsPattern": "^.*(Compiling|Finished|Running).*$",
           "endsPattern": "^Fake-Moonraker listening.*$"
         }
       }
-    },
-    {
-      "label": "run: freakymate (fake Moonraker, Basic)",
-      "type": "shell",
-      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
-      "dependsOn": "run: fake-moonraker (Basic)",
-      "problemMatcher": ["$rustc"]
     },
     {
       "label": "run: fake-moonraker (ERCF)",
@@ -74,20 +65,15 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "rust",
-        "pattern": { "regexp": "^__never__$" },
+        "pattern": {
+          "regexp": "^__never__$"
+        },
         "background": {
           "activeBegin": true,
           "beginsPattern": "^.*(Compiling|Finished|Running).*$",
           "endsPattern": "^Fake-Moonraker listening.*$"
         }
       }
-    },
-    {
-      "label": "run: freakymate (fake Moonraker, ERCF)",
-      "type": "shell",
-      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
-      "dependsOn": "run: fake-moonraker (ERCF)",
-      "problemMatcher": ["$rustc"]
     },
     {
       "label": "run: fake-moonraker (Tool changer)",
@@ -96,20 +82,15 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "rust",
-        "pattern": { "regexp": "^__never__$" },
+        "pattern": {
+          "regexp": "^__never__$"
+        },
         "background": {
           "activeBegin": true,
           "beginsPattern": "^.*(Compiling|Finished|Running).*$",
           "endsPattern": "^Fake-Moonraker listening.*$"
         }
       }
-    },
-    {
-      "label": "run: freakymate (fake Moonraker, Tool changer)",
-      "type": "shell",
-      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
-      "dependsOn": "run: fake-moonraker (Tool changer)",
-      "problemMatcher": ["$rustc"]
     },
     {
       "label": "run: fake-moonraker (Happy Hare units)",
@@ -118,20 +99,15 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "rust",
-        "pattern": { "regexp": "^__never__$" },
+        "pattern": {
+          "regexp": "^__never__$"
+        },
         "background": {
           "activeBegin": true,
           "beginsPattern": "^.*(Compiling|Finished|Running).*$",
           "endsPattern": "^Fake-Moonraker listening.*$"
         }
       }
-    },
-    {
-      "label": "run: freakymate (fake Moonraker, Happy Hare units)",
-      "type": "shell",
-      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
-      "dependsOn": "run: fake-moonraker (Happy Hare units)",
-      "problemMatcher": ["$rustc"]
     },
     {
       "label": "run: fake-moonraker (Tool changer + Happy Hare)",
@@ -140,20 +116,15 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "rust",
-        "pattern": { "regexp": "^__never__$" },
+        "pattern": {
+          "regexp": "^__never__$"
+        },
         "background": {
           "activeBegin": true,
           "beginsPattern": "^.*(Compiling|Finished|Running).*$",
           "endsPattern": "^Fake-Moonraker listening.*$"
         }
       }
-    },
-    {
-      "label": "run: freakymate (fake Moonraker, Tool changer + Happy Hare)",
-      "type": "shell",
-      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
-      "dependsOn": "run: fake-moonraker (Tool changer + Happy Hare)",
-      "problemMatcher": ["$rustc"]
     },
     {
       "label": "run: fake-moonraker (AFC)",
@@ -162,20 +133,15 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "rust",
-        "pattern": { "regexp": "^__never__$" },
+        "pattern": {
+          "regexp": "^__never__$"
+        },
         "background": {
           "activeBegin": true,
           "beginsPattern": "^.*(Compiling|Finished|Running).*$",
           "endsPattern": "^Fake-Moonraker listening.*$"
         }
       }
-    },
-    {
-      "label": "run: freakymate (fake Moonraker, AFC)",
-      "type": "shell",
-      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
-      "dependsOn": "run: fake-moonraker (AFC)",
-      "problemMatcher": ["$rustc"]
     },
     {
       "label": "run: fake-moonraker (AFC tool changer)",
@@ -184,20 +150,15 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "rust",
-        "pattern": { "regexp": "^__never__$" },
+        "pattern": {
+          "regexp": "^__never__$"
+        },
         "background": {
           "activeBegin": true,
           "beginsPattern": "^.*(Compiling|Finished|Running).*$",
           "endsPattern": "^Fake-Moonraker listening.*$"
         }
       }
-    },
-    {
-      "label": "run: freakymate (fake Moonraker, AFC tool changer)",
-      "type": "shell",
-      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
-      "dependsOn": "run: fake-moonraker (AFC tool changer)",
-      "problemMatcher": ["$rustc"]
     },
     {
       "label": "run: fake-moonraker (Tool changer, UNSELECT_TOOL absent)",
@@ -206,26 +167,15 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "rust",
-        "pattern": { "regexp": "^__never__$" },
+        "pattern": {
+          "regexp": "^__never__$"
+        },
         "background": {
           "activeBegin": true,
           "beginsPattern": "^.*(Compiling|Finished|Running).*$",
           "endsPattern": "^Fake-Moonraker listening.*$"
         }
       }
-    },
-    {
-      "label": "run: freakymate (fake Moonraker, Tool changer, UNSELECT_TOOL absent)",
-      "type": "shell",
-      "command": "cargo run -p freakymate -- --moonraker http://127.0.0.1:7125",
-      "dependsOn": "run: fake-moonraker (Tool changer, UNSELECT_TOOL absent)",
-      "problemMatcher": ["$rustc"]
-    },
-    {
-      "label": "run: freakymate (saved settings)",
-      "type": "shell",
-      "command": "cargo run -p freakymate",
-      "problemMatcher": ["$rustc"]
     },
     {
       "label": "ui-preview (Linux, bash)",
@@ -255,8 +205,13 @@
       "label": "check",
       "type": "shell",
       "command": "cargo clippy --workspace --all-targets; cargo clippy -p freakymate --no-default-features; cargo test --workspace",
-      "group": { "kind": "test", "isDefault": true },
-      "problemMatcher": ["$rustc"]
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$rustc"
+      ]
     }
   ]
 }

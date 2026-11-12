@@ -61,8 +61,8 @@ component WifiRow inherits Rectangle {
             cross-axis-self-alignment: center;
             source: Icons.ui-lock;
             colorize: Theme.muted;
-            width: 18px;
-            height: 18px;
+            width: Theme.icon-compact;
+            height: Theme.icon-compact;
         }
         if root.network.active: IconButton {
             width: Theme.touch;
@@ -114,7 +114,7 @@ component WifiCard inherits Card {
             }
         }
         IconButton {
-            icon: Icons.ui-refresh;
+            icon: Icons.ui-search;
             text: @tr("Search");
             horizontal: root.wide;
             enabled: Network.wifi-enabled;

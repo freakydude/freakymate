@@ -91,6 +91,11 @@ export global Actions {
     // The tool takes its filament from the gate: (tool, gate).
     callback mmu-map-tool(int, int);
     callback mmu-reset-tool-map();
+    // AFC: clears its error state (`RESET_FAILURE`); pulls a lane (its name) back until the hub is clear; the tool takes
+    // its filament from the lane of the tile in this row of `Printer.mmu-gates`: (tool, row).
+    callback afc-reset-failure();
+    callback afc-reset-lane(string);
+    callback map-tool-to-lane(int, int);
     callback mmu-set-endless-spool(bool);
     // Moves a gate into an EndlessSpool group: (gate, group).
     callback mmu-set-endless-spool-group(int, int);

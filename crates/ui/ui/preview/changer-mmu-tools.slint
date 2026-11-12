@@ -2,14 +2,14 @@
 // scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
-import { FilamentTab, Navigation, Page, Printer } from "../state.slint";
+import { ChangerTab, Navigation, Page, Printer } from "../state.slint";
 import { Sample } from "sample.slint";
 
-export component FilamentMmuToolsPreview inherits AppWindow {
+export component ChangerMmuToolsPreview inherits AppWindow {
     init => {
         Sample.mmu();
-        Navigation.page = Page.filament;
-        Navigation.filament-tab = FilamentTab.tools;
+        Navigation.page = Page.changer;
+        Navigation.changer-tab = ChangerTab.tools;
         Printer.mmu-endless-spool = true;
         Printer.mmu-tools = [
             { tool: 0, gate: 0, loaded-material: "PLA", loaded-colors: { first: #e03131, count: 1 }, loaded-name: "Red PLA" },

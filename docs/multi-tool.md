@@ -349,9 +349,10 @@ Happy Hare v4 `mmu_unit.py`, `mmu_controller.py`; Klipper `extruder.py`, `heater
 - **Heating a nozzle that is not active.** `SET_HEATER_TEMPERATURE HEATER=extruder1 TARGET=…` (or `M104 T1 S…`,
   which does not change the active extruder).
 
-### D1 Filament page: a selector per level (decided 2026-11-11)
+### D1 Filament page: a selector per level (decided 2026-11-11; head row superseded by D7 on 2026-11-12)
 
-**Every level with more than one node gets a selector, below it today's view of the chosen path.** Rejected: a tab
+**Every level with more than one node gets a selector, below it today's view of the chosen path.** (D7 keeps the
+principle and turns the head row into a chip with a picker; the machine tabs move to the Changer page.) Rejected: a tab
 "Heads" beside Gates and Extruder (heads as one more topic instead of a level), a strip of heads above the Extruder
 view, a head dialog. Today's Extruder view is the tree reduced to one path (one head, one nozzle, one lane), so it
 stays the leaf view at every size. A level with one node shows no selector; one head and one lane look exactly as
@@ -563,10 +564,177 @@ Read from AFC `main` on 2026-11-11:
 - **Scope:** the Tools tab maps tools to lanes for both sources through one intent (`MapToolToLane`, `ResetToolMap`;
   Happy Hare: `MMU_TTG_MAP`, AFC: `SET_MAP`, `RESET_AFC_MAPPING RUNOUT=no`). Service of AFC: "Clear error"
   (`AfcResetFailure`) while `AFC.error_state` is set, and per lane "Back to hub" (`AfcResetLane`), not while
-  printing. Core and commands are done; the screens are not yet.
+  printing. Core, commands and screens are done (D7, 2026-11-12). The button is also disabled while a lane is loaded in
+  the head. That is a deliberate exception to "hints, not locks": AFC prints "unload or check sensor before resetting
+  lane" but lacks the `return` (`AFC_functions.py` L1690-1692 at 5ea84ea) and pulls the filament anyway. We treat it as an
+  AFC bug, not as behaviour to build on; marked `AFC-BUG-WORKAROUND` in the core, to be removed when AFC fixes it (AFCProject/AFC-Klipper-Add-On#903).
 - **Left out:** `AFC_RESET` (only opens a Mainsail prompt with `AFC_LANE_RESET` per lane), `AFC_RECOVER_LANE`,
   `SET_LANE_LOADED`, `UNSET_LANE_LOADED`, `AFC_CALIBRATION` (their names depend on `show_macros`, and they are last
   resorts: the console is the way), runout lanes (`SET_RUNOUT`), buffer settings, tests, statistics, encoder details.
+
+## Changer page and head picker (decided 2026-11-12, package D7)
+
+Built D1 showed the Filament page at its fullest (tool changer with an MMU per head): a row of heads with the
+machine tabs, a second row of path tabs, then the gates, about 100 px of 436 px for selectors. IDEX would add a
+third level. The cause is two kinds of content on one page, and levels of the tree stacked as rows. D7 fixes both and
+supersedes the parts of D1 and D2 named below.
+
+### Principle
+
+- **Filament is the path of one head**, the everyday work: what sits where, load, unload, extrude. One tab row at
+  most. Object choice (which head) is a chip in that row, not a row of its own.
+- **Changer is the machine**: the filament or tool changer as a whole, its map, its service and its untied sensors.
+  Configuration and diagnosis sit one level below operation (overview → operation → detail → diagnosis).
+- **Per-object actions on the object, machine actions on the machine.** A head's actions (Select, Pick up, Drop)
+  live with the head; the changer's (Initialize, Recover, Home, Clear error) live on Changer. A hint line on
+  Filament brings the one button that helps when something deviates, as D1 already does.
+- Everything appears only where it has content: a printer with one head and one lane looks exactly as today, the
+  Changer entry exists only when at least one of its tabs has content.
+
+### Navigation
+
+Print, Motion, Thermal, Filament, **Changer**, System (Tune moved to Motion, see below). The entries stretch; six leave about 62 px each, above
+`Theme.touch`. "Changer" covers Happy Hare, AFC and tool changers alike; "MMU" and "Tools" each fit only a part.
+`Page.changer` in `Navigation`, the item in `chrome.slint` under the same `enabled` rule as Filament.
+
+### Filament page
+
+```text
+Tool changer with an MMU per head
+ │ [Gates]  Extruder                                  ▌T1 190° ✓ ▾
+ │ Tradrack · on T1                                      Gates 4–7
+ │ ‹ ┌Gate 4┐ ┌Gate 5┐ ┌Gate 6┐ ┌Gate 7┐ ┌Bypass┐ ›
+ │  ○──────○──⚙──○──▽  Filament path            0.0 mm    Unload
+ │  FlowGuard ready    Flow 100 %                        [ Home ]
+
+Tool changer without MMU
+ │                                                    ▌T2 24° ▾
+ │ ┌▌Blue PETG · 905 g               ◎ ┐ ┌  Load  ┐
+ │ ┌ ▽ Nozzle T2  24 / 0 °C            ┐ ┌ Unload ┐   (hint "T2 is not mounted", extruding disabled)
+ │ ┌ Retract ┐ ┌ Extrude ┐ …
+
+One head, one lane: unchanged (no row, no chip)
+One head with Happy Hare: [Gates] Extruder, no chip
+```
+
+- **Head chip**, right end of the tab row (or alone at the top right where there are no path tabs): colour edge of
+  the spool, `T<n>` (a head without a number: its name, elided at about 98 px), nozzle temperature, check where the
+  detection found it on the carriage, a chevron. Height of the tab row; width at most 160 px. The chip replaces the
+  head tabs of D1 and the "Select T2" button of the head view. Tap opens the picker.
+- The tabs Tools, Service and Sensors leave the page (to Changer). `FilamentTab` keeps `gates` and `extruder`; the
+  `tab` derivation in `filament.slint` loses its machine cases.
+- **Hint line** under the tab row as in D1, only on deviation: "Not initialized" + Initialize (only where a change
+  would fail), "Tool changer error, see console" + Recover (with confirmation), "T1 selected, T2 detected" without a
+  button; for AFC "AFC error" + Clear error. The buttons send the same intents as the Service tab of Changer.
+- **Home of the MMU** (bottom right of Gates): accent only while `mmu.is_homed` is false, otherwise a normal
+  button. Accent marks the main action; a homed MMU has none there.
+- Units stay pages inside Gates (D6). Gates tiles get their full height back (the compact variant of D1 goes).
+
+### Head picker
+
+An overlay list over the Filament page (`Dialog` of `dialog.slint`, closes on ✕ or a tap beside it), title
+"Heads". One row per head, `Theme.touch` high, scrolling from about six rows:
+
+```text
+ ▌ T0  extruder            24°  ✓ mounted                [ Drop ]
+ ▌ T1  extruder1          190°                       [ Select ]
+ ╎ T2  extruder2           24°   no spool             [ Select ]
+ ▌ T3  extruder3          150°                      [ Pick up ]
+```
+
+- Columns: colour edge of the spool (dotted without a spool), `T<n>`, section name muted (only where it is not
+  `T<n>`), nozzle temperature, state text ("mounted" with success icon only with detection; nothing for absent), one
+  button.
+- The button: "Select" (`T<n>` of a head with one lane), "Pick up" (`SELECT_TOOL TOOL=<object>` where the head has
+  several `T<n>`), "Drop" on the mounted head (`UNSELECT_TOOL`; AFC `AFC_UNSELECT_TOOL`, only if `gcode.help` lists
+  it and the heads come from AFC); none where the command does not exist (AFC's changer has no bare pick-up). Disabled with the reason as hint while a print runs (the page is
+  locked then), while the changer is not `ready` (or `uninitialized` with `first-use`), not while paused.
+- Tapping the row (not the button) chooses the head for viewing and closes the picker; the page opens on the
+  mounted head as before. Viewing a head never moves the printer.
+- IDEX later: group captions per carriage ("Left carriage", "Right carriage" from `dual_carriage`), two heads
+  mounted at once in copy and mirror; the chip then reads `T0+T1`. No new row on the page.
+- Initialize and Recover are not in the picker (machine actions, see Changer); D1's head view with them is
+  superseded.
+
+### Changer page
+
+Tabs as `TabBar`, each only with content; the page as a whole only with at least one tab:
+
+| Tab | Content | Exists when |
+| --- | --- | --- |
+| **Tools** | today's Tools tab: `T<n>` → lane map, EndlessSpool, Reset (`MapToolToLane`, `ResetToolMap`) | Happy Hare, or AFC (`SET_MAP` exists per lane, also for AFC's own changer: `AFC_spool.py` L54-59); not for a tool changer alone (`T<n>` is the head, nothing to change) |
+| **Service** | Happy Hare: today's Service tab (Home, Motors off, Recover, Unlock, …). AFC: state card with "Clear error" while `error_state`, and "Back to hub" per lane, locked while a lane is loaded in the head ("Unload lane2 first") and offered only for lanes with filament at the load switch and with a hub (`AFC_functions.py` L1685-1692, AFC-Klipper-Add-On 5ea84ea); the Filament page shows "AFC error" with "Clear error" in the tab row. Tool changer: one state card (`status`, `initialize_on`, selected and detected head) with Initialize (`INITIALIZE_TOOLCHANGER`) and Recover (`INITIALIZE_TOOLCHANGER RECOVER=1`, confirmation). Several changers: one card each, in the order MMU, tool changer | any changer |
+| **Sensors** | today's Sensors tab of the Filament page with its warning dot on the tab | untied filament sensors on a printer with several heads |
+
+- The dot on Sensors (a switched-on sensor without filament) also shows on the Changer entry of the navigation,
+  small, top right, like the unread-error counter; it is the only way a runout on an untied sensor reaches the eye
+  without opening the page. Same rule as today (`enabled && !detected`).
+- Service lists the changer's state card first, then the commands, so the reason for a disabled command is visible
+  above it.
+- Two tabs named "Sensors" exist (Thermal: temperature sensors; Changer: filament sensors). Kept: different parents
+  make them unambiguous, and "Filament sensors" does not fit the tab. Rename to "Filament" only if it confuses in use.
+- During a print the Changer page stays reachable (Tools and the AFC map are allowed while printing); the commands
+  that move keep today's locks.
+
+### Other pages, decided with D7
+
+- **IDEX modes on Move, not Changer** (package C): copy, mirror and single carriage are kinematics
+  (`dual_carriage`), not a tool change. A card or tab beside Calibrate; Changer keeps its meaning. Which head sits on
+  which carriage stays an open question below.
+- **Tune Basics = Z offset, speed factor, flow factor, part cooling fan; Expert = pressure advance, smooth time,
+  velocities and the rest.** The fan stays on Thermal too (that is its home); Basics shows the fan of the selected
+  head's nozzle where fans are per head, else `fan`. Basics fills the page that is half empty today, Expert scrolls
+  less. The tie is `tool.fan` as decided under "Sensors, fans and drivers", read in
+  `sources/toolchanger.rs` into the head in the tree and shown by the presenter. No guess: a head that states no fan shows none in Basics; only without a head level is `fan` the fan.
+  Superseded: Tune is now a tab of the Motion page and the part fan left it; the fan of the mounted head is the first row of Thermal › Fans.
+
+### Code
+
+- `pages/changer.slint`: new page from `mmu-tools.slint`, `mmu-service.slint` and the `SensorsTab` of
+  `filament.slint`, plus the tool changer's state card; the dialogs of Tools (`ToolDialog`, `ToolGateDialog`,
+  `EndlessSpoolDialog`) move with it. `filament.slint` keeps Gates, Extruder, the hint line, the chip and the picker.
+- `components/head-tabs.slint` becomes `head-chip.slint` (chip) and `head-picker.slint` (overlay); `HeadTabs`
+  goes. `Navigation.filament-tab` keeps `gates`/`extruder`; a new `Navigation.changer-tab`.
+- Core: no new facts; `Printer.heads`, the changer state and the sensors are there since D1/D2. The fan of the
+  selected head for Tune Basics needs the nozzle → fan link from the tree (`tool.fan` of viesturz; else `fan`).
+- `print-prepared`: the tap on a tool chip opens Changer › Tools with the dialog (was Filament › Tools).
+- Snapshot scenes: `filament` (chip, picker open), `changer-tools`, `changer-service`, `changer-sensors` for the
+  profiles `toolchanger`, `toolchanger-required`, `toolchanger-mmu`, `happy-hare`, `afc`; `voron` and `basic` must
+  stay pixel-identical on Filament, and must not show a Changer entry.
+
+### Fit
+
+Filament with an MMU per head: one row of 44 px instead of about 100 px; the gates get the tile height of the
+single-head page. Chip 160 px plus two path tabs of 124 px leave room on 730 px. Picker rows: edge 6 px, `T<n>` 48
+px, name elided, temperature 56 px right-aligned, state text elided, button 124 px. Check with the longest names in
+the fakes (`toolchanger-required`).
+
+### Deviations from the draft
+
+Found while building D7; the code is the truth where it differs from the text above.
+
+- The hint line sits in the tab row (`ChangerHint` in `head-chip.slint`), not below it.
+- Picker buttons are normal buttons, not accent buttons; the accent marks the mounted head's `T<n>` and the frame of the
+  viewed head.
+- "selected" means mounted without detection (`mounted` and not `detected`); "mounted" needs a detected head.
+- The Changer entry is `enabled: Printer.ready`, like Thermal.
+- The warning dot on the Changer entry shows only where the Sensors tab exists (`has-changer-sensors`).
+- Thermal › Fans lists the part fan of the mounted head first, not that of the head the Filament page shows
+  (`selected_part_fan` and `fans_part_fan_first` in `crates/app/src/items.rs`).
+
+### Rejected
+
+- Keeping the head row and moving only the machine tabs: saves one tab, not the row that costs the space.
+- A tree rail at the left: takes the width the gate tiles need and grows again with IDEX.
+- The path strip as navigation (tap "Nozzle" for the extruder view): hides Extrude/Retract behind a small symbol;
+  possible later on top of D7.
+- Machine tabs under System: System is the host; the changer is printer hardware, and the entry hides itself where
+  there is none.
+
+### Supersedes
+
+D1's head tab row, its head view with Initialize/Recover, its rule "the tool changer gets no Service tab", the
+compact gate tiles; D2's Sensors tab on the Filament page (the tab itself stays, on Changer).
 
 ## Open questions
 

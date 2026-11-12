@@ -2,9 +2,9 @@
 // marked as fitting. Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { MmuDialogs, Printer } from "../state.slint";
-import { FilamentMmuToolsMatchPreview } from "filament-mmu-tools-match.slint";
+import { ChangerMmuToolsMatchPreview } from "changer-mmu-tools-match.slint";
 
-export component FilamentMmuToolDialogMatchPreview inherits FilamentMmuToolsMatchPreview {
+export component ChangerMmuToolDialogMatchPreview inherits ChangerMmuToolsMatchPreview {
     init => {
         Printer.has-spoolman = true;
         MmuDialogs.tool = 3;

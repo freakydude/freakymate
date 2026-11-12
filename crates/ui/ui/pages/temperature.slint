@@ -30,8 +30,8 @@ component HeaterRow inherits Rectangle {
             cross-axis-self-alignment: center;
             source: root.heater.object == "heater_bed" ? Icons.thermal-bed : root.heater.nozzle ? Icons.thermal-nozzle : Icons.thermal-chamber;
             colorize: root.heater.target > 0 ? Theme.accent : Theme.muted;
-            width: 28px;
-            height: 28px;
+            width: Theme.icon;
+            height: Theme.icon;
         }
         VerticalLayout {
             alignment: center;
@@ -48,14 +48,14 @@ component HeaterRow inherits Rectangle {
                     cross-axis-self-alignment: center;
                     source: Icons.nav-history;
                     colorize: Theme.muted;
-                    width: Theme.icon-tiny;
-                    height: Theme.icon-tiny;
+                    width: Theme.icon-compact;
+                    height: Theme.icon-compact;
                 }
                 // The spool recommends another temperature than the target: a quiet note, nothing is changed. In a
                 // narrow row the spool icon stands for the word.
                 if root.heater.spool-hint != "": IconLabel {
                     icon: root.compact ? Icons.filament-spool : Icons.ui-warning;
-                    icon-size: 14px;
+                    icon-size: Theme.icon-compact;
                     text: root.compact ? root.heater.spool-hint : @tr("Spool {}", root.heater.spool-hint);
                     color: Theme.warning;
                     font-size: Theme.font-small;
@@ -132,8 +132,8 @@ component FanRow inherits Rectangle {
             // A fan that does not turn although it should is an error: its icon and its speeds turn red.
             source: root.fan.stalled ? Icons.state-error : Icons.thermal-fan;
             colorize: root.fan.stalled ? Theme.danger : root.fan.speed > 0 ? Theme.accent : Theme.muted;
-            width: 28px;
-            height: 28px;
+            width: Theme.icon;
+            height: Theme.icon;
         }
         VerticalLayout {
             alignment: center;

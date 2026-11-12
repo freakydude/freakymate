@@ -179,6 +179,18 @@ pub enum AfcCommand {
     SetMaterial { lane: Option<String>, material: Option<String> },
     /// `SET_MAP LANE= MAP=` (L148).
     SetMap { lane: Option<String>, map: Option<String> },
+    /// `RESET_AFC_MAPPING [RUNOUT=]` (`AFC_spool.py` L44, L527-566); the fake has no runout lanes, so `RUNOUT` does
+    /// nothing.
+    ResetMapping,
+    /// `RESET_FAILURE` (`AFC_error.py` L58, L172-195).
+    ResetFailure,
+    /// `AFC_LANE_RESET LANE= [DISTANCE=]` (`AFC_functions.py` L178, L1640-1735); the fake does not move a distance.
+    LaneReset { lane: Option<String> },
+    /// `AFC_UNSELECT_TOOL` (`AFC_Toolchanger.py` L51-52, L153-190); only AFC's tool changer has it.
+    UnselectTool,
+    /// `FAKE_AFC_ERROR [LANE=]`: test hook of the fake, not in AFC. AFC goes into its error state; with `LANE` as
+    /// after a load that stopped between hub and toolhead (the lane's filament past the hub, nothing in the toolhead).
+    FakeError { lane: Option<String> },
 }
 
 /// `SET_VELOCITY_LIMIT`; every value is optional, as in Klipper.

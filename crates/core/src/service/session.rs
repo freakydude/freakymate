@@ -2,6 +2,7 @@
 
 use super::dispatch::console_line;
 use super::queries::update_status_events;
+use super::trail;
 use super::Snapshot;
 use super::{
     Access, Event, Outputs, Query, Request, SessionEnd, ACCESS_CHECK_INTERVAL, CLIENT_NAME, KLIPPY_POLL_INTERVAL,
@@ -13,7 +14,7 @@ use crate::domain::machine_tree::MachineTree;
 use crate::moonraker::access::{self, AccessError};
 use crate::moonraker::{CallError, Connection, ConnectionState, Endpoint, Notification};
 use crate::sources::happy_hare::stale_gate_map;
-use crate::sources::klipper::{self, FanWatch, HeightWatch, KlippyState, PendingTargets, PrintState};
+use crate::sources::klipper::{FanWatch, HeightWatch, KlippyState, PendingTargets, PrintState};
 use crate::sources::moonraker_server::gcode_store::ConsoleKind;
 use crate::sources::moonraker_server::update_manager;
 use crate::sources::moonraker_server::wled::{self, WledStrip};
@@ -126,6 +127,40 @@ fn identity() -> Value {
     })
 }
 
+/// Introduces this display on a fresh connection with the stored access of the address, and says what access it got.
+/// A stored login presents a fresh token; a stored access Moonraker refuses is dropped for this connection.
+pub(crate) async fn introduce(
+    connection: &Connection,
+    credentials: &CredentialStore,
+    endpoint: &Endpoint,
+) -> Result<Access, AccessError> {
+    let (access, credential) = match credentials.credential(endpoint) {
+        None => (Access::Open, None),
+        Some(Credential::ApiKey { api_key }) => (Access::ApiKey, Some(("api_key", api_key))),
+        Some(Credential::Login { username, refresh_token }) => {
+            match access::refresh(connection, &refresh_token).await {
+                Ok(token) => (Access::User(username), Some(("access_token", token))),
+                Err(AccessError::Refused(message)) => {
+                    log::info!("the stored login is no longer valid: {message}");
+                    (Access::Open, None)
+                }
+                Err(error) => return Err(error),
+            }
+        }
+    };
+    let presented = credential.as_ref().map(|(field, value)| (*field, value.as_str()));
+    match access::identify(connection, identity(), presented).await {
+        Ok(()) => Ok(access),
+        // A wrong key is refused even where Moonraker would trust this machine.
+        Err(AccessError::Refused(message)) if presented.is_some() => {
+            log::warn!("Moonraker refused the stored access of this display: {message}");
+            access::identify(connection, identity(), None).await?;
+            Ok(Access::Open)
+        }
+        Err(error) => Err(error),
+    }
+}
+
 pub(super) struct Session<'a> {
     pub(super) connection: Connection,
     pub(super) http: reqwest::Client,
@@ -138,6 +173,8 @@ pub(super) struct Session<'a> {
     /// From `server.info`, known before Klipper is ready; part of [`Sources`] once subscribed.
     pub(super) components: ServerComponents,
     pub(super) klippy_ready: bool,
+    /// The Klippy state the log last noted.
+    pub(super) logged_klippy: Option<KlippyState>,
     pub(super) job_filename: String,
     pub(super) job_state: PrintState,
     /// Targets sent but not yet reported back; the snapshot shows them.
@@ -175,6 +212,7 @@ impl<'a> Session<'a> {
             sources: Sources::default(),
             components: ServerComponents::default(),
             klippy_ready: false,
+            logged_klippy: None,
             job_filename: String::new(),
             job_state: PrintState::default(),
             pending_targets: PendingTargets::default(),
@@ -255,31 +293,7 @@ impl<'a> Session<'a> {
     /// Identifies with Moonraker, with the stored credential of this address if there is one. Refused means
     /// Moonraker wants a login.
     async fn introduce(&mut self) -> Result<(), AccessError> {
-        let (access, credential) = match self.credentials.credential(&self.endpoint) {
-            None => (Access::Open, None),
-            Some(Credential::ApiKey { api_key }) => (Access::ApiKey, Some(("api_key", api_key))),
-            Some(Credential::Login { username, refresh_token }) => {
-                match access::refresh(&self.connection, &refresh_token).await {
-                    Ok(token) => (Access::User(username), Some(("access_token", token))),
-                    Err(AccessError::Refused(message)) => {
-                        log::info!("the login of {username} is no longer valid: {message}");
-                        (Access::Open, None)
-                    }
-                    Err(error) => return Err(error),
-                }
-            }
-        };
-        let presented = credential.as_ref().map(|(field, value)| (*field, value.as_str()));
-        match access::identify(&self.connection, identity(), presented).await {
-            Ok(()) => self.access = access,
-            // A wrong key is refused even where Moonraker would trust this machine.
-            Err(AccessError::Refused(message)) if presented.is_some() => {
-                log::warn!("Moonraker refused the stored access of this display: {message}");
-                access::identify(&self.connection, identity(), None).await?;
-                self.access = Access::Open;
-            }
-            Err(error) => return Err(error),
-        }
+        self.access = introduce(&self.connection, self.credentials, &self.endpoint).await?;
         Ok(())
     }
 
@@ -326,7 +340,8 @@ impl<'a> Session<'a> {
         let credential = Credential::Login { username: login.username.clone(), refresh_token: login.refresh_token };
         remember_credential(self.credentials, &self.endpoint, Some(credential));
         access::identify(&self.connection, identity(), Some(("access_token", &login.token))).await?;
-        log::info!("logged in at Moonraker as {}", login.username);
+        log::info!("logged in at Moonraker");
+        log::debug!("logged in as {}", login.username);
         self.access = Access::User(login.username);
         Ok(())
     }
@@ -334,9 +349,9 @@ impl<'a> Session<'a> {
     /// Ends the login at Moonraker (an API key stays valid there), forgets the credential and connects again
     /// without it.
     async fn log_out(&mut self) -> SessionEnd {
-        if let Access::User(username) = &self.access {
+        if let Access::User(_) = &self.access {
             match access::log_out(&self.connection).await {
-                Ok(()) => log::info!("logged out {username} at Moonraker"),
+                Ok(()) => log::info!("logged out at Moonraker"),
                 Err(error) => log::info!("logout at Moonraker failed: {error}"),
             }
         }
@@ -380,11 +395,11 @@ impl<'a> Session<'a> {
         self.wled = self.fetch_wled().await;
         sources.wled_strips = self.wled.iter().map(WledStrip::object).collect();
         if let Some(help) = self.fetch_help().await {
-            sources.klipper.tool_commands = Some(klipper::tool_commands(&help));
-            sources.klipper.has_unselect_tool = klipper::lists_command(&help, "UNSELECT_TOOL");
+            sources.apply_help(&help);
         }
         self.sources = sources;
         self.store.replace(result.get("status").unwrap_or(&Value::Null));
+        log_fact("Changers", &PrinterStatus::from_store(&self.store).changer_systems());
         // After a restart the configuration or the hardware may have changed: what was learned about the fans is gone.
         self.fan_watch = FanWatch::default();
         self.klippy_ready = true;
@@ -480,9 +495,11 @@ impl<'a> Session<'a> {
     }
 
     async fn handle_notification(&mut self, notification: Notification) {
+        trail::notification(&notification.method, &notification.params);
         match notification.method.as_str() {
             "notify_status_update" => {
                 if let Some(changes) = notification.params.get(0) {
+                    trail::status_changes(changes);
                     self.store.merge(changes);
                     self.requery_stale_gate_map(changes).await;
                     self.publish();
@@ -497,6 +514,7 @@ impl<'a> Session<'a> {
             "notify_klippy_disconnected" => self.mark_klippy(KlippyState::Disconnected, "").await,
             "notify_gcode_response" => {
                 if let Some(message) = notification.params.get(0).and_then(Value::as_str) {
+                    trail::console_response(message);
                     self.outputs.event(Event::ConsoleLine(console_line(ConsoleKind::Response, message)));
                 }
             }
@@ -539,6 +557,10 @@ impl<'a> Session<'a> {
     /// (when it ended and what it took).
     pub(super) fn publish(&mut self) {
         let status = self.current_status();
+        if self.logged_klippy != Some(status.klippy_state) {
+            self.logged_klippy = Some(status.klippy_state);
+            log_klippy(status.klippy_state, &status.klippy_message);
+        }
         if status.job.filename != self.job_filename {
             self.job_filename.clone_from(&status.job.filename);
             if !self.job_filename.is_empty() {
@@ -547,6 +569,7 @@ impl<'a> Session<'a> {
         }
         if status.job.state != self.job_state {
             self.job_state = status.job.state;
+            log::info!("print {}", self.job_state.as_str());
             if self.job_state.is_finished() {
                 self.answer(Query::PrintHistory);
             }
@@ -567,6 +590,16 @@ impl<'a> Session<'a> {
             status,
             sources: self.sources.clone(),
         });
+    }
+}
+
+/// Klipper's state when it changes, with the reason Klipper gives for an error or a shutdown.
+fn log_klippy(state: KlippyState, message: &str) {
+    let message = message.trim();
+    if message.is_empty() || state == KlippyState::Ready {
+        log::info!("Klipper {}", state.as_str());
+    } else {
+        log::info!("Klipper {}: {message}", state.as_str());
     }
 }
 

@@ -1,0 +1,64 @@
+name: Support for new hardware
+description: Ask FreakyMate to support an MMU, tool changer, buffer, sensor or other hardware
+title: "[Hardware]: "
+labels: [hardware-support, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues in German are welcome too. Please search the existing issues first. Questions and help are best asked on [Discord](https://discord.gg/Ja2cxCcmJQ).
+
+        FreakyMate is tested against simulated printers built from diagnostic reports. Testers with real hardware make support possible.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of hardware
+      options:
+        - MMU / filament changer
+        - Tool changer
+        - Buffer or sensor
+        - Display
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: project
+    attributes:
+      label: Project link
+      description: Link to the hardware's project or firmware repository.
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What does the hardware do?
+      description: How does it work and how is it used at the printer?
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Diagnostic report
+      description: |
+        On the printer host run `~/freakymate/freakymate --report` (installed with `install.sh`) or `freakymate --report` (`.deb` package).
+        This writes `freakymate-report.json` to `printer_data/logs`, so you can download it in Mainsail or Fluidd under Machine → logs.
+        Drag the file into this field (drag and drop). The report lets us build a simulated printer from it.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Klipper configuration of this hardware
+      description: Paste it or drag the file into this field.
+    validations:
+      required: true
+  - type: dropdown
+    id: test
+    attributes:
+      label: Can you test changes on this hardware?
+      options:
+        - "Yes"
+        - "No"
+        - Maybe
+    validations:
+      required: true

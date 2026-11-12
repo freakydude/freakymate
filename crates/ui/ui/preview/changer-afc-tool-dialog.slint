@@ -1,0 +1,10 @@
+// Preview: the choice of lane for T1 with AFC. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { MmuDialogs } from "../state.slint";
+import { ChangerAfcToolsPreview } from "changer-afc-tools.slint";
+
+export component ChangerAfcToolDialogPreview inherits ChangerAfcToolsPreview {
+    init => {
+        MmuDialogs.afc-tool = 1;
+    }
+}

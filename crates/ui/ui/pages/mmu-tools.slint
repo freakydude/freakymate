@@ -1,11 +1,11 @@
-// Tools tab of the Filament page: which tool takes its filament from which gate (Happy Hare's tool-to-gate map),
+// Tools tab of the Changer page: which tool takes its filament from which gate (Happy Hare's tool-to-gate map),
 // compared with the job's file, and EndlessSpool with the groups of the gates in a dialog. Both are set here only; the
 // Gates tab shows them.
 
 import { Theme } from "../theme.slint";
 import { ToolLabel } from "../components/tool-label.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, SpoolPicker, ToolMatchItem, Printer } from "../state.slint";
+import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, Page, SpoolPicker, ToolMatchItem, Printer } from "../state.slint";
 import { BarColors } from "../structs.slint";
 import { ButtonKind, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
 import { FilamentCompare } from "../components/filament-compare.slint";
@@ -14,7 +14,7 @@ import { DialogHeader, DialogPanel, DialogTitle, Scrim } from "../components/dia
 import { SlotTile, VerdictIcon } from "../components/mmu-tiles.slint";
 
 // One side of a tool's row: a tap area with the filament's colour as its left edge over the full height.
-component FilamentHalf inherits Rectangle {
+export component FilamentHalf inherits Rectangle {
     in property <BarColors> colors;
     in property <bool> empty;
     in property <bool> color-warn;
@@ -102,7 +102,7 @@ component ToolRow inherits Rectangle {
             }
         }
         if root.has-file: Image {
-            width: 18px;
+            width: Theme.icon-small;
             source: Icons.ui-chevron-right;
             colorize: Theme.muted;
         }
@@ -169,8 +169,8 @@ component ToolsHeader inherits HorizontalLayout {
         }
         Image {
             y: (parent.height - self.height) / 2;
-            width: 16px;
-            height: 16px;
+            width: Theme.icon-compact;
+            height: Theme.icon-compact;
             source: Icons.file-gcode;
             colorize: Theme.muted;
         }
@@ -197,7 +197,7 @@ component ToolsHeader inherits HorizontalLayout {
     IconButton {
         width: 112px;
         height: 40px;
-        icon: Icons.ui-refresh;
+        icon: Icons.ui-reset;
         icon-size: Theme.icon-small;
         text: @tr("Reset");
         horizontal: true;
@@ -326,7 +326,7 @@ export component EndlessSpoolDialog inherits Scrim {
 }
 
 // A line of a dialog in the style of the tool rows: the filament's colour as the left edge, material and name beside it.
-component FilamentLine inherits Rectangle {
+export component FilamentLine inherits Rectangle {
     in property <BarColors> colors;
     in property <bool> empty;
     in property <bool> color-warn;
@@ -414,6 +414,7 @@ component OpenGateButton inherits IconButton {
         MmuDialogs.gate-row = root.gate-row;
         root.opened();
         Navigation.filament-tab = FilamentTab.gates;
+        Navigation.page = Page.filament;
     }
 }
 

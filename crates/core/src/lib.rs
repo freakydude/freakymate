@@ -13,6 +13,7 @@ pub mod credentials;
 pub mod domain;
 pub mod moonraker;
 pub mod network;
+pub mod report;
 pub mod service;
 pub mod settings;
 pub mod setup;

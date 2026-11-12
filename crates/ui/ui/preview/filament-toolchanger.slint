@@ -1,0 +1,13 @@
+// Preview: the Filament page of a tool changer with three heads and spools, T1 mounted. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component FilamentToolchangerPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Sample.toolchanger();
+        Navigation.page = Page.filament;
+    }
+}

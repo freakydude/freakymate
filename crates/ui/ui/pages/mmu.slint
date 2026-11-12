@@ -31,10 +31,8 @@ component MmuRecoverRow inherits HorizontalLayout {
 
 // A tap on a gate opens its dialog instead of moving the selector, so looking at a gate or setting its colour never
 // moves anything. Loading belongs to a gate (its dialog); unloading takes out whatever is loaded, so it sits at the
-// filament path. The tools are on the Tools tab, the commands for the MMU as a whole on the Service tab.
+// filament path. The tools and the commands for the MMU as a whole are on the Changer page.
 export component MmuGatesTab inherits Rectangle {
-    // Under the head tabs and their path tabs the page has 64 px less: smaller tiles, the path card without its heading.
-    in property <bool> compact;
     // The head whose gates the tab shows, a row of `Printer.heads`; -1 without a head level (all gates).
     in property <int> head-index: -1;
     // The pages of this view: one unit at a time, five tiles at most (the split is made in the core, `gate_pages.rs`).
@@ -72,7 +70,7 @@ export component MmuGatesTab inherits Rectangle {
 
         HorizontalLayout {
             spacing: Theme.spacing;
-            height: root.compact ? 128px : 150px;
+            height: 150px;
             if root.pages > 1: IconButton {
                 width: 48px;
                 icon: Icons.ui-chevron-left;
@@ -86,7 +84,6 @@ export component MmuGatesTab inherits Rectangle {
                     x: slot * (tiles.cell-width + Theme.spacing);
                     width: tiles.cell-width;
                     height: tiles.height;
-                    compact: root.compact;
                     gate: Printer.mmu-gates[root.current.first-row + slot];
                     clicked => {
                         Actions.lane-tapped(root.current.first-row + slot);
@@ -112,7 +109,7 @@ export component MmuGatesTab inherits Rectangle {
         }
 
         Card {
-            title: root.compact ? "" : @tr("Filament path");
+            title: @tr("Filament path");
             icon: Icons.filament-sensor;
             HorizontalLayout {
                 spacing: Theme.spacing;
@@ -150,22 +147,15 @@ export component MmuGatesTab inherits Rectangle {
                     // Happy Hare's buffer is the selected gate's: another lane on the card has none to show.
                     if Printer.mmu-has-buffer && Printer.lane-buffer != "" && !root.needs-recovery: VerticalLayout {
                         spacing: Theme.spacing-small;
-                        if !root.compact: IconLabel {
+                        IconLabel {
                             icon: Icons.mmu-sync;
                             text: @tr("Buffer: {}", MmuTexts.buffer(Printer.mmu-buffer-state));
                             color: gauge.marker-color;
                             font-size: Theme.font-small;
                         }
-                        // The ends named beside the gauge, so the card keeps its height with the filament path above;
-                        // under the head tabs the state word stands in the same line.
+                        // The ends named beside the gauge, so the card keeps its height with the filament path above.
                         HorizontalLayout {
                             spacing: Theme.spacing;
-                            if root.compact: IconLabel {
-                                icon: Icons.mmu-sync;
-                                text: @tr("Buffer: {}", MmuTexts.buffer(Printer.mmu-buffer-state));
-                                color: gauge.marker-color;
-                                font-size: Theme.font-small;
-                            }
                             Text { text: @tr("Tension"); color: Theme.muted; font-size: Theme.font-small; vertical-alignment: center; }
                             gauge := BufferGauge {
                                 horizontal-stretch: 1;
@@ -202,11 +192,11 @@ export component MmuGatesTab inherits Rectangle {
                         enabled: Printer.mmu-filament != "unloaded";
                         clicked => { Actions.mmu-unload(); }
                     }
-                    // A hint, not a lock: an MMU without home is still shown, but most commands need it.
-                    if !Printer.mmu-homed: IconButton {
+                    // Accent only while the MMU is not homed (most commands need it); a homed one has no main action here.
+                    IconButton {
                         icon: Icons.mmu-home;
                         text: @tr("Home");
-                        kind: ButtonKind.accent;
+                        kind: Printer.mmu-homed ? ButtonKind.normal : ButtonKind.accent;
                         clicked => { Actions.mmu-home(); }
                     }
                     Rectangle { vertical-stretch: 1; }
