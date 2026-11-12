@@ -295,7 +295,7 @@ pub enum HubReturnBlock {
     /// AFC-BUG-WORKAROUND: this block deliberately deviates from the rule "hints, not locks". Its message says the
     /// reset must stop, but unlike the hub check right above it, `AFC_functions.py` L1690-1692 has no `return`, so AFC
     /// pulls filament back out of a loaded head (verified at 5ea84ea, 2026-11-12). We treat this as a technical bug in
-    /// AFC, not as behaviour to rely on. Once AFC fixes it (issue: see the backlog item "AFC issue"), remove this
+    /// AFC, not as behaviour to rely on. Once AFC fixes it (issue: https://github.com/AFCProject/AFC-Klipper-Add-On/issues/903), remove this
     /// variant, let `hub_returns` ignore `current_load` and show only a hint.
     ToolLoaded(String),
     /// The hub's switch sees no filament; AFC refuses ("Hub is already clear while trying to reset '…'").

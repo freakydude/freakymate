@@ -567,7 +567,7 @@ Read from AFC `main` on 2026-11-11:
   printing. Core, commands and screens are done (D7, 2026-11-12). The button is also disabled while a lane is loaded in
   the head. That is a deliberate exception to "hints, not locks": AFC prints "unload or check sensor before resetting
   lane" but lacks the `return` (`AFC_functions.py` L1690-1692 at 5ea84ea) and pulls the filament anyway. We treat it as an
-  AFC bug, not as behaviour to build on; marked `AFC-BUG-WORKAROUND` in the core, to be removed when AFC fixes it.
+  AFC bug, not as behaviour to build on; marked `AFC-BUG-WORKAROUND` in the core, to be removed when AFC fixes it (AFCProject/AFC-Klipper-Add-On#903).
 - **Left out:** `AFC_RESET` (only opens a Mainsail prompt with `AFC_LANE_RESET` per lane), `AFC_RECOVER_LANE`,
   `SET_LANE_LOADED`, `UNSET_LANE_LOADED`, `AFC_CALIBRATION` (their names depend on `show_macros`, and they are last
   resorts: the console is the way), runout lanes (`SET_RUNOUT`), buffer settings, tests, statistics, encoder details.
