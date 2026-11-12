@@ -30,7 +30,7 @@ component InterruptionBanner inherits Rectangle {
         spacing: Theme.spacing;
         Image {
             cross-axis-self-alignment: center;
-            source: root.failed ? Icons.ui-error : Icons.print-pause;
+            source: root.failed ? Icons.state-error : Icons.print-pause;
             colorize: root.tone;
             width: Theme.icon-medium;
             height: Theme.icon-medium;
@@ -216,7 +216,7 @@ export component PrintPage inherits Rectangle {
                         spacing: Theme.spacing;
                         if !root.finished: ValueTile {
                             weight: 4;
-                            icon: Icons.print-eta;
+                            icon: Icons.print-remaining;
                             label: @tr("Remaining");
                             value: Printer.remaining;
                         }
@@ -245,7 +245,7 @@ export component PrintPage inherits Rectangle {
                         spacing: Theme.spacing;
                         ValueTile {
                             weight: 4;
-                            icon: Icons.ui-info;
+                            icon: Icons.print-eta;
                             label: @tr("ETA");
                             value: Printer.eta;
                         }
@@ -270,7 +270,7 @@ export component PrintPage inherits Rectangle {
             width: 104px;
             spacing: Theme.spacing;
             if !Printer.is-printing: ActionTile {
-                icon: Icons.print-load;
+                icon: Icons.file-folder;
                 text: @tr("Files");
                 kind: !root.prepared && !root.has-job ? ButtonKind.accent : ButtonKind.normal;
                 clicked => {

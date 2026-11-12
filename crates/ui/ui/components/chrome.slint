@@ -126,8 +126,8 @@ export component StatusBar inherits Rectangle {
                         cross-axis-self-alignment: center;
                         source: Printer.status-message-error ? Icons.ui-error : Icons.ui-info;
                         colorize: Printer.status-message-error ? Theme.danger : Theme.info;
-                        width: Theme.icon-medium;
-                        height: Theme.icon-medium;
+                        width: Theme.icon-large;
+                        height: Theme.icon-large;
                     }
                     Text {
                         horizontal-stretch: 1;
@@ -274,8 +274,8 @@ export component StatusBar inherits Rectangle {
                 Image {
                     source: Icons.system-emergency-stop;
                     colorize: Theme.foreground;
-                    width: 28px;
-                    height: 28px;
+                    width: Theme.icon;
+                    height: Theme.icon;
                 }
             }
         }
@@ -317,8 +317,8 @@ component NavItem inherits Rectangle {
             cross-axis-self-alignment: center;
             source: root.icon;
             colorize: root.content;
-            width: 26px;
-            height: 26px;
+            width: Theme.icon-nav;
+            height: Theme.icon-nav;
         }
         Text {
             text: root.label;
