@@ -4,17 +4,19 @@
 
 use super::pages::prepared_job;
 use crate::session::Session;
-use freakymate::{Confirm, FilamentTab, Navigation, Page, Printer, SpoolPicker};
+use freakymate::{ChangerTab, Confirm, FilamentTab, Navigation, Page, Printer, SpoolPicker};
 use freakymate_core::Command;
 use slint::ComponentHandle;
 use slint::Model;
 use std::time::Duration;
 
-/// The tab of head T2 and the button at the top right of the head view, in the 800x480 layout.
-const HEAD_TAB_T2: (f32, f32) = (310.0, 90.0);
-const HEAD_ACTION: (f32, f32) = (730.0, 140.0);
-/// The button of the line under the tabs (Initialize, Recover).
-const NOTE_BUTTON: (f32, f32) = (730.0, 145.0);
+/// The chip of the head at the right end of the tab row, in the 800x480 layout; in the picker the row of T2 (a tap on it
+/// chooses the head) and the button of that row.
+const HEAD_CHIP: (f32, f32) = (712.0, 90.0);
+const PICKER_ROW_T2: (f32, f32) = (300.0, 280.0);
+const PICKER_BUTTON_T2: (f32, f32) = (690.0, 280.0);
+/// The button of the hint in the tab row (Initialize, Recover).
+const NOTE_BUTTON: (f32, f32) = (550.0, 80.0);
 
 /// Without a tool changer or without Spoolman the scene is skipped.
 pub(super) fn toolchanger(session: &mut Session) -> Result<(), String> {
@@ -96,44 +98,61 @@ fn start_state(session: &mut Session) -> Result<(), String> {
     })
 }
 
-/// The Filament page with a tab per head: the mounted head, a head that is not mounted with its "Select" button, the
+/// The Filament page with the chip of the head and its picker: the mounted head, a head that is not mounted with its "Select" button, the
 /// deviations of the changer (error with its confirmation, not initialized) and back to ready.
 fn head_level(session: &mut Session) -> Result<(), String> {
     // A changer that requires a mounted tool has no `UNSELECT_TOOL`: the mounted head without "Drop".
     let has_drop = session.presenter.snapshot().sources.klipper.has_unselect_tool;
     session.show_page(Page::Filament, if has_drop { "toolchanger-filament-heads" } else { "toolchanger-no-drop" })?;
     if session.window.global::<Printer>().get_heads().row_count() < 2 {
-        return Err("a tool changer should give the Filament page a tab per head".into());
+        return Err("a tool changer should give the Filament page a row per head".into());
     }
     if !has_drop {
         return Ok(());
     }
     let reference = session.has_reference_layout();
     if session.presenter.snapshot().status.mmu.is_some() {
-        // Heads with a unit of their own: Gates and Extruder below the heads, Tools and Service beside them.
+        // Heads with a unit of their own: Gates and Extruder beside the chip; Tools and Service are on Changer.
         session.window.global::<Navigation>().set_filament_head(1);
         session.capture("toolchanger-mmu-second-head")?;
         error_with_unit(session)?;
         session.window.global::<Navigation>().set_filament_tab(FilamentTab::Extruder);
         session.capture("toolchanger-mmu-extruder")?;
-        session.window.global::<Navigation>().set_filament_tab(FilamentTab::Tools);
-        session.capture("toolchanger-mmu-tools")?;
-        session.window.global::<Navigation>().set_filament_tab(FilamentTab::Service);
-        session.capture("toolchanger-mmu-service")?;
         session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
         session.window.global::<Navigation>().set_filament_head(-1);
+        for (tab, name) in
+            [(ChangerTab::Tools, "toolchanger-mmu-tools"), (ChangerTab::Service, "toolchanger-mmu-service")]
+        {
+            session.window.global::<Navigation>().set_changer_tab(tab);
+            session.show_page(Page::Changer, name)?;
+        }
+        session.window.global::<Navigation>().set_changer_tab(ChangerTab::Tools);
         return Ok(());
     }
 
-    // T2 is not mounted: its own nozzle and spool, nothing to extrude, the button picks it up.
+    // The chip opens the picker; a tap on the row of T2 shows that head, which is not mounted: its own nozzle and
+    // spool, nothing to extrude. The button of its row in the picker selects it.
     if reference {
-        session.tap(HEAD_TAB_T2.0, HEAD_TAB_T2.1);
+        session.tap(HEAD_CHIP.0, HEAD_CHIP.1);
+    } else {
+        session.window.global::<Navigation>().set_head_picker_open(true);
+    }
+    session.capture("toolchanger-head-picker")?;
+    if reference {
+        session.tap(PICKER_ROW_T2.0, PICKER_ROW_T2.1);
     } else {
         session.window.global::<Navigation>().set_filament_head(2);
+        session.window.global::<Navigation>().set_head_picker_open(false);
+    }
+    if session.window.global::<Navigation>().get_head_picker_open()
+        || session.window.global::<Navigation>().get_filament_head() != 2
+    {
+        return Err("a tap on the row of T2 should show that head and close the picker".into());
     }
     session.capture("toolchanger-filament-parked")?;
     if reference {
-        session.tap(HEAD_ACTION.0, HEAD_ACTION.1);
+        session.tap(HEAD_CHIP.0, HEAD_CHIP.1);
+        session.tap(PICKER_BUTTON_T2.0, PICKER_BUTTON_T2.1);
     } else {
         session.service.send(Command::RunMacro { name: "T2".into() });
     }
@@ -172,7 +191,7 @@ fn head_level(session: &mut Session) -> Result<(), String> {
     no_head_mounted(session)
 }
 
-/// `UNSELECT_TOOL` drops the head: no head on the carriage, the Filament page with its head tabs and the status bar
+/// `UNSELECT_TOOL` drops the head: no head on the carriage, the Filament page with its chip and the status bar
 /// without a nozzle of a mounted head (`toolchanger-no-head`); then T2 is picked up again for the following scenes.
 fn no_head_mounted(session: &mut Session) -> Result<(), String> {
     session.service.send(Command::RunGcode { script: "UNSELECT_TOOL".into() });

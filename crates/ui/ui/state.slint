@@ -91,6 +91,14 @@ export global Printer {
     in property <bool> changer-ready: true;
     // The mounted head can be dropped (`UNSELECT_TOOL` exists).
     in property <bool> has-drop;
+    // A tool changer (`toolchanger` object) with its state: `status` (uninitialized, initializing, ready, changing,
+    // error), `initialize_on` of its configuration ("" while unknown) and the heads it selected and the detection
+    // found (`T<n>`, "" for none).
+    in property <bool> has-toolchanger;
+    in property <string> changer-status;
+    in property <string> changer-initialize-on;
+    in property <string> changer-head;
+    in property <string> changer-head-detected;
     // The name of the head whose nozzle the status bar shows (`T1`); empty without swappable heads.
     in property <string> nozzle-head;
     // False while the printer has heads but none is mounted: no nozzle to show.
@@ -102,12 +110,18 @@ export global Printer {
     in property <float> bed-target;
     // Part fan first, then the other fans.
     in property <[FanItem]> fans;
+    // The part cooling fan of the nozzle in use for the Tune page: that of the mounted head where heads state one,
+    // else `fan`; `has-part-fan` is false where there is none (a head that states no fan, no head mounted).
+    in property <bool> has-part-fan;
+    in property <FanItem> part-fan;
     in property <[LedItem]> leds;
     in property <[LedEffectItem]> led-effects;
     // The main light (chamber or case light): there is one, its name, and whether it is on.
     in property <bool> has-light;
     in property <string> light-name;
     in property <bool> light-on;
+    // The flow factor for the Basics of the Tune page; `tuning` holds the expert values without it.
+    in property <TuningItem> flow-factor;
     in property <[TuningItem]> tuning;
     // Temperature history of one heater or sensor, drawn as SVG path commands in a 1000 x 1000 view box.
     in property <string> history-title;
@@ -126,6 +140,11 @@ export global Printer {
     in property <[FilamentSensorItem]> filament-sensors;
     // A switched-on filament sensor reports no filament; the Sensors tab of a tool changer shows a dot.
     in property <bool> filament-sensor-runout;
+    // What the tabs of the Changer page have to show; the page and its entry exist when one of them has.
+    out property <bool> has-changer-tools: self.has-mmu;
+    out property <bool> has-changer-service: self.has-mmu || self.has-toolchanger;
+    out property <bool> has-changer-sensors: self.heads.length > 0 && self.filament-sensors.length > 0;
+    out property <bool> has-changer: self.has-changer-tools || self.has-changer-service || self.has-changer-sensors;
     // Objects of the running print; excluded ones cannot be printed again.
     in property <[PrintObjectItem]> print-objects;
     // The bed the objects lie on; not shown if the slicer did not tell where they are.
@@ -446,8 +465,11 @@ export global MmuDialogs {
     in-out property <bool> endless-spool-open;
 }
 
-// Tabs of the Filament page; without an MMU it shows the extruder alone.
-export enum FilamentTab { gates, extruder, tools, service, sensors }
+// Tabs of the Filament page (the path of one head); without lanes it shows the extruder alone.
+export enum FilamentTab { gates, extruder }
+
+// Tabs of the Changer page (the machine: map, service, filament sensors that no head owns); each only with content.
+export enum ChangerTab { tools, service, sensors }
 
 // Tabs of the Move page; without anything to calibrate it shows the axes alone.
 export enum MoveTab { axes, calibrate }
@@ -464,6 +486,10 @@ export global Navigation {
     out property <bool> messages-open;
     // Filament page; with an MMU it opens on the Gates tab.
     in-out property <FilamentTab> filament-tab;
+    // Changer page; a tab without content falls back to the first one that has some.
+    in-out property <ChangerTab> changer-tab;
+    // The head picker over the Filament page.
+    in-out property <bool> head-picker-open;
     // The head the Filament page shows, a row of `Printer.heads`; -1 follows the mounted head.
     in-out property <int> filament-head: -1;
     // Page of gate tiles the Gates tab shows, counted from 0 within its view; -1 opens on the unit of the loaded gate.
@@ -525,6 +551,12 @@ export global Confirm {
         self.argument = argument;
         self.danger = danger;
         self.open = true;
+    }
+
+    // Recover the tool changer after an error: initialise it and restore the position.
+    public function ask-recover-toolchanger() {
+        self.ask(@tr("Recover tool changer"), @tr("Initializes the tool changer and restores the position after the error."), "recover-toolchanger", "", false);
+        self.confirm-text = @tr("Recover");
     }
 
     public function ask-for-items(title: string, message: string, items: [string], action: string, argument: string, danger: bool) {
@@ -590,6 +622,7 @@ export global Dialogs {
         MmuDialogs.gate-row = -1;
         MmuDialogs.bypass-open = false;
         MmuDialogs.tool = -1;
+        Navigation.head-picker-open = false;
         MeshDialogs.map-open = false;
         MeshDialogs.profiles-open = false;
         if (Navigation.history-open) { Actions.close-history(); }

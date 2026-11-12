@@ -654,6 +654,7 @@ mod tests {
             name: format!("T{number}"),
             number: Some(number),
             extruder: Some(extruder.into()),
+            fan: None,
             active: number == 0,
         };
         let status = PrinterStatus {

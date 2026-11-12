@@ -9,7 +9,7 @@ use crate::history_view::HistoryView;
 use crate::items::{
     compared_tool_items, connection_name, fan_item, head_item, head_nozzles, heater_item, heaters_by_head,
     host_interface_item, led_effect_item, led_item, no_head_selected, power_item, replace_rows, selected_head,
-    sensor_item, spool_in_use_target, spool_tool, tuning_item, update_item,
+    selected_part_fan, sensor_item, split_tuning, spool_in_use_target, spool_tool, tuning_item, update_item,
 };
 use crate::macro_view::MacroView;
 use crate::mmu_view::{JobFile, MmuView};
@@ -310,10 +310,15 @@ impl Presenter {
         printer.set_light_name(main_led.map(|led| led.label.as_str()).unwrap_or_default().into());
         printer.set_light_on(main_led.is_some_and(|led| led.on));
         replace_rows(&self.fans, status.fans.iter().map(fan_item).collect());
+        let part_fan = selected_part_fan(&snapshot.tree, &status.fans);
+        printer.set_has_part_fan(part_fan.is_some());
+        printer.set_part_fan(part_fan.map(fan_item).unwrap_or_default());
         replace_rows(&self.leds, status.leds.iter().map(led_item).collect());
         replace_rows(&self.led_effects, status.led_effects.iter().map(led_effect_item).collect());
         let tuning = tuning::values(status, &snapshot.sources.klipper.tuning);
-        replace_rows(&self.tuning, tuning.iter().map(tuning_item).collect());
+        let (flow_factor, expert) = split_tuning(&tuning);
+        printer.set_flow_factor(flow_factor.map(tuning_item).unwrap_or_default());
+        replace_rows(&self.tuning, expert.into_iter().map(tuning_item).collect());
         printer.set_save_config_pending(status.save_config_pending);
         printer.set_leveling_state(match status.leveling_applied {
             Some(true) => "applied".into(),
@@ -431,6 +436,12 @@ impl Presenter {
         printer.set_changer_detected(detected.into());
         printer.set_changer_ready(changer.is_none_or(ToolchangerStatus::accepts_tool_change));
         printer.set_has_drop(changer.is_some() && snapshot.sources.klipper.has_unselect_tool);
+        printer.set_has_toolchanger(changer.is_some());
+        printer.set_changer_status(changer.map_or("", |changer| changer.status.as_str()).into());
+        printer.set_changer_initialize_on(changer.map_or("", |changer| changer.initialize_on.as_str()).into());
+        let head_name = |number: Option<usize>| number.map_or_else(String::new, |number| format!("T{number}"));
+        printer.set_changer_head(head_name(changer.and_then(|changer| changer.selected)).into());
+        printer.set_changer_head_detected(head_name(changer.and_then(|changer| changer.detected)).into());
     }
 
     /// Logs which source a derived value comes from when it changes; `None` means no source has a value.

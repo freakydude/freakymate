@@ -1,6 +1,6 @@
-// Preview: Filament page of a tool changer with five heads (long names), Happy Hare's Tools and Service beside them, the
-// third head looked at and not mounted, with the line of a mismatch between selected and detected head. Open in the Slint
-// preview or render with scripts/ui-preview.sh.
+// Preview: Filament page of a tool changer with five heads (long names) and Happy Hare, the third head looked at and not
+// mounted, with the line of a mismatch between selected and detected head. Open in the Slint preview or render with
+// scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
 import { Navigation, Page, Printer } from "../state.slint";
@@ -23,6 +23,10 @@ export component FilamentHeadsFivePreview inherits AppWindow {
             { name: "Toolhead_E", label: "T4", subtitle: "Toolhead_E", has-nozzle: true, temperature: 24, mounted: false, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T4", has-spool: false, spool-id: -1, spool-tool: 4, can-pick-spool: true },
         ];
         Printer.mounted-head = 0;
+        Printer.has-toolchanger = true;
+        Printer.changer-status = "ready";
+        Printer.changer-head = "T0";
+        Printer.changer-head-detected = "T2";
         Printer.changer-note = "mismatch";
         Printer.changer-selected = "T0";
         Printer.changer-detected = "T2";

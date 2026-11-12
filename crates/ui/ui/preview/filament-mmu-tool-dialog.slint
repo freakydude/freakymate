@@ -2,14 +2,14 @@
 // scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
-import { FilamentTab, MmuDialogs, Navigation, Page, Printer } from "../state.slint";
+import { ChangerTab, MmuDialogs, Navigation, Page, Printer } from "../state.slint";
 import { Sample } from "sample.slint";
 
 export component FilamentMmuToolDialogPreview inherits AppWindow {
     init => {
         Sample.mmu();
-        Navigation.page = Page.filament;
-        Navigation.filament-tab = FilamentTab.tools;
+        Navigation.page = Page.changer;
+        Navigation.changer-tab = ChangerTab.tools;
         Printer.mmu-tools = [{ tool: 0, gate: 0 }, { tool: 1, gate: 3 }, { tool: 2, gate: 2 }, { tool: 3, gate: 1 }];
         MmuDialogs.tool = 1;
     }

@@ -128,7 +128,13 @@ mod tests {
     use crate::sources::toolchanger::ToolHead;
 
     fn head(name: &str, number: usize, active: bool) -> ToolHead {
-        ToolHead { name: name.into(), number: Some(number), extruder: Some(format!("extruder{number}")), active }
+        ToolHead {
+            name: name.into(),
+            number: Some(number),
+            extruder: Some(format!("extruder{number}")),
+            fan: None,
+            active,
+        }
     }
 
     fn changer(status: &str, selected: Option<usize>, detected: Option<usize>) -> ToolchangerStatus {

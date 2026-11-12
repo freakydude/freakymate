@@ -1,10 +1,10 @@
-// Fine tuning during the print: Z offset and speed factor; in the expert tab flow, pressure advance and the motion
-// and extrusion values of the configuration, changed until the next restart.
+// Fine tuning during the print: Z offset, speed and flow factor and the part cooling fan; in the expert tab pressure
+// advance and the motion and extrusion values of the configuration, changed until the next restart.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, Navigation, Printer, TuneTab, TuningItem, UiSettings } from "../state.slint";
-import { ButtonKind, Card, IconButton, ScrollList, StepSelector, TabBar, TabButton } from "../components/controls.slint";
+import { ButtonKind, Card, IconButton, ScrollList, StepSelector, TabBar, TabButton, TouchSlider } from "../components/controls.slint";
 
 // Names of the expert values; the core identifies them by id.
 global TuningTexts {
@@ -114,8 +114,74 @@ component ExpertTab inherits Rectangle {
     }
 }
 
-// What one corrects while watching a print: the Z offset of the first layer, and the speed of a print that has to
-// go slower. Calibration values (pressure advance, flow) are in the expert tab.
+// The part cooling fan of the nozzle in use, the same fan as on the Thermal page: the mounted head's where heads
+// state one (named after the head), else `fan`. One row with the name above the value, so the page keeps its height
+// with the note under the factors.
+component PartFanCard inherits Card {
+    HorizontalLayout {
+        spacing: Theme.spacing;
+        height: Theme.touch;
+        Image {
+            cross-axis-self-alignment: center;
+            // A fan that does not turn although it should is an error, as on the Thermal page.
+            source: Printer.part-fan.stalled ? Icons.state-error : Icons.thermal-fan;
+            colorize: Printer.part-fan.stalled ? Theme.danger : Printer.part-fan.speed > 0 ? Theme.accent : Theme.muted;
+            width: 28px;
+            height: 28px;
+        }
+        VerticalLayout {
+            alignment: center;
+            width: 180px;
+            Text {
+                text: Printer.nozzle-head == "" ? @tr("Part fan") : @tr("Part fan {}", Printer.nozzle-head);
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                overflow: elide;
+            }
+            HorizontalLayout {
+                spacing: Theme.spacing;
+                alignment: start;
+                Text {
+                    text: round(part-fan-slider.shown) + " %";
+                    color: Printer.part-fan.stalled ? Theme.danger : Theme.foreground;
+                    font-size: Theme.font-large;
+                    font-weight: 600;
+                }
+                if Printer.part-fan.rpm != "": Text {
+                    text: Printer.part-fan.rpm;
+                    color: Printer.part-fan.stalled ? Theme.danger : Theme.muted;
+                    font-size: Theme.font-small;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+        }
+        IconButton {
+            width: Theme.button-narrow;
+            text: @tr("Off");
+            enabled: Printer.part-fan.controllable;
+            checked: Printer.part-fan.speed < 1;
+            clicked => { Actions.set-fan(Printer.part-fan.object, 0); }
+        }
+        part-fan-slider := TouchSlider {
+            cross-axis-self-alignment: center;
+            horizontal-stretch: 1;
+            enabled: Printer.part-fan.controllable;
+            value: Printer.part-fan.speed;
+            changed(level) => { Actions.set-fan(Printer.part-fan.object, level); }
+        }
+        IconButton {
+            width: Theme.button-narrow;
+            text: "100%";
+            enabled: Printer.part-fan.controllable;
+            checked: Printer.part-fan.speed > 99;
+            clicked => { Actions.set-fan(Printer.part-fan.object, 100); }
+        }
+    }
+}
+
+// What one corrects while watching a print: the Z offset of the first layer, the speed and flow of the print, and the
+// part cooling fan. Calibration values (pressure advance, smooth time) and the limits are in the expert tab.
 component BasicsTab inherits Rectangle {
     VerticalLayout {
         padding: Theme.padding;
@@ -176,7 +242,18 @@ component BasicsTab inherits Rectangle {
                     increase => { Actions.set-speed-factor(Printer.speed-factor + 5); }
                     reset => { Actions.set-speed-factor(100); }
                 }
-                // A quiet note: the slicer planned layer times and cooling for 100 %.
+                Adjuster {
+                    title: @tr("Flow factor");
+                    icon: Icons.filament-flow;
+                    value: Printer.flow-factor.value;
+                    highlight: Printer.flow-factor.changed;
+                    can-reset: Printer.flow-factor.can-reset;
+                    decrease => { Actions.step-tuning(Printer.flow-factor.id, -1); }
+                    increase => { Actions.step-tuning(Printer.flow-factor.id, 1); }
+                    reset => { Actions.reset-tuning(Printer.flow-factor.id); }
+                }
+                // A quiet note: the slicer planned layer times and cooling for 100 %. Below both factors, so the flow
+                // factor does not move while the speed is tapped.
                 if round(Printer.speed-factor) != 100: Text {
                     text: @tr("Layer times and cooling differ from what the slicer planned.");
                     color: Theme.muted;
@@ -186,6 +263,7 @@ component BasicsTab inherits Rectangle {
                 Rectangle { vertical-stretch: 1; }
             }
         }
+        if Printer.has-part-fan: PartFanCard { }
     }
 }
 

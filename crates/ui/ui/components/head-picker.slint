@@ -1,0 +1,197 @@
+// The heads of a tool changer as a list over the Filament page (docs/multi-tool.md, D7): the colour of the spool, `T<n>`,
+// the nozzle, the state and the one button that changes it. A tap on a row chooses the head the page shows (it never
+// moves the printer), the button acts on the changer.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, HeadItem, Navigation, Printer, Severity } from "../state.slint";
+import { StateIcons } from "../state-icons.slint";
+import { IconButton, ScrollList } from "controls.slint";
+import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
+import { FilamentSwatch } from "filament-swatch.slint";
+
+component HeadRow inherits Rectangle {
+    in property <HeadItem> head;
+    // The page shows this head.
+    in property <bool> viewed;
+    // Changing heads is possible now (no print, changer ready).
+    in property <bool> can-change;
+    callback chosen;
+    callback select;
+    callback drop;
+
+    property <bool> has-select: !root.head.mounted && root.head.pick-up != "";
+    property <bool> has-drop: root.head.mounted && Printer.has-drop;
+    property <string> state-text: root.head.mounted ? (root.head.detected ? @tr("mounted") : @tr("selected"))
+        : Printer.has-spoolman && !root.head.has-spool ? @tr("no spool") : "";
+
+    border-radius: Theme.radius;
+    // On the panel itself, so that the buttons stand out from it; the head the page shows has an accent frame.
+    background: row-touch.pressed ? Theme.surface-raised : transparent;
+    border-width: root.viewed ? 2px : 1px;
+    border-color: root.viewed ? Theme.accent : Theme.border;
+
+    row-touch := TouchArea {
+        clicked => { root.chosen(); }
+    }
+
+    HorizontalLayout {
+        padding-left: Theme.spacing-large;
+        padding-right: Theme.spacing;
+        spacing: Theme.spacing-large;
+        FilamentSwatch {
+            cross-axis-self-alignment: center;
+            width: 6px;
+            height: 36px;
+            radius: 3px;
+            empty: !root.head.has-spool;
+            colors: root.head.spool-colors;
+        }
+        Text {
+            width: 48px;
+            text: root.head.label;
+            color: root.head.mounted ? Theme.accent : Theme.foreground;
+            font-size: Theme.font-normal;
+            font-weight: 700;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        // The name of the section, where it says more than the label.
+        Text {
+            horizontal-stretch: 1;
+            text: root.head.subtitle;
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        Text {
+            width: 56px;
+            text: root.head.has-nozzle ? round(root.head.temperature) + "°" : "";
+            color: Theme.muted;
+            font-size: Theme.font-normal;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+        // The state: where the detection found the head, the check and the word; else the word alone.
+        state-cell := Rectangle {
+            width: 120px;
+            property <bool> checked: root.head.mounted && root.head.detected;
+            if state-cell.checked: Image {
+                x: 0px;
+                y: (state-cell.height - self.height) / 2;
+                source: Icons.ui-check;
+                colorize: StateIcons.severity-color(Severity.fine);
+                width: Theme.icon-compact;
+                height: Theme.icon-compact;
+            }
+            Text {
+                x: state-cell.checked ? Theme.icon-compact + Theme.spacing-small : 0px;
+                width: state-cell.width - self.x;
+                height: state-cell.height;
+                text: root.state-text;
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+        // None where the command does not exist (the mounted head of a changer without `UNSELECT_TOOL`).
+        Rectangle {
+            width: 124px;
+            if root.has-select: IconButton {
+                height: parent.height - 8px;
+                y: 4px;
+                text: root.head.pick-up == "macro" ? @tr("Select") : @tr("Pick up");
+                horizontal: true;
+                enabled: root.can-change;
+                clicked => { root.select(); }
+            }
+            if root.has-drop: IconButton {
+                height: parent.height - 8px;
+                y: 4px;
+                text: @tr("Drop");
+                horizontal: true;
+                enabled: root.can-change;
+                clicked => { root.drop(); }
+            }
+        }
+    }
+}
+
+export component HeadPicker inherits Scrim {
+    // The row of the head the page shows.
+    in property <int> head-index;
+    property <length> row-height: Theme.touch;
+    property <length> row-step: self.row-height + Theme.spacing;
+    property <length> list-height: Printer.heads.length * self.row-step - Theme.spacing;
+    property <bool> can-change: !Printer.motion-locked && Printer.changer-ready;
+    // Why the buttons are off.
+    property <string> blocked: Printer.motion-locked ? @tr("Not while printing") : !Printer.changer-ready ? @tr("Tool changer not ready") : "";
+    visible: Navigation.head-picker-open;
+
+    function close() {
+        Navigation.head-picker-open = false;
+    }
+
+    // A tap beside the list closes it.
+    TouchArea {
+        clicked => { root.close(); }
+    }
+
+    DialogPanel {
+        width: min(parent.width - 16px, 680px);
+        // The header, the list and the room around them; from about six rows the list scrolls.
+        height: min(parent.height - 16px, 2 * Theme.dialog-padding + Theme.touch + Theme.spacing + root.list-height);
+        x: (parent.width - self.width) / 2;
+        y: 8px;
+
+        TouchArea { }
+
+        VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing;
+            DialogHeader {
+                title: @tr("Heads");
+                close => { root.close(); }
+                if root.blocked != "": Text {
+                    text: root.blocked;
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                    vertical-alignment: center;
+                }
+            }
+            list := ScrollList {
+                vertical-stretch: 1;
+                content-height: root.list-height;
+                for head[row] in Printer.heads: HeadRow {
+                    y: row * root.row-step;
+                    width: list.row-width;
+                    height: root.row-height;
+                    head: head;
+                    viewed: row == root.head-index;
+                    can-change: root.can-change;
+                    chosen => {
+                        Navigation.filament-head = row;
+                        Navigation.mmu-page = -1;
+                        root.close();
+                    }
+                    select => {
+                        if (head.pick-up == "macro") {
+                            Actions.run-macro(head.pick-up-macro);
+                        } else {
+                            Actions.pick-up-head(head.name);
+                        }
+                        Navigation.filament-head = row;
+                        Navigation.mmu-page = -1;
+                        root.close();
+                    }
+                    drop => {
+                        Actions.drop-head();
+                        root.close();
+                    }
+                }
+            }
+        }
+    }
+}

@@ -4,7 +4,7 @@
 //! `toolchanger-mmu` and `toolchanger`; what a profile does not have is skipped.
 
 use crate::session::Session;
-use freakymate::{Actions, FilamentTab, MmuDialogs, Navigation, Page, Printer};
+use freakymate::{Actions, ChangerTab, FilamentTab, MmuDialogs, Navigation, Page, Printer};
 use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::sources::happy_hare::LoadedFilament;
 use freakymate_core::Command;
@@ -134,7 +134,7 @@ fn units_on_heads(session: &mut Session) -> Result<(), String> {
     Ok(())
 }
 
-/// A tool changer without lanes: the head's part of the path on its Extruder view, the machine's sensors on the Sensors tab.
+/// A tool changer without lanes: the head's part of the path on its Extruder view, the machine's sensors on Changer > Sensors.
 fn head_without_lanes(session: &mut Session) -> Result<(), String> {
     session.window.global::<Navigation>().set_filament_head(1);
     session.window.global::<Navigation>().set_filament_tab(FilamentTab::Extruder);
@@ -142,9 +142,9 @@ fn head_without_lanes(session: &mut Session) -> Result<(), String> {
     if session.window.global::<Printer>().get_filament_sensors().row_count() == 0 {
         return Err("the machine should have filament sensors for the Sensors tab".into());
     }
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Sensors);
-    session.show_page(Page::Filament, "lanes-sensors")?;
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Extruder);
+    session.window.global::<Navigation>().set_changer_tab(ChangerTab::Sensors);
+    session.show_page(Page::Changer, "lanes-sensors")?;
+    session.window.global::<Navigation>().set_changer_tab(ChangerTab::Tools);
     session.window.global::<Navigation>().set_filament_head(-1);
     Ok(())
 }

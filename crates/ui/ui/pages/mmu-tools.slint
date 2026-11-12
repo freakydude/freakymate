@@ -1,11 +1,11 @@
-// Tools tab of the Filament page: which tool takes its filament from which gate (Happy Hare's tool-to-gate map),
+// Tools tab of the Changer page: which tool takes its filament from which gate (Happy Hare's tool-to-gate map),
 // compared with the job's file, and EndlessSpool with the groups of the gates in a dialog. Both are set here only; the
 // Gates tab shows them.
 
 import { Theme } from "../theme.slint";
 import { ToolLabel } from "../components/tool-label.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, SpoolPicker, ToolMatchItem, Printer } from "../state.slint";
+import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, Page, SpoolPicker, ToolMatchItem, Printer } from "../state.slint";
 import { BarColors } from "../structs.slint";
 import { ButtonKind, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
 import { FilamentCompare } from "../components/filament-compare.slint";
@@ -414,6 +414,7 @@ component OpenGateButton inherits IconButton {
         MmuDialogs.gate-row = root.gate-row;
         root.opened();
         Navigation.filament-tab = FilamentTab.gates;
+        Navigation.page = Page.filament;
     }
 }
 

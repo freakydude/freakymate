@@ -3,7 +3,7 @@
 use super::mmu::{mmu_bypass, mmu_gate, mmu_service, mmu_tools_and_groups};
 use super::temperature::heat_tabs;
 use crate::session::Session;
-use freakymate::{Actions, Confirm, FilamentTab, MmuDialogs, Navigation, Page, Printer, TuneTab};
+use freakymate::{Actions, ChangerTab, Confirm, FilamentTab, MmuDialogs, Navigation, Page, Printer, TuneTab};
 use freakymate_core::sources::klipper::tuning::TuningKey;
 use freakymate_core::Command;
 use slint::{ComponentHandle, Model, SharedString};
@@ -37,22 +37,21 @@ pub(super) fn prepared_job(session: &mut Session) -> Result<(), String> {
     Ok(())
 }
 
-/// A tap on a tool of the Tool-to-gate map leads to the Tools tab of the Filament page with that tool's dialog open.
-/// Afterwards back to the print page with the dialog closed and the Gates tab, as the later scenes expect.
+/// A tap on a tool of the Tool-to-gate map leads to Changer > Tools with that tool's dialog open.
+/// Afterwards back to the print page with the dialog closed, as the later scenes expect.
 fn tool_chip_opens_its_dialog(session: &mut Session) -> Result<(), String> {
     session.tap(PREPARED_CHIP_T1.0, PREPARED_CHIP_T1.1);
     session.pump(Duration::from_millis(300));
     let (page, tab) = {
         let navigation = session.window.global::<Navigation>();
-        (navigation.get_page(), navigation.get_filament_tab())
+        (navigation.get_page(), navigation.get_changer_tab())
     };
     let tool = session.window.global::<MmuDialogs>().get_tool();
-    if page != Page::Filament || tab != FilamentTab::Tools || tool != 1 {
-        return Err(format!("tap on T1 of the map: expected the Tools tab with the dialog of T1, got tool {tool}"));
+    if page != Page::Changer || tab != ChangerTab::Tools || tool != 1 {
+        return Err(format!("tap on T1 of the map: expected Changer > Tools with the dialog of T1, got tool {tool}"));
     }
     session.capture("print-prepared-tool-dialog")?;
     session.window.global::<MmuDialogs>().set_tool(-1);
-    session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
     session.show_page(Page::Print, "print-prepared-back")
 }
 
@@ -97,6 +96,9 @@ pub(super) fn pages(session: &mut Session) -> Result<(), String> {
         (Page::Settings, "settings"),
     ] {
         session.show_page(page, name)?;
+        if page == Page::Filament {
+            head_picker(session)?;
+        }
         if page == Page::Temperature {
             heat_tabs(session)?;
         }
@@ -119,8 +121,42 @@ pub(super) fn pages(session: &mut Session) -> Result<(), String> {
             session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
         }
     }
+    changer_pages(session)?;
     messages(session)?;
     command_running(session)
+}
+
+/// The picker over the Filament page lists the heads of a tool changer (`filament-head-picker`); without heads nothing
+/// opens.
+fn head_picker(session: &mut Session) -> Result<(), String> {
+    if session.window.global::<Printer>().get_heads().row_count() == 0 {
+        return Ok(());
+    }
+    session.window.global::<Navigation>().set_head_picker_open(true);
+    session.capture("filament-head-picker")?;
+    session.window.global::<Navigation>().set_head_picker_open(false);
+    Ok(())
+}
+
+/// The tabs of the Changer page, each only where the printer has content for it; none on a printer without a changer
+/// (the entry is not there either).
+fn changer_pages(session: &mut Session) -> Result<(), String> {
+    let (tools, service, sensors) = {
+        let printer = session.window.global::<Printer>();
+        (printer.get_has_changer_tools(), printer.get_has_changer_service(), printer.get_has_changer_sensors())
+    };
+    for (tab, present, name) in [
+        (ChangerTab::Tools, tools, "changer-tools"),
+        (ChangerTab::Service, service, "changer-service"),
+        (ChangerTab::Sensors, sensors, "changer-sensors"),
+    ] {
+        if present {
+            session.window.global::<Navigation>().set_changer_tab(tab);
+            session.show_page(Page::Changer, name)?;
+        }
+    }
+    session.window.global::<Navigation>().set_changer_tab(ChangerTab::Tools);
+    Ok(())
 }
 
 /// A command that waits long for its answer: the status bar shows the turning wheel and the command until the answer

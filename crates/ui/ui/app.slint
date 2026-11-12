@@ -15,6 +15,7 @@ import { MovePage } from "pages/move.slint";
 import { TemperaturePage } from "pages/temperature.slint";
 import { TunePage } from "pages/tune.slint";
 import { FilamentPage } from "pages/filament.slint";
+import { ChangerPage } from "pages/changer.slint";
 import { ConsolePage } from "pages/console.slint";
 import { SystemPage } from "pages/system.slint";
 import { UpdatesPage } from "pages/updates.slint";
@@ -77,6 +78,7 @@ export component AppWindow inherits Window {
                 if Navigation.page == Page.temperature: TemperaturePage { }
                 if Navigation.page == Page.tune: TunePage { }
                 if Navigation.page == Page.filament: FilamentPage { }
+                if Navigation.page == Page.changer: ChangerPage { }
                 if Navigation.page == Page.console: ConsolePage { }
                 if Navigation.page == Page.system: SystemPage { }
                 if Navigation.page == Page.updates: UpdatesPage { }

@@ -36,8 +36,10 @@ export global Sample {
         Printer.has-light = true;
         Printer.light-name = "Chamber";
         Printer.light-on = true;
+        Printer.flow-factor = { id: "flow_factor", value: "100 %", configured: "100 %", changed: false, can-reset: false };
+        Printer.has-part-fan = true;
+        Printer.part-fan = { object: "fan", label: "Part fan", kind: "fan", controllable: true, speed: 40, rpm: "", stalled: false };
         Printer.tuning = [
-            { id: "flow_factor", value: "100 %", configured: "100 %", changed: false, can-reset: false },
             { id: "max_velocity", value: "300 mm/s", configured: "300 mm/s", changed: false, can-reset: false },
             { id: "max_accel", value: "3500 mm/s²", configured: "3000 mm/s²", changed: true, can-reset: true },
             { id: "pressure_advance", value: "0.040", configured: "0.040", changed: false, can-reset: false },

@@ -471,6 +471,7 @@ fn status_with_heads(mounted: Option<&str>) -> PrinterStatus {
         name: name.into(),
         number: name.strip_prefix('T').and_then(|number| number.parse().ok()),
         extruder: Some(extruder.into()),
+        fan: None,
         active: mounted == Some(name),
     };
     PrinterStatus {

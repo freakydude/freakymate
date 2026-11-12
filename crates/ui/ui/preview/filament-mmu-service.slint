@@ -2,14 +2,14 @@
 // preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
-import { FilamentTab, Navigation, Page, Printer } from "../state.slint";
+import { ChangerTab, Navigation, Page, Printer } from "../state.slint";
 import { Sample } from "sample.slint";
 
 export component FilamentMmuServicePreview inherits AppWindow {
     init => {
         Sample.mmu();
-        Navigation.page = Page.filament;
-        Navigation.filament-tab = FilamentTab.service;
+        Navigation.page = Page.changer;
+        Navigation.changer-tab = ChangerTab.service;
         Printer.mmu-homed = false;
         Printer.mmu-servo = "up";
         Printer.mmu-action = "Homing";

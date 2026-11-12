@@ -4,14 +4,14 @@
 // gate; T7 has no gate. Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
-import { FilamentTab, Navigation, Page, Printer } from "../state.slint";
+import { ChangerTab, Navigation, Page, Printer } from "../state.slint";
 import { Sample } from "sample.slint";
 
 export component FilamentMmuToolsMatchPreview inherits AppWindow {
     init => {
         Sample.mmu();
-        Navigation.page = Page.filament;
-        Navigation.filament-tab = FilamentTab.tools;
+        Navigation.page = Page.changer;
+        Navigation.changer-tab = ChangerTab.tools;
         Printer.mmu-endless-spool = true;
         Printer.mmu-match-file = "cube-mc8-silk_petg_asa-t0_t7.gcode";
         Printer.mmu-match-summary = @tr("1 of 7 tools fit");

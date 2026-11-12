@@ -13,7 +13,9 @@ const TOOLCHANGER_OBJECT: &str = "toolchanger";
 const INITIALIZE_ON_FIRST_USE: &str = "first-use";
 const TOOL_PREFIX: &str = "tool ";
 const TOOLCHANGER_FIELDS: [&str; 5] = ["status", "tool_number", "detected_tool_number", "has_detection", "tool_names"];
-const TOOL_FIELDS: [&str; 3] = ["tool_number", "extruder", "active"];
+const TOOL_FIELDS: [&str; 4] = ["tool_number", "extruder", "fan", "active"];
+/// The kind a bare fan name of `tool.fan` is looked up under (viesturz `tool.py` at 94756df, Z.109-111).
+const TOOL_FAN_KIND: &str = "fan_generic";
 
 /// The tool changer and its heads.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -57,6 +59,8 @@ pub struct ToolHead {
     pub number: Option<usize>,
     /// The Klipper extruder of the head; `None` for a head without one.
     pub extruder: Option<String>,
+    /// The Klipper object of the head's part cooling fan (`fan_generic T0_fan`); `None` where the head states none.
+    pub fan: Option<String>,
     /// The head is the one in use.
     pub active: bool,
 }
@@ -121,8 +125,19 @@ fn read_head(store: &ObjectStore, object: &str) -> Option<ToolHead> {
         name: object.strip_prefix(TOOL_PREFIX).unwrap_or(object).to_owned(),
         number: count(tool, "tool_number"),
         extruder: (!extruder.is_empty()).then(|| extruder.to_owned()),
+        fan: fan_object(store, text(tool, "fan")),
         active: flag(tool, "active"),
     })
+}
+
+/// The object of a head's part fan. `tool.fan` reports the configured name, which already falls back to the `fan` of
+/// `[toolchanger]`; the plugin looks it up as an object and else as `fan_generic <name>`, and has no fan where
+/// neither exists (viesturz `tool.py` at 94756df, Z.49 and 109-111, status Z.126; KTC-easy `tool.py` Z.47, 92-94).
+fn fan_object(store: &ObjectStore, name: &str) -> Option<String> {
+    if name.is_empty() {
+        return None;
+    }
+    [name.to_owned(), format!("{TOOL_FAN_KIND} {name}")].into_iter().find(|object| store.object(object).is_some())
 }
 
 #[cfg(test)]
@@ -151,10 +166,41 @@ mod tests {
         assert_eq!(
             toolchanger.heads,
             [
-                ToolHead { name: "T0".into(), number: Some(0), extruder: Some("extruder".into()), active: false },
-                ToolHead { name: "T1".into(), number: Some(1), extruder: Some("extruder1".into()), active: true },
+                ToolHead {
+                    name: "T0".into(),
+                    number: Some(0),
+                    extruder: Some("extruder".into()),
+                    fan: None,
+                    active: false
+                },
+                ToolHead {
+                    name: "T1".into(),
+                    number: Some(1),
+                    extruder: Some("extruder1".into()),
+                    fan: None,
+                    active: true
+                },
             ]
         );
+    }
+
+    #[test]
+    fn a_head_fan_is_found_by_its_full_name_or_as_fan_generic_and_else_not_at_all() {
+        // viesturz `tool.py` at 94756df, Z.109-111: `lookup_object(name, lookup_object("fan_generic " + name, None))`.
+        let store = store(json!({
+            "toolchanger": { "status": "ready", "tool_names": ["tool T0", "tool T1", "tool T2", "tool T3"] },
+            "tool T0": { "tool_number": 0, "extruder": "extruder", "fan": "fan_generic T0_partfan" },
+            "tool T1": { "tool_number": 1, "extruder": "extruder1", "fan": "T1_partfan" },
+            "tool T2": { "tool_number": 2, "extruder": "extruder2", "fan": "missing" },
+            "tool T3": { "tool_number": 3, "extruder": "extruder3", "fan": null },
+            "fan_generic T0_partfan": { "speed": 0.0 },
+            "fan_generic T1_partfan": { "speed": 0.5 },
+        }));
+
+        let fans: Vec<Option<String>> =
+            read_toolchanger(&store).unwrap().heads.into_iter().map(|head| head.fan).collect();
+
+        assert_eq!(fans, [Some("fan_generic T0_partfan".into()), Some("fan_generic T1_partfan".into()), None, None]);
     }
 
     #[test]

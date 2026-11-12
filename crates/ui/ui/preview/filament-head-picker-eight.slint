@@ -1,0 +1,10 @@
+// Preview: the picker with eight heads, which scroll. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { Navigation } from "../state.slint";
+import { FilamentHeadsEightPreview } from "filament-heads-eight.slint";
+
+export component FilamentHeadPickerEightPreview inherits FilamentHeadsEightPreview {
+    init => {
+        Navigation.head-picker-open = true;
+    }
+}

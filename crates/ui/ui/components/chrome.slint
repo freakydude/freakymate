@@ -287,6 +287,8 @@ component NavItem inherits Rectangle {
     in property <string> label;
     in property <Page> page;
     in property <bool> enabled: true;
+    // Something needs a look: a small dot in the top right corner.
+    in property <bool> warn;
     // System stays marked on its pages below (console, settings, updates), so a tap leads back.
     property <bool> active: Navigation.page == root.page || (root.page == Page.system
         && (Navigation.page == Page.console || Navigation.page == Page.settings || Navigation.page == Page.updates
@@ -327,6 +329,15 @@ component NavItem inherits Rectangle {
             overflow: elide;
         }
     }
+
+    if root.warn: Rectangle {
+        x: parent.width - self.width - 10px;
+        y: 6px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        background: Theme.warning;
+    }
 }
 
 export component NavRail inherits Rectangle {
@@ -341,6 +352,7 @@ export component NavRail inherits Rectangle {
         NavItem { icon: Icons.nav-thermal; label: @tr("Thermal"); page: Page.temperature; enabled: Printer.ready; }
         NavItem { icon: Icons.filament-extrude; label: @tr("Filament"); page: Page.filament; enabled: Printer.ready && !Printer.motion-locked; }
         NavItem { icon: Icons.nav-tuning; label: @tr("Tune"); page: Page.tune; enabled: Printer.ready; }
+        if Printer.has-changer: NavItem { icon: Icons.mmu-tool-change; label: @tr("Changer"); page: Page.changer; enabled: Printer.ready; warn: Printer.has-changer-sensors && Printer.filament-sensor-runout; }
         NavItem { icon: Icons.nav-system; label: @tr("System"); page: Page.system; }
     }
 }

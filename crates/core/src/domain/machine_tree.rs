@@ -14,6 +14,8 @@ use crate::sources::PrinterStatus;
 
 /// The extruder of a printer with one nozzle, as Klipper names it.
 const MAIN_EXTRUDER: &str = "extruder";
+/// Klipper's part cooling fan of `M106`, the fan of a printer without a head level.
+const PART_FAN: &str = "fan";
 
 /// One place for a spool: a gate of Happy Hare, a lane of AFC, the head of a tool changer, or the one spool of a
 /// printer without either (the active spool of Moonraker).
@@ -99,6 +101,9 @@ pub struct Head {
     /// The head is mounted (always for the fixed head).
     pub active: bool,
     pub nozzles: Vec<Nozzle>,
+    /// The Klipper object of the part cooling fan the head states (`tool.fan`); `None` for a head that states none and
+    /// for the fixed head.
+    pub fan: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -148,12 +153,26 @@ impl MachineTree {
     /// The Klipper extruder of the nozzle in use: that of the mounted head of a tool changer (`None` while no head
     /// is mounted or the mounted one has no nozzle), else that of the fixed head.
     pub fn selected_extruder(&self) -> Option<&str> {
-        let selected = if self.has_swappable_heads() {
+        self.selected_head().and_then(|head| head.nozzles.first()).map(|nozzle| nozzle.extruder.as_str())
+    }
+
+    /// The part cooling fan of the nozzle in use: with swappable heads the one the mounted head states (`None` while
+    /// no head is mounted or the mounted one states none), else Klipper's `[fan]`.
+    pub fn selected_part_fan(&self) -> Option<&str> {
+        if self.has_swappable_heads() {
+            self.selected_head()?.fan.as_deref()
+        } else {
+            Some(PART_FAN)
+        }
+    }
+
+    /// The mounted head of a tool changer, else the fixed head.
+    fn selected_head(&self) -> Option<&Head> {
+        if self.has_swappable_heads() {
             self.heads().find(|head| head.name.is_some() && head.active)
         } else {
             self.heads().next()
-        };
-        selected.and_then(|head| head.nozzles.first()).map(|nozzle| nozzle.extruder.as_str())
+        }
     }
 
     fn heads(&self) -> impl Iterator<Item = &Head> {
@@ -201,7 +220,7 @@ fn fixed_head(fed: Vec<Lane>, tool_spools: &[ToolSpool]) -> Head {
         let lanes = vec![direct_lane(MAIN_EXTRUDER, Some(0), tool_spools)];
         nozzles.push(Nozzle { extruder: MAIN_EXTRUDER.to_owned(), lanes });
     }
-    Head { name: None, active: true, nozzles }
+    Head { name: None, active: true, nozzles, fan: None }
 }
 
 /// A head of the tool changer with the nozzle of its extruder: the lanes of `fed` that feed it (taken out of `fed`),
@@ -220,7 +239,7 @@ fn swappable_head(head: &ToolHead, fed: &mut Vec<Lane>, tool_spools: &[ToolSpool
         let lanes = lanes.into_iter().map(|lane| Lane { head: Some(head.name.clone()), ..lane }).collect();
         Nozzle { extruder: extruder.clone(), lanes }
     });
-    Head { name: Some(head.name.clone()), active: head.active, nozzles: nozzles.collect() }
+    Head { name: Some(head.name.clone()), active: head.active, nozzles: nozzles.collect(), fan: head.fan.clone() }
 }
 
 /// The direct feed of `extruder` for `tool`, with the spool its tool macro declares.
@@ -305,6 +324,8 @@ fn afc_heads(afc: &AfcStatus) -> Vec<ToolHead> {
             name: head.name.clone(),
             number: tool_of(&head.extruder),
             extruder: Some(head.extruder.clone()),
+            // AFC states no part fan of a head (no `fan` in `AFC_extruder.py`, `AFC_Toolchanger.py`, main 2026-11-12).
+            fan: None,
             active: head.mounted,
         })
         .collect()
@@ -401,6 +422,7 @@ mod tests {
             name: format!("T{number}"),
             number: Some(number),
             extruder: Some(extruder.into()),
+            fan: None,
             active: number == active,
         };
         PrinterStatus {
@@ -670,5 +692,23 @@ mod tests {
 
         assert!(!tree.has_swappable_heads());
         assert_eq!(tree.selected_extruder(), Some("extruder"));
+    }
+
+    #[test]
+    fn the_part_fan_is_that_of_the_mounted_head_and_plain_fan_only_without_heads() {
+        let with_fans = |active: usize| {
+            let mut status = toolchanger(active);
+            let heads = &mut status.toolchanger.as_mut().unwrap().heads;
+            heads[0].fan = Some("fan_generic T0_partfan".into());
+            heads[1].fan = Some("fan_generic T1_partfan".into());
+            MachineTree::build(&status)
+        };
+
+        assert_eq!(with_fans(1).selected_part_fan(), Some("fan_generic T1_partfan"));
+        // A head that states no fan has none, not `[fan]`.
+        assert_eq!(with_fans(2).selected_part_fan(), None);
+        // No head mounted: no nozzle, no fan.
+        assert_eq!(with_fans(7).selected_part_fan(), None);
+        assert_eq!(MachineTree::build(&PrinterStatus::default()).selected_part_fan(), Some("fan"));
     }
 }

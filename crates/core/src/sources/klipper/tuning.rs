@@ -32,7 +32,8 @@ pub struct TuningRange {
 }
 
 impl TuningKey {
-    /// In the order of the expert tab: extrusion first, then motion, then retraction.
+    /// In the order of the Tune page: extrusion first (the flow factor sits in its Basics), then motion, then
+    /// retraction.
     pub const ALL: [Self; 11] = [
         Self::FlowFactor,
         Self::PressureAdvance,
@@ -168,7 +169,7 @@ impl TuningConfig {
     }
 }
 
-/// One row of the expert tab.
+/// One value of the Tune page.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TuningValue {
     pub key: TuningKey,
