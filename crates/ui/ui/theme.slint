@@ -58,15 +58,17 @@ export global Theme {
     out property <length> spacing-large: 12px;
     // Minimum size for reliably hittable touch areas.
     out property <length> touch: 56px;
+    // Icon sizes by role, never by pixel:
+    // icon-compact (16): marker next to small text (checks, history marks, lock, chevron in a chip).
+    // icon-small (20): icon next to normal-size text (tabs, card headers, labels, chevrons in list rows).
+    // icon-large (24): leading icon of a single-line row, banner or tile.
+    // icon (28): leading icon of a row that shows a large value (heaters, fans, LEDs); default of IconButton.
+    out property <length> icon-compact: 16px;
+    out property <length> icon-small: 20px;
+    out property <length> icon-large: 24px;
     out property <length> icon: 28px;
     // Icon of a navigation rail item.
     out property <length> icon-nav: 26px;
-    out property <length> icon-small: 20px;
-    // Icon sizes between the steps above, kept apart where they differ by a pixel (pixel-identical to the old literals).
-    out property <length> icon-tiny: 14px;
-    out property <length> icon-compact: 16px;
-    out property <length> icon-medium: 22px;
-    out property <length> icon-large: 24px;
     // Rows of controls (label, slider, buttons) and the narrow square-ish buttons in them.
     out property <length> row-height: 60px;
     out property <length> row-height-small: 52px;

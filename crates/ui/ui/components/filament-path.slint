@@ -11,8 +11,8 @@ import { BarColors, FilamentPathItem } from "../state.slint";
 // so it stands out from any filament colour.
 component SensorMark inherits Image {
     in property <int> state;
-    width: root.state < 0 ? 0px : 20px;
-    height: 20px;
+    width: root.state < 0 ? 0px : Theme.icon-small;
+    height: Theme.icon-small;
     source: Icons.filament-sensor;
     colorize: root.state == 1 ? Theme.foreground : Theme.disabled-foreground;
 }
@@ -94,8 +94,8 @@ export component FilamentPath inherits VerticalLayout {
         cross-axis-alignment: center;
         // Direction of movement at the left: the gate pushes or pulls.
         Image {
-            width: 20px;
-            height: 20px;
+            width: Theme.icon-small;
+            height: Theme.icon-small;
             source: root.direction < 0 ? Icons.ui-chevron-left : Icons.ui-chevron-right;
             colorize: Theme.accent;
             // The place stays, so the tube does not move when the filament starts or stops.
@@ -112,8 +112,8 @@ export component FilamentPath inherits VerticalLayout {
         SensorMark { state: root.path.extruder-sensor; }
         // The extruder gears: lit once the filament has reached them (6) or they have it (7 and on).
         Image {
-            width: Theme.icon-medium;
-            height: Theme.icon-medium;
+            width: Theme.icon-large;
+            height: Theme.icon-large;
             source: Icons.filament-extruder-gears;
             colorize: root.position >= 6 ? root.line-color : Theme.muted;
         }
@@ -121,8 +121,8 @@ export component FilamentPath inherits VerticalLayout {
         SensorMark { state: root.path.toolhead-sensor; }
         Tube { horizontal-stretch: 1; fill: root.fill(4); filament: root.tube-colors; }
         Image {
-            width: Theme.icon-medium;
-            height: Theme.icon-medium;
+            width: Theme.icon-large;
+            height: Theme.icon-large;
             source: Icons.thermal-nozzle;
             colorize: root.position >= 10 ? root.line-color : Theme.muted;
         }

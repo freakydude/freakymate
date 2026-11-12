@@ -79,8 +79,8 @@ export component SlotTile inherits Rectangle {
 export component VerdictIcon inherits Image {
     in property <string> verdict;
 
-    width: 18px;
-    height: 18px;
+    width: Theme.icon-compact;
+    height: Theme.icon-compact;
     visible: root.verdict != "";
     source: root.verdict == "fits" ? Icons.ui-check : Icons.ui-warning;
     colorize: root.verdict == "fits" ? Theme.success : Theme.warning;

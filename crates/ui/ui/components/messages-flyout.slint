@@ -68,8 +68,8 @@ export component MessagesFlyout inherits Rectangle {
                             y: 0px;
                             source: message.is-error ? Icons.ui-error : Icons.ui-info;
                             colorize: message.is-error ? Theme.danger : Theme.info;
-                            width: 20px;
-                            height: 20px;
+                            width: Theme.icon-small;
+                            height: Theme.icon-small;
                         }
                         Text {
                             horizontal-stretch: 1;
@@ -98,7 +98,7 @@ export component MessagesFlyout inherits Rectangle {
                     width: 140px;
                     text: @tr("Clear");
                     icon: Icons.ui-delete;
-                    icon-size: 20px;
+                    icon-size: Theme.icon-small;
                     horizontal: true;
                     min-height: 44px;
                     // Nothing is left to read: the flyout closes with it.
@@ -111,7 +111,7 @@ export component MessagesFlyout inherits Rectangle {
                     width: 140px;
                     text: @tr("Console");
                     icon: Icons.nav-console;
-                    icon-size: 20px;
+                    icon-size: Theme.icon-small;
                     horizontal: true;
                     min-height: 44px;
                     clicked => {

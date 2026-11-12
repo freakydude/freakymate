@@ -68,8 +68,8 @@ export component HeadChip inherits Rectangle {
             cross-axis-self-alignment: center;
             source: Icons.ui-check;
             colorize: StateIcons.severity-color(Severity.fine);
-            width: Theme.icon-tiny;
-            height: Theme.icon-tiny;
+            width: Theme.icon-compact;
+            height: Theme.icon-compact;
         }
         Image {
             cross-axis-self-alignment: center;
@@ -93,8 +93,8 @@ export component ChangerHint inherits HorizontalLayout {
         cross-axis-self-alignment: center;
         source: Printer.changer-note == "error" ? Icons.ui-error : Printer.changer-note == "mismatch" ? Icons.ui-warning : Icons.ui-info;
         colorize: StateIcons.severity-color(Printer.changer-note == "error" ? Severity.error : Printer.changer-note == "mismatch" ? Severity.attention : Severity.info);
-        width: 20px;
-        height: 20px;
+        width: Theme.icon-small;
+        height: Theme.icon-small;
     }
     Text {
         horizontal-stretch: 1;
@@ -134,8 +134,8 @@ export component AfcHint inherits HorizontalLayout {
         cross-axis-self-alignment: center;
         source: Icons.ui-error;
         colorize: StateIcons.severity-color(Severity.error);
-        width: 20px;
-        height: 20px;
+        width: Theme.icon-small;
+        height: Theme.icon-small;
     }
     Text {
         horizontal-stretch: 1;

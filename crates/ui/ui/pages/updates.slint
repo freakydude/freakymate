@@ -23,7 +23,7 @@ export component UpdatesPage inherits Rectangle {
                 text: @tr("Finish the last update: run {} once on the printer host.", UiSettings.setup-command);
                 color: Theme.warning;
                 font-size: Theme.font-small;
-                icon-size: 16px;
+                icon-size: Theme.icon-compact;
             }
             update-list := ScrollList {
                 property <length> row-pitch: 54px;
@@ -38,7 +38,7 @@ export component UpdatesPage inherits Rectangle {
                         horizontal-stretch: 1;
                         alignment: center;
                         Text { text: update.label; color: Theme.foreground; font-size: Theme.font-normal; overflow: elide; }
-                        if update.up-to-date: IconLabel { icon: Icons.ui-check; text: update.detail; color: Theme.success; font-size: Theme.font-small; icon-size: 14px; }
+                        if update.up-to-date: IconLabel { icon: Icons.ui-check; text: update.detail; color: Theme.success; font-size: Theme.font-small; icon-size: Theme.icon-compact; }
                         if !update.up-to-date: Text { text: update.detail; color: update.has-update ? Theme.warning : Theme.muted; font-size: Theme.font-small; overflow: elide; }
                     }
                     IconButton {
@@ -46,7 +46,7 @@ export component UpdatesPage inherits Rectangle {
                         // Fits the row, so the buttons of two updates do not touch.
                         min-height: 40px;
                         icon: Icons.system-update;
-                        icon-size: 20px;
+                        icon-size: Theme.icon-small;
                         horizontal: true;
                         text: @tr("Update");
                         enabled: update.has-update && !Printer.host-actions-locked;
@@ -69,7 +69,7 @@ export component UpdatesPage inherits Rectangle {
                     width: 140px;
                     height: 48px;
                     icon: Icons.ui-refresh;
-                    icon-size: 20px;
+                    icon-size: Theme.icon-small;
                     horizontal: true;
                     text: @tr("Check");
                     enabled: !Printer.host-actions-locked;

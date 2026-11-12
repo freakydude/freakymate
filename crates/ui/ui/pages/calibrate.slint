@@ -36,8 +36,8 @@ component ScrewRow inherits HorizontalLayout {
     if !root.screw.is-base: Image {
         source: root.screw.level ? Icons.ui-check : root.screw.clockwise ? Icons.calibration-screw-clockwise : Icons.calibration-screw-counterclockwise;
         colorize: root.screw.level ? Theme.success : Theme.foreground;
-        width: 28px;
-        height: 28px;
+        width: Theme.icon;
+        height: Theme.icon;
         cross-axis-self-alignment: center;
         accessible-role: image;
         accessible-label: root.screw.level ? @tr("level") : root.screw.clockwise ? @tr("clockwise") : @tr("counterclockwise");

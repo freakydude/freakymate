@@ -102,7 +102,7 @@ component ToolRow inherits Rectangle {
             }
         }
         if root.has-file: Image {
-            width: 18px;
+            width: Theme.icon-small;
             source: Icons.ui-chevron-right;
             colorize: Theme.muted;
         }
@@ -169,8 +169,8 @@ component ToolsHeader inherits HorizontalLayout {
         }
         Image {
             y: (parent.height - self.height) / 2;
-            width: 16px;
-            height: 16px;
+            width: Theme.icon-compact;
+            height: Theme.icon-compact;
             source: Icons.file-gcode;
             colorize: Theme.muted;
         }
