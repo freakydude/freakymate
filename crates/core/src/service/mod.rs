@@ -6,6 +6,9 @@
 mod dispatch;
 mod queries;
 mod session;
+mod trail;
+
+pub(crate) use session::introduce;
 
 use crate::commands::{Command, CommandError};
 use crate::credentials::CredentialStore;

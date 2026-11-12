@@ -32,7 +32,10 @@ impl Session<'_> {
         };
         let events = self.outputs.events.clone();
         let lane_spools = self.spoolman_lane_spools.clone().unwrap_or_default();
-        let permits = matches!(query, Query::FileDetails { .. }).then(|| self.file_details.clone());
+        let file_details = matches!(query, Query::FileDetails { .. });
+        let permits = file_details.then(|| self.file_details.clone());
+        // A file's name only goes to the verbose log.
+        let failure_level = if file_details { log::Level::Debug } else { log::Level::Info };
         tokio::spawn(async move {
             // The timeout starts once it is this query's turn.
             let _permit = match permits {
@@ -45,8 +48,8 @@ impl Session<'_> {
                 Ok(Ok(results)) => results.into_iter().for_each(|event| {
                     let _ = events.send(event);
                 }),
-                Ok(Err(error)) => log::info!("query {query:?} failed: {error}"),
-                Err(_) => log::info!("query {query:?} timed out"),
+                Ok(Err(error)) => log::log!(failure_level, "query {query:?} failed: {error}"),
+                Err(_) => log::log!(failure_level, "query {query:?} timed out"),
             }
         });
     }
@@ -90,9 +93,9 @@ async fn fetch(
                 match downloads.get(connection, &path).await {
                     Ok(data) => match ThumbnailImage::decode(&data) {
                         Some(image) => events.push(Event::Thumbnail { filename: filename.clone(), image }),
-                        None => log::info!("thumbnail of {filename} cannot be decoded"),
+                        None => log::debug!("thumbnail of {filename} cannot be decoded"),
                     },
-                    Err(error) => log::info!("thumbnail of {filename} unavailable: {error}"),
+                    Err(error) => log::debug!("thumbnail of {filename} unavailable: {error}"),
                 }
             }
             events.insert(0, Event::FileMetadata(Box::new(FileMetadata { filename: filename.clone(), ..metadata })));

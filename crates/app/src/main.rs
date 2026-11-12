@@ -6,6 +6,7 @@ use freakymate::app::{Application, Options};
 use freakymate::logging;
 use freakymate_core::backlight::BacklightBackend;
 use freakymate_core::network::NetworkBackend;
+use freakymate_core::report::{self, ReportRequest};
 use freakymate_core::setup::{self, SetupState};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -42,6 +43,10 @@ struct Cli {
     /// Prints the setup version install.sh writes to /etc/freakymate/setup-version and exits
     #[arg(long, hide = true)]
     setup_version: bool,
+    /// Writes a diagnostic report for a bug report and exits: versions, Klipper objects and configuration, what
+    /// FreakyMate detects; no passwords or network data (default: printer_data/logs/freakymate-report.json)
+    #[arg(long, value_name = "FILE")]
+    report: Option<Option<PathBuf>>,
 }
 
 impl Cli {
@@ -106,6 +111,32 @@ fn setup_command() -> String {
         .map_or_else(|| "install.sh".to_owned(), |script| script.display().to_string())
 }
 
+/// `--report`: writes the diagnostic report and says where it is. Warnings go to stderr; the log file is not touched.
+fn write_report(cli: &Cli, setup: SetupState, output: Option<PathBuf>) -> ExitCode {
+    let _ = logging::init(logging::Config::default());
+    let mut facts = cli.log_header(setup);
+    facts.push(("Created".to_owned(), chrono::Local::now().to_rfc3339()));
+    let request =
+        ReportRequest { moonraker: cli.moonraker.clone(), settings_file: cli.settings.clone(), output, facts };
+    let written = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| error.to_string())
+        .and_then(|runtime| runtime.block_on(report::write(request)).map_err(|error| error.to_string()));
+    match written {
+        Ok(path) => {
+            println!("Report written to {}", path.display());
+            println!("Attach it to the GitHub issue. It holds the versions, the Klipper objects and configuration and");
+            println!("the last console lines; no passwords, network addresses or host name.");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("No report: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     if cli.setup_version {
@@ -113,6 +144,9 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     let setup = cli.setup_state();
+    if let Some(output) = cli.report.clone() {
+        return write_report(&cli, setup, output);
+    }
     let config = logging::Config { file: cli.logfile.clone(), header: cli.log_header(setup) };
     if let Err(error) = logging::init(config) {
         eprintln!("cannot start the log: {error}");

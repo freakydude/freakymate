@@ -4,6 +4,12 @@ Bug reports, ideas and pull requests are welcome. FreakyMate is a hobby project 
 so replies may take a while. Questions and discussions fit best on [Discord](https://discord.gg/Ja2cxCcmJQ), bugs
 and feature requests in the GitHub issues.
 
+## Bug reports
+
+Please use the issue forms and search the existing issues first. A bug report needs the diagnostic report
+(`freakymate --report`) and the verbose log; [Bug reports](docs/configuration.md#bug-reports) explains how to get
+both. Issues in German are welcome too.
+
 ## How the project is run
 
 I maintain FreakyMate and decide what goes in and where it is heading. Before you start on a bigger change, please

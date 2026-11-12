@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest an improvement or a new function
+title: "[Feature]: "
+labels: [feature, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues in German are welcome too. Please search the existing issues first. Questions and help are best asked on [Discord](https://discord.gg/Ja2cxCcmJQ).
+
+        Please describe the problem and your workflow, not a finished screen design. FreakyMate shows only what the printer reports, gives hints instead of blocking, and follows the hardware. The maintainer decides what goes in and how.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do at the printer, and where does it get in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware
+      description: Printer, components and plugins involved.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you do it today?
+      description: Optional. For example in Mainsail, in the console or with a macro.
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: Optional, if you have one.
+  - type: dropdown
+    id: test
+    attributes:
+      label: Can you test it on your printer?
+      options:
+        - "Yes"
+        - "No"

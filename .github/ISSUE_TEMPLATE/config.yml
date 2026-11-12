@@ -1,0 +1,20 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and help
+    url: https://discord.gg/Ja2cxCcmJQ
+    about: Questions, help and discussions fit best on Discord.
+  - name: Happy Hare bugs
+    url: https://github.com/moggieuk/Happy-Hare/issues
+    about: Use this when the same problem also shows in Mainsail/Fluidd or the console.
+  - name: AFC bugs
+    url: https://github.com/ArmoredTurtle/AFC-Klipper-Add-On/issues
+    about: Use this when the same problem also shows in Mainsail/Fluidd or the console.
+  - name: Klipper problems
+    url: https://www.klipper3d.org/Contact.html
+    about: Use this when the same problem also shows in Mainsail/Fluidd or the console.
+  - name: Moonraker bugs
+    url: https://github.com/Arksine/moonraker/issues
+    about: Use this when the same problem also shows in Mainsail/Fluidd or the console.
+  - name: Spoolman bugs
+    url: https://github.com/Donkie/Spoolman/issues
+    about: Use this when the same problem also shows in Mainsail/Fluidd or the console.

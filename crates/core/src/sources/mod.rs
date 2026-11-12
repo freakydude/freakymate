@@ -93,6 +93,14 @@ impl Sources {
         self.klipper.apply_settings(settings);
     }
 
+    /// What only Klipper's command list (`printer.gcode.help`) tells: the tool commands and the commands that drop the
+    /// head of a tool changer (`UNSELECT_TOOL`, AFC's `AFC_UNSELECT_TOOL`).
+    pub fn apply_help(&mut self, help: &Value) {
+        self.klipper.tool_commands = Some(klipper::tool_commands(help));
+        self.klipper.has_unselect_tool = klipper::lists_command(help, toolchanger::commands::DROP);
+        self.klipper.has_afc_unselect_tool = klipper::lists_command(help, afc::DROP_HEAD);
+    }
+
     /// Parameters for `printer.objects.subscribe`: every source adds its objects, only `available` ones are kept.
     pub fn subscription(&self, available: &[String]) -> Value {
         let mut subscription = Subscription::new(available);

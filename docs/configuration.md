@@ -6,7 +6,7 @@ the Moonraker login, displays and the network settings.
 ## Command line
 
 ```text
-freakymate [--moonraker <url>] [--fullscreen] [--framebuffer] [--settings <file>] [--logfile <file>] [--simulate-network] [--simulate-backlight]
+freakymate [--moonraker <url>] [--fullscreen] [--framebuffer] [--settings <file>] [--logfile <file>] [--report [<file>]] [--simulate-network] [--simulate-backlight]
 ```
 
 | Option               | Meaning                                                                                          |
@@ -16,6 +16,7 @@ freakymate [--moonraker <url>] [--fullscreen] [--framebuffer] [--settings <file>
 | `--framebuffer`      | Fallback for displays without DRM/KMS (Linux): draws straight to `/dev/fbN` without cage, implies `--fullscreen`. The installer uses it only when there is no `/dev/dri/card*` (see [Installation](install.md)) |
 | `--settings`         | Settings file (TOML), default `~/.config/freakymate/settings.conf` (Windows: `%APPDATA%`). The installer passes `printer_data/config/freakymate.conf` |
 | `-l, --logfile`      | Log file, rotated daily like those of Klipper and Moonraker (default: stderr only). The installer passes `printer_data/logs/freakymate.log` |
+| `--report [FILE]`    | Writes a diagnostic report `freakymate-report.json` and exits, see [Bug reports](#bug-reports). Without FILE it goes to `printer_data/logs` (when the settings are in `printer_data/config`), otherwise to the current folder; FILE may also be a folder |
 | `--simulate-network` | Simulated Wi-Fi/Ethernet instead of NetworkManager (development builds only, see [Development](development.md#development-builds-and-releases)) |
 | `--simulate-backlight` | Simulated backlight with brightness and standby (development builds only) |
 
@@ -58,14 +59,54 @@ With the installer or the `.deb` the log is `printer_data/logs/freakymate.log`, 
 `moonraker.log`, so Mainsail and Fluidd list it under Machine → logs. It rotates at midnight, keeps three old files
 (`freakymate.log.YYYY-MM-DD`) and also goes to the journal (`journalctl -u freakymate` with `install.sh`,
 `journalctl -u freakymate@<user>` with the `.deb`). An installation from before 0.3.7 writes no log file until
-`install.sh` runs again (see [Updates and channels](install.md#updates-and-channels)). Each file starts with a
-header: FreakyMate version, command line, system, then the versions of Moonraker, Klipper and Happy Hare and what was
-detected on the printer (power devices, Spoolman, LEDs, macros and so on). Attach `freakymate.log`, `klippy.log` and
-`moonraker.log` to a bug report.
+`install.sh` runs again (see [Updates and channels](install.md#updates-and-channels)). The FreakyMate version is shown
+on the Settings page and at the top of each log file.
 
-Normally only the important lines are logged. For a bug report set `verbose_log = true` in the settings file and
-restart; FreakyMate then logs its debug messages too. `RUST_LOG` (for example `RUST_LOG=freakymate_core=trace`) takes
-precedence over the setting.
+The normal log holds the basics: a header (FreakyMate version, command line, system, the versions of Moonraker, Klipper
+and Happy Hare, the detected hardware including a "Changers" line), the connection, Klipper state changes with Klipper's
+reason, print state changes (without file names), failed commands with Moonraker's error, and warnings. It leaves out
+user names, Wi-Fi network names and file names.
+
+The verbose log adds more detail. Set `verbose_log = true` in `freakymate.conf` (Mainsail: Machine → config) and restart
+FreakyMate: `sudo systemctl restart freakymate`, with the `.deb` `sudo systemctl restart freakymate@<user>`. Mainsail
+can restart it too, because the installer adds it to `moonraker.asvc`. It then also logs:
+
+- every command from the screen: the intent, the Moonraker call with its parameters, the answer and how long it took,
+  and refusals such as "print running"
+- changes of the objects that matter: print state and file, homing, pause, Happy Hare `mmu`, AFC objects, tool changer
+  and tools, filament sensors, calibration helpers and LED effects (no temperatures or positions)
+- Klipper's console lines and selected Moonraker notifications (Spoolman, power devices, files, history)
+- file names, network names and the Moonraker user name
+
+It costs nothing while it is off. Turn it off again after the bug is captured, because it writes more to the SD card.
+`RUST_LOG` takes precedence over the setting; `RUST_LOG=freakymate_core=trace` also logs every raw Moonraker
+notification.
+
+## Bug reports
+
+A bug report that can be fixed without follow-up questions has three parts:
+
+1. The diagnostic report. On the printer host run `~/freakymate/freakymate --report` (installed with `install.sh`) or
+   `freakymate --report` (`.deb`). It finds the settings itself; `--settings` and `--moonraker` work as usual if
+   needed. The file `freakymate-report.json` lands in `printer_data/logs`, so Mainsail and Fluidd offer it under
+   Machine → logs for download. Without that folder it lands in the current folder; `--report <file or folder>` picks
+   another place.
+2. The verbose log: set `verbose_log = true` (see [Log](#log)), restart FreakyMate, reproduce the problem once and
+   download `freakymate.log`. Add `klippy.log` and `moonraker.log` when Klipper or Moonraker show errors. Set
+   `verbose_log` back to `false` afterwards.
+3. The steps to reproduce, numbered, and what you expected.
+
+The report contains the FreakyMate version, system, setup and settings; Moonraker `server.info` and `printer.info`
+(without host name); board and OS (without network, serial numbers and SD card); the installed versions from the update
+manager (Klipper, Moonraker, Happy Hare, AFC, Mainsail and so on, without commit history); the Spoolman status; the last
+100 console lines; `printer.objects.list`; the status of all Klipper objects including the Klipper configuration
+(`configfile.settings`); Klipper's command list; and what FreakyMate detects (summary, changer systems Happy Hare, AFC
+and tool changer, machine tree). It does not contain Moonraker's configuration (API keys, passwords), network
+addresses, the host name, serial numbers, user names or the stored access of the display. Have a look at the file
+before you share it.
+
+Open a bug on the [issue page](https://github.com/freakydude/freakymate/issues/new/choose) and drag the files into
+the form.
 
 ## Moonraker login
 

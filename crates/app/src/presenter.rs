@@ -904,7 +904,7 @@ impl Presenter {
 
     fn store_thumbnail(&self, filename: &str, thumbnail: &ThumbnailImage) {
         let Some(image) = thumbnail::to_image(thumbnail) else {
-            log::info!("thumbnail of {filename} cannot be shown");
+            log::debug!("thumbnail of {filename} cannot be shown");
             return;
         };
         let is_prepared = {

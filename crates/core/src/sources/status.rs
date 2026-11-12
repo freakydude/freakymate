@@ -79,6 +79,21 @@ impl PrinterStatus {
         }
     }
 
+    /// The systems for filament and tools on this printer (Happy Hare, AFC, tool changer), for the log and the report.
+    pub fn changer_systems(&self) -> String {
+        let systems = [
+            ("Happy Hare", self.mmu.is_some()),
+            ("AFC", self.afc.is_some()),
+            ("tool changer", self.toolchanger.is_some()),
+        ];
+        let present: Vec<&str> = systems.iter().filter(|(_, present)| *present).map(|(name, _)| *name).collect();
+        if present.is_empty() {
+            "none".to_owned()
+        } else {
+            present.join(", ")
+        }
+    }
+
     /// A print is under way. After a shutdown `print_stats` keeps "printing" or "paused" (Klipper's virtual_sdcard
     /// notes a pause), but the print is lost and restarts must stay possible.
     pub fn print_running(&self) -> bool {
