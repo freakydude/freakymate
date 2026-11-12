@@ -47,6 +47,13 @@ component HeadRow inherits Rectangle {
             empty: !root.head.has-spool;
             colors: root.head.spool-colors;
         }
+        Image {
+            cross-axis-self-alignment: center;
+            source: Icons.mmu-tool-head;
+            colorize: root.head.mounted ? Theme.accent : Theme.muted;
+            width: Theme.icon-small;
+            height: Theme.icon-small;
+        }
         Text {
             width: 48px;
             text: root.head.label;

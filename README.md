@@ -35,11 +35,11 @@ is the BTT HDMI5 (5", 800x480, landscape).
 - **Print**: progress, layers, ETA and filament; pause, resume, cancel and exclude objects on a map of the bed; a file
   list with thumbnails, where **Prepare** makes a file the job of the print page and shows how its filament fits the
   tools, as a comparison of file and gate (a hint, never a lock).
-- **Move**: jog, home, Quad Gantry Level or Z-Tilt; a **Calibrate** tab for bed screws, Z offset and the bed mesh with
+- **Motion**: jog, home, Quad Gantry Level or Z-Tilt; a **Calibrate** tab for bed screws, Z offset and the bed mesh with
   a coloured map and profiles.
 - **Thermal**: heaters with presets and temperature history, fans with a warning when one stops, sensors.
 - **Light**: main light, LEDs and the effects of led_effect.
-- **Tune**: Z offset and speed during a print; an Expert tab for flow, pressure advance, limits and retraction.
+- **Motion › Tune**: Z offset and speed during a print; an Expert tab for flow, pressure advance, limits and retraction.
 - **Filament**: extrude, retract, load and unload macros, filament sensors.
 - **System**: restarts and power devices, updates, Wi-Fi and Ethernet, a full console with macros and forms for their
   parameters, display settings.
@@ -56,7 +56,7 @@ Functions only appear when the printer has them. Every page in detail: [docs/fea
 | ------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | Maturity           | Young, one developer, tried on three printers, English only                                                       |
 | Technology         | Rust with Slint, one native binary; fullscreen under `cage` (Wayland) or as a normal window; fallback straight to the framebuffer for displays without DRM/KMS |
-| Scope              | What a printer needs every day: print, move, heat, tune, filament, console and macros, system, settings, network |
+| Scope              | What a printer needs every day: print, motion and tuning, heat, filament, console and macros, system, settings, network |
 | Printers and hosts | One Moonraker at a time, on the printer host or elsewhere; Wi-Fi settings only on the printer host               |
 | Displays           | Works best from 5" at 800x480 (tested with the BTT HDMI5); other sizes are scaled, not tested yet                |
 | Multi-material     | Happy Hare 4.1 or newer; gates, filament path, buffer, FlowGuard and flow rate                                   |

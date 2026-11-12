@@ -1,0 +1,13 @@
+// Preview: the Motion page while a job runs on a tool changer: Axes and Calibrate are disabled, the page shows Tune. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component MotionToolchangerPrintingPreview inherits AppWindow {
+    init => {
+        Sample.printing();
+        Sample.toolchanger();
+        Navigation.page = Page.motion;
+    }
+}

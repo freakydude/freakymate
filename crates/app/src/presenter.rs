@@ -7,9 +7,9 @@ use crate::console_view::ConsoleView;
 use crate::files_view::{FileState, FilesView};
 use crate::history_view::HistoryView;
 use crate::items::{
-    compared_tool_items, connection_name, fan_item, head_item, head_nozzles, heater_item, heaters_by_head,
-    host_interface_item, led_effect_item, led_item, no_head_selected, power_item, replace_rows, selected_head,
-    selected_part_fan, sensor_item, split_tuning, spool_in_use_target, spool_tool, tuning_item, update_item,
+    compared_tool_items, connection_name, fan_item, fans_part_fan_first, head_item, head_nozzles, heater_item,
+    heaters_by_head, host_interface_item, led_effect_item, led_item, no_head_selected, power_item, replace_rows,
+    selected_head, sensor_item, split_tuning, spool_in_use_target, spool_tool, tuning_item, update_item,
 };
 use crate::macro_view::MacroView;
 use crate::mmu_view::{JobFile, MmuView};
@@ -309,10 +309,7 @@ impl Presenter {
         printer.set_has_light(main_led.is_some());
         printer.set_light_name(main_led.map(|led| led.label.as_str()).unwrap_or_default().into());
         printer.set_light_on(main_led.is_some_and(|led| led.on));
-        replace_rows(&self.fans, status.fans.iter().map(fan_item).collect());
-        let part_fan = selected_part_fan(&snapshot.tree, &status.fans);
-        printer.set_has_part_fan(part_fan.is_some());
-        printer.set_part_fan(part_fan.map(fan_item).unwrap_or_default());
+        replace_rows(&self.fans, fans_part_fan_first(&snapshot.tree, &status.fans).into_iter().map(fan_item).collect());
         replace_rows(&self.leds, status.leds.iter().map(led_item).collect());
         replace_rows(&self.led_effects, status.led_effects.iter().map(led_effect_item).collect());
         let tuning = tuning::values(status, &snapshot.sources.klipper.tuning);

@@ -27,8 +27,9 @@ probe still counts as the probe).
     "No gate". Tools that share a gate share its spool, so their planned weights add up against what the spool has
     left; with EndlessSpool the rest of its group is shown as its own line. The question before the start shows the
     same comparison, compact, for each tool that does not fit.
-- **Move**: jog X/Y/Z with selectable steps, home (all/XY/Z), motors off, Quad Gantry Level or Z-Tilt when configured.
-  Move and Filament are locked while a print runs; the screen leaves them when a print starts.
+- **Motion**: the **Axes** tab jogs X/Y/Z with selectable steps, homes (all/XY/Z), turns motors off, runs Quad Gantry Level
+  or Z-Tilt when configured. Filament is locked while a print runs and the screen leaves it when a print starts; on
+  Motion the Axes and Calibrate tabs are greyed out then and the page shows the Tune tab.
   - **Calibrate** tab: Klipper's own calibration commands, with their results. Bed screws
     (`SCREWS_TILT_CALCULATE` with the turns per screw, or the paper test `BED_SCREWS_ADJUST`), Z offset of the probe or
     the Z endstop, bed mesh (measure, a coloured map of the active mesh, load, save and remove profiles, clear) and
@@ -38,7 +39,7 @@ probe still counts as the probe).
   respect `min_temp`/`max_temp` from the Klipper configuration. Tapping a heater or sensor shows its temperature
   history with a grid: the last 20 minutes of Moonraker's temperature store, asked again every five seconds while it
   is open. Moonraker keeps heaters and `temperature_sensor` objects there; the others have no history. Further tabs when the printer has them:
-  - **Fans**: part fan and `fan_generic` fans (filter, exhaust) with a slider, `heater_fan` and `controller_fan` as a
+  - **Fans**: part fan (the one of the nozzle in use first) and `fan_generic` fans (filter, exhaust) with a slider, `heater_fan` and `controller_fan` as a
     bar, speed in rpm where there is a tachometer. A fan turns red when its tachometer has reported 0 rpm for a few
     seconds at a speed where it measured before (many tachometers report nothing at a low speed although the fan
     turns); what it learned is forgotten when Klipper restarts.
@@ -46,7 +47,7 @@ probe still counts as the probe).
 - **Light**: the light symbol in the status bar opens a panel with the main (chamber) light as a switch, every LED
   (`neopixel`, `led`, `dotstar`, …) on, off and dimmed as white light, and the effects of the
   [led_effect](https://github.com/julianschill/klipper-led_effect) plugin when it is installed.
-- **Tune**: what one corrects while watching a print: Z offset (babysteps, apply to probe/endstop, save config) and
+- **Tune** tab of Motion: what one corrects while watching a print: Z offset (babysteps, apply to probe/endstop, save config) and
   the speed factor, with a quiet note that layer times then differ from the slicer's plan. The **Expert** tab holds
   the calibration values until the next restart: flow factor, pressure advance and smooth time, velocity and
   acceleration limits, square corner velocity, minimum cruise ratio and firmware retraction; it shows where a value

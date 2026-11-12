@@ -1,0 +1,14 @@
+// Preview: the Sensors tab of the Changer page of a tool changer (filament sensors that no head owns). Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { ChangerTab, Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component ChangerToolchangerSensorsPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Sample.toolchanger();
+        Navigation.page = Page.changer;
+        Navigation.changer-tab = ChangerTab.sensors;
+    }
+}

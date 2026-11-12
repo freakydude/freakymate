@@ -4,7 +4,7 @@
 
 use super::pages::prepared_job;
 use crate::session::Session;
-use freakymate::{ChangerTab, Confirm, FilamentTab, Navigation, Page, Printer, SpoolPicker};
+use freakymate::{ChangerTab, Confirm, FilamentTab, HeatTab, Navigation, Page, Printer, SpoolPicker};
 use freakymate_core::Command;
 use slint::ComponentHandle;
 use slint::Model;
@@ -60,7 +60,7 @@ pub(super) fn toolchanger(session: &mut Session) -> Result<(), String> {
     session.capture("toolchanger-tool-picker")?;
     session.window.global::<SpoolPicker>().set_open(false);
 
-    tune_head_fan(session)?;
+    head_fan(session)?;
     prepared_job(session)?;
     for heater in ["extruder", "extruder1"] {
         session.service.send(Command::SetHeaterTarget { heater: heater.into(), target: 0.0 });
@@ -69,21 +69,23 @@ pub(super) fn toolchanger(session: &mut Session) -> Result<(), String> {
     head_level(session)
 }
 
-/// The part fan of the mounted head on Tune › Basics: the fake gives each head a `fan_generic T<n>_partfan` and has
+/// The part fan of the mounted head on Thermal › Fans: the fake gives each head a `fan_generic T<n>_partfan` and has
 /// `M106` drive the fan of the active head (viesturz `tool.py` Z.126, `toolchanger.py` Z.837-838). T1 runs at 50 %
-/// (`toolchanger-tune-fan`); then the head and the fan go back as they were.
-fn tune_head_fan(session: &mut Session) -> Result<(), String> {
+/// (`toolchanger-fans`); then the head and the fan go back as they were.
+fn head_fan(session: &mut Session) -> Result<(), String> {
     session.service.send(Command::RunMacro { name: "T1".into() });
     session.wait_until("T1 selected", |snapshot| {
         snapshot.status.toolchanger.as_ref().is_some_and(|changer| changer.selected == Some(1))
     })?;
     session.service.send(Command::RunGcode { script: "M106 S127.5".into() });
     session.pump(Duration::from_secs(1));
-    let printer = session.window.global::<Printer>();
-    if !printer.get_has_part_fan() || (printer.get_part_fan().speed - 50.0).abs() > 0.5 {
-        return Err("Tune should show the fan of the mounted head at 50 %".into());
+    let first_fan = session.window.global::<Printer>().get_fans().row_data(0);
+    if first_fan.is_none_or(|fan| fan.object != "fan_generic T1_partfan" || (fan.speed - 50.0).abs() > 0.5) {
+        return Err("Thermal should list the fan of the mounted head first, at 50 %".into());
     }
-    session.show_page(Page::Tune, "toolchanger-tune-fan")?;
+    session.window.global::<Navigation>().set_heat_tab(HeatTab::Fans);
+    session.show_page(Page::Temperature, "toolchanger-fans")?;
+    session.window.global::<Navigation>().set_heat_tab(HeatTab::Heaters);
     session.service.send(Command::RunGcode { script: "M107".into() });
     session.service.send(Command::RunMacro { name: "T0".into() });
     session.wait_until("T0 selected again", |snapshot| {

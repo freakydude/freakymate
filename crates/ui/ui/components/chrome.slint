@@ -2,7 +2,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, Severity, TuneTab } from "../state.slint";
+import { Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, Severity } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
 import { BusyWheel } from "busy-wheel.slint";
 
@@ -304,8 +304,6 @@ component NavItem inherits Rectangle {
     nav-touch := TouchArea {
         enabled: root.enabled;
         clicked => {
-            // The Tune page opens with the basics; the expert tab is one tap away.
-            if (root.page == Page.tune) { Navigation.tune-tab = TuneTab.basics; }
             Dialogs.dismiss();
             Navigation.page = root.page;
         }
@@ -348,11 +346,10 @@ export component NavRail inherits Rectangle {
         padding: 3px;
         spacing: 1px;
         NavItem { icon: Icons.nav-printer; label: @tr("Print"); page: Page.print; enabled: Printer.ready; }
-        NavItem { icon: Icons.nav-move; label: @tr("Move"); page: Page.move; enabled: Printer.ready && !Printer.motion-locked; }
+        NavItem { icon: Icons.nav-move; label: @tr("Motion"); page: Page.motion; enabled: Printer.ready; }
         NavItem { icon: Icons.nav-thermal; label: @tr("Thermal"); page: Page.temperature; enabled: Printer.ready; }
-        NavItem { icon: Icons.filament-extrude; label: @tr("Filament"); page: Page.filament; enabled: Printer.ready && !Printer.motion-locked; }
-        NavItem { icon: Icons.nav-tuning; label: @tr("Tune"); page: Page.tune; enabled: Printer.ready; }
-        if Printer.has-changer: NavItem { icon: Icons.mmu-tool-change; label: @tr("Changer"); page: Page.changer; enabled: Printer.ready; warn: Printer.has-changer-sensors && Printer.filament-sensor-runout; }
+        NavItem { icon: Icons.nav-filament; label: @tr("Filament"); page: Page.filament; enabled: Printer.ready && !Printer.motion-locked; }
+        if Printer.has-changer: NavItem { icon: Icons.nav-changer; label: @tr("Changer"); page: Page.changer; enabled: Printer.ready; warn: Printer.has-changer-sensors && Printer.filament-sensor-runout; }
         NavItem { icon: Icons.nav-system; label: @tr("System"); page: Page.system; }
     }
 }

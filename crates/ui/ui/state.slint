@@ -108,12 +108,8 @@ export global Printer {
     in property <bool> has-bed;
     in property <float> bed-temperature;
     in property <float> bed-target;
-    // Part fan first, then the other fans.
+    // The part fan of the nozzle in use first (the mounted head's, else `fan`), then the other fans.
     in property <[FanItem]> fans;
-    // The part cooling fan of the nozzle in use for the Tune page: that of the mounted head where heads state one,
-    // else `fan`; `has-part-fan` is false where there is none (a head that states no fan, no head mounted).
-    in property <bool> has-part-fan;
-    in property <FanItem> part-fan;
     in property <[LedItem]> leds;
     in property <[LedEffectItem]> led-effects;
     // The main light (chamber or case light): there is one, its name, and whether it is on.
@@ -480,14 +476,11 @@ export enum FilamentTab { gates, extruder }
 // Tabs of the Changer page (the machine: map, service, filament sensors that no head owns); each only with content.
 export enum ChangerTab { tools, service, sensors }
 
-// Tabs of the Move page; without anything to calibrate it shows the axes alone.
-export enum MoveTab { axes, calibrate }
+// Tabs of the Motion page; a tab the printer has nothing for falls back, and while printing only Tune and Expert work.
+export enum MotionTab { axes, tune, expert, calibrate }
 
 // Tabs of the Thermal page; a tab the printer has nothing for falls back to the heaters.
 export enum HeatTab { heaters, fans, sensors }
-
-// Tabs of the Tune page; without expert values it shows the basics alone.
-export enum TuneTab { basics, expert }
 
 export global Navigation {
     in-out property <Page> page: Page.print;
@@ -504,9 +497,8 @@ export global Navigation {
     // Page of gate tiles the Gates tab shows, counted from 0 within its view; -1 opens on the unit of the loaded gate.
     in-out property <int> mmu-page: -1;
     in-out property <HeatTab> heat-tab;
-    // The navigation rail opens the basics.
-    in-out property <TuneTab> tune-tab;
-    in-out property <MoveTab> move-tab;
+    // Motion page; the page shows Tune instead while a print locks the axes, so the choice comes back afterwards.
+    in-out property <MotionTab> motion-tab;
     in-out property <bool> history-open;
     // Width to height of the drawing area of the temperature chart; the chart's lines are drawn for this shape.
     in-out property <float> history-aspect: 2;

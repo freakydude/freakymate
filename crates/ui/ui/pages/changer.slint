@@ -38,7 +38,7 @@ component SensorsTab inherits VerticalLayout {
 // not offered stands above it.
 component ToolchangerCard inherits Card {
     title: @tr("Tool changer");
-    icon: Icons.mmu-tool-change;
+    icon: Icons.nav-changer;
 
     property <string> status: Printer.changer-status;
     property <Severity> severity: root.status == "error" ? Severity.error : root.status == "uninitialized" ? Severity.attention : root.status == "ready" ? Severity.fine : Severity.info;
@@ -143,7 +143,7 @@ export component ChangerPage inherits Rectangle {
     VerticalLayout {
         TabBar {
             if Printer.has-changer-tools: TabButton {
-                icon: Icons.mmu-ttg-map;
+                icon: Icons.mmu-tool-head;
                 text: @tr("Tools");
                 checked: root.tab == ChangerTab.tools;
                 clicked => { Navigation.changer-tab = ChangerTab.tools; }

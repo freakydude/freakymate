@@ -162,7 +162,7 @@ history).
   `spool-strip.slint`, `busy-wheel.slint`. Messages (errors and informations) are kept in `status_log.rs`, pure logic
   that `status_view.rs` shows. Colours of filament are one struct, `BarColors` (up to six colours and whether they
   run along the filament), which `FilamentSwatch` draws.
-- `pages/`: print (with the file list in `files.slint` and the prepared file in `print-prepared.slint`), move (with the Calibrate tab in `calibrate.slint`), temperature, tune, filament (with Happy Hare the
+- `pages/`: print (with the file list in `files.slint` and the prepared file in `print-prepared.slint`), motion (tabs Axes, Tune and Expert from `tune.slint`, and Calibrate in `calibrate.slint`), temperature, filament (with Happy Hare the
   tabs Gates in `mmu.slint` with the dialogs in `mmu-dialogs.slint`, Extruder, Tools in `mmu-tools.slint` and
   Service in `mmu-service.slint`;
   otherwise the extruder alone), and the system tabs: system (machine), updates, network (`network-page.slint` with
@@ -171,7 +171,8 @@ history).
 - `preview/`: small components with sample data (`sample.slint`) for `scripts/ui-preview.sh`, never imported by the app.
 - Pages only read globals and only call `Actions`/`Confirm`; printer-related logic belongs in the core.
 - Touch rules: controls at least 56 px (`Theme.touch`), confirmation for cancel, emergency stop and host actions;
-  Move and Filament are locked while printing, and the window leaves them when a print starts (`app.slint`).
+  Filament and the Axes and Calibrate tabs of Motion are locked while printing; the window leaves Filament when a print
+  starts, Motion shows its Tune tab instead (`app.slint`, `motion.slint`).
 - No scrolling except for lists of any length (files, macros, console, networks): `ScrollList` with a slim bar that
   can be dragged or tapped. Coarse values such as the fan speed use `TouchSlider`. One list per kind of item.
 - Texts in English with `@tr(...)`, so translations can be added later without code changes.

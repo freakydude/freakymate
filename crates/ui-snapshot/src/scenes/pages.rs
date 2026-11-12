@@ -3,7 +3,7 @@
 use super::mmu::{mmu_bypass, mmu_gate, mmu_service, mmu_tools_and_groups};
 use super::temperature::heat_tabs;
 use crate::session::Session;
-use freakymate::{Actions, ChangerTab, Confirm, FilamentTab, MmuDialogs, Navigation, Page, Printer, TuneTab};
+use freakymate::{Actions, ChangerTab, Confirm, FilamentTab, MmuDialogs, MotionTab, Navigation, Page, Printer};
 use freakymate_core::sources::klipper::tuning::TuningKey;
 use freakymate_core::Command;
 use slint::{ComponentHandle, Model, SharedString};
@@ -86,10 +86,9 @@ pub(super) fn pages(session: &mut Session) -> Result<(), String> {
     prepared_job(session)?;
     // The console comes before the Thermal page, whose fan test would fill it with the fake's commands.
     for (page, name) in [
-        (Page::Move, "move"),
+        (Page::Motion, "motion"),
         (Page::Console, "console"),
         (Page::Temperature, "temperature"),
-        (Page::Tune, "tune"),
         (Page::Filament, "filament"),
         (Page::System, "system"),
         (Page::Updates, "updates"),
@@ -103,10 +102,14 @@ pub(super) fn pages(session: &mut Session) -> Result<(), String> {
             heat_tabs(session)?;
         }
         let has_tuning = session.presenter.snapshot().sources.klipper.tuning.get(TuningKey::MaxAccel).is_some();
-        if page == Page::Tune && has_tuning {
-            session.window.global::<Navigation>().set_tune_tab(TuneTab::Expert);
-            session.show_page(Page::Tune, "tune-expert")?;
-            session.window.global::<Navigation>().set_tune_tab(TuneTab::Basics);
+        if page == Page::Motion {
+            session.window.global::<Navigation>().set_motion_tab(MotionTab::Tune);
+            session.show_page(Page::Motion, "motion-tune")?;
+            if has_tuning {
+                session.window.global::<Navigation>().set_motion_tab(MotionTab::Expert);
+                session.show_page(Page::Motion, "motion-expert")?;
+            }
+            session.window.global::<Navigation>().set_motion_tab(MotionTab::Axes);
         }
         if page == Page::Filament && session.presenter.snapshot().status.mmu.is_some() {
             session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);

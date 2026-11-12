@@ -1,0 +1,14 @@
+// Preview: Thermal > Fans of a tool changer: the part fan of the mounted head (T1) comes first. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { HeatTab, Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component TemperatureToolchangerFansPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Sample.toolchanger();
+        Navigation.page = Page.temperature;
+        Navigation.heat-tab = HeatTab.fans;
+    }
+}

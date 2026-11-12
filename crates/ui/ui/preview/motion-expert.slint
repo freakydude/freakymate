@@ -1,0 +1,14 @@
+// Preview: the Expert tab of the Motion page with one changed value. Open in the Slint preview or render with
+// scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { MotionTab, Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component MotionExpertPreview inherits AppWindow {
+    init => {
+        Sample.printing();
+        Navigation.page = Page.motion;
+        Navigation.motion-tab = MotionTab.expert;
+    }
+}

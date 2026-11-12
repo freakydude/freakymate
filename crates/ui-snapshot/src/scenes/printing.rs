@@ -77,6 +77,8 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
     tangle_boost(session)?;
     session.show_page(Page::Temperature, "temperature-printing")?;
     session.show_page(Page::System, "system-printing")?;
+    // The axes stand still: Axes and Calibrate are greyed out and the page shows Tune.
+    session.show_page(Page::Motion, "motion-printing")?;
 
     session.window.global::<Navigation>().set_page(Page::Print);
     pause_at_next_layer(session)?;
@@ -85,7 +87,7 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
     if !session.window.global::<Printer>().get_position_locked() {
         return Err("position-locked off while the print is paused".into());
     }
-    session.show_page(Page::Move, "move-paused")?;
+    session.show_page(Page::Motion, "motion-paused")?;
     session.show_page(Page::Filament, "printing-paused-filament")?;
     session.window.global::<Navigation>().set_page(Page::Print);
     exclude_object(session)?;

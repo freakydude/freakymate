@@ -273,11 +273,17 @@ pub(crate) fn fan_item(fan: &Fan) -> FanItem {
     }
 }
 
-/// The part cooling fan of the nozzle in use, for the Basics of the Tune page; see
-/// [`MachineTree::selected_part_fan`]. `None` where it states none or Klipper does not report it.
+/// The part cooling fan of the nozzle in use; see [`MachineTree::selected_part_fan`]. `None` where it states none or
+/// Klipper does not report it.
 pub(crate) fn selected_part_fan<'a>(tree: &MachineTree, fans: &'a [Fan]) -> Option<&'a Fan> {
     let object = tree.selected_part_fan()?;
     fans.iter().find(|fan| fan.object == object)
+}
+
+/// The fans of the Thermal page: the part fan of the nozzle in use first, the others in their order.
+pub(crate) fn fans_part_fan_first<'a>(tree: &MachineTree, fans: &'a [Fan]) -> Vec<&'a Fan> {
+    let part_fan = selected_part_fan(tree, fans);
+    part_fan.into_iter().chain(fans.iter().filter(|fan| Some(*fan) != part_fan)).collect()
 }
 
 /// The tuning values split into the Basics of the Tune page (the flow factor) and the expert tab (the rest).
@@ -619,7 +625,7 @@ mod tests {
     }
 
     #[test]
-    fn the_tune_page_shows_the_fan_of_the_mounted_head_or_plain_fan_without_heads() {
+    fn the_part_fan_is_the_fan_of_the_mounted_head_or_plain_fan_without_heads() {
         let fans = [fan("fan"), fan("fan_generic T0_partfan"), fan("fan_generic T1_partfan")];
         let mut heads = tree(&[(Some("T0"), false, "extruder"), (Some("T1"), true, "extruder1")]);
         heads.carriages[0].heads[0].fan = Some("fan_generic T0_partfan".into());
@@ -634,6 +640,23 @@ mod tests {
         assert_eq!(shown(&tree(&[(None, true, "extruder")])).as_deref(), Some("fan"));
         // A stated fan Klipper does not report is not shown.
         assert_eq!(selected_part_fan(&tree(&[(None, true, "extruder")]), &fans[1..]), None);
+    }
+
+    #[test]
+    fn the_fan_of_the_nozzle_in_use_comes_first_in_the_fan_list() {
+        let fans = [fan("fan"), fan("fan_generic T0_partfan"), fan("fan_generic T1_partfan"), fan("fan_generic case")];
+        let mut heads = tree(&[(Some("T0"), false, "extruder"), (Some("T1"), true, "extruder1")]);
+        heads.carriages[0].heads[0].fan = Some("fan_generic T0_partfan".into());
+        heads.carriages[0].heads[1].fan = Some("fan_generic T1_partfan".into());
+
+        let order = |tree: &MachineTree| {
+            fans_part_fan_first(tree, &fans).iter().map(|fan| fan.object.clone()).collect::<Vec<_>>()
+        };
+
+        assert_eq!(order(&heads), ["fan_generic T1_partfan", "fan", "fan_generic T0_partfan", "fan_generic case"]);
+        // Without a fan of the nozzle in use the order stays.
+        heads.carriages[0].heads[1].fan = None;
+        assert_eq!(order(&heads), ["fan", "fan_generic T0_partfan", "fan_generic T1_partfan", "fan_generic case"]);
     }
 
     #[test]

@@ -1,7 +1,7 @@
 // Sample data for previews (VS Code Slint preview, slint-viewer, scripts/ui-preview.sh).
 // Not part of the app: nothing in app.slint imports this folder. In the app, Rust fills these globals.
 
-import { MoveTab, Navigation, Network, Page, Printer, UiSettings } from "../state.slint";
+import { MotionTab, Navigation, Network, Page, Printer, UiSettings } from "../state.slint";
 
 export global Sample {
     // Connected Voron-like printer, homed, nozzle and bed at temperature, no job.
@@ -37,8 +37,6 @@ export global Sample {
         Printer.light-name = "Chamber";
         Printer.light-on = true;
         Printer.flow-factor = { id: "flow_factor", value: "100 %", configured: "100 %", changed: false, can-reset: false };
-        Printer.has-part-fan = true;
-        Printer.part-fan = { object: "fan", label: "Part fan", kind: "fan", controllable: true, speed: 40, rpm: "", stalled: false };
         Printer.tuning = [
             { id: "max_velocity", value: "300 mm/s", configured: "300 mm/s", changed: false, can-reset: false },
             { id: "max_accel", value: "3500 mm/s²", configured: "3000 mm/s²", changed: true, can-reset: true },
@@ -100,8 +98,8 @@ export global Sample {
     // than fit, so the list scrolls), screws measured and a probe offset waiting for SAVE_CONFIG.
     public function calibration() {
         self.ready-printer();
-        Navigation.page = Page.move;
-        Navigation.move-tab = MoveTab.calibrate;
+        Navigation.page = Page.motion;
+        Navigation.motion-tab = MotionTab.calibrate;
         Printer.can-quad-gantry-level = false;
         Printer.has-probe = true;
         Printer.z-calibration = "probe";
@@ -214,6 +212,53 @@ export global Sample {
         Printer.total-layers = 200;
         Printer.layer-pause-plan-known = true;
         Printer.layer-pause-planned = "120";
+    }
+
+    // The tool changer of the fake's `toolchanger` profile (fake-moonraker: `MachineProfile::toolchanger()`): three heads
+    // T0 to T2 with their own nozzles and `fan_generic T<n>_partfan`, spools 1 and 3 on T0 and T1 (Spoolman), no MMU.
+    // Call after `ready-printer()` or `printing()`: it replaces fans, heaters and the head data. T1 is mounted, so the
+    // nozzle shown is the one of T1 and its fan comes first on Thermal > Fans (`fans_part_fan_first`).
+    public function toolchanger() {
+        Printer.has-spoolman = true;
+        // The spool in use is the one of the mounted head: spool 3 on T1.
+        Printer.has-spool = true;
+        Printer.spool-id = 3;
+        Printer.spool-tool = 1;
+        Printer.spool-target = "T1";
+        Printer.spool-title = "Blue PLA";
+        Printer.spool-material = "PLA";
+        Printer.spool-weight = "905 g";
+        Printer.spool-colors = { first: #0033ff, count: 1 };
+        Printer.has-toolchanger = true;
+        Printer.has-drop = true;
+        Printer.changer-status = "ready";
+        Printer.changer-initialize-on = "first-use";
+        Printer.changer-head = "T1";
+        Printer.changer-head-detected = "T1";
+        Printer.changer-note = "";
+        Printer.nozzle-head = "T1";
+        Printer.mounted-head = 1;
+        Printer.heads = [
+            { name: "T0", label: "T0", subtitle: "", has-nozzle: true, temperature: 24, target: 0, mounted: false, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T0", has-spool: true, spool-title: "Red PLA", spool-material: "PLA", spool-weight: "812 g", spool-colors: { first: #ff0000, count: 1 }, spool-id: 1, spool-tool: 0, can-pick-spool: true },
+            { name: "T1", label: "T1", subtitle: "", has-nozzle: true, temperature: 214.6, target: 215, mounted: true, detected: true, lanes: 1, pick-up: "macro", pick-up-macro: "T1", has-spool: true, spool-title: "Blue PLA", spool-material: "PLA", spool-weight: "905 g", spool-colors: { first: #0033ff, count: 1 }, spool-id: 3, spool-tool: 1, can-pick-spool: true },
+            { name: "T2", label: "T2", subtitle: "", has-nozzle: true, temperature: 24, target: 0, mounted: false, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T2", has-spool: false, spool-id: -1, spool-tool: 2, can-pick-spool: true },
+        ];
+        // The fake has no `[fan]` with heads (the plugin refuses it); the fan of the mounted head leads the list.
+        Printer.fans = [
+            { object: "fan_generic T1_partfan", label: "T1 Partfan", kind: "generic", controllable: true, speed: 50, rpm: "" },
+            { object: "fan_generic T0_partfan", label: "T0 Partfan", kind: "generic", controllable: true, speed: 0, rpm: "" },
+            { object: "fan_generic T2_partfan", label: "T2 Partfan", kind: "generic", controllable: true, speed: 0, rpm: "" },
+            { object: "fan_generic nevermore", label: "Nevermore", kind: "generic", controllable: true, speed: 0, rpm: "" },
+            { object: "fan_generic exhaust", label: "Exhaust", kind: "generic", controllable: true, speed: 60, rpm: "1680 rpm" },
+            { object: "heater_fan hotend", label: "Hotend", kind: "heater", controllable: false, speed: 100, rpm: "7200 rpm" },
+        ];
+        Printer.heaters = [
+            { object: "extruder", label: "Nozzle T0", temperature: 24, target: 0, power: 0, can-raise: true, nozzle: true },
+            { object: "extruder1", label: "Nozzle T1", temperature: 214.6, target: 215, power: 0.42, can-raise: true, nozzle: true },
+            { object: "extruder2", label: "Nozzle T2", temperature: 24, target: 0, power: 0, can-raise: true, nozzle: true },
+            { object: "heater_bed", label: "Bed", temperature: 59.8, target: 60, power: 0.3, can-raise: true },
+            { object: "heater_generic chamber", label: "Chamber", temperature: 38.2, target: 0, power: 0, can-raise: true },
+        ];
     }
 
     // Network tab of a printer host managed with NetworkManager.

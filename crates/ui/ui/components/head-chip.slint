@@ -15,7 +15,7 @@ export component HeadChip inherits Rectangle {
     in property <bool> open;
     callback clicked;
 
-    width: 160px;
+    width: 188px;
     height: Theme.touch;
     border-radius: Theme.radius;
     background: touch.pressed ? Theme.surface-active : Theme.surface-raised;
@@ -39,6 +39,13 @@ export component HeadChip inherits Rectangle {
             radius: 2px;
             empty: !root.head.has-spool;
             colors: root.head.spool-colors;
+        }
+        Image {
+            cross-axis-self-alignment: center;
+            source: Icons.mmu-tool-head;
+            colorize: Theme.muted;
+            width: Theme.icon-small;
+            height: Theme.icon-small;
         }
         Text {
             // A head without a number shows its name, cut at about 98 px.

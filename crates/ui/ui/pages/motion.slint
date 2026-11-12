@@ -1,12 +1,14 @@
-// Jog, home and level the axes; calibrating the bed in its own tab. Both move the axes, so neither is for a running
-// print (the navigation locks the page then).
+// Motion: jog, home and level the axes, tune the print while it runs (Z offset, speed and flow, the expert values of
+// the configuration) and calibrate the bed. Axes and Calibrate move the axes, so a running print greys them out and the
+// page shows Tune instead.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, MoveTab, Navigation, Printer, UiSettings } from "../state.slint";
+import { Actions, Confirm, MotionTab, Navigation, Printer, UiSettings } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
 import { ButtonKind, Card, IconButton, Note, StepSelector, TabBar, TabButton } from "../components/controls.slint";
 import { CalibrateTab } from "calibrate.slint";
+import { TuneBasicsTab, TuneExpertTab } from "tune.slint";
 
 component AxisValue inherits HorizontalLayout {
     in property <string> axis;
@@ -134,34 +136,56 @@ component AxesTab inherits Rectangle {
     }
 }
 
-export component MovePage inherits Rectangle {
+export component MotionPage inherits Rectangle {
     property <bool> can-calibrate: Printer.has-bed-mesh || Printer.has-screws-tilt || Printer.has-bed-screws
         || Printer.z-calibration != "" || Printer.can-quad-gantry-level || Printer.can-z-tilt;
-    property <MoveTab> tab: root.can-calibrate ? Navigation.move-tab : MoveTab.axes;
+    // The tab the user chose, fallen back where the printer has nothing for it ...
+    property <MotionTab> chosen: Navigation.motion-tab == MotionTab.expert && Printer.tuning.length == 0 ? MotionTab.tune
+        : Navigation.motion-tab == MotionTab.calibrate && !root.can-calibrate ? MotionTab.axes : Navigation.motion-tab;
+    // ... and the tab shown: while printing the axes stay still, so Tune. `Navigation.motion-tab` is not touched, the
+    // choice is back after the print.
+    property <MotionTab> tab: Printer.motion-locked && (root.chosen == MotionTab.axes || root.chosen == MotionTab.calibrate)
+        ? MotionTab.tune : root.chosen;
 
     VerticalLayout {
-        if root.can-calibrate: TabBar {
+        TabBar {
             TabButton {
                 icon: Icons.nav-move;
-                text: @tr("Move");
-                checked: root.tab == MoveTab.axes;
-                clicked => { Navigation.move-tab = MoveTab.axes; }
+                text: @tr("Axes");
+                enabled: !Printer.motion-locked;
+                checked: root.tab == MotionTab.axes;
+                clicked => { Navigation.motion-tab = MotionTab.axes; }
             }
             TabButton {
+                icon: Icons.nav-tuning;
+                text: @tr("Tune");
+                checked: root.tab == MotionTab.tune;
+                clicked => { Navigation.motion-tab = MotionTab.tune; }
+            }
+            if Printer.tuning.length > 0: TabButton {
+                icon: Icons.nav-tuning-advanced;
+                text: @tr("Expert");
+                checked: root.tab == MotionTab.expert;
+                clicked => { Navigation.motion-tab = MotionTab.expert; }
+            }
+            if root.can-calibrate: TabButton {
                 icon: Icons.nav-calibration;
                 text: @tr("Calibrate");
-                checked: root.tab == MoveTab.calibrate;
-                clicked => { Navigation.move-tab = MoveTab.calibrate; }
+                enabled: !Printer.motion-locked;
+                checked: root.tab == MotionTab.calibrate;
+                clicked => { Navigation.motion-tab = MotionTab.calibrate; }
             }
         }
         // While paused: moving and extruding stay possible, what would lose the print's position does not.
-        if Printer.position-locked: Note {
+        if Printer.position-locked && (root.tab == MotionTab.axes || root.tab == MotionTab.calibrate): Note {
             text: @tr("Print paused: homing, leveling, calibrating and motors off stay off until the print ends.");
             horizontal-alignment: center;
             height: Theme.font-small * 2;
             vertical-alignment: center;
         }
-        if root.tab == MoveTab.axes: AxesTab { vertical-stretch: 1; }
-        if root.tab == MoveTab.calibrate: CalibrateTab { vertical-stretch: 1; }
+        if root.tab == MotionTab.axes: AxesTab { vertical-stretch: 1; }
+        if root.tab == MotionTab.tune: TuneBasicsTab { vertical-stretch: 1; }
+        if root.tab == MotionTab.expert: TuneExpertTab { vertical-stretch: 1; }
+        if root.tab == MotionTab.calibrate: CalibrateTab { vertical-stretch: 1; }
     }
 }

@@ -593,7 +593,7 @@ supersedes the parts of D1 and D2 named below.
 
 ### Navigation
 
-Print, Move, Thermal, Filament, Tune, **Changer**, System. The entries stretch; seven leave about 62 px each, above
+Print, Motion, Thermal, Filament, **Changer**, System (Tune moved to Motion, see below). The entries stretch; six leave about 62 px each, above
 `Theme.touch`. "Changer" covers Happy Hare, AFC and tool changers alike; "MMU" and "Tools" each fit only a part.
 `Page.changer` in `Navigation`, the item in `chrome.slint` under the same `enabled` rule as Filament.
 
@@ -686,6 +686,7 @@ Tabs as `TabBar`, each only with content; the page as a whole only with at least
   head's nozzle where fans are per head, else `fan`. Basics fills the page that is half empty today, Expert scrolls
   less. The tie is `tool.fan` as decided under "Sensors, fans and drivers", read in
   `sources/toolchanger.rs` into the head in the tree and shown by the presenter. No guess: a head that states no fan shows none in Basics; only without a head level is `fan` the fan.
+  Superseded: Tune is now a tab of the Motion page and the part fan left it; the fan of the mounted head is the first row of Thermal › Fans.
 
 ### Code
 
@@ -718,8 +719,8 @@ Found while building D7; the code is the truth where it differs from the text ab
 - "selected" means mounted without detection (`mounted` and not `detected`); "mounted" needs a detected head.
 - The Changer entry is `enabled: Printer.ready`, like Thermal.
 - The warning dot on the Changer entry shows only where the Sensors tab exists (`has-changer-sensors`).
-- Tune Basics shows the part fan of the mounted head, not of the head the Filament page shows
-  (`selected_part_fan` in `crates/app/src/items.rs`).
+- Thermal › Fans lists the part fan of the mounted head first, not that of the head the Filament page shows
+  (`selected_part_fan` and `fans_part_fan_first` in `crates/app/src/items.rs`).
 
 ### Rejected
 

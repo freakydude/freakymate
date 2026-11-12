@@ -1,10 +1,10 @@
-// Fine tuning during the print: Z offset, speed and flow factor and the part cooling fan; in the expert tab pressure
-// advance and the motion and extrusion values of the configuration, changed until the next restart.
+// The Tune and Expert tabs of the Motion page: Z offset, speed and flow factor to correct during the print; in the
+// expert tab pressure advance and the motion and extrusion values of the configuration, changed until the next restart.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Navigation, Printer, TuneTab, TuningItem, UiSettings } from "../state.slint";
-import { ButtonKind, Card, IconButton, ScrollList, StepSelector, TabBar, TabButton, TouchSlider } from "../components/controls.slint";
+import { Actions, Confirm, Printer, TuningItem, UiSettings } from "../state.slint";
+import { ButtonKind, Card, IconButton, ScrollList, StepSelector } from "../components/controls.slint";
 
 // Names of the expert values; the core identifies them by id.
 global TuningTexts {
@@ -49,7 +49,7 @@ component Adjuster inherits Card {
             vertical-alignment: center;
         }
         IconButton { width: Theme.button-narrow; icon: Icons.ui-plus; clicked => { root.increase(); } }
-        if root.resettable: IconButton { width: Theme.button-narrow; icon: Icons.ui-refresh; enabled: root.can-reset; clicked => { root.reset(); } }
+        if root.resettable: IconButton { width: Theme.button-narrow; icon: Icons.ui-reset; enabled: root.can-reset; clicked => { root.reset(); } }
     }
 }
 
@@ -88,7 +88,7 @@ component TuningRow inherits Rectangle {
         IconButton { width: Theme.button-narrow; icon: Icons.ui-plus; clicked => { Actions.step-tuning(root.item.id, 1); } }
         IconButton {
             width: Theme.button-narrow;
-            icon: Icons.ui-refresh;
+            icon: Icons.ui-reset;
             enabled: root.item.can-reset;
             accessible-label: @tr("Back to the configuration");
             clicked => { Actions.reset-tuning(root.item.id); }
@@ -97,7 +97,7 @@ component TuningRow inherits Rectangle {
 }
 
 // The values of the configuration that Klipper can change at runtime; they are back after a restart.
-component ExpertTab inherits Rectangle {
+export component TuneExpertTab inherits Rectangle {
     property <length> row-step: 64px;
 
     list := ScrollList {
@@ -114,75 +114,9 @@ component ExpertTab inherits Rectangle {
     }
 }
 
-// The part cooling fan of the nozzle in use, the same fan as on the Thermal page: the mounted head's where heads
-// state one (named after the head), else `fan`. One row with the name above the value, so the page keeps its height
-// with the note under the factors.
-component PartFanCard inherits Card {
-    HorizontalLayout {
-        spacing: Theme.spacing;
-        height: Theme.touch;
-        Image {
-            cross-axis-self-alignment: center;
-            // A fan that does not turn although it should is an error, as on the Thermal page.
-            source: Printer.part-fan.stalled ? Icons.state-error : Icons.thermal-fan;
-            colorize: Printer.part-fan.stalled ? Theme.danger : Printer.part-fan.speed > 0 ? Theme.accent : Theme.muted;
-            width: 28px;
-            height: 28px;
-        }
-        VerticalLayout {
-            alignment: center;
-            width: 180px;
-            Text {
-                text: Printer.nozzle-head == "" ? @tr("Part fan") : @tr("Part fan {}", Printer.nozzle-head);
-                color: Theme.muted;
-                font-size: Theme.font-small;
-                overflow: elide;
-            }
-            HorizontalLayout {
-                spacing: Theme.spacing;
-                alignment: start;
-                Text {
-                    text: round(part-fan-slider.shown) + " %";
-                    color: Printer.part-fan.stalled ? Theme.danger : Theme.foreground;
-                    font-size: Theme.font-large;
-                    font-weight: 600;
-                }
-                if Printer.part-fan.rpm != "": Text {
-                    text: Printer.part-fan.rpm;
-                    color: Printer.part-fan.stalled ? Theme.danger : Theme.muted;
-                    font-size: Theme.font-small;
-                    vertical-alignment: center;
-                    overflow: elide;
-                }
-            }
-        }
-        IconButton {
-            width: Theme.button-narrow;
-            text: @tr("Off");
-            enabled: Printer.part-fan.controllable;
-            checked: Printer.part-fan.speed < 1;
-            clicked => { Actions.set-fan(Printer.part-fan.object, 0); }
-        }
-        part-fan-slider := TouchSlider {
-            cross-axis-self-alignment: center;
-            horizontal-stretch: 1;
-            enabled: Printer.part-fan.controllable;
-            value: Printer.part-fan.speed;
-            changed(level) => { Actions.set-fan(Printer.part-fan.object, level); }
-        }
-        IconButton {
-            width: Theme.button-narrow;
-            text: "100%";
-            enabled: Printer.part-fan.controllable;
-            checked: Printer.part-fan.speed > 99;
-            clicked => { Actions.set-fan(Printer.part-fan.object, 100); }
-        }
-    }
-}
-
-// What one corrects while watching a print: the Z offset of the first layer, the speed and flow of the print, and the
-// part cooling fan. Calibration values (pressure advance, smooth time) and the limits are in the expert tab.
-component BasicsTab inherits Rectangle {
+// What one corrects while watching a print: the Z offset of the first layer, and the speed and flow of the print.
+// Calibration values (pressure advance, smooth time) and the limits are in the expert tab.
+export component TuneBasicsTab inherits Rectangle {
     VerticalLayout {
         padding: Theme.padding;
         spacing: Theme.spacing;
@@ -213,7 +147,7 @@ component BasicsTab inherits Rectangle {
                     spacing: Theme.spacing;
                     height: 64px;
                     IconButton {
-                        icon: Printer.has-probe ? Icons.calibration-probe : Icons.motion-home-z;
+                        icon: Printer.has-probe ? Icons.calibration-probe : Icons.calibration-z-offset;
                         text: @tr("Apply offset");
                         enabled: Printer.z-offset != 0 && !Printer.is-printing;
                         clicked => { Actions.apply-z-offset(); }
@@ -263,29 +197,5 @@ component BasicsTab inherits Rectangle {
                 Rectangle { vertical-stretch: 1; }
             }
         }
-        if Printer.has-part-fan: PartFanCard { }
-    }
-}
-
-export component TunePage inherits Rectangle {
-    property <TuneTab> tab: Printer.tuning.length > 0 ? Navigation.tune-tab : TuneTab.basics;
-
-    VerticalLayout {
-        TabBar {
-            TabButton {
-                icon: Icons.nav-tuning;
-                text: @tr("Basics");
-                checked: root.tab == TuneTab.basics;
-                clicked => { Navigation.tune-tab = TuneTab.basics; }
-            }
-            if Printer.tuning.length > 0: TabButton {
-                icon: Icons.nav-tuning-advanced;
-                text: @tr("Expert");
-                checked: root.tab == TuneTab.expert;
-                clicked => { Navigation.tune-tab = TuneTab.expert; }
-            }
-        }
-        if root.tab == TuneTab.basics: BasicsTab { vertical-stretch: 1; }
-        if root.tab == TuneTab.expert: ExpertTab { vertical-stretch: 1; }
     }
 }
