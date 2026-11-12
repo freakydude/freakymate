@@ -66,7 +66,7 @@ component LegendEntry inherits HorizontalLayout {
 }
 
 export component BedMapLegend inherits HorizontalLayout {
-    spacing: 14px;
+    spacing: Theme.spacing-large;
     LegendEntry { fill: Theme.active-fill; stroke: Theme.accent; text: @tr("Printing"); }
     LegendEntry { fill: Theme.surface; stroke: Theme.disabled-foreground; text: @tr("Excluded"); }
     LegendEntry { fill: transparent; stroke: Theme.foreground; text: @tr("Selected"); }

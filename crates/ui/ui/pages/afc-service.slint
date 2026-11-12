@@ -77,8 +77,9 @@ export component AfcServiceTab inherits VerticalLayout {
             }
         }
     }
-    if Printer.afc-hub-returns.length > 0: Card {
-        vertical-stretch: 1;
+    Card {
+        visible: Printer.afc-hub-returns.length > 0;
+        vertical-stretch: Printer.afc-hub-returns.length > 0 ? 1 : 0;
         title: @tr("Pull a lane back out of the hub");
         icon: Icons.mmu-unload;
         returns := ScrollList {
@@ -92,5 +93,5 @@ export component AfcServiceTab inherits VerticalLayout {
             }
         }
     }
-    if Printer.afc-hub-returns.length == 0: Rectangle { vertical-stretch: 1; }
+    Rectangle { vertical-stretch: Printer.afc-hub-returns.length == 0 ? 1 : 0; }
 }

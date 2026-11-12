@@ -67,8 +67,8 @@ component ToolRow inherits Rectangle {
     opacity: root.has-file && !root.mapping.used ? 0.45 : 1.0;
 
     HorizontalLayout {
-        padding: 5px;
-        spacing: 5px;
+        padding: Theme.spacing-medium;
+        spacing: Theme.spacing-medium;
         VerticalLayout {
             width: 40px;
             alignment: center;
@@ -145,7 +145,7 @@ component ToolRow inherits Rectangle {
 // and Reset.
 component ToolsHeader inherits HorizontalLayout {
     spacing: Theme.spacing;
-    height: 40px;
+    height: Theme.touch;
     if Printer.mmu-match-file == "": Text {
         horizontal-stretch: 1;
         text: @tr("Tool-to-gate map");
@@ -186,7 +186,7 @@ component ToolsHeader inherits HorizontalLayout {
     // Marked while EndlessSpool is on.
     IconButton {
         width: 168px;
-        height: 40px;
+        height: Theme.touch;
         icon: Icons.mmu-endless-spool;
         icon-size: Theme.icon-small;
         text: @tr("EndlessSpool");
@@ -196,7 +196,7 @@ component ToolsHeader inherits HorizontalLayout {
     }
     IconButton {
         width: 112px;
-        height: 40px;
+        height: Theme.touch;
         icon: Icons.ui-reset;
         icon-size: Theme.icon-small;
         text: @tr("Reset");
@@ -309,8 +309,10 @@ export component EndlessSpoolDialog inherits Scrim {
                 font-size: Theme.font-small;
                 wrap: word-wrap;
             }
-            if Printer.mmu-endless-spool: group-list := ScrollList {
-                vertical-stretch: 1;
+            // Always in the layout, switched by visible: a conditional list squeezes the navigation.
+            group-list := ScrollList {
+                visible: Printer.mmu-endless-spool;
+                vertical-stretch: Printer.mmu-endless-spool ? 1 : 0;
                 property <length> row-step: Theme.touch + 4px;
                 content-height: Printer.mmu-gates.length * self.row-step - 4px;
                 for gate[index] in Printer.mmu-gates: GroupRow {
@@ -320,7 +322,7 @@ export component EndlessSpoolDialog inherits Scrim {
                     gate: gate;
                 }
             }
-            if !Printer.mmu-endless-spool: Rectangle { vertical-stretch: 1; }
+            Rectangle { vertical-stretch: Printer.mmu-endless-spool ? 0 : 1; }
         }
     }
 }

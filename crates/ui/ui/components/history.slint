@@ -138,7 +138,7 @@ export component HistoryDialog inherits Scrim {
         }
 
         HorizontalLayout {
-            spacing: 16px;
+            spacing: 2 * Theme.spacing;
             alignment: end;
             Legend { color: Theme.accent; text: @tr("Temperature"); }
             if Printer.history-target-path != "": Legend { color: Theme.muted; text: @tr("Target"); }

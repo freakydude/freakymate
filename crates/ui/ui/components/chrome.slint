@@ -58,8 +58,8 @@ component UnreadCounter inherits Rectangle {
     background: Theme.danger-fill;
     counter-row := HorizontalLayout {
         padding-left: Theme.spacing-medium;
-        padding-right: 9px;
-        spacing: 3px;
+        padding-right: Theme.spacing;
+        spacing: Theme.spacing-small;
         Image {
             cross-axis-self-alignment: center;
             source: Icons.ui-error;
@@ -343,8 +343,8 @@ export component NavRail inherits Rectangle {
     background: Theme.surface;
 
     VerticalLayout {
-        padding: 3px;
-        spacing: 1px;
+        padding: Theme.spacing-small;
+        spacing: Theme.spacing-tight;
         NavItem { icon: Icons.nav-printer; label: @tr("Print"); page: Page.print; enabled: Printer.ready; }
         NavItem { icon: Icons.nav-move; label: @tr("Motion"); page: Page.motion; enabled: Printer.ready; }
         NavItem { icon: Icons.nav-thermal; label: @tr("Thermal"); page: Page.temperature; enabled: Printer.ready; }

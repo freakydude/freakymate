@@ -20,7 +20,7 @@ component MinutesRow inherits VerticalLayout {
         spacing: Theme.spacing;
         for minutes in root.choices: IconButton {
             height: Theme.row-height-small;
-            text: minutes == 0 ? @tr("Never") : minutes + " min";
+            text: minutes == 0 ? @tr("Never") : @tr("{} min", minutes);
             checked: root.current == minutes;
             clicked => { root.chosen(minutes); }
         }
