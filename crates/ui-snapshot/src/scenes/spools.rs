@@ -66,13 +66,14 @@ fn unlink_active_spool(session: &mut Session) -> Result<(), String> {
     session.pump(Duration::from_millis(300));
     if session.has_reference_layout() {
         session.tap(UNLINK_BUTTON.0, UNLINK_BUTTON.1);
+        if session.window.global::<SpoolPicker>().get_open() {
+            return Err("spool picker still open after Unlink".into());
+        }
     } else {
         session.window.global::<Actions>().invoke_set_active_spool(-1);
+        session.window.global::<SpoolPicker>().set_open(false);
     }
     session.settle_replies(Duration::from_secs(2));
-    if session.window.global::<SpoolPicker>().get_open() {
-        return Err("spool picker still open after Unlink".into());
-    }
     match session.window.global::<Printer>().get_spool_id() {
         -1 => Ok(()),
         id => Err(format!("spool {id} still active after Unlink")),
