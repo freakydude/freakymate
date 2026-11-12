@@ -8,7 +8,7 @@ import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
 import { NumberEntryDialog } from "entry-dialogs.slint";
 import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
 
-// Picks a spool of Spoolman for the gate (or, without MMU, as the active spool), weighs it, or takes it out of the gate.
+// Picks a spool of Spoolman for the gate (or, without MMU, as the active spool), weighs it, or unlinks it again.
 // The list shows the spools in a lane first, then the most recently used ones.
 export component SpoolDialog inherits Scrim {
     property <int> selected: -1;
@@ -97,8 +97,9 @@ export component SpoolDialog inherits Scrim {
             HorizontalLayout {
                 spacing: Theme.spacing;
                 height: Theme.touch;
-                // Takes only the link to Spoolman away; Happy Hare keeps material and colour of the gate.
-                if SpoolPicker.gate >= 0 || SpoolPicker.tool >= 0 || SpoolPicker.lane >= 0: IconButton {
+                // Takes only the link to Spoolman away (for a printer without MMU: clears the active spool of
+                // Moonraker); Happy Hare keeps material and colour of the gate.
+                IconButton {
                     text: @tr("Unlink");
                     horizontal: true;
                     enabled: SpoolPicker.current >= 0;
@@ -107,8 +108,10 @@ export component SpoolDialog inherits Scrim {
                             Actions.assign-tool-spool(SpoolPicker.tool, -1);
                         } else if (SpoolPicker.lane >= 0) {
                             Actions.assign-lane-spool(SpoolPicker.lane, -1);
-                        } else {
+                        } else if (SpoolPicker.gate >= 0) {
                             Actions.assign-gate-spool(SpoolPicker.gate, -1);
+                        } else {
+                            Actions.set-active-spool(-1);
                         }
                         SpoolPicker.open = false;
                     }
