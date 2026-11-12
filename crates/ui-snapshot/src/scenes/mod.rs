@@ -50,7 +50,7 @@ pub enum Scene {
     Taps,
     /// Editing keys in the text entry of the console, physical and on-screen.
     Typing,
-    /// The Calibrate tab of the Move page: results of the bed mesh and the screws, the dialogs of the waiting modes.
+    /// The Calibrate tab of the Motion page: results of the bed mesh and the screws, the dialogs of the waiting modes.
     Calibrate,
     /// Print running, system page locked, cancel.
     Printing,
