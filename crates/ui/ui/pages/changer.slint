@@ -1,6 +1,6 @@
 // Changer: the machine as a whole (docs/multi-tool.md, D7), the counterpart of the Filament page, which is the path of one
-// head. Tabs, each only with content: Tools (the map of tools to gates and EndlessSpool), Service (the commands of the MMU
-// and the state card of the tool changer) and Sensors (the filament sensors that no head owns). The dialogs of the Tools
+// head. Tabs, each only with content: Tools (the map of tools to gates and EndlessSpool, or to lanes with AFC), Service (the commands of the MMU,
+// AFC's state and the state card of the tool changer) and Sensors (the filament sensors that no head owns). The dialogs of the Tools
 // tab cover the whole page. The page stays reachable during a print; the commands that move keep their locks.
 
 import { Theme } from "../theme.slint";
@@ -9,6 +9,8 @@ import { Actions, ChangerTab, Confirm, Navigation, Printer, Severity } from "../
 import { StateIcons } from "../state-icons.slint";
 import { ButtonKind, Card, IconButton, IconLabel, TabBar, TabButton } from "../components/controls.slint";
 import { FilamentSensorGrid } from "../components/sensor-grid.slint";
+import { AfcServiceTab } from "afc-service.slint";
+import { AfcToolLaneDialog, AfcToolsTab } from "afc-tools.slint";
 import { MmuServiceTab } from "mmu-service.slint";
 import { EndlessSpoolDialog, MmuToolsTab, ToolDialog, ToolGateDialog } from "mmu-tools.slint";
 
@@ -109,15 +111,18 @@ component ToolchangerCard inherits Card {
     }
 }
 
-// The cards of every changer the printer has, in the order MMU, tool changer.
+// The cards of every changer the printer has, in the order MMU, AFC, tool changer.
 component ServiceTab inherits VerticalLayout {
     spacing: 0px;
+    if Printer.has-afc: AfcServiceTab {
+        vertical-stretch: 1;
+    }
     if Printer.has-mmu: MmuServiceTab {
         vertical-stretch: 1;
     }
     if Printer.has-toolchanger: VerticalLayout {
         padding: Theme.padding;
-        padding-top: Printer.has-mmu ? 0px : Theme.padding;
+        padding-top: Printer.has-mmu || Printer.has-afc ? 0px : Theme.padding;
         ToolchangerCard {
             vertical-stretch: 0;
             max-height: 160px;
@@ -157,7 +162,10 @@ export component ChangerPage inherits Rectangle {
                 clicked => { Navigation.changer-tab = ChangerTab.sensors; }
             }
         }
-        if root.tab == ChangerTab.tools: MmuToolsTab {
+        if root.tab == ChangerTab.tools && Printer.has-mmu: MmuToolsTab {
+            vertical-stretch: 1;
+        }
+        if root.tab == ChangerTab.tools && !Printer.has-mmu: AfcToolsTab {
             vertical-stretch: 1;
         }
         if root.tab == ChangerTab.service: ServiceTab {
@@ -168,7 +176,8 @@ export component ChangerPage inherits Rectangle {
         }
     }
 
-    if root.tab == ChangerTab.tools: ToolDialog { }
-    if root.tab == ChangerTab.tools: ToolGateDialog { }
-    if root.tab == ChangerTab.tools: EndlessSpoolDialog { }
+    if root.tab == ChangerTab.tools && Printer.has-mmu: ToolDialog { }
+    if root.tab == ChangerTab.tools && Printer.has-mmu: ToolGateDialog { }
+    if root.tab == ChangerTab.tools && Printer.has-mmu: EndlessSpoolDialog { }
+    if root.tab == ChangerTab.tools && !Printer.has-mmu: AfcToolLaneDialog { }
 }

@@ -48,6 +48,9 @@ pub struct Setup {
     pub tool_commands: Option<Vec<usize>>,
     /// Klipper has the command `UNSELECT_TOOL` (a tool changer without `require_tool_present`); from the same answer.
     pub has_unselect_tool: bool,
+    /// Klipper has the command `AFC_UNSELECT_TOOL` (AFC with its own tool changer, `[AFC_Toolchanger]`); from the same
+    /// answer.
+    pub has_afc_unselect_tool: bool,
     /// `[save_variables]` is configured, so `SAVE_VARIABLE` keeps values across restarts.
     pub save_variables: bool,
 }

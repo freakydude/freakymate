@@ -435,7 +435,7 @@ impl Presenter {
         printer.set_changer_selected(selected.into());
         printer.set_changer_detected(detected.into());
         printer.set_changer_ready(changer.is_none_or(ToolchangerStatus::accepts_tool_change));
-        printer.set_has_drop(changer.is_some() && snapshot.sources.klipper.has_unselect_tool);
+        printer.set_has_drop(heads::drop_command(&snapshot.sources.klipper, status).is_some());
         printer.set_has_toolchanger(changer.is_some());
         printer.set_changer_status(changer.map_or("", |changer| changer.status.as_str()).into());
         printer.set_changer_initialize_on(changer.map_or("", |changer| changer.initialize_on.as_str()).into());
@@ -644,6 +644,11 @@ impl Presenter {
     /// The lane of the tile in `row` of the Gates tab.
     pub fn lane_id(&self, row: usize) -> Option<LaneId> {
         self.mmu.lane_id(row)
+    }
+
+    /// The row of the lane's tile on the Gates tab; -1 without tile.
+    pub fn lane_row(&self, lane: &LaneId) -> i32 {
+        self.mmu.row_of(lane)
     }
 
     /// The load path card shows `lane` from now on (a tap on its tile).

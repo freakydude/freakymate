@@ -60,12 +60,35 @@ pub(super) fn toolchanger(session: &mut Session) -> Result<(), String> {
     session.capture("toolchanger-tool-picker")?;
     session.window.global::<SpoolPicker>().set_open(false);
 
+    tune_head_fan(session)?;
     prepared_job(session)?;
     for heater in ["extruder", "extruder1"] {
         session.service.send(Command::SetHeaterTarget { heater: heater.into(), target: 0.0 });
     }
     session.pump(Duration::from_millis(500));
     head_level(session)
+}
+
+/// The part fan of the mounted head on Tune › Basics: the fake gives each head a `fan_generic T<n>_partfan` and has
+/// `M106` drive the fan of the active head (viesturz `tool.py` Z.126, `toolchanger.py` Z.837-838). T1 runs at 50 %
+/// (`toolchanger-tune-fan`); then the head and the fan go back as they were.
+fn tune_head_fan(session: &mut Session) -> Result<(), String> {
+    session.service.send(Command::RunMacro { name: "T1".into() });
+    session.wait_until("T1 selected", |snapshot| {
+        snapshot.status.toolchanger.as_ref().is_some_and(|changer| changer.selected == Some(1))
+    })?;
+    session.service.send(Command::RunGcode { script: "M106 S127.5".into() });
+    session.pump(Duration::from_secs(1));
+    let printer = session.window.global::<Printer>();
+    if !printer.get_has_part_fan() || (printer.get_part_fan().speed - 50.0).abs() > 0.5 {
+        return Err("Tune should show the fan of the mounted head at 50 %".into());
+    }
+    session.show_page(Page::Tune, "toolchanger-tune-fan")?;
+    session.service.send(Command::RunGcode { script: "M107".into() });
+    session.service.send(Command::RunMacro { name: "T0".into() });
+    session.wait_until("T0 selected again", |snapshot| {
+        snapshot.status.toolchanger.as_ref().is_some_and(|changer| changer.selected == Some(0))
+    })
 }
 
 /// The plugin is `uninitialized` after the connect and after any rejected command (viesturz `_handle_connect`,

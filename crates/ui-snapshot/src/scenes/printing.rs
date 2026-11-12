@@ -34,7 +34,7 @@ pub(super) fn tools_match_the_job(session: &mut Session) -> Result<(), String> {
         return Ok(());
     }
     session.window.global::<Navigation>().set_changer_tab(ChangerTab::Tools);
-    session.show_page(Page::Changer, "filament-mmu-tools-match")?;
+    session.show_page(Page::Changer, "changer-mmu-tools-match")?;
     if session.window.global::<Printer>().get_mmu_match_file().is_empty() {
         return Err("the Tools tab does not compare with the file being printed".into());
     }
@@ -50,10 +50,10 @@ fn tool_compare(session: &mut Session) -> Result<(), String> {
     session.window.global::<Actions>().invoke_mmu_map_tool(0, 3);
     session.wait_until("T0 on gate 3", |snapshot| tool_0_gate(snapshot) == Some(3))?;
     session.window.global::<MmuDialogs>().set_tool(0);
-    session.show_page(Page::Changer, "filament-mmu-tool-compare")?;
+    session.show_page(Page::Changer, "changer-mmu-tool-compare")?;
     session.window.global::<MmuDialogs>().set_tool(-1);
     session.window.global::<MmuDialogs>().set_tool_gate(0);
-    session.show_page(Page::Changer, "filament-mmu-tool-gate-compare")?;
+    session.show_page(Page::Changer, "changer-mmu-tool-gate-compare")?;
     session.window.global::<MmuDialogs>().set_tool_gate(-1);
     let tool = session.window.global::<Printer>().get_mmu_tools().row_data(0).unwrap_or_default();
     session.window.global::<Actions>().invoke_mmu_map_tool(0, 0);

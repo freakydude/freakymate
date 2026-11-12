@@ -183,7 +183,12 @@ fn bind_mmu(actions: &Actions, service: &PrinterService) {
             tool_map_service.send(Command::MmuMapTool { tool, gate });
         }
     });
-    actions.on_mmu_reset_tool_map(send(service, || Command::MmuResetToolMap));
+    // The source in charge resets its map: Happy Hare (`MMU_TTG_MAP RESET=1`), else AFC (`RESET_AFC_MAPPING`).
+    actions.on_mmu_reset_tool_map(send(service, || Command::ResetToolMap));
+    actions.on_afc_reset_failure(send(service, || Command::AfcResetFailure));
+    actions.on_afc_reset_lane(with(service, |service, lane: SharedString| {
+        service.send(Command::AfcResetLane { lane: lane.into() })
+    }));
     actions.on_mmu_set_endless_spool(with(service, |service, enabled: bool| {
         service.send(Command::MmuEndlessSpool { enabled })
     }));
@@ -203,6 +208,12 @@ fn bind_lanes(actions: &Actions, service: &PrinterService, presenter: &Rc<Presen
         }
     }));
     actions.on_bypass_tapped(run_presenter(presenter, |presenter| presenter.show_lane(LaneId::Bypass)));
+    let (service_for_map, presenter_for_map) = (service.clone(), Rc::clone(presenter));
+    actions.on_map_tool_to_lane(move |tool, row| {
+        if let (Ok(tool), Some(lane)) = (usize::try_from(tool), lane_of_row(&presenter_for_map, row)) {
+            service_for_map.send(Command::MapToolToLane { tool, lane });
+        }
+    });
     actions.on_lane_load(with_lane(service, presenter, |lane| Command::LoadLane { lane }));
     actions.on_lane_unload(with_lane(service, presenter, |lane| Command::UnloadLane { lane }));
     actions.on_lane_eject(with_lane(service, presenter, |lane| Command::EjectLane { lane }));

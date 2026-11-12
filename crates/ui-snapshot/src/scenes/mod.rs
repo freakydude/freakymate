@@ -41,7 +41,8 @@ pub enum Scene {
     /// A tool changer (`-p toolchanger`): spool in use, hints, the picker of a tool macro, the prepared file.
     Toolchanger,
     /// Lanes and the load path (`-p afc`, `-p afc-toolchanger`, `-p toolchanger-mmu`, `-p toolchanger`): the tiles and
-    /// dialog of AFC lanes, the path card, the head's part of the path and the sensors of the machine on System.
+    /// dialog of AFC lanes, the path card, the head's part of the path and the sensors of the machine on System; with AFC
+    /// also the Changer page (tool map, service) and the error state.
     Lanes,
     /// Settings > Network: list, connecting, confirmation, read-only fallback.
     Network,

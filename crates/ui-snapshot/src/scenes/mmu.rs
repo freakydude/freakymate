@@ -18,7 +18,7 @@ const GATE_DIALOG_SELECT: (f32, f32) = (172.0, 230.0);
 /// Filament page afterwards.
 pub(super) fn mmu_service(session: &mut Session) -> Result<(), String> {
     session.window.global::<Navigation>().set_changer_tab(ChangerTab::Service);
-    session.show_page(Page::Changer, "filament-mmu-service")?;
+    session.show_page(Page::Changer, "changer-mmu-service")?;
     {
         let actions = session.window.global::<Actions>();
         actions.invoke_mmu_servo_down();
@@ -27,7 +27,7 @@ pub(super) fn mmu_service(session: &mut Session) -> Result<(), String> {
     session.wait_until("servo down and MMU not homed", |snapshot| {
         snapshot.status.mmu.as_ref().is_some_and(|mmu| !mmu.homed && mmu.servo == Some(ServoPosition::Down))
     })?;
-    session.show_page(Page::Changer, "filament-mmu-service-motors-off")?;
+    session.show_page(Page::Changer, "changer-mmu-service-motors-off")?;
     if session.window.global::<Printer>().get_mmu_servo() != "down" {
         return Err("the service tab does not show the servo down".into());
     }
@@ -69,7 +69,7 @@ pub(super) fn mmu_tools_and_groups(session: &mut Session) -> Result<(), String> 
         if session.window.global::<MmuDialogs>().get_tool_gate() != 3 || tool_3_gate(session) != before {
             return Err("a tap on the gate side of the row of T3 does not open the choice of gate, or it maps".into());
         }
-        session.show_page(Page::Changer, "filament-mmu-tool-gate-dialog")?;
+        session.show_page(Page::Changer, "changer-mmu-tool-gate-dialog")?;
         let (x, y) = GATE_DIALOG_GATE_1;
         session.tap(x, y);
     } else {
@@ -89,9 +89,9 @@ pub(super) fn mmu_tools_and_groups(session: &mut Session) -> Result<(), String> 
             .as_ref()
             .is_some_and(|mmu| mmu.gates.get(1).and_then(|gate| gate.endless_spool_group) == Some(0))
     })?;
-    session.show_page(Page::Changer, "filament-mmu-tools")?;
+    session.show_page(Page::Changer, "changer-mmu-tools")?;
     session.window.global::<MmuDialogs>().set_endless_spool_open(true);
-    session.show_page(Page::Changer, "filament-mmu-endless-spool")?;
+    session.show_page(Page::Changer, "changer-mmu-endless-spool")?;
     session.window.global::<MmuDialogs>().set_endless_spool_open(false);
     session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
     {

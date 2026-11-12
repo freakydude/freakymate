@@ -564,7 +564,10 @@ Read from AFC `main` on 2026-11-11:
 - **Scope:** the Tools tab maps tools to lanes for both sources through one intent (`MapToolToLane`, `ResetToolMap`;
   Happy Hare: `MMU_TTG_MAP`, AFC: `SET_MAP`, `RESET_AFC_MAPPING RUNOUT=no`). Service of AFC: "Clear error"
   (`AfcResetFailure`) while `AFC.error_state` is set, and per lane "Back to hub" (`AfcResetLane`), not while
-  printing. Core and commands are done; the screens are not yet.
+  printing. Core, commands and screens are done (D7, 2026-11-12). The button is also disabled while a lane is loaded in
+  the head. That is a deliberate exception to "hints, not locks": AFC prints "unload or check sensor before resetting
+  lane" but lacks the `return` (`AFC_functions.py` L1690-1692 at 5ea84ea) and pulls the filament anyway. We treat it as an
+  AFC bug, not as behaviour to build on; marked `AFC-BUG-WORKAROUND` in the core, to be removed when AFC fixes it.
 - **Left out:** `AFC_RESET` (only opens a Mainsail prompt with `AFC_LANE_RESET` per lane), `AFC_RECOVER_LANE`,
   `SET_LANE_LOADED`, `UNSET_LANE_LOADED`, `AFC_CALIBRATION` (their names depend on `show_macros`, and they are last
   resorts: the console is the way), runout lanes (`SET_RUNOUT`), buffer settings, tests, statistics, encoder details.
@@ -643,8 +646,8 @@ An overlay list over the Filament page (`Dialog` of `dialog.slint`, closes on �
   `T<n>`), nozzle temperature, state text ("mounted" with success icon only with detection; nothing for absent), one
   button.
 - The button: "Select" (`T<n>` of a head with one lane), "Pick up" (`SELECT_TOOL TOOL=<object>` where the head has
-  several `T<n>`), "Drop" on the mounted head (`UNSELECT_TOOL`, AFC `AFC_UNSELECT_TOOL`); none where the command
-  does not exist (AFC's changer has no bare pick-up). Disabled with the reason as hint while a print runs (the page is
+  several `T<n>`), "Drop" on the mounted head (`UNSELECT_TOOL`; AFC `AFC_UNSELECT_TOOL`, only if `gcode.help` lists
+  it and the heads come from AFC); none where the command does not exist (AFC's changer has no bare pick-up). Disabled with the reason as hint while a print runs (the page is
   locked then), while the changer is not `ready` (or `uninitialized` with `first-use`), not while paused.
 - Tapping the row (not the button) chooses the head for viewing and closes the picker; the page opens on the
   mounted head as before. Viewing a head never moves the printer.
@@ -659,8 +662,8 @@ Tabs as `TabBar`, each only with content; the page as a whole only with at least
 
 | Tab | Content | Exists when |
 | --- | --- | --- |
-| **Tools** | today's Tools tab: `T<n>` → lane map, EndlessSpool, Reset (`MapToolToLane`, `ResetToolMap`) | Happy Hare, or AFC (`SET_MAP`); not for a tool changer alone (`T<n>` is the head, nothing to change) |
-| **Service** | Happy Hare: today's Service tab (Home, Motors off, Recover, Unlock, …). AFC: "Clear error" while `error_state`, "Back to hub" per lane. Tool changer: one state card (`status`, `initialize_on`, selected and detected head) with Initialize (`INITIALIZE_TOOLCHANGER`) and Recover (`INITIALIZE_TOOLCHANGER RECOVER=1`, confirmation). Several changers: one card each, in the order MMU, tool changer | any changer |
+| **Tools** | today's Tools tab: `T<n>` → lane map, EndlessSpool, Reset (`MapToolToLane`, `ResetToolMap`) | Happy Hare, or AFC (`SET_MAP` exists per lane, also for AFC's own changer: `AFC_spool.py` L54-59); not for a tool changer alone (`T<n>` is the head, nothing to change) |
+| **Service** | Happy Hare: today's Service tab (Home, Motors off, Recover, Unlock, …). AFC: state card with "Clear error" while `error_state`, and "Back to hub" per lane, locked while a lane is loaded in the head ("Unload lane2 first") and offered only for lanes with filament at the load switch and with a hub (`AFC_functions.py` L1685-1692, AFC-Klipper-Add-On 5ea84ea); the Filament page shows "AFC error" with "Clear error" in the tab row. Tool changer: one state card (`status`, `initialize_on`, selected and detected head) with Initialize (`INITIALIZE_TOOLCHANGER`) and Recover (`INITIALIZE_TOOLCHANGER RECOVER=1`, confirmation). Several changers: one card each, in the order MMU, tool changer | any changer |
 | **Sensors** | today's Sensors tab of the Filament page with its warning dot on the tab | untied filament sensors on a printer with several heads |
 
 - The dot on Sensors (a switched-on sensor without filament) also shows on the Changer entry of the navigation,
@@ -681,9 +684,8 @@ Tabs as `TabBar`, each only with content; the page as a whole only with at least
 - **Tune Basics = Z offset, speed factor, flow factor, part cooling fan; Expert = pressure advance, smooth time,
   velocities and the rest.** The fan stays on Thermal too (that is its home); Basics shows the fan of the selected
   head's nozzle where fans are per head, else `fan`. Basics fills the page that is half empty today, Expert scrolls
-  less. The tie is `tool.fan` as decided under "Sensors, fans and drivers"; the core does not read it yet, so D7
-  adds it (`sources/toolchanger.rs` → the head in the tree → presenter), with the field name taken from the plugin's
-  source. No guess: a head that states no fan shows none in Basics; only without a head level is `fan` the fan.
+  less. The tie is `tool.fan` as decided under "Sensors, fans and drivers", read in
+  `sources/toolchanger.rs` into the head in the tree and shown by the presenter. No guess: a head that states no fan shows none in Basics; only without a head level is `fan` the fan.
 
 ### Code
 
@@ -705,6 +707,19 @@ Filament with an MMU per head: one row of 44 px instead of about 100 px; the gat
 single-head page. Chip 160 px plus two path tabs of 124 px leave room on 730 px. Picker rows: edge 6 px, `T<n>` 48
 px, name elided, temperature 56 px right-aligned, state text elided, button 124 px. Check with the longest names in
 the fakes (`toolchanger-required`).
+
+### Deviations from the draft
+
+Found while building D7; the code is the truth where it differs from the text above.
+
+- The hint line sits in the tab row (`ChangerHint` in `head-chip.slint`), not below it.
+- Picker buttons are normal buttons, not accent buttons; the accent marks the mounted head's `T<n>` and the frame of the
+  viewed head.
+- "selected" means mounted without detection (`mounted` and not `detected`); "mounted" needs a detected head.
+- The Changer entry is `enabled: Printer.ready`, like Thermal.
+- The warning dot on the Changer entry shows only where the Sensors tab exists (`has-changer-sensors`).
+- Tune Basics shows the part fan of the mounted head, not of the head the Filament page shows
+  (`selected_part_fan` in `crates/app/src/items.rs`).
 
 ### Rejected
 

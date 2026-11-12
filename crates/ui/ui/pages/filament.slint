@@ -8,7 +8,7 @@ import { ButtonKind, Card, IconButton, IconLabel, StepSelector, TabBar, TabButto
 import { FilamentSensorGrid } from "../components/sensor-grid.slint";
 import { FilamentPath } from "../components/filament-path.slint";
 import { SpoolStrip } from "../components/spool-strip.slint";
-import { ChangerHint, HeadChip } from "../components/head-chip.slint";
+import { AfcHint, ChangerHint, HeadChip } from "../components/head-chip.slint";
 import { HeadPicker } from "../components/head-picker.slint";
 import { MmuGatesTab } from "mmu.slint";
 import { BypassDialog, GateDialog } from "mmu-dialogs.slint";
@@ -172,7 +172,7 @@ export component FilamentPage inherits Rectangle {
     property <length> tab-width: root.has-heads ? 124px : 130px;
 
     VerticalLayout {
-        if root.has-heads || Printer.has-lanes: Rectangle {
+        if root.has-heads || Printer.has-lanes || Printer.afc-error: Rectangle {
             height: Theme.touch + Theme.padding;
             TabBar {
                 if root.path-tabs: TabButton {
@@ -193,7 +193,13 @@ export component FilamentPage inherits Rectangle {
                 }
             }
             // What the tool changer does differently takes the room between the tabs and the chip.
-            if root.has-heads && Printer.changer-note != "": ChangerHint {
+            if Printer.afc-error: AfcHint {
+                x: root.path-tabs ? 2 * root.tab-width + 3 * Theme.spacing + Theme.padding : Theme.padding;
+                y: Theme.padding;
+                width: parent.width - self.x - Theme.padding - (root.has-heads ? 160px + Theme.padding + Theme.spacing : 0px);
+                height: Theme.touch;
+            }
+            if root.has-heads && Printer.changer-note != "" && !Printer.afc-error: ChangerHint {
                 x: root.path-tabs ? 2 * root.tab-width + 3 * Theme.spacing + Theme.padding : Theme.padding;
                 y: Theme.padding;
                 width: parent.width - self.x - 160px - 2 * Theme.padding - Theme.spacing;

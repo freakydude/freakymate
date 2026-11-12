@@ -487,6 +487,57 @@ fn activate_extruder_sets_the_toolhead_extruder() {
 }
 
 #[test]
+fn toolchanger_heads_have_fan_generic_fans_and_no_printer_fan() {
+    let status = toolchanger_printer().status();
+
+    assert_eq!(status["tool T0"]["fan"], "T0_partfan");
+    assert_eq!(status["tool T2"]["fan"], "T2_partfan");
+    assert_eq!(status["fan_generic T1_partfan"], json!({ "speed": 0.0, "rpm": null }));
+    assert!(status.get("fan").is_none());
+    assert!(status["configfile"]["settings"].get("fan").is_none());
+    assert!(status["configfile"]["settings"].get("fan_generic T0_partfan").is_some());
+}
+
+#[test]
+fn m106_drives_the_fan_of_the_active_tool_and_a_tool_change_moves_the_speed() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "T0").unwrap();
+    run(&mut printer, "M106 S127.5").unwrap();
+    assert_eq!(printer.status()["fan_generic T0_partfan"]["speed"], 0.5);
+
+    run(&mut printer, "T1").unwrap();
+    let status = printer.status();
+    assert_eq!(status["fan_generic T0_partfan"]["speed"], 0.0);
+    assert_eq!(status["fan_generic T1_partfan"]["speed"], 0.5);
+
+    run(&mut printer, "M107").unwrap();
+    assert_eq!(printer.status()["fan_generic T1_partfan"]["speed"], 0.0);
+    run(&mut printer, "SET_FAN_SPEED FAN=T2_partfan SPEED=0.25").unwrap();
+    assert_eq!(printer.status()["fan_generic T2_partfan"]["speed"], 0.25);
+}
+
+#[test]
+fn m106_without_an_active_tool_waits_for_the_first_tool() {
+    let mut printer = toolchanger_printer();
+
+    run(&mut printer, "M106 S255").unwrap();
+    assert_eq!(printer.status()["fan_generic T0_partfan"]["speed"], 0.0);
+
+    run(&mut printer, "T2").unwrap();
+    assert_eq!(printer.status()["fan_generic T2_partfan"]["speed"], 1.0);
+}
+
+#[test]
+fn other_profiles_keep_the_printer_fan() {
+    let mut printer = Printer::with_profile(1.0, MachineProfile::voron());
+
+    run(&mut printer, "M106 S255").unwrap();
+
+    assert_eq!(printer.status()["fan"]["speed"], 1.0);
+}
+
+#[test]
 fn other_profiles_report_no_tool_changer_details() {
     let mut printer = Printer::with_profile(1.0, MachineProfile::voron());
 

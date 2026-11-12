@@ -1,0 +1,195 @@
+// Tools tab of the Changer page with AFC: the tool-to-lane map (`SET_MAP`, `RESET_AFC_MAPPING`). Each tool shows the lane
+// it takes its filament from, with that lane's tile (colour, material); a tap opens the choice of lane. AFC swaps the
+// tool with the lane that had it, the tile list shows the result at the next status.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, Confirm, MmuDialogs, Navigation, Printer } from "../state.slint";
+import { MmuGateItem, AfcToolItem } from "../structs.slint";
+import { ToolLabel } from "../components/tool-label.slint";
+import { IconButton, ScrollList } from "../components/controls.slint";
+import { FilamentColors, FilamentText } from "../components/filament-swatch.slint";
+import { DialogPanel, DialogTitle, Scrim } from "../components/dialog.slint";
+import { FilamentHalf, FilamentLine } from "mmu-tools.slint";
+
+// What a lane tile holds as the text of a row: material and name, or "Empty".
+component LaneText inherits FilamentText {
+    in property <MmuGateItem> tile;
+    in property <bool> has-tile;
+    in property <string> lane;
+
+    lead: root.lane;
+    material: !root.has-tile ? "-" : root.tile.availability == "empty" ? @tr("Empty") : root.tile.material == "" ? "-" : root.tile.material;
+    name: root.has-tile && root.tile.availability != "empty" ? root.tile.name : "";
+    trail: root.has-tile && root.tile.availability != "empty" ? root.tile.spool-text : "";
+}
+
+// A tool and its lane.
+component AfcToolRow inherits Rectangle {
+    in property <AfcToolItem> mapping;
+    callback clicked;
+
+    property <bool> has-tile: root.mapping.lane-row >= 0 && root.mapping.lane-row < Printer.mmu-gates.length;
+    property <MmuGateItem> tile: Printer.mmu-gates[root.mapping.lane-row];
+    property <bool> is-empty: !root.has-tile || root.tile.availability == "empty";
+
+    border-radius: Theme.radius;
+    background: Theme.surface;
+
+    HorizontalLayout {
+        padding: 5px;
+        spacing: 5px;
+        ToolLabel {
+            width: 40px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            tool: root.mapping.tool;
+        }
+        FilamentHalf {
+            horizontal-stretch: 1;
+            label: @tr("Lane {}", root.mapping.lane);
+            colors: root.is-empty ? root.tile.colors : FilamentColors.generic(root.tile.colors);
+            empty: root.is-empty;
+            clicked => { root.clicked(); }
+            LaneText {
+                horizontal-stretch: 1;
+                tile: root.tile;
+                has-tile: root.has-tile;
+                lane: root.mapping.lane;
+            }
+        }
+    }
+}
+
+export component AfcToolsTab inherits Rectangle {
+    VerticalLayout {
+        padding: Theme.padding;
+        padding-top: Theme.spacing-small;
+        spacing: Theme.spacing-small;
+        HorizontalLayout {
+            spacing: Theme.spacing;
+            height: 40px;
+            Text {
+                horizontal-stretch: 1;
+                text: @tr("Tool-to-lane map");
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                vertical-alignment: center;
+            }
+            IconButton {
+                width: 112px;
+                height: 40px;
+                icon: Icons.ui-refresh;
+                icon-size: Theme.icon-small;
+                text: @tr("Reset");
+                horizontal: true;
+                clicked => {
+                    Confirm.ask(@tr("Reset tools"), @tr("Every tool takes its filament from the lane AFC has configured for it again."), "mmu-reset-tool-map", "", false);
+                }
+            }
+        }
+        tool-list := ScrollList {
+            vertical-stretch: 1;
+            property <length> row-height: 66px;
+            property <length> row-step: self.row-height + Theme.spacing-medium;
+            content-height: Printer.afc-tools.length * self.row-step - Theme.spacing-medium;
+            for mapping[index] in Printer.afc-tools: AfcToolRow {
+                y: index * tool-list.row-step;
+                width: tool-list.row-width;
+                height: tool-list.row-height;
+                mapping: mapping;
+                clicked => { MmuDialogs.afc-tool = index; }
+            }
+        }
+    }
+}
+
+// A lane to choose for a tool: material and name with the lane's colour as the left edge, on the right the tools that
+// take their filament from it ("free" for none).
+component LaneChoice inherits FilamentLine {
+    in property <MmuGateItem> tile;
+
+    property <bool> is-empty: root.tile.availability == "empty";
+
+    colors: root.is-empty ? root.tile.colors : FilamentColors.generic(root.tile.colors);
+    empty: root.is-empty;
+    pressable: true;
+    label: root.tile.title;
+    LaneText {
+        horizontal-stretch: 1;
+        tile: root.tile;
+        has-tile: true;
+        lane: root.tile.title;
+    }
+    HorizontalLayout {
+        alignment: center;
+        Rectangle {
+            width: tools-text.preferred-width + 16px;
+            height: 24px;
+            cross-axis-self-alignment: center;
+            border-radius: Theme.radius-small;
+            background: root.tile.tools == "" ? transparent : Theme.surface-active;
+            border-width: root.tile.tools == "" ? 1px : 0px;
+            border-color: Theme.muted;
+            tools-text := Text {
+                text: root.tile.tools == "" ? @tr("free") : root.tile.tools;
+                color: root.tile.tools == "" ? Theme.muted : Theme.accent;
+                font-size: Theme.font-small;
+                font-weight: root.tile.tools == "" ? 400 : 700;
+            }
+        }
+    }
+}
+
+// The lane of one tool: all lanes to map the tool to; a tap on a lane maps the tool to it and closes the dialog.
+export component AfcToolLaneDialog inherits Scrim {
+    property <AfcToolItem> mapping: Printer.afc-tools[MmuDialogs.afc-tool];
+    visible: MmuDialogs.afc-tool >= 0 && MmuDialogs.afc-tool < Printer.afc-tools.length;
+
+    function close() {
+        MmuDialogs.afc-tool = -1;
+    }
+
+    DialogPanel {
+        width: min(parent.width - 16px, 560px);
+        height: parent.height - 16px;
+        x: (parent.width - self.width) / 2;
+        y: 8px;
+
+        VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing-medium;
+            HorizontalLayout {
+                height: Theme.touch;
+                spacing: Theme.spacing;
+                DialogTitle {
+                    horizontal-stretch: 1;
+                    text: @tr("Lane for T{}", root.mapping.tool);
+                }
+                IconButton {
+                    width: Theme.touch;
+                    icon: Icons.ui-close;
+                    accessible-label: @tr("Close");
+                    clicked => { root.close(); }
+                }
+            }
+            choice-list := ScrollList {
+                vertical-stretch: 1;
+                property <length> row-step: 52px + 4px;
+                content-height: Printer.mmu-gates.length * self.row-step - 4px;
+                for tile[index] in Printer.mmu-gates: LaneChoice {
+                    y: index * choice-list.row-step;
+                    width: choice-list.row-width;
+                    tile: tile;
+                    selected: index == root.mapping.lane-row;
+                    clicked => {
+                        if (!self.selected) {
+                            Actions.map-tool-to-lane(root.mapping.tool, index);
+                        }
+                        root.close();
+                    }
+                }
+            }
+        }
+    }
+}

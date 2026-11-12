@@ -269,6 +269,39 @@ fn read_extruder(store: &ObjectStore, name: &str) -> AfcExtruder {
     }
 }
 
+/// A slicer tool and the lane AFC feeds it from (`map` of the lane).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolLane {
+    pub tool: usize,
+    pub lane: String,
+}
+
+/// A lane whose filament AFC can pull back until its hub is clear (`AFC_LANE_RESET`), and why not right now.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HubReturn {
+    pub lane: String,
+    /// The unit of the lane where AFC has several, else `None`.
+    pub unit: Option<String>,
+    /// `None` while AFC would carry it out.
+    pub blocked: Option<HubReturnBlock>,
+}
+
+/// Why AFC does not pull a lane back to its hub now (`AFC_functions.py` L1685-1692 at 5ea84ea).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HubReturnBlock {
+    /// The named lane is loaded in the toolhead; AFC wants it unloaded first ("Toolhead is loaded with '…', unload or
+    /// check sensor before resetting lane"; AFC only logs it and goes on, so it is held back here).
+    ///
+    /// AFC-BUG-WORKAROUND: this block deliberately deviates from the rule "hints, not locks". Its message says the
+    /// reset must stop, but unlike the hub check right above it, `AFC_functions.py` L1690-1692 has no `return`, so AFC
+    /// pulls filament back out of a loaded head (verified at 5ea84ea, 2026-11-12). We treat this as a technical bug in
+    /// AFC, not as behaviour to rely on. Once AFC fixes it (issue: see the backlog item "AFC issue"), remove this
+    /// variant, let `hub_returns` ignore `current_load` and show only a hint.
+    ToolLoaded(String),
+    /// The hub's switch sees no filament; AFC refuses ("Hub is already clear while trying to reset '…'").
+    HubClear,
+}
+
 impl AfcStatus {
     pub fn lane(&self, name: &str) -> Option<&AfcLane> {
         self.lanes.iter().find(|lane| lane.name == name)
@@ -284,6 +317,43 @@ impl AfcStatus {
 
     pub fn extruder(&self, name: &str) -> Option<&AfcExtruder> {
         self.extruders.iter().find(|extruder| extruder.name == name)
+    }
+
+    /// The tools AFC maps to its lanes, by tool number; a lane without `map` has none. `SET_MAP` swaps, so a tool has
+    /// one lane (`AFC_spool.py` L147-185).
+    pub fn tool_lanes(&self) -> Vec<ToolLane> {
+        let mut tools: Vec<ToolLane> = self
+            .lanes
+            .iter()
+            .filter_map(|lane| lane.tool.map(|tool| ToolLane { tool, lane: lane.name.clone() }))
+            .collect();
+        tools.sort_by_key(|entry| entry.tool);
+        tools
+    }
+
+    /// The lanes `AFC_LANE_RESET` can pull back, as AFC's own prompt `AFC_RESET` offers them: filament at the load
+    /// switch (`AFC_functions.py` L1617-1626; without a load pin AFC counts the lane as loaded, `AFC_lane.py` L229-233).
+    /// A lane without a hub (`hub: direct`) is left out: its stand-in hub is always clear, so AFC always refuses
+    /// (`AFC_lane.py` L611-615). With a virtual hub (`switch_pin: virtual`) the status `load` is `loaded_to_hub`
+    /// instead of the switch (`AFC_lane.py` L1093-1103).
+    pub fn hub_returns(&self) -> Vec<HubReturn> {
+        let blocked = |hub: &str| match &self.current_load {
+            Some(loaded) => Some(HubReturnBlock::ToolLoaded(loaded.clone())),
+            None if self.hub(hub).and_then(|hub| hub.switch) == Some(false) => Some(HubReturnBlock::HubClear),
+            None => None,
+        };
+        self.lanes
+            .iter()
+            .filter(|lane| lane.load.unwrap_or(true))
+            .filter_map(|lane| {
+                let hub = lane.hub.as_deref()?;
+                Some(HubReturn {
+                    lane: lane.name.clone(),
+                    unit: self.several_units.then(|| lane.unit.clone()),
+                    blocked: blocked(hub),
+                })
+            })
+            .collect()
     }
 
     /// The names of the switch sensors AFC creates for its lanes, hubs, buffers and toolheads (`AFC_utils.py` L42-90,
@@ -356,6 +426,12 @@ pub const RESET_FAILURE: &str = "RESET_FAILURE";
 pub fn reset_lane(lane: &str) -> String {
     format!("AFC_LANE_RESET LANE={lane}")
 }
+
+/// Docks the head on the shuttle of AFC's tool changer through its `custom_unselect`, else viesturz `UNSELECT_TOOL`
+/// (`AFC_Toolchanger.py` L51-52, L153-190). Registered only with an `[AFC_Toolchanger]`; with `show_macros` (the
+/// default, `AFC.py` L318) the name is a macro that calls `_AFC_UNSELECT_TOOL` (`AFC_functions.py` L869-893), so this
+/// name works either way.
+pub const DROP_HEAD: &str = "AFC_UNSELECT_TOOL";
 
 /// Ejects the filament of `lane` out of the unit (`LANE_UNLOAD`, `AFC.py` L1321-1338); AFC refuses it while printing.
 pub fn eject_lane(lane: &str) -> String {

@@ -14,7 +14,7 @@ import { DialogHeader, DialogPanel, DialogTitle, Scrim } from "../components/dia
 import { SlotTile, VerdictIcon } from "../components/mmu-tiles.slint";
 
 // One side of a tool's row: a tap area with the filament's colour as its left edge over the full height.
-component FilamentHalf inherits Rectangle {
+export component FilamentHalf inherits Rectangle {
     in property <BarColors> colors;
     in property <bool> empty;
     in property <bool> color-warn;
@@ -326,7 +326,7 @@ export component EndlessSpoolDialog inherits Scrim {
 }
 
 // A line of a dialog in the style of the tool rows: the filament's colour as the left edge, material and name beside it.
-component FilamentLine inherits Rectangle {
+export component FilamentLine inherits Rectangle {
     in property <BarColors> colors;
     in property <bool> empty;
     in property <bool> color-warn;

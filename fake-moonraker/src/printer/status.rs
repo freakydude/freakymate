@@ -78,13 +78,12 @@ impl Printer {
     }
 
     fn core_status(&self) -> Map<String, Value> {
-        let Value::Object(objects) = json!({
+        let Value::Object(mut objects) = json!({
             "webhooks": { "state": self.klippy.as_str(), "state_message": self.klippy.message() },
             "idle_timeout": { "state": self.idle_state(), "printing_time": 0.0 },
             "heater_bed": self.bed.to_json(),
             "extruder": self.extruder_json(),
             "toolhead": self.toolhead_json(),
-            "fan": { "speed": self.fan_speed, "rpm": null },
             "gcode_move": {
                 "homing_origin": [0.0, 0.0, self.z_offset, 0.0],
                 "gcode_position": self.gcode_position(),
@@ -105,6 +104,10 @@ impl Printer {
         }) else {
             unreachable!("json! object literal");
         };
+        // With fans on the heads the plugin refuses `[fan]` (`toolchanger.py` Z.800-801).
+        if self.has_printer_fan() {
+            objects.insert("fan".to_owned(), json!({ "speed": self.fan_speed, "rpm": null }));
+        }
         objects
     }
 

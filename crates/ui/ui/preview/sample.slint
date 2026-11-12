@@ -120,6 +120,31 @@ export global Sample {
         Printer.pending-config = "probe: z_offset = 1.800 · bed_mesh default: 8 values";
     }
 
+    // AFC with four lanes (one empty), tools mapped to them and a hub that two of the lanes can be pulled back out of.
+    public function afc() {
+        self.ready-printer();
+        Printer.has-afc = true;
+        Printer.has-lanes = true;
+        Printer.afc-state = "Idle";
+        Printer.mmu-gates = [
+            { title: "lane1", index: -1, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", group: -1, selected: true },
+            { title: "lane2", index: -1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", group: -1, selected: false },
+            { title: "lane3", index: -1, availability: "available", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", group: -1, selected: false },
+            { title: "lane4", index: -1, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", group: -1, selected: false },
+        ];
+        Printer.afc-tools = [
+            { tool: 0, lane: "lane1", lane-row: 0 },
+            { tool: 1, lane: "lane2", lane-row: 1 },
+            { tool: 2, lane: "lane3", lane-row: 2 },
+            { tool: 3, lane: "lane4", lane-row: 3 },
+        ];
+        Printer.afc-hub-returns = [
+            { lane: "lane1", unit: "Turtle_1", enabled: false, reason: "Unload lane1 first" },
+            { lane: "lane2", unit: "Turtle_1", enabled: true, reason: "" },
+            { lane: "lane3", unit: "Turtle_1", enabled: true, reason: "" },
+        ];
+    }
+
     // Ready printer with a job at 37 %.
     // Happy Hare with four gates, one of them empty, and a sync-feedback buffer in tension.
     public function mmu() {

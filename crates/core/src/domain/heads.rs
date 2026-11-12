@@ -3,8 +3,9 @@
 //! (`docs/multi-tool.md`, D1). Only a printer with swappable heads has rows.
 
 use super::machine_tree::{Lane, MachineTree};
-use crate::sources::toolchanger::ToolchangerStatus;
-use crate::sources::PrinterStatus;
+use crate::sources::klipper::Setup;
+use crate::sources::toolchanger::{self, ToolchangerStatus};
+use crate::sources::{afc, PrinterStatus};
 
 /// How a head that is not mounted gets to the carriage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +92,22 @@ pub fn head_rows(tree: &MachineTree, status: &PrinterStatus, lanes: &[Lane]) -> 
             })
         })
         .collect()
+}
+
+/// The G-code that docks the mounted head, from the changer the heads come from (as in the tree: `toolchanger`, else
+/// AFC's own); `None` where that changer has no such command. viesturz and KTC-easy register `UNSELECT_TOOL` only
+/// without `require_tool_present`; AFC registers `AFC_UNSELECT_TOOL` with its tool changer. Both are looked up in
+/// Klipper's command list.
+pub fn drop_command(setup: &Setup, status: &PrinterStatus) -> Option<&'static str> {
+    let heads_of_toolchanger = status.toolchanger.as_ref().is_some_and(|changer| !changer.heads.is_empty());
+    let heads_of_afc = status.afc.as_ref().is_some_and(|afc| !afc.heads.is_empty());
+    if heads_of_toolchanger {
+        setup.has_unselect_tool.then_some(toolchanger::commands::DROP)
+    } else if heads_of_afc {
+        setup.has_afc_unselect_tool.then_some(afc::DROP_HEAD)
+    } else {
+        None
+    }
 }
 
 /// A deviation of the tool changer, one line under the tabs.
@@ -214,5 +231,28 @@ mod tests {
                 ToolchangerStatus { initialize_on: initialize_on.into(), ..changer("uninitialized", None, None) };
             assert_eq!(changer_note(&changer), expected, "initialize_on {initialize_on:?}");
         }
+    }
+
+    #[test]
+    fn the_head_is_dropped_by_the_changer_it_comes_from_where_klipper_lists_the_command() {
+        let both = Setup { has_unselect_tool: true, has_afc_unselect_tool: true, ..Setup::default() };
+        let toolchanger =
+            PrinterStatus { toolchanger: Some(changer("ready", Some(0), None)), ..PrinterStatus::default() };
+        let afc_heads = afc::AfcStatus {
+            heads: vec![afc::AfcHead { name: "e0".into(), extruder: "extruder".into(), mounted: true }],
+            ..afc::AfcStatus::default()
+        };
+        let afc_changer = PrinterStatus { afc: Some(afc_heads.clone()), ..PrinterStatus::default() };
+        // With viesturz's object beside AFC the heads come from viesturz, so its command docks them.
+        let afc_with_toolchanger = PrinterStatus { afc: Some(afc_heads), ..toolchanger.clone() };
+
+        assert_eq!(drop_command(&both, &toolchanger), Some("UNSELECT_TOOL"));
+        assert_eq!(drop_command(&both, &afc_changer), Some("AFC_UNSELECT_TOOL"));
+        assert_eq!(drop_command(&both, &afc_with_toolchanger), Some("UNSELECT_TOOL"));
+        assert_eq!(drop_command(&Setup::default(), &toolchanger), None);
+        assert_eq!(drop_command(&Setup::default(), &afc_changer), None);
+        assert_eq!(drop_command(&both, &PrinterStatus::default()), None);
+        let box_turtle = PrinterStatus { afc: Some(afc::AfcStatus::default()), ..PrinterStatus::default() };
+        assert_eq!(drop_command(&both, &box_turtle), None);
     }
 }

@@ -2,10 +2,10 @@
 
 import { Icons } from "icons.slint";
 import { Theme } from "theme.slint";
-import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 import { Actions } from "actions.slint";
 
-export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 export { Actions } from "actions.slint";
 
 
@@ -141,8 +141,8 @@ export global Printer {
     // A switched-on filament sensor reports no filament; the Sensors tab of a tool changer shows a dot.
     in property <bool> filament-sensor-runout;
     // What the tabs of the Changer page have to show; the page and its entry exist when one of them has.
-    out property <bool> has-changer-tools: self.has-mmu;
-    out property <bool> has-changer-service: self.has-mmu || self.has-toolchanger;
+    out property <bool> has-changer-tools: self.has-mmu || self.afc-tools.length > 0;
+    out property <bool> has-changer-service: self.has-mmu || self.has-toolchanger || self.has-afc;
     out property <bool> has-changer-sensors: self.heads.length > 0 && self.filament-sensors.length > 0;
     out property <bool> has-changer: self.has-changer-tools || self.has-changer-service || self.has-changer-sensors;
     // Objects of the running print; excluded ones cannot be printed again.
@@ -151,6 +151,13 @@ export global Printer {
     in property <BedMapItem> bed-map;
     // Happy Hare (4.1 or newer). Without it the Filament page has no MMU tabs.
     in property <bool> has-mmu;
+    // AFC (Armored Turtle): its state, its tool map and the lanes it can pull back out of their hub. `afc-error` is
+    // AFC's error state (what "Clear error" clears); `afc-state` is its `current_state` ("Idle", "Error", ...).
+    in property <bool> has-afc;
+    in property <bool> afc-error;
+    in property <string> afc-state;
+    in property <[AfcHubReturnItem]> afc-hub-returns;
+    in property <[AfcToolItem]> afc-tools;
     // The Gates tab has tiles: the gates of Happy Hare or the lanes of AFC (then only the tabs Gates and Extruder).
     in property <bool> has-lanes;
     in property <bool> mmu-unsupported;
@@ -461,6 +468,8 @@ export global MmuDialogs {
     in-out property <int> tool: -1;
     // The choice of gate for a tool, same index; -1 for none.
     in-out property <int> tool-gate: -1;
+    // The choice of lane for a tool of AFC: its index in `Printer.afc-tools`, -1 for none.
+    in-out property <int> afc-tool: -1;
     // EndlessSpool and its groups, opened from the Tools tab.
     in-out property <bool> endless-spool-open;
 }
@@ -584,6 +593,7 @@ export global Confirm {
         if (self.action == "mmu-check-gate") { Actions.mmu-check-gate(self.argument.to-float()); }
         if (self.action == "mmu-check-all-gates") { Actions.mmu-check-all-gates(); }
         if (self.action == "mmu-reset-tool-map") { Actions.mmu-reset-tool-map(); }
+        if (self.action == "afc-reset-lane") { Actions.afc-reset-lane(self.argument); }
         if (self.action == "save-config") { Actions.save-config(); }
         if (self.action == "remove-bed-mesh") { Actions.remove-bed-mesh(self.argument); }
         if (self.action == "reboot-host") { Actions.reboot-host(); }
@@ -622,6 +632,8 @@ export global Dialogs {
         MmuDialogs.gate-row = -1;
         MmuDialogs.bypass-open = false;
         MmuDialogs.tool = -1;
+        MmuDialogs.tool-gate = -1;
+        MmuDialogs.afc-tool = -1;
         Navigation.head-picker-open = false;
         MeshDialogs.map-open = false;
         MeshDialogs.profiles-open = false;

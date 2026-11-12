@@ -1,0 +1,14 @@
+// Preview: Tools tab with AFC, four tools with their lanes. Open in the Slint preview or render with
+// scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { ChangerTab, Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component ChangerAfcToolsPreview inherits AppWindow {
+    init => {
+        Sample.afc();
+        Navigation.page = Page.changer;
+        Navigation.changer-tab = ChangerTab.tools;
+    }
+}

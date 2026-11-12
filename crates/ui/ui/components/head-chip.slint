@@ -117,3 +117,32 @@ export component ChangerHint inherits HorizontalLayout {
         clicked => { Confirm.ask-recover-toolchanger(); }
     }
 }
+
+// AFC is in its error state: the text and the button that clears it, in the tab row like the hint of the tool changer.
+// "Clear error" moves nothing and does not resume a print.
+export component AfcHint inherits HorizontalLayout {
+    spacing: Theme.spacing;
+
+    Image {
+        cross-axis-self-alignment: center;
+        source: Icons.ui-error;
+        colorize: StateIcons.severity-color(Severity.error);
+        width: 20px;
+        height: 20px;
+    }
+    Text {
+        horizontal-stretch: 1;
+        text: @tr("AFC error");
+        color: StateIcons.severity-color(Severity.error);
+        font-size: Theme.font-normal;
+        overflow: elide;
+        vertical-alignment: center;
+    }
+    IconButton {
+        icon: Icons.mmu-recover;
+        text: @tr("Clear error");
+        horizontal: true;
+        width: 150px;
+        clicked => { Actions.afc-reset-failure(); }
+    }
+}

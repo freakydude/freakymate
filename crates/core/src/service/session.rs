@@ -18,7 +18,7 @@ use crate::sources::moonraker_server::gcode_store::ConsoleKind;
 use crate::sources::moonraker_server::update_manager;
 use crate::sources::moonraker_server::wled::{self, WledStrip};
 use crate::sources::moonraker_server::{server_info, ServerComponents};
-use crate::sources::{ObjectStore, PrinterStatus, Sources};
+use crate::sources::{afc, toolchanger, ObjectStore, PrinterStatus, Sources};
 use serde_json::{json, Value};
 use std::sync::Arc;
 use std::time::Instant;
@@ -381,7 +381,8 @@ impl<'a> Session<'a> {
         sources.wled_strips = self.wled.iter().map(WledStrip::object).collect();
         if let Some(help) = self.fetch_help().await {
             sources.klipper.tool_commands = Some(klipper::tool_commands(&help));
-            sources.klipper.has_unselect_tool = klipper::lists_command(&help, "UNSELECT_TOOL");
+            sources.klipper.has_unselect_tool = klipper::lists_command(&help, toolchanger::commands::DROP);
+            sources.klipper.has_afc_unselect_tool = klipper::lists_command(&help, afc::DROP_HEAD);
         }
         self.sources = sources;
         self.store.replace(result.get("status").unwrap_or(&Value::Null));

@@ -77,8 +77,8 @@ probe still counts as the probe).
 
 ## Happy Hare (MMU)
 
-Needs Happy Hare 4.1 or newer. The Filament page then opens on the **Gates** tab, next to **Extruder**, **Tools** and
-**Service**. The Gates tab and a strip on the print page show:
+Needs Happy Hare 4.1 or newer. The Filament page then opens on the **Gates** tab, next to **Extruder**; the **Changer** page
+holds **Tools** and **Service**. The Gates tab and a strip on the print page show:
 
 - the gates and the bypass (five at a time): status, material, colour and the tools that take their filament from each
   gate; unload what is loaded, home, recover and unlock after a pause;
@@ -92,7 +92,7 @@ Needs Happy Hare 4.1 or newer. The Filament page then opens on the **Gates** tab
 A tap on a gate opens what can be done with it: select, load, preload, check or eject it, and pick its spool. Without
 Spoolman the dialog sets material and colour of the gate in Happy Hare's gate map instead, from a set of common
 materials and colours. A tap on a gate never moves the selector by itself. The bypass takes filament fed by hand past
-the gates; its dialog selects and loads it. The **Tools** tab is the one place to set which gate each tool takes its
+the gates; its dialog selects and loads it. **Changer > Tools** is the one place to set which gate each tool takes its
 filament from (Happy Hare's tool-to-gate map): one row per tool with what its gate holds (material, colour, spool, grams
 left and, with EndlessSpool, what its group can still give), and a tap on a tool offers the gates with their colour and
 material. With a file prepared (or the file of the current job), each row shows on its left what the file asks of the
@@ -106,8 +106,8 @@ gates and, on selectors with a servo, servo up and down.
 | ![Gates tab](screenshots/mmu.png)                                    | ![FlowGuard line while tangle prevention raises the gear current](screenshots/print-tangle-boost.png) |
 | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | The Gates tab: gates, sensors, buffer                                | The print page while tangle prevention raises the gear current (the FlowGuard line turns yellow)      |
-| ![Gate dialog](screenshots/gate-dialog.png)                          | ![Tools tab](screenshots/mmu-tools.png)                                                               |
-| A tap on a gate: select, load, preload, check, eject, pick its spool | The Tools tab: T3 moved to gate 1, what each gate holds, EndlessSpool on                              |
+| ![Gate dialog](screenshots/gate-dialog.png)                          | ![Changer > Tools](screenshots/mmu-tools.png)                                                               |
+| A tap on a gate: select, load, preload, check, eject, pick its spool | Changer > Tools: T3 moved to gate 1, what each gate holds, EndlessSpool on                              |
 
 **Quieter console (recommended).** FreakyMate shows Klipper's console messages in its status bar. Happy Hare prints a
 lot there by default: the gate table at startup, a picture of the filament path and statistics after every tool
@@ -130,11 +130,11 @@ This changes the console for every client, Mainsail and Fluidd included.
 Appears when Moonraker has the `spoolman` component, with or without an MMU:
 
 - the spool in use and what is left of it on the print page and at each gate, with a colour bar for multi-colour
-  filaments: side by side for coaxial ones (silk), taking turns for longitudinal ones (gradient); on the Tools tab a
+  filaments: side by side for coaxial ones (silk), taking turns for longitudinal ones (gradient); on Changer > Tools a
   colour field split diagonally for coaxial ones and blending for longitudinal ones (up to six colours, a rainbow);
 - a picker lists the spools (the ones in a gate first, then the most recently used): assign a spool to a gate or, without
   an MMU, choose the active spool, and correct the remaining weight by weighing;
-- a filament colour with transparency (alpha) shows over a checkerboard in the gate bars, dialogs and the Tools tab;
+- a filament colour with transparency (alpha) shows over a checkerboard in the gate bars, dialogs and Changer > Tools;
 - the temperature page offers a preset for the spool in use and notes quietly when the target is off from it;
 - before a print the confirmation names what differs between the file and the spools (material, weight, colour), only as
   a hint.

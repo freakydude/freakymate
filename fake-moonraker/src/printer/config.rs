@@ -41,7 +41,9 @@ impl Printer {
         );
         sections
             .insert("heater_bed".to_owned(), json!({ "min_temp": MIN_HEATER_TEMPERATURE, "max_temp": MAX_BED_TARGET }));
-        sections.insert("fan".to_owned(), json!({}));
+        if self.has_printer_fan() {
+            sections.insert("fan".to_owned(), json!({}));
+        }
         if self.chamber.is_some() {
             sections.insert(
                 "heater_generic chamber".to_owned(),
