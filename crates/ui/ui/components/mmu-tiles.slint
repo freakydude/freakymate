@@ -53,7 +53,7 @@ export component SlotTile inherits Rectangle {
     in property <string> label;
     in property <bool> enabled: true;
     // Room between the border and the content; a tile with a colour edge sets its own.
-    in property <length> content-padding: 10px;
+    in property <length> content-padding: Theme.padding;
     out property <bool> pressed: tile-touch.pressed;
     callback clicked;
 
@@ -118,7 +118,7 @@ export component GateTile inherits SlotTile {
             horizontal-stretch: 1;
             padding-top: Theme.spacing-medium;
             padding-bottom: Theme.spacing-medium;
-            padding-right: 7px;
+            padding-right: Theme.spacing-medium;
             spacing: Theme.spacing-tight;
             HorizontalLayout {
                 spacing: Theme.spacing-small;

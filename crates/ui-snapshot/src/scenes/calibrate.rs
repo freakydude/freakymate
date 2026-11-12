@@ -1,4 +1,4 @@
-//! The Calibrate tab of the Move page and the bed mesh dialogs.
+//! The Calibrate tab of the Motion page and the bed mesh dialogs.
 
 use crate::session::Session;
 use freakymate::{Actions, MeshDialogs, MotionTab, Navigation, Page};

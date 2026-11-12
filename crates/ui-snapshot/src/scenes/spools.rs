@@ -2,7 +2,7 @@
 
 use super::mmu::filament_path_midway;
 use crate::session::Session;
-use freakymate::{Confirm, Navigation, Page, Printer, SpoolPicker};
+use freakymate::{Actions, Confirm, Navigation, Page, Printer, SpoolPicker};
 use freakymate_core::Command;
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::time::Duration;
@@ -52,5 +52,33 @@ pub(super) fn spools(session: &mut Session) -> Result<(), String> {
     session.window.global::<Confirm>().set_open(false);
     session.service.send(Command::SetHeaterTarget { heater: "extruder".into(), target: 0.0 });
     session.pump(Duration::from_millis(500));
+    if !has_mmu {
+        unlink_active_spool(session)?;
+    }
     Ok(())
 }
+
+/// Without MMU, "Unlink" in the picker clears the active spool of Moonraker. Without the reference layout the tap goes
+/// through the app's callback.
+fn unlink_active_spool(session: &mut Session) -> Result<(), String> {
+    let current = session.window.global::<Printer>().get_spool_id();
+    session.window.global::<SpoolPicker>().invoke_show(-1, current);
+    session.pump(Duration::from_millis(300));
+    if session.has_reference_layout() {
+        session.tap(UNLINK_BUTTON.0, UNLINK_BUTTON.1);
+        if session.window.global::<SpoolPicker>().get_open() {
+            return Err("spool picker still open after Unlink".into());
+        }
+    } else {
+        session.window.global::<Actions>().invoke_set_active_spool(-1);
+        session.window.global::<SpoolPicker>().set_open(false);
+    }
+    session.settle_replies(Duration::from_secs(2));
+    match session.window.global::<Printer>().get_spool_id() {
+        -1 => Ok(()),
+        id => Err(format!("spool {id} still active after Unlink")),
+    }
+}
+
+/// The first button of the picker's bottom row in the 800x480 layout, right of the navigation rail.
+const UNLINK_BUTTON: (f32, f32) = (200.0, 432.0);
