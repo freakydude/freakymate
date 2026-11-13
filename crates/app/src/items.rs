@@ -199,7 +199,7 @@ pub(crate) fn spool_colors(spool: &Spool) -> BarColors {
 }
 
 /// The row of a heater; the hint says that the target is off from what the spools recommend.
-pub(crate) fn heater_item(heater: &Heater, lanes: &[Lane], has_history: bool) -> HeaterItem {
+pub(crate) fn heater_item(heater: &Heater, lanes: &[Lane]) -> HeaterItem {
     let recommended = spools::recommended_temperature(lanes, &heater.object);
     let spool_hint = spools::temperature_hint(heater.target, recommended)
         .map_or_else(SharedString::new, |degrees| format!("{degrees:.0}°").into());
@@ -214,7 +214,7 @@ pub(crate) fn heater_item(heater: &Heater, lanes: &[Lane], has_history: bool) ->
         target_range: heater.max_temp.map_or_else(SharedString::new, |maximum| {
             format!("Klipper: {:.0}–{maximum:.0} °C", heater.min_temp).into()
         }),
-        has_history,
+        has_history: heater.has_history,
         nozzle: heater.is_nozzle(),
     }
 }
@@ -251,13 +251,13 @@ pub(crate) fn update_item(update: &UpdateInfo) -> UpdateItem {
     }
 }
 
-pub(crate) fn sensor_item(sensor: &TemperatureSensor, has_history: bool) -> SensorItem {
+pub(crate) fn sensor_item(sensor: &TemperatureSensor) -> SensorItem {
     SensorItem {
         object: sensor.object.as_str().into(),
         label: sensor.label.as_str().into(),
         temperature: sensor.temperature.unwrap_or_default() as f32,
         known: sensor.temperature.is_some(),
-        has_history,
+        has_history: sensor.has_history,
     }
 }
 
@@ -674,15 +674,7 @@ mod tests {
     }
 
     fn heater(object: &str) -> Heater {
-        Heater {
-            object: object.into(),
-            label: object.into(),
-            temperature: 0.0,
-            target: 0.0,
-            power: 0.0,
-            min_temp: 0.0,
-            max_temp: None,
-        }
+        Heater { object: object.into(), label: object.into(), ..Heater::default() }
     }
 
     #[test]

@@ -7,7 +7,7 @@ use freakymate_core::sources::moonraker_server::temperature_store::TemperatureSe
 use freakymate_core::sources::PrinterStatus;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Moonraker does not report changes of its store; an open chart asks for it again after this many seconds.
@@ -22,27 +22,12 @@ struct Shown {
 pub struct HistoryView {
     window: slint::Weak<AppWindow>,
     shown: RefCell<Option<Shown>>,
-    /// The objects the store had at the last answer; only they can open a chart.
-    known: RefCell<HashSet<String>>,
     seconds_since_refresh: Cell<u32>,
 }
 
 impl HistoryView {
     pub fn new(window: &AppWindow) -> Self {
-        Self {
-            window: window.as_weak(),
-            shown: RefCell::default(),
-            known: RefCell::default(),
-            seconds_since_refresh: Cell::default(),
-        }
-    }
-
-    pub fn has_history(&self, object: &str) -> bool {
-        self.known.borrow().contains(object)
-    }
-
-    pub fn knows_objects(&self) -> bool {
-        !self.known.borrow().is_empty()
+        Self { window: window.as_weak(), shown: RefCell::default(), seconds_since_refresh: Cell::default() }
     }
 
     /// Opens the chart; the values come with the next answer of the store.
@@ -77,8 +62,9 @@ impl HistoryView {
         due
     }
 
+    /// Shows the open chart's series; Moonraker answers `{}` for a moment after Klipper became ready, and the next
+    /// refresh fills the chart.
     pub fn store(&self, mut store: HashMap<String, TemperatureSeries>, status: &PrinterStatus) {
-        *self.known.borrow_mut() = store.keys().cloned().collect();
         {
             let mut shown = self.shown.borrow_mut();
             let Some(shown) = shown.as_mut() else { return };
@@ -157,6 +143,7 @@ mod tests {
                 object: "tmc2240 stepper_x".into(),
                 label: "Stepper X".into(),
                 temperature: None,
+                has_history: false,
             }],
             ..PrinterStatus::default()
         };

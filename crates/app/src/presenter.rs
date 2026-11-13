@@ -39,7 +39,7 @@ use freakymate_core::sources::toolchanger::ToolchangerStatus;
 use freakymate_core::sources::PrinterStatus;
 use freakymate_core::{Access, Command, ConnectionState, Event, PrinterService, Query, Snapshot};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -75,8 +75,6 @@ pub struct Presenter {
     led_effects: Rc<VecModel<LedEffectItem>>,
     tuning: Rc<VecModel<TuningItem>>,
     history: HistoryView,
-    /// The temperature store was asked for since the printer became ready.
-    history_requested: Cell<bool>,
     /// The lengths the Filament page offers, set again only when the configuration changes them.
     extrude_lengths: RefCell<Vec<f64>>,
     filament_sensors: Rc<VecModel<FilamentSensorItem>>,
@@ -112,7 +110,6 @@ impl Presenter {
             led_effects: Rc::default(),
             tuning: Rc::default(),
             history: HistoryView::new(window),
-            history_requested: Cell::default(),
             extrude_lengths: RefCell::default(),
             filament_sensors: Rc::default(),
             print_objects: ObjectsView::default(),
@@ -217,7 +214,7 @@ impl Presenter {
         self.show_devices(&printer, snapshot);
         let lanes = self.lanes(snapshot);
         let active_spool = spools::active_spool(&lanes).cloned();
-        self.show_temperatures(&printer, snapshot, ready, &lanes);
+        self.show_temperatures(&printer, snapshot, &lanes);
         self.print_objects.show(&printer, &status.print_objects, status.motion.bed());
         self.show_capabilities(&printer, snapshot);
         self.show_filament(&printer, snapshot, &lanes, active_spool.as_ref());
@@ -325,7 +322,7 @@ impl Presenter {
     }
 
     /// Nozzle and bed, the heaters with the hint of the spools, and the sensors.
-    fn show_temperatures(&self, printer: &Printer, snapshot: &Snapshot, ready: bool, lanes: &[Lane]) {
+    fn show_temperatures(&self, printer: &Printer, snapshot: &Snapshot, lanes: &[Lane]) {
         let status = &snapshot.status;
         let head_rows = heads::head_rows(&snapshot.tree, status, lanes);
         let head_nozzles = head_nozzles(&head_rows);
@@ -345,7 +342,7 @@ impl Presenter {
             heaters_by_head(&status.heaters, &head_nozzles)
                 .into_iter()
                 .map(|(heater, name)| {
-                    let mut item = heater_item(heater, lanes, self.history.has_history(&heater.object));
+                    let mut item = heater_item(heater, lanes);
                     if let Some(name) = name {
                         item.label = name.into();
                     }
@@ -353,17 +350,7 @@ impl Presenter {
                 })
                 .collect(),
         );
-        replace_rows(
-            &self.sensors,
-            status.sensors.iter().map(|sensor| sensor_item(sensor, self.history.has_history(&sensor.object))).collect(),
-        );
-        // Which objects Moonraker keeps a history of: asked once per connection, so the rows know whether to open one.
-        if ready && !self.history.knows_objects() && !self.history_requested.replace(true) {
-            self.service.query(Query::TemperatureHistory);
-        }
-        if !ready {
-            self.history_requested.set(false);
-        }
+        replace_rows(&self.sensors, status.sensors.iter().map(sensor_item).collect());
     }
 
     /// What the printer offers: leveling, probe, calibration, the filament macros, power devices, updates and macros.

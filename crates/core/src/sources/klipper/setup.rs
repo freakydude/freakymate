@@ -156,6 +156,7 @@ impl Setup {
         );
         subscription.add("configfile", Some(&["save_config_pending", "save_config_pending_items", "settings"]));
         subscription.add("heater_bed", Some(HEATER_FIELDS));
+        subscription.add("heaters", Some(&["available_sensors"]));
         for leveling in Leveling::objects() {
             subscription.add(leveling, Some(&["applied"]));
         }
