@@ -2,129 +2,116 @@
 
 # FreakyMate
 
-**A touch screen for Klipper, with Happy Hare and Spoolman built in.**
+**A touch screen for Klipper, with Happy Hare, AFC, tool changers and Spoolman built in.**
 
-A touch screen interface for 3D printers running [Klipper](https://www.klipper3d.org/): a small native app that runs
-on the printer's own host (Raspberry Pi, BTT CB1/CB2 and similar), fills the display attached to it and talks to
-[Moonraker](https://moonraker.readthedocs.io/). It has built-in support for **[Happy Hare](https://github.com/moggieuk/Happy-Hare)
-(MMU)** and **[Spoolman](https://github.com/Donkie/Spoolman)**.
+FreakyMate is a small native app for the display on your 3D printer. It runs on the printer host (Raspberry Pi, BTT
+CB1/CB2 and similar), starts fullscreen at boot and talks to [Klipper](https://www.klipper3d.org/) through
+[Moonraker](https://moonraker.readthedocs.io/). Written in Rust with [Slint](https://slint.dev/): no browser, no
+desktop needed.
 
-Written in Rust with a [Slint](https://slint.dev/) UI: no browser, no WebView, no X11 desktop needed. The first target
-is the BTT HDMI5 (5", 800x480, landscape).
+![Print page with Happy Hare and Spoolman](docs/screenshots/print.png)
 
-> [!CAUTION]
-> **Young software: use it with care and at your own risk.**
-> FreakyMate has been tried on three different printers and works quite well there, so you are welcome to use it every
-> day. It is still very young, though, and may well contain bugs; feedback and bug reports are very welcome (see
-> [Contact and support](#contact-and-support)). It sends commands that move motors, heat up nozzles and beds and
-> restart services, and a bug can damage your printer or your print or start a fire. Do not leave the printer
-> unattended, and keep an emergency stop within reach.
-> The software is provided "as is", **without any warranty and without any liability** of the author
-> for damage of any kind, to the extent permitted by law (see sections 15 and 16 of the [GPL](LICENSE)).
+## At a glance
 
-![Print screen with Happy Hare and Spoolman](docs/screenshots/print.png)
+- **Everyday printing:** files with thumbnails, start, pause, cancel, exclude objects, pause at a layer; jog, home,
+  level and calibrate; heaters, fans, light, filament, console with macros, updates and Wi-Fi.
+- **Multi-material and several heads:** [Happy Hare](https://github.com/moggieuk/Happy-Hare) 4.1 or newer (also with
+  several units), [AFC](https://github.com/AFCProject/AFC-Klipper-Add-On) and tool changers with
+  [klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger); ERCF, Tradrack, Box Turtle, StealthChanger
+  and more, on one Changer page.
+- **[Spoolman](https://github.com/Donkie/Spoolman):** the spool in use, a spool picker with weighing, and a hint
+  before a print when file and filament differ.
+- **Fits your printer:** shows only what your printer has, and points out what looks unusual without forbidding it.
+- **Needs:** Klipper with Moonraker on a Debian 12, Raspberry Pi OS Bookworm or Ubuntu 22.04 host (or newer) and a
+  display, ideally 5" at 800x480 with touch.
+- **Updates** through Moonraker's update manager, like Mainsail and Fluidd. No cloud, no telemetry.
 
-|                                      |                                        |                                                            |
-| ------------------------------------ | -------------------------------------- | ---------------------------------------------------------- |
-| ![Files](docs/screenshots/files.png) | ![Move](docs/screenshots/move.png)     | ![Thermal](docs/screenshots/temperature.png)           |
-| ![Tune](docs/screenshots/tune.png)   | ![System](docs/screenshots/system.png) | ![Klipper shut down](docs/screenshots/klippy-shutdown.png) |
-| ![Console](docs/screenshots/console.png) | ![Filament](docs/screenshots/filament.png) | ![MMU (Happy Hare)](docs/screenshots/mmu.png)       |
+|                                                   |                                                       |                                                         |
+| ------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------- |
+| ![Files](docs/screenshots/files.png)              | ![Motion](docs/screenshots/move.png)                  | ![Thermal](docs/screenshots/temperature.png)            |
+| ![Happy Hare gates](docs/screenshots/mmu.png)     | ![Tool changer heads](docs/screenshots/toolchanger-heads.png) | ![Spool picker](docs/screenshots/spool-picker.png) |
 
-## Features
+More pictures and every page in detail: [Features](docs/features.md). Which plugins and hardware work:
+[Requirements and hardware](docs/hardware.md).
 
-- **Print**: progress, layers, ETA and filament; pause, resume, cancel and exclude objects on a map of the bed; a file
-  list with thumbnails, where **Prepare** makes a file the job of the print page and shows how its filament fits the
-  tools, as a comparison of file and gate (a hint, never a lock).
-- **Motion**: jog, home, Quad Gantry Level or Z-Tilt; a **Calibrate** tab for bed screws, Z offset and the bed mesh with
-  a coloured map and profiles.
-- **Thermal**: heaters with presets and temperature history, fans with a warning when one stops, sensors.
-- **Light**: main light, LEDs and the effects of led_effect.
-- **Motion › Tune**: Z offset and speed during a print; an Expert tab for flow, pressure advance, limits and retraction.
-- **Filament**: extrude, retract, load and unload macros, filament sensors.
-- **System**: restarts and power devices, updates, Wi-Fi and Ethernet, a full console with macros and forms for their
-  parameters, display settings.
-- **Happy Hare (MMU)**, 4.1 or newer: gates, filament path, buffer, FlowGuard and flow rate; select, load and eject
-  gates, tool-to-gate map, EndlessSpool; filament colours with transparency over a checkerboard.
-- **Spoolman**: the spool in use on the print page and at each gate, a spool picker with weighing, a preset from the
-  spool and hints before a print.
+> [!IMPORTANT]
+> **Young software, tested on a few printers.** My means to test are limited: FreakyMate runs on my own printers and
+> on a friend's printer with an ERCF, and it works well there. Tool changers, AFC and Happy Hare with several units
+> have been built from the source code of these projects and tried against a simulated printer, not on real
+> machines. I am fairly confident that it works well on yours too; if it does not, please
+> [tell me](#contact-support-and-donations).
+> FreakyMate moves motors, heats and restarts services, so do not leave the printer unattended while you try it. It
+> comes without warranty or liability, as far as the law allows (sections 15 and 16 of the [GPL](LICENSE)).
 
-Functions only appear when the printer has them. Every page in detail: [docs/features.md](docs/features.md).
+## Install
 
-## What to expect
-
-|                    | FreakyMate                                                                                                        |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| Maturity           | Young, one developer, tried on three printers, English only                                                       |
-| Technology         | Rust with Slint, one native binary; fullscreen under `cage` (Wayland) or as a normal window; fallback straight to the framebuffer for displays without DRM/KMS |
-| Scope              | What a printer needs every day: print, motion and tuning, heat, filament, console and macros, system, settings, network |
-| Printers and hosts | One Moonraker at a time, on the printer host or elsewhere; Wi-Fi settings only on the printer host               |
-| Displays           | Works best from 5" at 800x480 (tested with the BTT HDMI5); other sizes are scaled, not tested yet                |
-| Multi-material     | Happy Hare 4.1 or newer; gates, filament path, buffer, FlowGuard and flow rate                                   |
-| Spoolman           | Woven into the print page, the temperature page and the MMU gates, with hints before a print                     |
-| Updates            | Moonraker's update manager, with a `stable` and a `beta` channel                                                 |
-| License            | GPL-3.0-or-later                                                                                                  |
-
-Functions appear only where the printer has them, and the screen points out what looks unusual without forbidding it.
-Feedback, bug reports and corrections are welcome, please open an issue.
-
-## Quick start
-
-On the printer host (Debian 12 or newer, Raspberry Pi OS Bookworm or newer, Ubuntu or Armbian 22.04 or newer, with
-the display attached), run as the user running Klipper and Moonraker:
+On the printer host, as the user that runs Klipper and Moonraker:
 
 ```bash
 curl -fsSLO https://github.com/freakydude/freakymate/releases/latest/download/get-freakymate.sh
 bash get-freakymate.sh -m http://127.0.0.1:7125
 ```
 
-The script downloads the zip for your architecture from the [releases](https://github.com/freakydude/freakymate/releases)
-and runs its installer; installing from the zip by hand works as well.
+The script picks the build for your system, installs the few packages it needs and sets up a service. FreakyMate then
+starts on the display at every boot, and new versions show up in the update list of Mainsail, Fluidd and its own
+System page.
 
-FreakyMate then starts fullscreen on the display at boot and updates through Moonraker's update manager, like Mainsail
-or Fluidd. Release or pre-release, update channels, the Debian package and the desktop window:
-[docs/install.md](docs/install.md). For thumbnails, layers and the layer pause see
-[Slicer and macros](docs/printer-setup.md). To try it without a printer, see
-[Try it without a printer](docs/development.md#try-it-without-a-printer).
+Pre-release channel, install by hand, Debian package, desktop window and uninstall: [Install and update](docs/install.md).
+
+## Builds
+
+| Build            | What it is                                                                                    | Where                                                                       |
+| ---------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| **Release**      | A tagged state of `main` (`vX.Y.0`), when a set of changes feels finished                     | [Releases](https://github.com/freakydude/freakymate/releases/latest), update channel `stable` |
+| **Pre-release**  | Always the latest `main`, replaced by every merged change                                     | [Releases](https://github.com/freakydude/freakymate/releases), update channel `beta` |
+| **Pull request** | The state of an open pull request, to try a change before it is merged                        | Artifacts of the pull request's CI run (needs a GitHub login), see [Install](docs/install.md#release-and-pre-release) |
 
 ## Documentation
 
-| Page                                   | What it covers                                                                       |
-| -------------------------------------- | ------------------------------------------------------------------------------------ |
-| [Features](docs/features.md)           | Every page in detail, Happy Hare (MMU) and Spoolman                                  |
-| [Install and update](docs/install.md)  | Release and pre-release, installer, update channels, Debian package, desktop use     |
-| [Slicer and macros](docs/printer-setup.md) | Thumbnails, layers, excluding objects; macros for loading filament and pausing at a layer |
-| [Configuration](docs/configuration.md) | Command line, settings file and temperature presets, Moonraker login, displays, network |
-| [Development](docs/development.md)     | Build, simulated printer, checks and screenshots, CI, versions and releases          |
-| [Architecture](docs/architecture.md)   | Structure, data flow and conventions of the code                                     |
-| [Contributing](CONTRIBUTING.md)        | Pull requests and the Contributor License Agreement                                  |
+| Page                                          | What it covers                                                                        |
+| --------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [Requirements and hardware](docs/hardware.md) | Host, display, plugins and typical hardware, what is not supported yet, privacy       |
+| [Features](docs/features.md)                  | Every page in detail: print, motion, thermal, filament, changer, system, Spoolman     |
+| [Install and update](docs/install.md)         | Release and pre-release, installer, update channels, uninstall, Debian package, desktop |
+| [Slicer and macros](docs/printer-setup.md)    | Thumbnails, layers, excluding objects; macros for filament, layer pause and tool spools |
+| [Configuration](docs/configuration.md)        | Command line, settings file, log, bug reports, Moonraker login, displays, network     |
+| [Troubleshooting](docs/troubleshooting.md)    | Black screen, no connection, touch, where the log is                                  |
+| [Development](docs/development.md)            | Build, simulated printer, checks and screenshots, CI and releases                     |
+| [Contributing](CONTRIBUTING.md)               | From an idea to a merged pull request                                                 |
 
-## Contact and support
+## Contact, support and donations
 
-Want to get in touch, report a bug, discuss a feature or show what you built? Meet me and the others who try
-FreakyMate on Discord. Bugs and feature requests are also welcome as GitHub issues, and pull requests too (see
-[CONTRIBUTING.md](CONTRIBUTING.md)).
+Questions, ideas or a printer to show? Meet me and others who use FreakyMate on Discord. Bugs and feature requests are
+welcome as [GitHub issues](https://github.com/freakydude/freakymate/issues/new/choose), pull requests too (see
+[Contributing](CONTRIBUTING.md)).
 
 <a href="https://discord.gg/Ja2cxCcmJQ"><img src="https://img.shields.io/badge/Discord-join%20the%20chat-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Discord" height="40"></a>
 
-FreakyMate is a private project that I work on in my spare time, for my own printer. It comes without support
-promises, so answers may take a while. If you like it and want to say thanks, you can support me here:
+FreakyMate is a private project that I work on in my spare time, so answers may take a while. If you like it and want
+to say thanks, you can support it here:
 
 <a href="https://ko-fi.com/freakydude"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" height="40"></a>
 <a href="https://www.patreon.com/freakydude"><img src="https://c5.patreon.com/external/logo/become_a_patron_button.png" alt="Become a patron" height="40"></a>
 <a href="https://www.buymeacoffee.com/freakydude"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" height="40"></a>
 
-## Thanks
+## Made possible by
 
-FreakyMate builds on the work of many people. Thank you to
+FreakyMate only shows and controls what other projects do. Thank you to
 
-- [Klipper](https://github.com/Klipper3d/klipper) and [Moonraker](https://github.com/Arksine/moonraker), above all:
-  the firmware and the API that FreakyMate talks to; without them it would have nothing to show.
-- [Happy Hare](https://github.com/moggieuk/Happy-Hare) for the multi-material support that the MMU pages show and
-  control.
-- [Spoolman](https://github.com/Donkie/Spoolman) for keeping track of the spools.
-- [Mainsail](https://github.com/mainsail-crew/mainsail), [KlipperScreen](https://github.com/KlipperScreen/KlipperScreen)
-  and the [KlipperScreen Happy Hare Edition](https://github.com/moggieuk/KlipperScreen-Happy-Hare-Edition) for their
-  work on running Klipper and Happy Hare from a browser and a touch screen.
+- [Klipper](https://github.com/Klipper3d/klipper) and [Moonraker](https://github.com/Arksine/moonraker): the firmware
+  and the API that FreakyMate talks to, including Moonraker's update manager, which installs its updates.
+- [Happy Hare](https://github.com/moggieuk/Happy-Hare) and [AFC](https://github.com/AFCProject/AFC-Klipper-Add-On)
+  for multi-material, [klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger) and
+  [klipper-toolchanger-easy](https://github.com/jwellman80/klipper-toolchanger-easy) for tool changers,
+  [klipper-led_effect](https://github.com/julianschill/klipper-led_effect) for LED effects and
+  [Spoolman](https://github.com/Donkie/Spoolman) for keeping track of the spools.
+- [Mainsail](https://github.com/mainsail-crew/mainsail) and [Fluidd](https://github.com/fluidd-core/fluidd), whose
+  macro conventions (layer pause, spools of tool heads) FreakyMate follows, and
+  [KlipperScreen](https://github.com/KlipperScreen/KlipperScreen) with the
+  [KlipperScreen Happy Hare Edition](https://github.com/moggieuk/KlipperScreen-Happy-Hare-Edition) for their work on
+  running Klipper and Happy Hare from a touch screen.
+- [cage](https://github.com/cage-kiosk/cage), the Wayland kiosk that puts FreakyMate fullscreen on the display, and
+  NetworkManager for the Wi-Fi settings.
 - [Slint](https://slint.dev/) for the UI toolkit, and the Rust crates FreakyMate is built with, among them
   [Tokio](https://tokio.rs/), [reqwest](https://github.com/seanmonstar/reqwest),
   [tokio-tungstenite](https://github.com/snapview/tokio-tungstenite), [serde](https://serde.rs/),

@@ -37,7 +37,7 @@ if [ -f "$ALLOWED_SERVICES" ]; then
 fi
 
 rm -rf "$INSTALL_DIR"
-echo "Removed. Settings remain in $DATA_DIR/config/$NAME.json."
+echo "Removed. Settings remain in $DATA_DIR/config/$NAME.conf."
 if [ -f "$HOME/.config/$NAME/credentials.json" ]; then
   echo "A Moonraker login remains in $HOME/.config/$NAME/credentials.json; delete it if it is no longer needed."
 fi

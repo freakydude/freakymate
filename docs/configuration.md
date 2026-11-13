@@ -1,6 +1,6 @@
 # Configuration
 
-Most settings are changed on the screen (System → Settings → Display). This page covers the command line, the settings file,
+Most settings are changed on the screen (System → Settings). This page covers the command line, the settings file,
 the Moonraker login, displays and the network settings.
 
 ## Command line

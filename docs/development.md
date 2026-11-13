@@ -17,7 +17,7 @@ cargo run -p freakymate -- -m http://127.0.0.1:7125                       # the 
 
 | Fake option    | Meaning                                                                          |
 | -------------- | -------------------------------------------------------------------------------- |
-| `--profile`    | `basic`, `voron` (default), `happy-hare` or `ercf`, see below                    |
+| `--profile`    | the simulated machine, `voron` by default, see below                             |
 | `--gates`      | number of MMU gates, 1 to 16 (default 4; only with `happy-hare` and `ercf`)      |
 | `--port`       | port to listen on (default 7125; only one fake can run per port)                 |
 | `--time-scale` | simulation speed (default 10): heating and printing run that many times faster   |
@@ -29,6 +29,15 @@ cargo run -p freakymate -- -m http://127.0.0.1:7125                       # the 
 | `voron`      | adds Quad Gantry Level, a chamber heater, filament sensors, `exclude_object` and Spoolman                                  |
 | `happy-hare` | adds a Happy Hare MMU with a proportional sync-feedback buffer and FlowGuard, spools in the gates, and Spoolman            |
 | `ercf`       | like `happy-hare`, but without Spoolman: material and colour of the gates live in Happy Hare's gate map                    |
+| `happy-hare-units` | Happy Hare v4 with two units (ERCF and Tradrack, four gates each) on one extruder                                    |
+| `toolchanger` | a Voron with a tool changer of three heads (klipper-toolchanger), no MMU                                                  |
+| `toolchanger-required` | like `toolchanger`, after viesturz's example config: initialize on home, a head must always be mounted           |
+| `toolchanger-mmu` | a tool changer of two heads with one Happy Hare unit per head (ERCF on `extruder`, Tradrack on `extruder1`)            |
+| `afc`        | a Voron with one Box Turtle of AFC                                                                                         |
+| `afc-toolchanger` | a tool changer of four heads with AFC, after AFC's template for the Snapmaker U1                                     |
+
+The multi-tool profiles follow the plugins' source code field by field, see
+[multi-tool.md](multi-tool.md#what-each-source-reports).
 
 `FAKE_MMU_TANGLE BOOST=1` (G-code, simulator only) lets tangle prevention boost the gear current during a print. In VS Code
 the tasks and debug configurations "run: fake-moonraker", "run: freakymate (fake Moonraker)" and their Happy Hare
@@ -53,9 +62,11 @@ cargo run -p icon-index                                  # after changing icons 
 `taps`, `typing`, `calibrate`, `printing`, `shutdown`, and only when chosen `idle` (slow) and `login` (the fake then wants
 a login)). `ui-preview` renders single `.slint` files with fixed sample data, no build needed.
 
-Scripts exist in two variants with the same behaviour:
+The scripts in `scripts/` are bash and made for Linux (developed on Arch Linux). `scripts/setup-linux.sh` checks the
+environment and prints the missing packages as `pacman` commands; on Debian or Ubuntu install the packages named at
+the top of this page instead.
 
-- `scripts/*.sh` (bash) for Arch Linux, the development environment. `scripts/setup-linux.sh` checks the environment.
+How to bring a change into FreakyMate, step by step: [CONTRIBUTING.md](../CONTRIBUTING.md#your-first-pull-request).
 
 ## Tools
 
@@ -97,7 +108,7 @@ The development tools are separate programs and never shipped: `fake-moonraker` 
 
 - Versions come from git tags (`.github/scripts/version.sh`): releases are `vX.Y.0`, every later commit on `main` adds
   one to the patch number (`0.2.1`, `0.2.2`, ...). Pull request builds are `X.Y.Z-pr.<number>.<run>`, other branches
-  `X.Y.Z-dev.<commit>` (started manually), local builds `0.0.0-dev`. The version is shown on System → Settings → Display and by
+  `X.Y.Z-dev.<commit>` (started manually), local builds `0.0.0-dev`. The version is shown on System → Settings and by
   `--version`.
 - Every push to `main` and every pull request: format, clippy, tests, builds and packages for all targets
   (`.github/workflows/ci.yml`), with cargo caching; a branch without a pull request can be built with **Run workflow**.

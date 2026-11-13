@@ -126,6 +126,69 @@ log_statistics: 0       # no statistics after each tool change (still recorded)
 
 This changes the console for every client, Mainsail and Fluidd included.
 
+**Several units** (Happy Hare v4, for example an ERCF and a Tradrack on one printer): the Gates tab shows one page per
+unit, with a caption naming the unit, the head it feeds when there are several, and the page within the unit. It
+opens on the unit of the loaded gate. Each unit's bypass is its last tile.
+
+## Changer
+
+The **Changer** entry in the navigation appears when the printer has a filament changer (Happy Hare, AFC) or a tool
+changer. It holds the machine as a whole; the everyday work with one head stays on the Filament page. Its tabs only
+appear where they have content:
+
+- **Tools**: which lane or gate each tool takes its filament from (Happy Hare's tool-to-gate map, AFC's lane map),
+  with EndlessSpool for Happy Hare. A tool changer alone has no Tools tab, since its `T<n>` is the head.
+- **Service**: the rarely needed commands of each changer, with its state first, so the reason for a disabled
+  command is visible above it.
+- **Sensors**: filament sensors that belong to no head, on printers with a tool changer. A dot on the tab and on the
+  Changer entry shows a switched-on sensor without filament.
+
+## AFC
+
+With [AFC](https://github.com/AFCProject/AFC-Klipper-Add-On) (Box Turtle, Night Owl and other units) the Filament page
+shows its lanes as tiles on the Gates tab, one page per unit, with the same dialog as a Happy Hare gate: load, unload,
+eject, pick the spool, or set material and colour. Below the tiles a card shows the way of the filament of the
+selected lane through its unit and the hub to the head.
+
+- **Changer › Tools** maps tools to lanes (`SET_MAP`) and resets the map.
+- **Changer › Service** shows AFC's state, **Clear error** while AFC reports an error (also in the tab row of the
+  Filament page), and **Back to hub** per lane, which pulls a lane's filament back to the hub. It is offered only
+  for lanes with filament and a hub, not while printing, and is locked while a lane is loaded in the head or the hub
+  is already clear.
+- AFC's own tool changer (`AFC_Toolchanger`, for example the Snapmaker U1) shows its heads as below.
+
+## Tool changers
+
+With [klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger) or
+[klipper-toolchanger-easy](https://github.com/jwellman80/klipper-toolchanger-easy) (StealthChanger, TapChanger and
+others) the Filament page shows one head at a time:
+
+- A **head chip** at the top right shows the head in view: the colour of its spool, `T<n>`, its nozzle temperature
+  and a check when the changer detects it on the carriage. A tap opens the **head list**: every head with its spool,
+  temperature and state, and one button: on a head that is not mounted **Select** (`T<n>`), or **Pick up** for a head
+  with several lanes; on the mounted head **Drop**, where the changer offers `UNSELECT_TOOL`. The buttons are locked
+  during a print and while the changer is not ready. Tapping a row only
+  shows that head; it never moves the printer.
+- A **hint line** appears only when something is off: the changer is not initialized and will not do so by itself
+  (with **Initialize**; not with `initialize_on: first-use`), reports an error (with **Recover**), or, while ready, the
+  selected and the detected head differ.
+- **Changer › Service** shows the changer's state, the selected and the detected head, with Initialize and Recover
+  (Recover asks first).
+- The status bar shows the nozzle of the selected head, presets heat it, and Thermal › Fans lists the part fan of the
+  mounted head first.
+- **Spools per head** follow the convention of Fluidd and Mainsail (`spool_id` on `T<n>`), see
+  [Spools of tool heads](printer-setup.md#spools-of-tool-heads).
+- **With an MMU per head** (Happy Hare units or AFC lanes that feed different extruders) each head shows the gates of
+  its own unit.
+
+| ![Head list of a tool changer](screenshots/toolchanger-heads.png) | ![Changer › Service of a tool changer](screenshots/changer-toolchanger-service.png) |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| The head list: select, pick up or drop a head                     | Changer › Service: state of the tool changer, Initialize and Recover                |
+| ![AFC lanes](screenshots/afc-lanes.png)                           | ![Changer › Tools with AFC](screenshots/changer-afc-tools.png)                      |
+| The lanes of a Box Turtle (AFC) with the load path                | Changer › Tools: which lane each tool takes its filament from                       |
+| ![Filament page of a head](screenshots/toolchanger-filament.png)  | ![Gates of the unit of a head](screenshots/toolchanger-mmu.png)                     |
+| The Filament page of the mounted head, with the head chip         | A tool changer with an MMU per head: the gates of the ERCF on T0                    |
+
 ## Spoolman
 
 Appears when Moonraker has the `spoolman` component, with or without an MMU:
