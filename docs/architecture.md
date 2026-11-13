@@ -109,7 +109,8 @@ history).
 3. One-off data (files, metadata, thumbnails, power devices, updates, console, errors) arrives as `Event`. File
    details are fetched four at a time, and thumbnails arrive decoded (`files::ThumbnailImage`), so the UI thread only
    copies pixels. The temperature history comes from Moonraker's `server.temperature_store` when a chart opens
-   (drawn by `app/src/chart.rs` and `history_view.rs`). Spoolman is read through Moonraker's proxy: its state and the
+   (drawn by `app/src/chart.rs` and `history_view.rs`); which heaters and sensors have one is Klipper's
+   `heaters.available_sensors`, the list Moonraker builds its store from. Spoolman is read through Moonraker's proxy: its state and the
    spools of the gates every minute and when Moonraker reports a change; the picker list on demand. The lanes
    (`domain::spools::lanes`: a gate each while Happy Hare has the say, otherwise the one active spool) are what the
    screens and the hints before a print are built from.

@@ -23,6 +23,8 @@ pub struct Heater {
     /// `min_temp`/`max_temp` from the Klipper configuration; Klipper rejects targets outside (except 0 = off).
     pub min_temp: f64,
     pub max_temp: Option<f64>,
+    /// Moonraker keeps a temperature history of it; see [`history_objects`].
+    pub has_history: bool,
 }
 
 impl Heater {
@@ -59,12 +61,29 @@ pub struct TemperatureSensor {
     pub label: String,
     /// `None` if the sensor has no value right now, e.g. a stepper driver that is switched off.
     pub temperature: Option<f64>,
+    /// Moonraker keeps a temperature history of it; see [`history_objects`].
+    pub has_history: bool,
+}
+
+/// The objects in Moonraker's temperature store (`server.temperature_store` without monitors): Moonraker builds it
+/// from Klipper's `heaters.available_sensors`, which therefore tells it as soon as Klipper is ready. The store itself
+/// answers `{}` until Moonraker has set it up a moment later. Stepper drivers are only `available_monitors`.
+fn history_objects(store: &ObjectStore) -> Vec<&str> {
+    store
+        .object("heaters")
+        .and_then(|heaters| heaters.get("available_sensors"))
+        .and_then(Value::as_array)
+        .map(|names| names.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default()
 }
 
 /// Extruder first, then bed, then additional heaters in object order.
 pub(super) fn read_heaters(store: &ObjectStore) -> Vec<Heater> {
     let settings = store.object("configfile").and_then(|configfile| configfile.get("settings"));
-    let heater = |name: &str, value: &Value| heater(name, value, settings.and_then(|settings| settings.get(name)));
+    let with_history = history_objects(store);
+    let heater = |name: &str, value: &Value| {
+        heater(name, value, settings.and_then(|settings| settings.get(name)), with_history.contains(&name))
+    };
     let mut heaters: Vec<Heater> = [NOZZLE_HEATER, BED_HEATER]
         .into_iter()
         .filter_map(|name| store.object(name).map(|value| heater(name, value)))
@@ -84,7 +103,7 @@ fn is_extra_heater(name: &str) -> bool {
         || (name.starts_with("extruder") && name != "extruder" && !name.contains(' '))
 }
 
-fn heater(object: &str, value: &Value, settings: Option<&Value>) -> Heater {
+fn heater(object: &str, value: &Value, settings: Option<&Value>, has_history: bool) -> Heater {
     let settings = settings.unwrap_or(&Value::Null);
     Heater {
         object: object.to_owned(),
@@ -94,6 +113,7 @@ fn heater(object: &str, value: &Value, settings: Option<&Value>) -> Heater {
         power: number(value, "power"),
         min_temp: number(settings, "min_temp").max(0.0),
         max_temp: settings.get("max_temp").and_then(Value::as_f64),
+        has_history,
     }
 }
 
@@ -105,6 +125,7 @@ const SENSOR_KINDS: [&str; 3] = ["temperature_sensor", "tmc2240", "tmc5262"];
 
 /// In the order of [`SENSOR_KINDS`], each kind in name order.
 pub(super) fn read_sensors(store: &ObjectStore) -> Vec<TemperatureSensor> {
+    let with_history = history_objects(store);
     SENSOR_KINDS
         .iter()
         .flat_map(|kind| {
@@ -115,6 +136,7 @@ pub(super) fn read_sensors(store: &ObjectStore) -> Vec<TemperatureSensor> {
                 object: name.to_owned(),
                 label: label(name),
                 temperature: value.get("temperature").and_then(Value::as_f64),
+                has_history: with_history.contains(&name),
             })
         })
         .collect()
@@ -148,6 +170,27 @@ mod tests {
         assert_eq!((nozzle.min_temp, nozzle.max_temp), (10.0, Some(280.0)));
         let bed = status.heater("heater_bed").unwrap();
         assert_eq!((bed.min_temp, bed.max_temp), (0.0, None));
+    }
+
+    #[test]
+    fn only_klippers_available_sensors_have_a_history() {
+        let mut store = ObjectStore::default();
+        store.replace(&json!({
+            "extruder": { "temperature": 20.0, "target": 0.0 },
+            "heater_bed": { "temperature": 20.0, "target": 0.0 },
+            "temperature_sensor mcu": { "temperature": 40.0 },
+            "tmc2240 stepper_x": { "temperature": 30.0 },
+            "heaters": {
+                "available_sensors": ["extruder", "heater_bed", "temperature_sensor mcu"],
+                "available_monitors": ["tmc2240 stepper_x"]
+            }
+        }));
+        let status = PrinterStatus::from_store(&store);
+
+        assert!(status.heaters.iter().all(|heater| heater.has_history));
+        let sensors: Vec<(&str, bool)> =
+            status.sensors.iter().map(|sensor| (sensor.object.as_str(), sensor.has_history)).collect();
+        assert_eq!(sensors, [("temperature_sensor mcu", true), ("tmc2240 stepper_x", false)]);
     }
 
     #[test]

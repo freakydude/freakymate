@@ -23,7 +23,17 @@ impl Printer {
             objects.insert(format!("gcode_macro {name}"), json!({}));
         }
         objects.insert(format!("gcode_macro {PRINT_STATS_INFO_MACRO}"), self.layer_pause.macro_status());
+        let heaters = self.heaters_json(&objects);
+        objects.insert("heaters".to_owned(), heaters);
         Value::Object(objects)
+    }
+
+    /// Klipper's `heaters`: the sensors are what the temperature store keeps (Moonraker builds it from this list);
+    /// TMC drivers register only as monitors (`klippy/extras/tmc.py`).
+    fn heaters_json(&self, objects: &Map<String, Value>) -> Value {
+        let sensors: Vec<String> = self.temperature_samples().into_iter().map(|(name, _)| name).collect();
+        let monitors: Vec<&String> = objects.keys().filter(|name| name.starts_with("tmc2240 ")).collect();
+        json!({ "available_sensors": sensors, "available_monitors": monitors })
     }
 
     /// The objects that a machine profile or a module adds: gantry, objects to exclude, calibration, MMU, devices.
