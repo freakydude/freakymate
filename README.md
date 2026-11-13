@@ -35,8 +35,9 @@ More pictures and every page in detail: [Features](docs/features.md). Which plug
 [Requirements and hardware](docs/hardware.md).
 
 > [!IMPORTANT]
-> **Young software, tested on a few printers.** My means to test are limited: FreakyMate runs on my own printers and
-> on a friend's printer with an ERCF, and it works well there. Tool changers, AFC and Happy Hare with several units
+> **Young software, tested on a few printers.** My means to test are limited: FreakyMate runs on a modified Artillery
+> Sidewinder, a Voron 2.4 with Happy Hare and on a friend's Voron 2.4 with an ERCF, and it works well there (details in
+> [Requirements and hardware](docs/hardware.md#tested-setups)). Tool changers, AFC and Happy Hare with several units
 > have been built from the source code of these projects and tried against a simulated printer, not on real
 > machines. I am fairly confident that it works well on yours too; if it does not, please
 > [tell me](#contact-support-and-donations).
