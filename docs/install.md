@@ -1,7 +1,7 @@
 # Install and update
 
-FreakyMate is young software: the caution in the [README](../README.md) applies to every build and every way of
-installing it.
+FreakyMate is young software: the note in the [README](../README.md) applies to every build and every way of
+installing it. What the host needs: [Requirements and hardware](hardware.md#requirements).
 
 ## Release and pre-release
 
@@ -14,8 +14,14 @@ The [releases page](https://github.com/freakydude/freakymate/releases) offers tw
 
 Neither is an untested nightly: a change only reaches `main` through a reviewed pull request whose automated checks
 (tests, builds and packages for all targets) are green, and a release is a state that was the pre-release before.
-Beyond that, "tested" means tried on three different printers, where it works quite well; other setups may still
-show bugs, so the caution applies to both builds. Pick the release if you want few updates, the
+Beyond that, testing on real printers is limited to a few machines (see [Requirements and hardware](hardware.md)), so
+the note in the README applies to both builds.
+
+**Builds of a pull request.** Every open pull request is built as well. The packages (`packages-<version>`, the same
+zips and `.deb` files as a release) are listed under Artifacts on the page of its CI run; a pull request from a branch
+of this repository also gets a comment with the link. Downloading them needs a GitHub login.
+Install such a zip by hand as in step 2 below. Moonraker does not offer pull request builds as updates: on the `beta`
+channel the next pre-release replaces it, on `stable` the next release. Pick the release if you want few updates, the
 pre-release if you want to follow the development; the [update channel](#updates-and-channels) decides which one
 Moonraker installs.
 
@@ -77,7 +83,7 @@ architecture and packages first and stops with a message if something does not f
    Run again, it keeps the address and folder of the existing installation unless you give them.
    Settings go to `printer_data/config/freakymate.conf` (TOML), next to the Klipper configs, so they can be edited in
    Mainsail or Fluidd (see [Configuration](configuration.md#settings-file)). The log is `printer_data/logs/freakymate.log` (Mainsail: Machine → logs), see [Configuration](configuration.md#log).
-   Remove everything with `~/freakymate/uninstall.sh`; the settings file stays.
+   To remove it again, see [Uninstall](#uninstall).
 
 ## Updates and channels
 
@@ -110,6 +116,22 @@ so: run `~/freakymate/install.sh` once. Without `-m` and `-d` it keeps the Moonr
 folder of the existing installation; your settings stay. The Debian package brings everything along with each
 version.
 
+## Uninstall
+
+Installed with the installer:
+
+```bash
+~/freakymate/uninstall.sh            # add -d <printer_data folder> if it is not ~/printer_data
+```
+
+It stops and removes the service, the udev and polkit rules and `~/freakymate`, removes the
+`[update_manager freakymate]` section from `moonraker.conf` and the entry in `moonraker.asvc`, restarts Moonraker and
+gives `tty1` back to the login console. It keeps the system packages (`cage`, `seatd`, …), the settings
+`printer_data/config/freakymate.conf`, the log and a stored Moonraker login (`~/.config/freakymate/credentials.json`);
+delete those by hand if you no longer need them.
+
+Installed as Debian package: `sudo apt remove freakymate && sudo systemctl enable getty@tty1` (see below).
+
 ## Packages and desktop use
 
 Besides the Moonraker route there are plain packages, for example to try it on a desktop or any other device:
@@ -132,5 +154,5 @@ Besides the Moonraker route there are plain packages, for example to try it on a
   and talks to any Moonraker over the network. On Debian and Ubuntu install the `.deb` and start FreakyMate from the
   application menu or with `freakymate` in a terminal (skip the `systemctl` lines above, they set up the kiosk); on Windows unpack
   `freakymate-x86_64-pc-windows-msvc.zip` and run `freakymate.exe`. There is no Windows installer yet. Set the
-  Moonraker address on System → Settings → Display or with `-m` (default `http://127.0.0.1:7125`). For fullscreen with a mouse,
+  Moonraker address on System → Settings or with `-m` (default `http://127.0.0.1:7125`). For fullscreen with a mouse,
   switch on Fullscreen on System → Settings → Display; `-f` is the kiosk mode for a touch screen and hides the mouse pointer.

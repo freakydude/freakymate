@@ -1,6 +1,6 @@
 # Configuration
 
-Most settings are changed on the screen (System → Settings → Display). This page covers the command line, the settings file,
+Most settings are changed on the screen (System → Settings). This page covers the command line, the settings file,
 the Moonraker login, displays and the network settings.
 
 ## Command line
@@ -138,11 +138,12 @@ the password of a login goes over the network unencrypted.
 
 ## Displays
 
-FreakyMate works best on a display of 5" or more at 800x480, such as the BTT HDMI5: the layout is made for that size and
-it is the one it has been tested with. In fullscreen, other resolutions show the same layout scaled up or down to fit, so
+FreakyMate works best on a display of 5" or more at 800x480: the layout is made for that size. It has been tested on
+the BTT HDMI5 (5") and the Raspberry Pi Touch Display v1 (7", DSI), both 800x480, and on a TFT35 SPI display through
+the framebuffer fallback. In fullscreen, other resolutions show the same layout scaled up or down to fit, so
 a 7" 1024x600 display fills its screen and a smaller one, say a 4.3" 480x272, shows everything, only smaller. A window on
 a desktop is never smaller than 800x480; a larger one shows more room instead of scaling (where a compositor forces a
-smaller window, the layout is fitted as in fullscreen). Other sizes are not tested yet. Whether a small display is
+smaller window, the layout is fitted as in fullscreen). Apart from the TFT35, other sizes are not tested yet. Whether a small display is
 comfortable to read and touch depends on the display and on you, so it is worth a try. Layouts of their own for the 7"
 and 4.3" displays are planned.
 
