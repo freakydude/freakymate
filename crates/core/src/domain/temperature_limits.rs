@@ -35,6 +35,8 @@ pub struct Limits {
     pub target: Option<f64>,
     /// Below this the nozzle does not extrude.
     pub min_extrude: Option<f64>,
+    /// Lowest and highest reading since Klipper started; Klipper counts it only for a `temperature_sensor`.
+    pub measured: Option<(f64, f64)>,
     pub level: Level,
 }
 
@@ -63,11 +65,12 @@ impl Limits {
     }
 }
 
-/// The limits of a sensor; none without `min_temp`/`max_temp` (stepper drivers) or without a value.
+/// The limits of a sensor; none without `min_temp`/`max_temp` (a `temperature_sensor` without `max_temp`).
 pub fn sensor_limits(sensor: &TemperatureSensor) -> Option<Limits> {
     let (min, max) = (sensor.min_temp?, sensor.max_temp?);
     let mut limits = Limits::zones(min, max)?;
     limits.level = sensor.temperature.map_or(Level::Normal, |temperature| limits.level_of(temperature));
+    limits.measured = sensor.measured;
     Some(limits)
 }
 
@@ -159,8 +162,8 @@ mod tests {
 
     #[test]
     fn a_sensor_without_a_maximum_has_no_scale() {
-        let driver = TemperatureSensor { temperature: Some(40.0), ..Default::default() };
-        assert_eq!(sensor_limits(&driver), None);
+        let chamber = TemperatureSensor { temperature: Some(40.0), ..Default::default() };
+        assert_eq!(sensor_limits(&chamber), None);
     }
 
     #[test]

@@ -63,8 +63,11 @@ impl Printer {
             objects.insert("heater_generic chamber".to_owned(), chamber.to_json());
         }
         let host = round(self.host_temperature(), 2);
-        objects.insert("temperature_sensor raspberry_pi".to_owned(), json!({ "temperature": host }));
-        objects.insert("temperature_sensor mcu".to_owned(), json!({ "temperature": round(self.mcu_temperature(), 2) }));
+        objects.insert("temperature_sensor raspberry_pi".to_owned(), sensor_status(host, HOST_TEMPERATURE));
+        objects.insert(
+            "temperature_sensor mcu".to_owned(),
+            sensor_status(round(self.mcu_temperature(), 2), MCU_TEMPERATURE),
+        );
         // Like Klipper: the sensor type `temperature_host` adds its own object beside the section.
         objects.insert("temperature_host raspberry_pi".to_owned(), json!({ "temperature": host }));
         if let Some(mmu) = &self.mmu {
@@ -174,5 +177,14 @@ fn retraction_json(retraction: Retraction) -> Value {
         "retract_speed": retraction.retract_speed,
         "unretract_extra_length": retraction.unretract_extra_length,
         "unretract_speed": retraction.unretract_speed,
+    })
+}
+
+/// A `temperature_sensor` with the lowest and highest reading since Klipper started around its usual value.
+fn sensor_status(temperature: f64, usual: f64) -> Value {
+    json!({
+        "temperature": temperature,
+        "measured_min_temp": usual - SENSOR_MEASURED_BELOW,
+        "measured_max_temp": usual + SENSOR_MEASURED_ABOVE,
     })
 }

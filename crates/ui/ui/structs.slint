@@ -23,6 +23,10 @@ export struct ScaleItem {
     // 0 without a target / without a nozzle.
     target: float,
     min-extrude: float,
+    // Lowest and highest reading since Klipper started (only `temperature_sensor`).
+    has-measured: bool,
+    measured-low: float,
+    measured-high: float,
     // The colour of the number: 0 normal, 1 warning, 2 danger.
     level: int,
     // "max 300 °C".

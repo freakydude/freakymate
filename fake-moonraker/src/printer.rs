@@ -39,6 +39,11 @@ const MAX_HOST_TEMPERATURE: f64 = 100.0;
 const MCU_TEMPERATURE: f64 = 85.0;
 const MCU_TEMPERATURE_SWING: f64 = 0.4;
 const MAX_MCU_TEMPERATURE: f64 = 105.0;
+/// How far below and above its current value a sensor has been since Klipper started (`measured_min_temp`,
+/// `measured_max_temp`); about the spread of a Voron's host and toolhead board (2026-11-15: CM4 36.0–44.3 °C at
+/// 40.4 °C, EBB 60.5–87.7 °C at 87.4 °C).
+const SENSOR_MEASURED_BELOW: f64 = 6.0;
+const SENSOR_MEASURED_ABOVE: f64 = 3.0;
 /// Klipper's default `min_temp` of a `temperature_sensor` (`extras/temperature_sensor.py`: `KELVIN_TO_CELSIUS`).
 const MIN_SENSOR_TEMPERATURE: f64 = -273.15;
 /// The host temperature wanders this much around `HOST_TEMPERATURE`, like a real CPU under changing load. Klipper

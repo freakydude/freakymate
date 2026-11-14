@@ -174,7 +174,7 @@ impl Setup {
             subscription.add(heater, None);
         }
         for sensor in &self.temperature_sensors {
-            subscription.add(sensor, Some(&["temperature"]));
+            subscription.add(sensor, Some(&["temperature", "measured_min_temp", "measured_max_temp"]));
         }
         for fan in &self.fans {
             subscription.add(fan, Some(&["speed", "rpm"]));

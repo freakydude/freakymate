@@ -236,6 +236,9 @@ fn scale_item(limits: Option<Limits>) -> ScaleItem {
         window_high: limits.window.map_or(0.0, |window| window.1) as f32,
         target: limits.target.unwrap_or_default() as f32,
         min_extrude: limits.min_extrude.unwrap_or_default() as f32,
+        has_measured: limits.measured.is_some(),
+        measured_low: limits.measured.map_or(0.0, |measured| measured.0) as f32,
+        measured_high: limits.measured.map_or(0.0, |measured| measured.1) as f32,
         level: match limits.level {
             Level::Normal => 0,
             Level::Warning => 1,

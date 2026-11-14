@@ -74,9 +74,13 @@ pub struct TemperatureSensor {
     pub label: String,
     /// `None` if the sensor has no value right now, e.g. a stepper driver that is switched off.
     pub temperature: Option<f64>,
-    /// `min_temp`/`max_temp` from the configuration, where it has them; Klipper shuts down outside.
+    /// `min_temp`/`max_temp` from the configuration, where it has them; Klipper shuts down outside. For a stepper
+    /// driver the operating range of its datasheet (see [`DRIVER_RANGE`]).
     pub min_temp: Option<f64>,
     pub max_temp: Option<f64>,
+    /// Lowest and highest reading since Klipper started (`measured_min_temp`/`measured_max_temp`, only
+    /// `temperature_sensor`); none before the first reading.
+    pub measured: Option<(f64, f64)>,
     /// Moonraker keeps a temperature history of it; see [`history_objects`].
     pub has_history: bool,
 }
@@ -161,6 +165,12 @@ fn heater(
 /// would show the same sensor twice (see `Setup::temperature_sensors`).
 const SENSOR_KINDS: [&str; 3] = ["temperature_sensor", "tmc2240", "tmc5262"];
 
+/// Range of the stepper drivers in [`SENSOR_KINDS`], which have no `min_temp`/`max_temp`: the operating temperature
+/// range of their datasheets (TMC2240 19-101548 Rev 2 11/23, TMC5262 19-102041 Rev 0 09/25: -40 to 125 °C). They shut
+/// down at 165 °C (typical) at the power stages, but measure in the middle of the die; the TMC5262 sheet puts that
+/// 20 to 40 °C cooler ("Thermal Protection and Shutdown"), so from 125 °C on the reading a shutdown can come.
+const DRIVER_RANGE: (f64, f64) = (-40.0, 125.0);
+
 /// In the order of [`SENSOR_KINDS`], each kind in name order.
 pub(super) fn read_sensors(store: &ObjectStore) -> Vec<TemperatureSensor> {
     let with_history = history_objects(store);
@@ -176,19 +186,32 @@ pub(super) fn read_sensors(store: &ObjectStore) -> Vec<TemperatureSensor> {
     SENSOR_KINDS
         .iter()
         .flat_map(|kind| {
-            store.names().filter(move |name| name.split_once(' ').is_some_and(|(prefix, _)| prefix == *kind))
+            store
+                .names()
+                .filter(move |name| name.split_once(' ').is_some_and(|(prefix, _)| prefix == *kind))
+                .map(move |name| (*kind, name))
         })
-        .filter_map(|name| {
+        .filter_map(|(kind, name)| {
+            let datasheet = (kind != "temperature_sensor").then_some(DRIVER_RANGE);
             store.object(name).map(|value| TemperatureSensor {
-                min_temp: setting(name, "min_temp"),
-                max_temp: maximum(name),
+                min_temp: setting(name, "min_temp").or(datasheet.map(|range| range.0)),
+                max_temp: maximum(name).or(datasheet.map(|range| range.1)),
                 object: name.to_owned(),
                 label: label(name),
                 temperature: value.get("temperature").and_then(Value::as_f64),
+                measured: measured_range(value),
                 has_history: with_history.contains(&name),
             })
         })
         .collect()
+}
+
+/// Klipper starts `measured_min_temp` at 99999999 and `measured_max_temp` at 0 (`extras/temperature_sensor.py`), so
+/// until the first reading the minimum lies above the maximum.
+fn measured_range(value: &Value) -> Option<(f64, f64)> {
+    let lowest = value.get("measured_min_temp").and_then(Value::as_f64)?;
+    let highest = value.get("measured_max_temp").and_then(Value::as_f64)?;
+    (lowest <= highest).then_some((lowest, highest))
 }
 
 #[cfg(test)]
@@ -213,6 +236,18 @@ mod tests {
     }
 
     #[test]
+    fn the_measured_range_counts_from_the_first_reading() {
+        let mut store = ObjectStore::default();
+        store.replace(&json!({
+            // Values of a Voron (2026-11-15); a fresh sensor still has Klipper's start values.
+            "temperature_sensor EBB": { "temperature": 87.41, "measured_min_temp": 60.51, "measured_max_temp": 87.66 },
+            "temperature_sensor fresh": { "temperature": 0.0, "measured_min_temp": 99999999.0, "measured_max_temp": 0.0 },
+        }));
+        let measured: Vec<_> = read_sensors(&store).iter().map(|sensor| sensor.measured).collect();
+        assert_eq!(measured, [Some((60.51, 87.66)), None]);
+    }
+
+    #[test]
     fn a_sensor_with_klippers_placeholder_maximum_has_no_limit() {
         let mut store = ObjectStore::default();
         store.replace(&json!({
@@ -226,6 +261,17 @@ mod tests {
         let sensors = read_sensors(&store);
         let limits: Vec<_> = sensors.iter().map(|sensor| (sensor.object.as_str(), sensor.max_temp)).collect();
         assert_eq!(limits, [("temperature_sensor chamber", None), ("temperature_sensor mcu", Some(80.0))]);
+    }
+
+    #[test]
+    fn stepper_drivers_take_the_operating_range_of_their_datasheet() {
+        let mut store = ObjectStore::default();
+        store.replace(&json!({
+            "tmc2240 stepper_x": { "temperature": 45.0 },
+            "tmc5262 stepper_y": { "temperature": null },
+        }));
+        let ranges: Vec<_> = read_sensors(&store).iter().map(|sensor| (sensor.min_temp, sensor.max_temp)).collect();
+        assert_eq!(ranges, [(Some(-40.0), Some(125.0)); 2]);
     }
 
     #[test]
