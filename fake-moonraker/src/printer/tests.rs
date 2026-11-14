@@ -710,7 +710,7 @@ fn temperature_sensors_list_their_limits_and_the_mcu_runs_warm() {
     let status = printer().status();
     let settings = &status["configfile"]["settings"];
 
-    assert_eq!(settings["temperature_sensor mcu"]["min_temp"], 0.0);
+    assert_eq!(settings["temperature_sensor mcu"]["min_temp"], -273.15);
     assert_eq!(settings["temperature_sensor mcu"]["max_temp"], 105.0);
     assert_eq!(settings["temperature_sensor raspberry_pi"]["max_temp"], 100.0);
     assert_eq!(settings["extruder"]["min_extrude_temp"], 170.0);

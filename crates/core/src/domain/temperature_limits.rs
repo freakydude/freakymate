@@ -9,6 +9,10 @@ use std::collections::HashMap;
 const WARNING_SHARE: f64 = 0.25;
 const DANGER_SHARE: f64 = 0.08;
 
+/// The scale starts at 0 °C at the lowest: Klipper's default `min_temp` of a `temperature_sensor` is -273.15 °C,
+/// which would put room temperature into the yellow zone. Real rooms are above freezing.
+const SCALE_FLOOR: f64 = 0.0;
+
 /// What the number of a temperature shows by its colour.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Level {
@@ -37,6 +41,7 @@ pub struct Limits {
 impl Limits {
     /// The zones of a sensor or a switched-off heater; none without a usable range.
     fn zones(min: f64, max: f64) -> Option<Self> {
+        let min = min.max(SCALE_FLOOR);
         let range = max - min;
         (range > 0.0).then_some(Self {
             min,
@@ -143,6 +148,13 @@ mod tests {
         assert_eq!(level(75.0), Level::Warning);
         assert_eq!(level(91.9), Level::Warning);
         assert_eq!(level(92.0), Level::Danger);
+    }
+
+    #[test]
+    fn klippers_default_minimum_of_absolute_zero_starts_the_scale_at_freezing() {
+        let mcu = TemperatureSensor { min_temp: Some(-273.15), ..sensor(22.0) };
+        let limits = sensor_limits(&mcu).unwrap();
+        assert_eq!((limits.min, limits.warning_from, limits.level), (0.0, Some(75.0), Level::Normal));
     }
 
     #[test]

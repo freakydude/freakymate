@@ -39,7 +39,8 @@ const MAX_HOST_TEMPERATURE: f64 = 100.0;
 const MCU_TEMPERATURE: f64 = 85.0;
 const MCU_TEMPERATURE_SWING: f64 = 0.4;
 const MAX_MCU_TEMPERATURE: f64 = 105.0;
-const MIN_SENSOR_TEMPERATURE: f64 = 0.0;
+/// Klipper's default `min_temp` of a `temperature_sensor` (`extras/temperature_sensor.py`: `KELVIN_TO_CELSIUS`).
+const MIN_SENSOR_TEMPERATURE: f64 = -273.15;
 /// The host temperature wanders this much around `HOST_TEMPERATURE`, like a real CPU under changing load. Klipper
 /// only reports changed values; this way status updates keep coming as on a real printer, whose readings never stand
 /// still.
