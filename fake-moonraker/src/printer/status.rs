@@ -50,7 +50,7 @@ impl Printer {
         }
         if let Some(devices) = &self.devices {
             let inputs = DeviceInputs {
-                nozzle_temperature: self.extruder.temperature,
+                nozzle_temperature: self.extruder.reading(),
                 steppers_enabled: self.homed.iter().any(|homed| *homed),
             };
             objects.extend(devices.status(inputs));
@@ -64,6 +64,7 @@ impl Printer {
         }
         let host = round(self.host_temperature(), 2);
         objects.insert("temperature_sensor raspberry_pi".to_owned(), json!({ "temperature": host }));
+        objects.insert("temperature_sensor mcu".to_owned(), json!({ "temperature": round(self.mcu_temperature(), 2) }));
         // Like Klipper: the sensor type `temperature_host` adds its own object beside the section.
         objects.insert("temperature_host raspberry_pi".to_owned(), json!({ "temperature": host }));
         if let Some(mmu) = &self.mmu {
@@ -127,12 +128,12 @@ impl Printer {
 
     pub(super) fn heater_json(&self, heater: &Heater) -> Value {
         json!({
-            "temperature": round(heater.temperature, 2),
+            "temperature": round(heater.reading(), 2),
             "target": heater.target,
-            "power": if heater.target > heater.temperature { 1.0 } else { 0.0 },
+            "power": if heater.target > heater.reading() { 1.0 } else { 0.0 },
             "pressure_advance": self.pressure_advance,
             "smooth_time": self.smooth_time,
-            "can_extrude": heater.temperature >= MIN_EXTRUDE_TEMPERATURE,
+            "can_extrude": heater.reading() >= MIN_EXTRUDE_TEMPERATURE,
         })
     }
 

@@ -41,6 +41,12 @@ impl Printer {
         );
         sections
             .insert("heater_bed".to_owned(), json!({ "min_temp": MIN_HEATER_TEMPERATURE, "max_temp": MAX_BED_TARGET }));
+        // Like Klipper: `settings` lists min_temp and max_temp of every temperature sensor with its defaults.
+        for (name, maximum) in
+            [("temperature_sensor raspberry_pi", MAX_HOST_TEMPERATURE), ("temperature_sensor mcu", MAX_MCU_TEMPERATURE)]
+        {
+            sections.insert(name.to_owned(), json!({ "min_temp": MIN_SENSOR_TEMPERATURE, "max_temp": maximum }));
+        }
         if self.has_printer_fan() {
             sections.insert("fan".to_owned(), json!({}));
         }

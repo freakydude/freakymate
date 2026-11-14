@@ -3,7 +3,7 @@
 use crate::{format, view};
 use crate::{
     BarColors, FanItem, FilamentPathItem, HeadItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, PowerItem,
-    SensorItem, SpoolItem, ToolMatchItem, TuningItem, UpdateItem,
+    ScaleItem, SensorItem, SpoolItem, ToolMatchItem, TuningItem, UpdateItem,
 };
 use freakymate_core::color::Rgba;
 use freakymate_core::domain::filament_match::{self, Difference, Supply, ToolMatch, Verdict};
@@ -11,6 +11,7 @@ use freakymate_core::domain::heads::{HeadRow, PickUp};
 use freakymate_core::domain::load_path::{self, LoadPath};
 use freakymate_core::domain::machine_tree::MachineTree;
 use freakymate_core::domain::spools::{self, FilamentColors, Lane, SpoolHolder};
+use freakymate_core::domain::temperature_limits::{self, Level, Limits};
 use freakymate_core::sources::happy_hare::PathSensor;
 use freakymate_core::sources::klipper::tuning::{TuningKey, TuningValue};
 use freakymate_core::sources::klipper::{Fan, Heater, Led, TemperatureSensor};
@@ -199,7 +200,7 @@ pub(crate) fn spool_colors(spool: &Spool) -> BarColors {
 }
 
 /// The row of a heater; the hint says that the target is off from what the spools recommend.
-pub(crate) fn heater_item(heater: &Heater, lanes: &[Lane]) -> HeaterItem {
+pub(crate) fn heater_item(heater: &Heater, lanes: &[Lane], limits: Option<Limits>) -> HeaterItem {
     let recommended = spools::recommended_temperature(lanes, &heater.object);
     let spool_hint = spools::temperature_hint(heater.target, recommended)
         .map_or_else(SharedString::new, |degrees| format!("{degrees:.0}°").into());
@@ -216,6 +217,31 @@ pub(crate) fn heater_item(heater: &Heater, lanes: &[Lane]) -> HeaterItem {
         }),
         has_history: heater.has_history,
         nozzle: heater.is_nozzle(),
+        scale: scale_item(limits),
+    }
+}
+
+/// The scale under a temperature; hidden without limits.
+fn scale_item(limits: Option<Limits>) -> ScaleItem {
+    let Some(limits) = limits else { return ScaleItem::default() };
+    ScaleItem {
+        shown: true,
+        min: limits.min as f32,
+        max: limits.max as f32,
+        has_warning: limits.warning_from.is_some(),
+        warning_from: limits.warning_from.unwrap_or_default() as f32,
+        danger_from: limits.danger_from as f32,
+        has_window: limits.window.is_some(),
+        window_low: limits.window.map_or(0.0, |window| window.0) as f32,
+        window_high: limits.window.map_or(0.0, |window| window.1) as f32,
+        target: limits.target.unwrap_or_default() as f32,
+        min_extrude: limits.min_extrude.unwrap_or_default() as f32,
+        level: match limits.level {
+            Level::Normal => 0,
+            Level::Warning => 1,
+            Level::Danger => 2,
+        },
+        max_text: format!("max {:.0} °C", limits.max).into(),
     }
 }
 
@@ -258,6 +284,7 @@ pub(crate) fn sensor_item(sensor: &TemperatureSensor) -> SensorItem {
         temperature: sensor.temperature.unwrap_or_default() as f32,
         known: sensor.temperature.is_some(),
         has_history: sensor.has_history,
+        scale: scale_item(temperature_limits::sensor_limits(sensor)),
     }
 }
 

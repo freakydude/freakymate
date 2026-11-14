@@ -1,0 +1,70 @@
+// The scale under a temperature: Klipper's range from min_temp to max_temp (where it shuts down) with the zones near
+// the top, the current value as a stroke and, for a heater with a target, the tolerance window, the target and the
+// lowest extrusion temperature. Everything is decided in the core; this only draws it.
+
+import { Theme } from "../theme.slint";
+import { ScaleItem } from "../structs.slint";
+
+export component TemperatureScale inherits Rectangle {
+    in property <ScaleItem> scale;
+    in property <float> temperature;
+    property <length> line-y: 2px;
+    property <length> line-height: 3px;
+    property <length> stroke-width: 3px;
+    height: 10px;
+
+    pure function x-of(value: float) -> length {
+        return root.width * clamp((value - root.scale.min) / max(root.scale.max - root.scale.min, 0.001), 0, 1);
+    }
+
+    // The range, the tolerance window and the zones lie on one line, each a piece of it.
+    Rectangle {
+        y: root.line-y;
+        height: root.line-height;
+        border-radius: self.height / 2;
+        background: Theme.surface-active;
+        clip: true;
+        if root.scale.has-window: Rectangle {
+            x: root.x-of(root.scale.window-low);
+            width: root.x-of(root.scale.window-high) - self.x;
+            background: Theme.muted;
+        }
+        if root.scale.has-warning: Rectangle {
+            x: root.x-of(root.scale.warning-from);
+            width: root.width - self.x;
+            background: Theme.warning.with-alpha(0.55);
+        }
+        Rectangle {
+            x: root.x-of(root.scale.danger-from);
+            width: root.width - self.x;
+            background: Theme.danger.with-alpha(0.7);
+        }
+    }
+    // The lowest temperature at which the nozzle extrudes.
+    if root.scale.min-extrude > 0: Rectangle {
+        x: root.x-of(root.scale.min-extrude) - 1px;
+        y: root.line-y + root.line-height;
+        width: 2px;
+        height: 4px;
+        background: Theme.muted;
+    }
+    Rectangle {
+        x: min(root.x-of(root.temperature) - root.stroke-width / 2, root.width - root.stroke-width);
+        y: 0;
+        width: root.stroke-width;
+        height: 9px;
+        border-radius: 1px;
+        background: Theme.foreground;
+    }
+    // The target, above the stroke so that its tip stays visible.
+    if root.scale.target > 0: Path {
+        x: root.x-of(root.scale.target) - 4px;
+        y: root.line-y + root.line-height;
+        width: 8px;
+        height: 5px;
+        viewbox-width: 8;
+        viewbox-height: 5;
+        commands: "M 0 5 L 4 0 L 8 5 Z";
+        fill: Theme.accent;
+    }
+}

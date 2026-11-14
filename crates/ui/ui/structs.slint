@@ -7,6 +7,28 @@ export enum Severity { neutral, calm, fine, running, attention, error, info }
 
 export enum Page { print, motion, temperature, filament, changer, console, system, settings, updates, network }
 
+// The scale under a temperature (`TemperatureScale`), decided in the core; `shown` is false without a `max_temp`.
+export struct ScaleItem {
+    shown: bool,
+    min: float,
+    max: float,
+    // The yellow zone starts here; a heater with a target has none.
+    has-warning: bool,
+    warning-from: float,
+    danger-from: float,
+    // Target ± the tolerance, while a target is set.
+    has-window: bool,
+    window-low: float,
+    window-high: float,
+    // 0 without a target / without a nozzle.
+    target: float,
+    min-extrude: float,
+    // The colour of the number: 0 normal, 1 warning, 2 danger.
+    level: int,
+    // "max 300 °C".
+    max-text: string,
+}
+
 export struct HeaterItem {
     object: string,
     label: string,
@@ -23,6 +45,7 @@ export struct HeaterItem {
     has-history: bool,
     // The heater of a nozzle (`extruder`, `extruder1`, …).
     nozzle: bool,
+    scale: ScaleItem,
 }
 
 export struct SensorItem {
@@ -33,6 +56,7 @@ export struct SensorItem {
     known: bool,
     // Moonraker keeps its temperature history, so a tap can show it.
     has-history: bool,
+    scale: ScaleItem,
 }
 
 // A fan. `kind`: part | generic | heater | controller; only part and generic fans can be set.

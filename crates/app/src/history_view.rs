@@ -144,6 +144,7 @@ mod tests {
                 label: "Stepper X".into(),
                 temperature: None,
                 has_history: false,
+                ..TemperatureSensor::default()
             }],
             ..PrinterStatus::default()
         };

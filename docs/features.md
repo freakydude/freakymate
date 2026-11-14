@@ -36,7 +36,11 @@ probe still counts as the probe).
     what `SAVE_CONFIG` would write. While Klipper waits for the paper test or the Z height, a dialog shows its steps;
     closing it aborts. FreakyMate only starts these commands, Klipper does the work.
 - **Thermal**: every heater with a target (nozzle, bed, `heater_generic`, `temperature_fan`), presets; − and +
-  respect `min_temp`/`max_temp` from the Klipper configuration. Tapping a heater or sensor shows its temperature
+  respect `min_temp`/`max_temp` from the Klipper configuration. Under each temperature with a `max_temp` a scale
+  shows the distance to the limit where Klipper shuts down: the current value as a stroke, "max N °C", and for a
+  heater with a target the tolerance of `verify_heater` (default 5 °C), the target and the nozzle's `min_extrude_temp`.
+  The number turns yellow or red when a sensor or a switched-off heater nears its limit, or when a heater that has
+  reached its target leaves the tolerance; heating up or cooling down after a new target stays grey. Tapping a heater or sensor shows its temperature
   history with a grid: the last 20 minutes of Moonraker's temperature store, asked again every five seconds while it
   is open. Moonraker keeps heaters and `temperature_sensor` objects there; the others have no history. Further tabs when the printer has them:
   - **Fans**: part fan (the one of the nozzle in use first) and `fan_generic` fans (filter, exhaust) with a slider, `heater_fan` and `controller_fan` as a

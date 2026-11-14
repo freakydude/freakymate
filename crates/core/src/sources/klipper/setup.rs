@@ -90,7 +90,7 @@ impl Setup {
     /// What only the configuration tells: macro parameters, LEDs with white, the configured tuning values.
     pub fn apply_settings(&mut self, settings: Option<&Value>) {
         self.macro_details = Arc::new(macros::details_from_settings(settings));
-        let section = |object: &str| settings.and_then(|settings| settings.get(object));
+        let section = |object: &str| settings.and_then(|settings| settings.get(object.to_lowercase()));
         self.led_white = self.leds.iter().map(|led| (led.clone(), devices::white_channel(section(led)))).collect();
         self.tuning = TuningConfig::from_settings(settings);
         self.calibration.apply_settings(settings);
@@ -215,6 +215,13 @@ pub fn tool_commands(help: &Value) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_white_channel_of_an_led_with_capitals_is_found_in_the_lower_case_section() {
+        let mut setup = Setup::from_objects(["neopixel Case"]);
+        setup.apply_settings(Some(&serde_json::json!({ "neopixel case": { "color_order": ["GRBW"] } })));
+        assert_eq!(setup.white_channel("neopixel Case"), WhiteChannel::All);
+    }
 
     #[test]
     fn detects_optional_hardware_and_macros() {

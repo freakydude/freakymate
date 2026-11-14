@@ -64,7 +64,32 @@ pub(super) fn heat_tabs(session: &mut Session) -> Result<(), String> {
         session.capture("screen-off")?;
         session.window.global::<Backlight>().set_off(false);
     }
+    if status.heater("extruder").is_some() {
+        heater_deviation(session)?;
+    }
     Ok(())
+}
+
+/// The nozzle holds its target, then reads 20 °C more (`FAKE_OVERSHOOT`): the number turns yellow, the stroke leaves
+/// the tolerance window on the scale. Afterwards the nozzle is off again.
+fn heater_deviation(session: &mut Session) -> Result<(), String> {
+    const TARGET: f64 = 50.0;
+    let nozzle = |snapshot: &Snapshot| snapshot.status.heater("extruder").map(|heater| heater.temperature);
+    session.service.send(Command::RunGcode { script: format!("M104 S{TARGET}") });
+    session.wait_until("the nozzle to reach its target", |snapshot| {
+        nozzle(snapshot).is_some_and(|temperature| (temperature - TARGET).abs() < 2.0)
+    })?;
+    // The target has been held for a status update, so the deviation counts as one.
+    session.pump(Duration::from_millis(500));
+    session.service.send(Command::RunGcode { script: "FAKE_OVERSHOOT HEATER=extruder DELTA=20".into() });
+    session.wait_until("the nozzle to read above its window", |snapshot| {
+        nozzle(snapshot).is_some_and(|temperature| temperature > TARGET + 10.0)
+    })?;
+    session.show_page(Page::Temperature, "temperature-deviation")?;
+    session.service.send(Command::RunGcode { script: "FAKE_OVERSHOOT HEATER=extruder DELTA=0\nM104 S0".into() });
+    session.wait_until("the nozzle target to be off", |snapshot| {
+        snapshot.status.heater("extruder").is_some_and(|heater| heater.target == 0.0)
+    })
 }
 
 /// The temperature history of the nozzle, once it has heated: Moonraker's stored minutes plus the live value.
