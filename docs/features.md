@@ -16,8 +16,11 @@ probe still counts as the probe).
   - **Filament check per tool**: the file's colour, material and weight for each tool, against the filament where that
     tool prints from (with Happy Hare the gate of the tool, otherwise the active spool; only what both sides know is
     compared). The result is a hint on the print page (for example "2 of 3 tools match", a tap leads to Filament →
-    Tools), in the tool list and in the gate picker; it never blocks a print or a change. A clear filament (colour with
-    full transparency) is not compared by colour.
+    Tools), in the tool list and in the gate picker; it never blocks a print or a change. The colour is shown side by
+    side but does not decide whether a tool fits: a slicer often keeps its profile's colour, not the spool's. In a
+    multi-colour print a yellow frame marks a tool whose own gate holds another colour while another tool of the file
+    prints with one close to its own (swapped gates), and the gate picker weighs the colour. A clear filament (colour
+    with full transparency) is not compared by colour.
     Each tool chip on the print page also shows the material the file asks for, in the warning colour when the gate
     holds another. A tap on a tool opens a comparison: material, colour, weight and name of the file against the
     gate, differing values in the warning colour, the slicer's estimate with `~`. FreakyMate does not know why they
@@ -101,9 +104,10 @@ the gates; its dialog selects and loads it. **Changer > Tools** is the one place
 filament from (Happy Hare's tool-to-gate map): one row per tool with what its gate holds (material, colour, spool, grams
 left and, with EndlessSpool, what its group can still give), and a tap on a tool offers the gates with their colour and
 material. With a file prepared (or the file of the current job), each row shows on its left what the file asks of the
-tool and whether the gate fits (✓ or ⚠, a hint only); only what differs is yellow: the material, the colour as a frame,
-the weight. A multi-colour spool is compared by its first colour, since slicers know one colour per tool. The gate list
-marks the gates that fit. The tab also resets the map; its EndlessSpool dialog turns EndlessSpool on or off and moves
+tool and whether the gate fits (✓ or ⚠, a hint only); only what differs is yellow: the material, the weight, and as a
+frame a colour that another tool of the file prints with (swapped gates). A multi-colour spool counts by its first
+colour, since slicers know one colour per tool. The gate list marks the gates that fit, in a multi-colour print also by
+colour. The tab also resets the map; its EndlessSpool dialog turns EndlessSpool on or off and moves
 each gate from group to group.
 The **Service** tab holds what is rarely needed for the MMU as a whole: home, recover, unlock, motors off, check all
 gates and, on selectors with a servo, servo up and down.
@@ -204,8 +208,8 @@ Appears when Moonraker has the `spoolman` component, with or without an MMU:
   an MMU, choose the active spool, and correct the remaining weight by weighing;
 - a filament colour with transparency (alpha) shows over a checkerboard in the gate bars, dialogs and Changer > Tools;
 - the temperature page offers a preset for the spool in use and notes quietly when the target is off from it;
-- before a print the confirmation names what differs between the file and the spools (material, weight, colour), only as
-  a hint.
+- before a print the confirmation names what differs between the file and the spools (material, weight), only as a
+  hint.
 
 | ![Spool picker](screenshots/spool-picker.png) | ![Start print with hints](screenshots/spool-hints.png) | ![Spool preset on the temperature page](screenshots/temperature-spool.png) |
 | --------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------- |

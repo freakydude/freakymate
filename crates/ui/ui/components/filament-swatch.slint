@@ -35,7 +35,7 @@ component CornerMask inherits Path {
 // The colour or colours of a filament as a field with a fine frame. A see-through colour lies over a checkerboard. Two
 // or three colours side by side (coaxial, Spoolman's default) split the field hard and diagonally; colours along the
 // filament (longitudinal) blend from left to right, up to six for a rainbow. Without a known colour the field is
-// neutral; `empty` (nothing in the gate) draws only a dashed outline, `warn` a yellow frame (the colour differs).
+// neutral; `empty` (nothing in the gate) draws only a dashed outline, `warn` a yellow frame (the colour sits with another tool).
 // Corners are rounded per layer instead of clipping, so the field keeps its shape in every renderer.
 export component FilamentSwatch inherits Rectangle {
     in property <BarColors> colors;
@@ -129,7 +129,7 @@ export component FilamentSwatch inherits Rectangle {
     if root.count > 1 && root.br > 0px: CornerMask { x: root.width - root.br; y: root.height - root.br; corner: 2; size: root.br; ground: root.ground; }
     if root.count > 1 && root.bl > 0px: CornerMask { x: 0px; y: root.height - root.bl; corner: 3; size: root.bl; ground: root.ground; }
 
-    // The frame: fine and grey (light around a dark filament), yellow with a gap when the colour differs.
+    // The frame: fine and grey (light around a dark filament), yellow with a gap for `warn`.
     if !root.empty: Rectangle {
         border-top-left-radius: root.tl;
         border-bottom-left-radius: root.bl;

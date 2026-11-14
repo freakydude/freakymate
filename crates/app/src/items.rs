@@ -452,7 +452,7 @@ pub(crate) fn tool_match_item(tool: usize, gate: Option<usize>, matches: &[ToolM
     item.verdict = view::verdict_key(&found.verdict).into();
     item.material_differs = view::material_difference(found).is_some();
     item.material_line = view::material_line(found).into();
-    item.color_differs = differs(found, |difference| matches!(difference, Difference::Color));
+    item.color_elsewhere = found.color_elsewhere;
     item.weight_differs = differs(found, |difference| matches!(difference, Difference::Weight { .. }));
     item
 }
@@ -817,6 +817,7 @@ mod tests {
             needed: Some(12.0),
             reserve: None,
             verdict,
+            color_elsewhere: false,
         }
     }
 
@@ -860,7 +861,7 @@ mod tests {
 
         let item = tool_match_item(2, Some(1), &[found]);
 
-        assert!(item.weight_differs && !item.color_differs && !item.material_differs);
+        assert!(item.weight_differs && !item.color_elsewhere && !item.material_differs);
     }
 
     #[test]
