@@ -16,3 +16,4 @@ pub mod pause;
 pub mod prepared_job;
 pub mod screen_wake;
 pub mod spools;
+pub mod temperature_limits;

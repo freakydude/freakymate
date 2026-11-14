@@ -23,9 +23,22 @@ pub struct Heater {
     /// `min_temp`/`max_temp` from the Klipper configuration; Klipper rejects targets outside (except 0 = off).
     pub min_temp: f64,
     pub max_temp: Option<f64>,
+    /// Klipper's `verify_heater` tolerance around the target ([`DEFAULT_HYSTERESIS`] unless configured).
+    pub hysteresis: f64,
+    /// A nozzle extrudes only above this (`min_extrude_temp`, Klipper's default 170); `None` for other heaters.
+    pub min_extrude_temp: Option<f64>,
+    /// Only cools (`temperature_fan`): staying below the target is no deviation.
+    pub cools_only: bool,
     /// Moonraker keeps a temperature history of it; see [`history_objects`].
     pub has_history: bool,
 }
+
+/// From here a `max_temp` is Klipper's placeholder for "none" (`temperature_sensor` defaults to 99999999.9).
+const UNSET_MAX_TEMP: f64 = 1_000_000.0;
+/// Klipper's default of `verify_heater` `hysteresis` (°C).
+pub const DEFAULT_HYSTERESIS: f64 = 5.0;
+/// Klipper's default of the extruder's `min_extrude_temp` (°C).
+const DEFAULT_MIN_EXTRUDE_TEMP: f64 = 170.0;
 
 impl Heater {
     /// The heater of a nozzle: Klipper's `extruder`, or `extruder1`, `extruder2`, … of a printer with several.
@@ -61,6 +74,13 @@ pub struct TemperatureSensor {
     pub label: String,
     /// `None` if the sensor has no value right now, e.g. a stepper driver that is switched off.
     pub temperature: Option<f64>,
+    /// `min_temp`/`max_temp` from the configuration, where it has them; Klipper shuts down outside. For a stepper
+    /// driver the operating range of its datasheet (see [`DRIVER_RANGE`]).
+    pub min_temp: Option<f64>,
+    pub max_temp: Option<f64>,
+    /// Lowest and highest reading since Klipper started (`measured_min_temp`/`measured_max_temp`, only
+    /// `temperature_sensor`); none before the first reading.
+    pub measured: Option<(f64, f64)>,
     /// Moonraker keeps a temperature history of it; see [`history_objects`].
     pub has_history: bool,
 }
@@ -77,12 +97,20 @@ fn history_objects(store: &ObjectStore) -> Vec<&str> {
         .unwrap_or_default()
 }
 
+/// The configuration section of an object: Klipper writes the section names of `configfile.settings` in lower case,
+/// while the objects keep the case of the config (`temperature_sensor M8P` is the section `temperature_sensor m8p`).
+fn section_of<'a>(settings: &'a Value, object: &str) -> Option<&'a Value> {
+    settings.get(object).or_else(|| settings.get(object.to_lowercase()))
+}
+
 /// Extruder first, then bed, then additional heaters in object order.
 pub(super) fn read_heaters(store: &ObjectStore) -> Vec<Heater> {
     let settings = store.object("configfile").and_then(|configfile| configfile.get("settings"));
     let with_history = history_objects(store);
     let heater = |name: &str, value: &Value| {
-        heater(name, value, settings.and_then(|settings| settings.get(name)), with_history.contains(&name))
+        let section = |name: &str| settings.and_then(|settings| section_of(settings, name));
+        let verify = section(&format!("verify_heater {}", name.rsplit(' ').next().unwrap_or(name)));
+        heater(name, value, section(name), verify, with_history.contains(&name))
     };
     let mut heaters: Vec<Heater> = [NOZZLE_HEATER, BED_HEATER]
         .into_iter()
@@ -103,8 +131,15 @@ fn is_extra_heater(name: &str) -> bool {
         || (name.starts_with("extruder") && name != "extruder" && !name.contains(' '))
 }
 
-fn heater(object: &str, value: &Value, settings: Option<&Value>, has_history: bool) -> Heater {
+fn heater(
+    object: &str,
+    value: &Value,
+    settings: Option<&Value>,
+    verify_heater: Option<&Value>,
+    has_history: bool,
+) -> Heater {
     let settings = settings.unwrap_or(&Value::Null);
+    let is_nozzle = object == NOZZLE_HEATER || is_additional_extruder(object);
     Heater {
         object: object.to_owned(),
         label: label(object),
@@ -113,6 +148,13 @@ fn heater(object: &str, value: &Value, settings: Option<&Value>, has_history: bo
         power: number(value, "power"),
         min_temp: number(settings, "min_temp").max(0.0),
         max_temp: settings.get("max_temp").and_then(Value::as_f64),
+        hysteresis: verify_heater
+            .and_then(|section| section.get("hysteresis"))
+            .and_then(Value::as_f64)
+            .unwrap_or(DEFAULT_HYSTERESIS),
+        min_extrude_temp: is_nozzle
+            .then(|| settings.get("min_extrude_temp").and_then(Value::as_f64).unwrap_or(DEFAULT_MIN_EXTRUDE_TEMP)),
+        cools_only: object.starts_with("temperature_fan "),
         has_history,
     }
 }
@@ -123,28 +165,114 @@ fn heater(object: &str, value: &Value, settings: Option<&Value>, has_history: bo
 /// would show the same sensor twice (see `Setup::temperature_sensors`).
 const SENSOR_KINDS: [&str; 3] = ["temperature_sensor", "tmc2240", "tmc5262"];
 
+/// Range of the stepper drivers in [`SENSOR_KINDS`], which have no `min_temp`/`max_temp`: the operating temperature
+/// range of their datasheets (TMC2240 19-101548 Rev 2 11/23, TMC5262 19-102041 Rev 0 09/25: -40 to 125 °C). They shut
+/// down at 165 °C (typical) at the power stages, but measure in the middle of the die; the TMC5262 sheet puts that
+/// 20 to 40 °C cooler ("Thermal Protection and Shutdown"), so from 125 °C on the reading a shutdown can come.
+const DRIVER_RANGE: (f64, f64) = (-40.0, 125.0);
+
 /// In the order of [`SENSOR_KINDS`], each kind in name order.
 pub(super) fn read_sensors(store: &ObjectStore) -> Vec<TemperatureSensor> {
     let with_history = history_objects(store);
+    let settings = store.object("configfile").and_then(|configfile| configfile.get("settings"));
+    let setting = |name: &str, key: &str| {
+        settings
+            .and_then(|settings| section_of(settings, name))
+            .and_then(|section| section.get(key))
+            .and_then(Value::as_f64)
+    };
+    // Klipper fills a missing `max_temp` of a sensor with 99999999.9: that is no limit.
+    let maximum = |name: &str| setting(name, "max_temp").filter(|maximum| *maximum < UNSET_MAX_TEMP);
     SENSOR_KINDS
         .iter()
         .flat_map(|kind| {
-            store.names().filter(move |name| name.split_once(' ').is_some_and(|(prefix, _)| prefix == *kind))
+            store
+                .names()
+                .filter(move |name| name.split_once(' ').is_some_and(|(prefix, _)| prefix == *kind))
+                .map(move |name| (*kind, name))
         })
-        .filter_map(|name| {
+        .filter_map(|(kind, name)| {
+            let datasheet = (kind != "temperature_sensor").then_some(DRIVER_RANGE);
             store.object(name).map(|value| TemperatureSensor {
+                min_temp: setting(name, "min_temp").or(datasheet.map(|range| range.0)),
+                max_temp: maximum(name).or(datasheet.map(|range| range.1)),
                 object: name.to_owned(),
                 label: label(name),
                 temperature: value.get("temperature").and_then(Value::as_f64),
+                measured: measured_range(value),
                 has_history: with_history.contains(&name),
             })
         })
         .collect()
 }
 
+/// Klipper starts `measured_min_temp` at 99999999 and `measured_max_temp` at 0 (`extras/temperature_sensor.py`), so
+/// until the first reading the minimum lies above the maximum.
+fn measured_range(value: &Value) -> Option<(f64, f64)> {
+    let lowest = value.get("measured_min_temp").and_then(Value::as_f64)?;
+    let highest = value.get("measured_max_temp").and_then(Value::as_f64)?;
+    (lowest <= highest).then_some((lowest, highest))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_settings_of_an_object_with_capitals_are_found_in_lower_case() {
+        let mut store = ObjectStore::default();
+        store.replace(&json!({
+            "temperature_sensor M8P": { "temperature": 40.0 },
+            "heater_generic Dryer": { "temperature": 30.0, "target": 0.0, "power": 0.0 },
+            "configfile": { "settings": {
+                "temperature_sensor m8p": { "min_temp": 10.0, "max_temp": 80.0 },
+                "heater_generic dryer": { "min_temp": 0.0, "max_temp": 70.0 },
+                "verify_heater dryer": { "hysteresis": 3.0 },
+            } }
+        }));
+        assert_eq!(read_sensors(&store)[0].max_temp, Some(80.0));
+        let dryer = &read_heaters(&store)[0];
+        assert_eq!((dryer.max_temp, dryer.hysteresis), (Some(70.0), 3.0));
+    }
+
+    #[test]
+    fn the_measured_range_counts_from_the_first_reading() {
+        let mut store = ObjectStore::default();
+        store.replace(&json!({
+            // Values of a Voron (2026-11-15); a fresh sensor still has Klipper's start values.
+            "temperature_sensor EBB": { "temperature": 87.41, "measured_min_temp": 60.51, "measured_max_temp": 87.66 },
+            "temperature_sensor fresh": { "temperature": 0.0, "measured_min_temp": 99999999.0, "measured_max_temp": 0.0 },
+        }));
+        let measured: Vec<_> = read_sensors(&store).iter().map(|sensor| sensor.measured).collect();
+        assert_eq!(measured, [Some((60.51, 87.66)), None]);
+    }
+
+    #[test]
+    fn a_sensor_with_klippers_placeholder_maximum_has_no_limit() {
+        let mut store = ObjectStore::default();
+        store.replace(&json!({
+            "temperature_sensor chamber": { "temperature": 30.0 },
+            "temperature_sensor mcu": { "temperature": 40.0 },
+            "configfile": { "settings": {
+                "temperature_sensor chamber": { "min_temp": 10.0, "max_temp": 99999999.9 },
+                "temperature_sensor mcu": { "min_temp": 10.0, "max_temp": 80.0 },
+            } }
+        }));
+        let sensors = read_sensors(&store);
+        let limits: Vec<_> = sensors.iter().map(|sensor| (sensor.object.as_str(), sensor.max_temp)).collect();
+        assert_eq!(limits, [("temperature_sensor chamber", None), ("temperature_sensor mcu", Some(80.0))]);
+    }
+
+    #[test]
+    fn stepper_drivers_take_the_operating_range_of_their_datasheet() {
+        let mut store = ObjectStore::default();
+        store.replace(&json!({
+            "tmc2240 stepper_x": { "temperature": 45.0 },
+            "tmc5262 stepper_y": { "temperature": null },
+        }));
+        let ranges: Vec<_> = read_sensors(&store).iter().map(|sensor| (sensor.min_temp, sensor.max_temp)).collect();
+        assert_eq!(ranges, [(Some(-40.0), Some(125.0)); 2]);
+    }
 
     #[test]
     fn every_extruder_heats_a_nozzle() {

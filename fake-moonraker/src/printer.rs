@@ -34,6 +34,18 @@ const MAX_BED_TARGET: f64 = 120.0;
 const MIN_HEATER_TEMPERATURE: f64 = 10.0;
 const MAX_CHAMBER_TARGET: f64 = 70.0;
 const HOST_TEMPERATURE: f64 = 45.0;
+const MAX_HOST_TEMPERATURE: f64 = 100.0;
+/// A warm MCU (85 of 0..105 °C): the temperature scale of the UI shows it yellow (assumption, not from a real printer).
+const MCU_TEMPERATURE: f64 = 85.0;
+const MCU_TEMPERATURE_SWING: f64 = 0.4;
+const MAX_MCU_TEMPERATURE: f64 = 105.0;
+/// How far below and above its current value a sensor has been since Klipper started (`measured_min_temp`,
+/// `measured_max_temp`); about the spread of a Voron's host and toolhead board (2026-11-15: CM4 36.0–44.3 °C at
+/// 40.4 °C, EBB 60.5–87.7 °C at 87.4 °C).
+const SENSOR_MEASURED_BELOW: f64 = 6.0;
+const SENSOR_MEASURED_ABOVE: f64 = 3.0;
+/// Klipper's default `min_temp` of a `temperature_sensor` (`extras/temperature_sensor.py`: `KELVIN_TO_CELSIUS`).
+const MIN_SENSOR_TEMPERATURE: f64 = -273.15;
 /// The host temperature wanders this much around `HOST_TEMPERATURE`, like a real CPU under changing load. Klipper
 /// only reports changed values; this way status updates keep coming as on a real printer, whose readings never stand
 /// still.
@@ -136,11 +148,13 @@ impl PrintState {
 struct Heater {
     temperature: f64,
     target: f64,
+    /// Set by `FAKE_OVERSHOOT`: the reading lies this far above the simulated temperature until the target changes.
+    overshoot: f64,
 }
 
 impl Heater {
     fn cold() -> Self {
-        Self { temperature: AMBIENT_TEMPERATURE, target: 0.0 }
+        Self { temperature: AMBIENT_TEMPERATURE, target: 0.0, overshoot: 0.0 }
     }
 
     fn advance(&mut self, seconds: f64) {
@@ -157,11 +171,17 @@ impl Heater {
             )));
         }
         self.target = target;
+        self.overshoot = 0.0;
         Ok(())
     }
 
+    /// The temperature Klipper would report.
+    fn reading(&self) -> f64 {
+        self.temperature + self.overshoot
+    }
+
     fn to_json(self) -> Value {
-        json!({ "temperature": round(self.temperature, 2), "target": self.target })
+        json!({ "temperature": round(self.reading(), 2), "target": self.target })
     }
 }
 
@@ -364,6 +384,10 @@ impl Printer {
         self.temperatures.advance(seconds, || samples.clone());
     }
 
+    fn mcu_temperature(&self) -> f64 {
+        MCU_TEMPERATURE + MCU_TEMPERATURE_SWING * (self.uptime / 11.0).sin()
+    }
+
     fn host_temperature(&self) -> f64 {
         HOST_TEMPERATURE + HOST_TEMPERATURE_SWING * (self.uptime / 7.0).sin()
     }
@@ -375,8 +399,8 @@ impl Printer {
 
     fn temperature_samples(&self) -> Vec<(String, Sample)> {
         let heater = |heater: &Heater| Sample {
-            temperature: heater.temperature,
-            heater: Some((heater.target, if heater.target > heater.temperature { 1.0 } else { 0.0 })),
+            temperature: heater.reading(),
+            heater: Some((heater.target, if heater.target > heater.reading() { 1.0 } else { 0.0 })),
         };
         let mut samples =
             vec![("extruder".to_owned(), heater(&self.extruder)), ("heater_bed".to_owned(), heater(&self.bed))];
@@ -390,6 +414,8 @@ impl Printer {
             "temperature_sensor raspberry_pi".to_owned(),
             Sample { temperature: self.host_temperature(), heater: None },
         ));
+        samples
+            .push(("temperature_sensor mcu".to_owned(), Sample { temperature: self.mcu_temperature(), heater: None }));
         samples
     }
 
@@ -455,6 +481,7 @@ impl Printer {
             Command::SetRetraction(change) => self.set_retraction(change)?,
             Command::Device(command) => self.apply_device(command)?,
             Command::SetHeaterTemperature { heater, target } => self.set_named_heater(&heater, target)?,
+            Command::FakeOvershoot { heater, delta } => self.named_heater_mut(&heater)?.0.overshoot = delta,
             Command::ExcludeObject { name } => self.exclude_object(&name),
             Command::SaveConfig => self.calibration.save(),
             Command::Calibration(command) => {
@@ -550,17 +577,23 @@ impl Printer {
         self.klippy.as_str()
     }
 
-    fn set_named_heater(&mut self, heater: &str, target: f64) -> Result<(), CommandError> {
+    /// A heater by its `HEATER=` name with its maximum target.
+    fn named_heater_mut(&mut self, heater: &str) -> Result<(&mut Heater, f64), CommandError> {
         if let Some(extruder) = self.toolchanger.as_mut().and_then(|toolchanger| toolchanger.extra_extruder_mut(heater))
         {
-            return extruder.set_target(target, MAX_EXTRUDER_TARGET);
+            return Ok((extruder, MAX_EXTRUDER_TARGET));
         }
         match (heater, self.chamber.as_mut()) {
-            ("extruder", _) => self.extruder.set_target(target, MAX_EXTRUDER_TARGET),
-            ("heater_bed", _) => self.bed.set_target(target, MAX_BED_TARGET),
-            ("chamber", Some(chamber)) => chamber.set_target(target, MAX_CHAMBER_TARGET),
+            ("extruder", _) => Ok((&mut self.extruder, MAX_EXTRUDER_TARGET)),
+            ("heater_bed", _) => Ok((&mut self.bed, MAX_BED_TARGET)),
+            ("chamber", Some(chamber)) => Ok((chamber, MAX_CHAMBER_TARGET)),
             _ => Err(CommandError::new(format!("Unknown heater '{heater}'"))),
         }
+    }
+
+    fn set_named_heater(&mut self, heater: &str, target: f64) -> Result<(), CommandError> {
+        let (heater, maximum) = self.named_heater_mut(heater)?;
+        heater.set_target(target, maximum)
     }
 
     fn set_velocity_limit(&mut self, limit: VelocityLimit) {
@@ -711,7 +744,7 @@ impl Printer {
             target[index] = position;
         }
         if let Some(distance) = movement.e {
-            if self.active_extruder_mut().temperature < MIN_EXTRUDE_TEMPERATURE {
+            if self.active_extruder_mut().reading() < MIN_EXTRUDE_TEMPERATURE {
                 return Err(CommandError::new("Extrude below minimum temp"));
             }
             target[EXTRUDER_INDEX] = if self.relative_positioning || self.relative_extrusion {

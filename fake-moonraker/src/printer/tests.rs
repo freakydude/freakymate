@@ -704,3 +704,44 @@ fn initialize_on_home_waits_for_the_homing() {
     assert_eq!(printer.status()["toolchanger"]["status"], "ready");
     assert_eq!(printer.status()["toolchanger"]["tool_number"], 0);
 }
+
+#[test]
+fn temperature_sensors_list_their_limits_and_the_mcu_runs_warm() {
+    let status = printer().status();
+    let settings = &status["configfile"]["settings"];
+
+    assert_eq!(settings["temperature_sensor mcu"]["min_temp"], -273.15);
+    assert_eq!(settings["temperature_sensor mcu"]["max_temp"], 105.0);
+    assert_eq!(settings["temperature_sensor raspberry_pi"]["max_temp"], 100.0);
+    assert_eq!(settings["extruder"]["min_extrude_temp"], 170.0);
+    assert_eq!(settings["heater_bed"]["max_temp"], 120.0);
+    let mcu = status["temperature_sensor mcu"]["temperature"].as_f64().unwrap();
+    assert!((84.0..86.0).contains(&mcu), "{mcu}");
+}
+
+#[test]
+fn fake_overshoot_lifts_the_reading_until_the_target_changes() {
+    let mut printer = printer();
+    run(&mut printer, "M104 S60").unwrap();
+    printer.advance(Duration::from_secs(60));
+
+    run(&mut printer, "FAKE_OVERSHOOT HEATER=extruder DELTA=20").unwrap();
+    assert_eq!(printer.status()["extruder"]["temperature"], 80.0);
+    assert_eq!(printer.status()["extruder"]["target"], 60.0);
+    printer.advance(Duration::from_secs(10));
+    assert_eq!(printer.status()["extruder"]["temperature"], 80.0);
+
+    run(&mut printer, "FAKE_OVERSHOOT HEATER=extruder DELTA=0").unwrap();
+    assert_eq!(printer.status()["extruder"]["temperature"], 60.0);
+
+    run(&mut printer, "FAKE_OVERSHOOT HEATER=extruder DELTA=20").unwrap();
+    run(&mut printer, "M104 S70").unwrap();
+    printer.advance(Duration::from_secs(60));
+    assert_eq!(printer.status()["extruder"]["temperature"], 70.0);
+}
+
+#[test]
+fn fake_overshoot_rejects_unknown_heaters() {
+    assert!(run(&mut printer(), "FAKE_OVERSHOOT HEATER=nozzle DELTA=5").is_err());
+    assert!(run(&mut printer(), "FAKE_OVERSHOOT DELTA=5").is_err());
+}

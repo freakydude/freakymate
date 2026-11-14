@@ -28,6 +28,7 @@ use freakymate_core::domain::heads::{self, ChangerNote};
 use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::domain::prepared_job::PreparedJob;
 use freakymate_core::domain::spools::{self, Lane};
+use freakymate_core::domain::temperature_limits::HeaterWatch;
 use freakymate_core::domain::{estimates, light, pause};
 use freakymate_core::sources::klipper::commands::{mesh_name_problem, MeshNameProblem};
 use freakymate_core::sources::klipper::{tuning, KlippyState, Leveling, BED_HEATER, NOZZLE_HEATER};
@@ -67,6 +68,8 @@ pub struct Presenter {
     cache: RefCell<Cache>,
     /// Last logged source of each derived value, so that a change is logged once.
     origins: RefCell<HashMap<&'static str, &'static str>>,
+    /// Which heaters have reached their target, for the colour of their temperature.
+    heater_watch: RefCell<HeaterWatch>,
     heaters: Rc<VecModel<HeaterItem>>,
     heads: Rc<VecModel<HeadItem>>,
     sensors: Rc<VecModel<SensorItem>>,
@@ -102,6 +105,7 @@ impl Presenter {
             service,
             cache: RefCell::default(),
             origins: RefCell::default(),
+            heater_watch: RefCell::default(),
             heaters: Rc::default(),
             heads: Rc::default(),
             sensors: Rc::default(),
@@ -337,12 +341,13 @@ impl Presenter {
         printer.set_has_bed(bed.is_some());
         printer.set_bed_temperature(bed.map_or(0.0, |heater| heater.temperature) as f32);
         printer.set_bed_target(bed.map_or(0.0, |heater| heater.target) as f32);
+        let mut watch = self.heater_watch.borrow_mut();
         replace_rows(
             &self.heaters,
             heaters_by_head(&status.heaters, &head_nozzles)
                 .into_iter()
                 .map(|(heater, name)| {
-                    let mut item = heater_item(heater, lanes);
+                    let mut item = heater_item(heater, lanes, watch.limits(heater));
                     if let Some(name) = name {
                         item.label = name.into();
                     }

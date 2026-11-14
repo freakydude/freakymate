@@ -83,6 +83,12 @@ pub enum Command {
         heater: String,
         target: f64,
     },
+    /// `FAKE_OVERSHOOT HEATER=<name> DELTA=<°C>`: the reading lies DELTA above the simulated temperature until the
+    /// target changes or DELTA=0 is sent (not a Klipper command).
+    FakeOvershoot {
+        heater: String,
+        delta: f64,
+    },
     /// Empty name: Klipper only lists the excluded objects.
     ExcludeObject {
         name: String,
