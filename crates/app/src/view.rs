@@ -657,12 +657,12 @@ mod tests {
 
     fn tool_match(tool: usize, gate: Option<usize>, verdict: Verdict) -> ToolMatch {
         let request = filament_match::ToolRequest { tool, ..filament_match::ToolRequest::default() };
-        ToolMatch { request, gate, needed: None, reserve: None, verdict }
+        ToolMatch { request, gate, needed: None, reserve: None, verdict, color_elsewhere: false }
     }
 
     #[test]
     fn tools_that_do_not_fit_win_over_those_without_facts() {
-        let differs = Verdict::Differs(vec![Difference::Color]);
+        let differs = Verdict::Differs(vec![Difference::Weight { needed: 20.0, left: 5.0, reserve: None }]);
 
         assert_eq!(combined_verdict([&Verdict::Fits, &Verdict::Fits]), "fits");
         assert_eq!(combined_verdict([&Verdict::Fits, &Verdict::Unknown]), "");
@@ -692,7 +692,7 @@ mod tests {
         found.request.material = Some("PLA".into());
 
         assert_eq!(material_line(&found), "PLA → ASA");
-        found.verdict = Verdict::Differs(vec![Difference::Color]);
+        found.verdict = Verdict::Differs(vec![Difference::Weight { needed: 20.0, left: 5.0, reserve: None }]);
         assert_eq!(material_line(&found), "PLA");
         assert_eq!(material_difference(&found), None);
     }

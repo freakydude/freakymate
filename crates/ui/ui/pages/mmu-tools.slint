@@ -47,7 +47,8 @@ export component FilamentHalf inherits Rectangle {
 }
 
 // A tool: left what the file asks of it, right the gate it takes its filament from and what that gate holds. Yellow
-// marks only what differs (material, colour as a frame, weight); tools the file does not use fade. Without a file to
+// marks only what differs (material, weight) and, as a frame, a colour another tool prints with (swapped gates); tools
+// the file does not use fade. Without a file to
 // compare only the gate side shows. The file side opens the tool's dialog, the gate side the choice of gate.
 component ToolRow inherits Rectangle {
     in property <ToolMatchItem> mapping;
@@ -112,7 +113,7 @@ component ToolRow inherits Rectangle {
             label: root.has-gate ? @tr("Gate {}", root.mapping.gate) : @tr("No gate");
             colors: root.has-gate && !root.mapping.gate-empty ? FilamentColors.generic(root.mapping.loaded-colors) : root.mapping.loaded-colors;
             empty: !root.has-gate || root.mapping.gate-empty;
-            color-warn: root.mapping.used && root.mapping.color-differs;
+            color-warn: root.mapping.used && root.mapping.color-elsewhere;
             enabled: root.has-gate && (root.mapping.used || root.can-choose);
             clicked => { root.clicked-gate(); }
             if !root.has-gate: FilamentText {
@@ -377,13 +378,13 @@ component WantedLine inherits FilamentLine {
     }
 }
 
-// What the gate of a tool holds; yellow marks a colour or weight that differs from the file.
+// What the gate of a tool holds; yellow marks a weight that differs from the file and a colour another tool prints with.
 component LoadedLine inherits FilamentLine {
     in property <ToolMatchItem> mapping;
 
     colors: root.mapping.gate-empty ? root.mapping.loaded-colors : FilamentColors.generic(root.mapping.loaded-colors);
     empty: root.mapping.gate-empty;
-    color-warn: root.mapping.used && root.mapping.color-differs;
+    color-warn: root.mapping.used && root.mapping.color-elsewhere;
     label: @tr("Gate {}", root.mapping.gate);
     if root.mapping.gate-empty: FilamentText {
         horizontal-stretch: 1;

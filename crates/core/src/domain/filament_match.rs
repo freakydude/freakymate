@@ -8,7 +8,10 @@
 //! beyond 0 needs a command `T<n>` in Klipper's command list (AFC's, a tool changer's or a macro); a file that calls a missing
 //! one stops at an unknown command.
 //!
-//! Slicers know one colour per tool (with alpha), so a multi-colour spool is compared by its first colour. With
+//! The colour is no part of the verdict: a slicer's colour is often only the one of its filament profile, not the
+//! spool that will print. It only marks tools of a multi-colour print whose colour another tool of the file prints
+//! with ([`ToolMatch::color_elsewhere`], swapped gates) and helps to pick a gate there ([`fitting_gates`]). Slicers know
+//! one colour per tool (with alpha), so a multi-colour spool is compared by its first colour. With
 //! EndlessSpool on, the other gates of a gate's group add their weight, except those a tool of the file uses; gates of
 //! the file in one group share them.
 
@@ -45,7 +48,6 @@ pub enum Difference {
         expected: String,
         loaded: String,
     },
-    Color,
     /// Planned grams against what the spool has left; tools that share the spool add up. `reserve` is what EndlessSpool
     /// could continue with, not part of `left`.
     Weight {
@@ -105,6 +107,9 @@ pub struct ToolMatch {
     /// The grams EndlessSpool can continue with for this tool's gate, shared with the other tools of its group.
     pub reserve: Option<f64>,
     pub verdict: Verdict,
+    /// The tool's colour is far from the filament it prints with, but another tool of the file prints with one close
+    /// to it: the gates look swapped. A hint beside the verdict, never part of it.
+    pub color_elsewhere: bool,
 }
 
 /// The tools of the file that print from `gate`, in tool order.
@@ -174,7 +179,7 @@ fn match_requests(
     let needs = needs_per_gate(&requests, gate_of);
     let busy: Vec<usize> = requests.iter().filter_map(|request| gate_of(request.tool)).collect();
     let reserves = shared_reserves(&busy, &needs, status, lanes);
-    requests
+    let mut matches: Vec<ToolMatch> = requests
         .into_iter()
         .map(|request| {
             let gate = gate_of(request.tool);
@@ -182,7 +187,30 @@ fn match_requests(
             let reserve = gate.and_then(|gate| reserves.get(&gate).copied());
             match_tool(request, gate, needed, reserve, status, lanes, klipper)
         })
-        .collect()
+        .collect();
+    mark_colors_elsewhere(&mut matches, status, lanes);
+    matches
+}
+
+/// Marks the tools whose colour another tool of the file prints with ([`ToolMatch::color_elsewhere`]). Only a tool
+/// whose own filament is far from its colour is marked, so a print whose colours are all only roughly what the slicer
+/// shows stays quiet; a print with one tool never is.
+fn mark_colors_elsewhere(matches: &mut [ToolMatch], status: &PrinterStatus, lanes: &[Lane]) {
+    let loaded: Vec<Option<Rgba>> = matches
+        .iter()
+        .map(|found| match found.verdict {
+            Verdict::NoGate | Verdict::GateEmpty => None,
+            _ => tool_supply(found, status, lanes).and_then(|supply| loaded_color(&supply)),
+        })
+        .collect();
+    for (index, found) in matches.iter_mut().enumerate() {
+        let (Some(wanted), Some(own)) = (wanted_color(&found.request), loaded[index]) else { continue };
+        found.color_elsewhere = !close_colors(wanted, own)
+            && loaded
+                .iter()
+                .enumerate()
+                .any(|(other, color)| other != index && color.is_some_and(|color| close_colors(wanted, color)));
+    }
 }
 
 /// The gates the tools of the file print from (with Happy Hare); see [`endless_spool_reserve`].
@@ -256,13 +284,16 @@ fn needs_per_gate(requests: &[ToolRequest], gate_of: impl Fn(usize) -> Option<us
 }
 
 /// Per gate index of Happy Hare: whether the gate is a good choice for `tool` of the file (`matches`). Each gate is
-/// tried as if the tool were mapped to it, by the same rule as the verdict (shared spool, EndlessSpool reserve), so the
-/// own gate fits exactly when the tool does. Stricter than the verdict: the gate must know the material and colour the
-/// file asks for. An empty gate never fits. Empty without Happy Hare or when the file does not use the tool.
+/// tried as if the tool were mapped to it, by the same rule as the verdict (shared spool, EndlessSpool reserve).
+/// Stricter than the verdict: the gate must know the material the file asks for, and in a print with several tools
+/// hold a colour close to the tool's, since there the colour tells the gates apart. A print with one tool leaves the
+/// colour out, as the verdict does, so there the own gate fits exactly when the tool does. An empty gate never fits.
+/// Empty without Happy Hare or when the file does not use the tool.
 pub fn fitting_gates(matches: &[ToolMatch], tool: usize, status: &PrinterStatus, lanes: &[Lane]) -> Vec<bool> {
     let Some(mmu) = status.happy_hare() else { return Vec::new() };
     let Some(position) = matches.iter().position(|found| found.request.tool == tool) else { return Vec::new() };
     let request = &matches[position].request;
+    let wanted = wanted_color(request).filter(|_| matches.len() > 1);
     let mut fits = vec![false; mmu.gates.iter().map(|gate| gate.index + 1).max().unwrap_or(0)];
     if tool >= mmu.tool_to_gate.len() {
         return fits;
@@ -270,8 +301,9 @@ pub fn fitting_gates(matches: &[ToolMatch], tool: usize, status: &PrinterStatus,
     for gate in mmu.gates.iter().filter(|gate| gate.availability != GateAvailability::Empty) {
         let supply = gate_supply(gate, lanes);
         let knows_material = request.material.is_none() || supply.material.is_some();
-        let knows_color = !request.color.is_some_and(|color| !is_clear(color)) || !supply.colors.is_empty();
-        if knows_material && knows_color {
+        let fits_color =
+            wanted.is_none_or(|wanted| loaded_color(&supply).is_some_and(|loaded| close_colors(wanted, loaded)));
+        if knows_material && fits_color {
             let mut tool_to_gate = mmu.tool_to_gate.clone();
             tool_to_gate[tool] = gate.index;
             let requests = matches.iter().map(|found| found.request.clone()).collect();
@@ -301,11 +333,18 @@ fn match_tool(
         request.tool > 0 && klipper.has_tool_command(request.tool) == Some(false)
     };
     if missing {
-        return ToolMatch { request, gate: None, needed, reserve: None, verdict: Verdict::NoGate };
+        return ToolMatch {
+            request,
+            gate: None,
+            needed,
+            reserve: None,
+            verdict: Verdict::NoGate,
+            color_elsewhere: false,
+        };
     }
     let supply = supply_of(request.tool, gate, status, lanes).unwrap_or_default();
     let verdict = if supply.empty { Verdict::GateEmpty } else { compare(&request, needed, reserve, &supply) };
-    ToolMatch { request, gate, needed, reserve, verdict }
+    ToolMatch { request, gate, needed, reserve, verdict, color_elsewhere: false }
 }
 
 /// What a tool of the file prints with, as far as it is known: with Happy Hare's gates what its gate holds, without
@@ -386,16 +425,6 @@ fn compare(request: &ToolRequest, needed: Option<f64>, reserve: Option<f64>, sup
             differences.push(Difference::Material { expected: expected.clone(), loaded: loaded.clone() });
         }
     }
-    // Slicers know one colour per tool, so a multi-colour spool is compared by its first colour; a clear one on either
-    // side is nothing to compare.
-    let wanted = request.color.filter(|color| !is_clear(*color));
-    let loaded = supply.colors.first().copied().filter(|color| !is_clear(*color));
-    if let (Some(wanted), Some(loaded)) = (wanted, loaded) {
-        compared = true;
-        if color_distance(rgb(wanted), rgb(loaded)) > COLOR_DISTANCE {
-            differences.push(Difference::Color);
-        }
-    }
     if let (Some(needed), Some(left)) = (needed, supply.left) {
         compared = true;
         if needed > left + reserve.unwrap_or(0.0) {
@@ -413,6 +442,21 @@ fn compare(request: &ToolRequest, needed: Option<f64>, reserve: Option<f64>, sup
 fn same_material(left: &str, right: &str) -> bool {
     let normalized = |text: &str| text.trim().trim_end_matches('+').to_ascii_uppercase();
     normalized(left) == normalized(right)
+}
+
+/// The colour the file asks of a tool; a clear one is nothing to compare.
+fn wanted_color(request: &ToolRequest) -> Option<Rgba> {
+    request.color.filter(|color| !is_clear(*color))
+}
+
+/// The colour a tool prints with: slicers know one colour per tool, so a multi-colour spool counts by its first; a
+/// clear one is nothing to compare.
+fn loaded_color(supply: &Supply) -> Option<Rgba> {
+    supply.colors.first().copied().filter(|color| !is_clear(*color))
+}
+
+fn close_colors(left: Rgba, right: Rgba) -> bool {
+    color_distance(rgb(left), rgb(right)) <= COLOR_DISTANCE
 }
 
 fn color_distance(left: [u8; 3], right: [u8; 3]) -> f64 {
@@ -492,6 +536,14 @@ mod tests {
             .collect()
     }
 
+    /// Per tool of the file whether its colour is marked as printed by another tool.
+    fn colors_elsewhere(metadata: &FileMetadata, status: &PrinterStatus, spools: &SpoolmanState) -> Vec<bool> {
+        match_tools(metadata, status, &lanes(status, spools), &Setup::default())
+            .into_iter()
+            .map(|found| found.color_elsewhere)
+            .collect()
+    }
+
     fn file(weights: &[f64], types: &[&str], colors: &[&str]) -> FileMetadata {
         FileMetadata {
             filament_weights: weights.to_vec(),
@@ -541,22 +593,45 @@ mod tests {
     }
 
     #[test]
-    fn swapped_black_and_white_gates_differ_in_colour() {
+    fn swapped_black_and_white_gates_mark_their_colour_elsewhere_but_still_fit() {
         let metadata = fixture("white to black");
         let gates = |colors: [[u8; 3]; 4]| {
             happy_hare(colors.iter().map(|color| gate("PLA", Some(*color))).collect(), &[0, 1, 2, 3])
         };
         let grey = [[0x63; 3], [0xB4; 3]];
+        let none = SpoolmanState::default();
 
         let fitting = gates([grey[0], grey[1], [0, 0, 0], [0xFF; 3]]);
-        assert!(verdicts(&metadata, &fitting, &SpoolmanState::default())
-            .iter()
-            .all(|(_, verdict)| *verdict == Verdict::Fits));
+        assert!(verdicts(&metadata, &fitting, &none).iter().all(|(_, verdict)| *verdict == Verdict::Fits));
+        assert_eq!(colors_elsewhere(&metadata, &fitting, &none), [false; 4]);
 
         let swapped = gates([grey[0], grey[1], [0xFF; 3], [0, 0, 0]]);
-        let found = verdicts(&metadata, &swapped, &SpoolmanState::default());
-        assert_eq!(found[2], (2, Verdict::Differs(vec![Difference::Color])));
-        assert_eq!(found[3], (3, Verdict::Differs(vec![Difference::Color])));
+        assert!(verdicts(&metadata, &swapped, &none).iter().all(|(_, verdict)| *verdict == Verdict::Fits));
+        assert_eq!(colors_elsewhere(&metadata, &swapped, &none), [false, false, true, true]);
+    }
+
+    #[test]
+    fn colours_that_are_only_roughly_right_stay_quiet() {
+        // The slicer's profile colours (orange, grey) while the gates hold blue and green: no gate has a tool's colour.
+        let status = happy_hare(vec![gate("PLA", Some([0, 0, 0xFF])), gate("PLA", Some([0, 0x80, 0]))], &[0, 1]);
+        let metadata = FileMetadata {
+            referenced_tools: vec![0, 1],
+            ..file(&[10.0, 10.0], &["PLA", "PLA"], &["#F76707", "#9E9E9E"])
+        };
+        let none = SpoolmanState::default();
+
+        assert_eq!(verdicts(&metadata, &status, &none), [(0, Verdict::Fits), (1, Verdict::Fits)]);
+        assert_eq!(colors_elsewhere(&metadata, &status, &none), [false, false]);
+    }
+
+    #[test]
+    fn a_single_colour_print_fits_whatever_colour_is_loaded() {
+        let status = happy_hare(vec![gate("PLA", Some([0, 0, 0xFF]))], &[0]);
+        let metadata = file(&[10.0], &["PLA"], &["#F76707"]);
+        let none = SpoolmanState::default();
+
+        assert_eq!(verdicts(&metadata, &status, &none), [(0, Verdict::Fits)]);
+        assert_eq!(colors_elsewhere(&metadata, &status, &none), [false]);
     }
 
     #[test]
@@ -603,20 +678,16 @@ mod tests {
 
         let found = verdicts(&metadata, &status, &SpoolmanState::default());
 
-        // Tool 0 prints from gate 1 (blue PLA), tool 1 from gate 0 (orange PLA); no weights without Spoolman.
+        // Tool 0 prints from gate 1 (blue PLA), tool 1 from gate 0 (orange PLA); no weights without Spoolman. The
+        // colours are swapped, which only marks them.
         assert_eq!(
             found,
             [
-                (
-                    0,
-                    Verdict::Differs(vec![
-                        Difference::Material { expected: "PETG".into(), loaded: "PLA".into() },
-                        Difference::Color
-                    ])
-                ),
-                (1, Verdict::Differs(vec![Difference::Color])),
+                (0, Verdict::Differs(vec![Difference::Material { expected: "PETG".into(), loaded: "PLA".into() }])),
+                (1, Verdict::Fits),
             ]
         );
+        assert_eq!(colors_elsewhere(&metadata, &status, &SpoolmanState::default()), [true, true]);
     }
 
     #[test]
@@ -759,17 +830,21 @@ mod tests {
     }
 
     #[test]
-    fn a_multi_colour_spool_is_compared_by_its_first_colour() {
+    fn a_multi_colour_spool_counts_by_its_first_colour() {
+        // Gate 0 holds a red and teal spool, gate 1 teal.
         let mut two_colours = test_spool(5, "PLA", 800.0, [0xFF, 0x00, 0x04]);
         two_colours.colors.push([0x26, 0xA6, 0x9A, 0xFF]);
-        let spools = spoolman(&[two_colours], Some(5));
-        let status = PrinterStatus::default();
+        let mut with_spool = gate("PLA", None);
+        with_spool.spool_id = Some(5);
+        let status = happy_hare(vec![with_spool, gate("PLA", Some([0x26, 0xA6, 0x9A]))], &[0, 1]);
+        let spools = spoolman(&[two_colours], None);
+        let asking = |colors: &[&str]| FileMetadata {
+            referenced_tools: vec![0, 1],
+            ..file(&[10.0, 10.0], &["PLA", "PLA"], colors)
+        };
 
-        assert_eq!(verdicts(&file(&[10.0], &["PLA"], &["#FF1010"]), &status, &spools), [(0, Verdict::Fits)]);
-        assert_eq!(
-            verdicts(&file(&[10.0], &["PLA"], &["#26A69A"]), &status, &spools),
-            [(0, Verdict::Differs(vec![Difference::Color]))]
-        );
+        assert_eq!(colors_elsewhere(&asking(&["#FF1010", "#26A69A"]), &status, &spools), [false, false]);
+        assert_eq!(colors_elsewhere(&asking(&["#26A69A", "#FF1010"]), &status, &spools), [true, true]);
     }
 
     /// Happy Hare with EndlessSpool on: gate `n` holds spool `n + 1` and belongs to `groups[n]`.
@@ -906,14 +981,22 @@ mod tests {
             &[0, 1, 2, 3],
         );
         let lanes = lanes(&status, &SpoolmanState::default());
-        let matches = match_tools(&file(&[5.0], &["PLA"], &["#E8590C"]), &status, &lanes, &Setup::default());
+        let two_tools = FileMetadata {
+            referenced_tools: vec![0, 1],
+            ..file(&[5.0, 5.0], &["PLA", "PLA"], &["#E8590C", "#000000"])
+        };
+        let matches = match_tools(&two_tools, &status, &lanes, &Setup::default());
 
         let fits = fitting_gates(&matches, 0, &status, &lanes);
 
-        // Gate 1 has the wrong material, gate 2 no colour to compare, gate 3 is empty.
+        // Gate 1 has the wrong material, gate 2 no colour to tell it from the other gates, gate 3 is empty.
         assert_eq!(fits, [true, false, false, false]);
         assert!(fitting_gates(&matches, 0, &PrinterStatus::default(), &[]).is_empty());
-        assert!(fitting_gates(&matches, 1, &status, &lanes).is_empty());
+        assert!(fitting_gates(&matches, 2, &status, &lanes).is_empty());
+
+        // With one tool the colour does not count, as in its verdict.
+        let one_tool = match_tools(&file(&[5.0], &["PLA"], &["#E8590C"]), &status, &lanes, &Setup::default());
+        assert_eq!(fitting_gates(&one_tool, 0, &status, &lanes), [true, false, true, false]);
     }
 
     #[test]
@@ -963,7 +1046,7 @@ mod tests {
 
     #[test]
     fn verdicts_that_do_not_fit_win_over_those_without_facts() {
-        let differs = Verdict::Differs(vec![Difference::Color]);
+        let differs = Verdict::Differs(vec![Difference::Material { expected: "PLA".into(), loaded: "ABS".into() }]);
 
         assert_eq!(Verdict::combine([&Verdict::Fits, &Verdict::Fits]), Verdict::Fits);
         assert_eq!(Verdict::combine([&Verdict::Fits, &Verdict::Unknown]), Verdict::Unknown);

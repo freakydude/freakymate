@@ -107,7 +107,7 @@ export component FilamentCompare inherits VerticalLayout {
                 height: root.swatch-height;
                 colors: root.mapping.gate-empty ? root.mapping.loaded-colors : FilamentColors.generic(root.mapping.loaded-colors);
                 empty: root.mapping.gate-empty || root.no-gate;
-                warn: root.mapping.used && root.mapping.color-differs;
+                warn: root.mapping.used && root.mapping.color-elsewhere;
             }
         }
     }
@@ -202,7 +202,7 @@ export component FilamentCompareRow inherits Rectangle {
                 width: root.swatch-width;
                 colors: root.mapping.gate-empty ? root.mapping.loaded-colors : FilamentColors.generic(root.mapping.loaded-colors);
                 empty: root.mapping.gate-empty;
-                warn: root.mapping.used && root.mapping.color-differs;
+                warn: root.mapping.used && root.mapping.color-elsewhere;
             }
             VerticalLayout {
                 horizontal-stretch: 1;
