@@ -65,6 +65,10 @@ pub struct FlowGuard {
     /// The tension (0 to 1 of the buffer's bias) from which tangle prevention raises the gear current; `None` while
     /// it is off or cannot work.
     pub tangle_threshold: Option<f64>,
+    /// The bias (0 to 1) from which the proportional sensor counts as at its end: FlowGuard's EKF takes it as its
+    /// extreme threshold and the virtual switches trigger there (`analog_sensor_threshold` of the buffer's section).
+    /// `None` without a proportional sensor or while the configuration does not tell.
+    pub extreme_threshold: Option<f64>,
     pub trigger: String,
     pub reason: String,
     /// How close FlowGuard is to a trigger: 0 at rest, +1 a clog (the buffer stays compressed), -1 a tangle (it stays
@@ -173,8 +177,22 @@ pub(super) fn read_flowguard(mmu: &Value, sensors: &[MmuSensor]) -> Option<FlowG
         active: flag(flowguard, "active"),
         boosting,
         tangle_threshold,
+        extreme_threshold: None,
         trigger: text(flowguard, "trigger").to_owned(),
         reason: text(flowguard, "reason").to_owned(),
         level: flowguard.get("level").and_then(Value::as_f64).unwrap_or_default().clamp(-1.0, 1.0),
     })
+}
+
+/// `analog_sensor_threshold` of the section `[mmu_buffer <buffer>]` (lowercased like every section in
+/// `configfile.settings`); Happy Hare allows 0.5 to 1.0 (`unit/mmu_buffer.py` L200). Only a proportional sensor has it.
+pub(super) fn read_extreme_threshold(settings: &Value, buffer: &str, sensors: &[MmuSensor]) -> Option<f64> {
+    if !has_proportional_sensor(sensors) {
+        return None;
+    }
+    settings
+        .get(format!("mmu_buffer {}", buffer.to_lowercase()))?
+        .get("analog_sensor_threshold")?
+        .as_f64()
+        .filter(|threshold| (0.5..=1.0).contains(threshold))
 }

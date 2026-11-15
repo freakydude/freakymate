@@ -207,8 +207,8 @@ export component BypassTile inherits SlotTile {
     }
 }
 
-// The scale of the buffer: tension at the left, compression at the right. The marker is the bias, the stroke in the
-// middle neutral, the stroke at the left the tension from which tangle prevention raises the gear current, and the
+// The scale of the buffer: tension at the left, compression at the right. The marker is the bias, the lighter ends
+// the zones from where a proportional sensor counts as extreme, the stroke in the middle neutral, the stroke at the left the tension from which tangle prevention raises the gear current, and the
 // strip growing from an end FlowGuard's level: how close it is to a tangle (left) or a clog (right) trigger. A side
 // that no sensor measures (a one-sided switch buffer) is an outline only; FlowGuard still infers it.
 component BufferScale inherits Rectangle {
@@ -216,6 +216,7 @@ component BufferScale inherits Rectangle {
     in property <string> sides;
     in property <float> level;
     in property <float> tangle-threshold;
+    in property <float> extreme-threshold;
     in property <color> marker-color;
     in property <color> level-color;
     property <length> marker-width: 8px;
@@ -241,6 +242,19 @@ component BufferScale inherits Rectangle {
         width: parent.width / 2;
         border-radius: Theme.radius-small;
         background: Theme.border;
+    }
+    // The ends from where the sensor counts as extreme (FlowGuard's trigger zones), lighter than the sides.
+    if root.extreme-threshold >= 0 && root.sides != "compression": Rectangle {
+        x: 0;
+        width: root.place(-root.extreme-threshold);
+        border-radius: Theme.radius-small;
+        background: Theme.flyout-border;
+    }
+    if root.extreme-threshold >= 0 && root.sides != "tension": Rectangle {
+        x: root.place(root.extreme-threshold);
+        width: parent.width - self.x;
+        border-radius: Theme.radius-small;
+        background: Theme.flyout-border;
     }
     Rectangle {
         x: (parent.width - self.width) / 2;
@@ -348,6 +362,7 @@ export component FlowGuardInstrument inherits VerticalLayout {
             sides: Printer.mmu-buffer-sides;
             level: root.level;
             tangle-threshold: Printer.mmu-tangle-threshold;
+            extreme-threshold: Printer.mmu-extreme-threshold;
             level-color: root.guard == "triggered" ? Theme.danger : Theme.warning;
             // Leaning to a side is the controller at work, not a deviation.
             marker-color: root.tone != Theme.muted ? root.tone : root.buffer == "neutral" ? Theme.success : root.buffer == "tension" || root.buffer == "compressed" ? Theme.foreground : Theme.muted;

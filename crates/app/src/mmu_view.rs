@@ -471,6 +471,7 @@ fn show_state(printer: &Printer, mmu: &MmuStatus) {
     printer.set_mmu_flowguard_detail(detail.join(": ").into());
     printer.set_mmu_flowguard_level(flowguard.level as f32);
     printer.set_mmu_tangle_threshold(flowguard.tangle_threshold.map_or(-1.0, |threshold| threshold as f32));
+    printer.set_mmu_extreme_threshold(flowguard.extreme_threshold.map_or(-1.0, |threshold| threshold as f32));
     printer.set_mmu_flow_rate(mmu.flow_rate.map_or(-1.0, |rate| rate.value as f32));
     printer.set_mmu_flow_measured(mmu.flow_rate.is_some_and(|rate| rate.is_measured()));
     printer.set_mmu_encoder_headroom(mmu.encoder_headroom.map(view::encoder_headroom).unwrap_or_default().into());

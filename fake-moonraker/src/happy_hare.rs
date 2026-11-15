@@ -408,9 +408,18 @@ impl HappyHare {
             sections.push((format!("mmu_toolhead {toolhead}"), json!({})));
         }
         for buffer in self.buffer_names() {
-            sections.push((format!("mmu_buffer {buffer}"), json!({})));
+            sections.push((format!("mmu_buffer {buffer}"), self.buffer_options()));
         }
         sections
+    }
+
+    /// Klipper lists the defaults too; `analog_sensor_threshold` exists only for a proportional sensor
+    /// (`unit/mmu_buffer.py` L200, default 0.9).
+    fn buffer_options(&self) -> Value {
+        match self.buffer {
+            BufferKind::Proportional => json!({ "analog_sensor_threshold": 0.9 }),
+            _ => json!({}),
+        }
     }
 
     pub fn config_sections(&self) -> Vec<(String, Value)> {
@@ -422,6 +431,8 @@ impl HappyHare {
             ("mmu".to_owned(), json!({ "enabled": true })),
             ("mmu_extruder extruder".to_owned(), json!({})),
             (format!("mmu_stepper {UNIT_NAME}_gear"), json!({})),
+            // The section name is the user's choice (made up here); the default is listed as Klipper does.
+            ("mmu_buffer buffer".to_owned(), self.buffer_options()),
         ]
     }
 
