@@ -3,7 +3,8 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { MmuGateItem, Printer } from "../state.slint";
+import { MmuGateItem, Printer, Severity } from "../state.slint";
+import { StateIcons } from "../state-icons.slint";
 import { IconLabel } from "controls.slint";
 import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
 
@@ -31,7 +32,7 @@ export component GateAvailabilityLabel inherits IconLabel {
 
     icon: root.has-filament ? Icons.mmu-gate-available : root.availability == "empty" ? Icons.mmu-gate-empty : Icons.mmu-gate-unknown;
     text: MmuTexts.availability(root.availability);
-    color: root.availability == "empty" ? Theme.warning : Theme.muted;
+    color: StateIcons.severity-color(root.availability == "empty" ? Severity.attention : Severity.calm);
     font-size: Theme.font-small;
 }
 
@@ -71,7 +72,7 @@ export component VerdictIcon inherits Image {
     height: Theme.icon-compact;
     visible: root.verdict != "";
     source: root.verdict == "fits" ? Icons.ui-check : Icons.ui-warning;
-    colorize: root.verdict == "fits" ? Theme.success : Theme.warning;
+    colorize: StateIcons.severity-color(root.verdict == "fits" ? Severity.fine : Severity.attention);
 }
 
 // A gate or a lane of AFC as a tile: the colour of the filament as the left edge over the full height (`FilamentSwatch`), beside it the
@@ -156,7 +157,7 @@ export component GateTile inherits SlotTile {
                 visible: root.shows-spool;
                 height: root.shows-spool ? self.preferred-height : 0px;
                 text: root.gate.spool-text != "" ? root.gate.spool-text : root.gate.spool-id >= 0 ? @tr("Spool #{}", root.gate.spool-id) : @tr("+ spool");
-                color: root.gate.spool-low ? Theme.warning : root.gate.spool-text == "" && root.gate.spool-id < 0 ? Theme.accent : Theme.muted;
+                color: root.gate.spool-low ? StateIcons.severity-color(Severity.attention) : root.gate.spool-text == "" && root.gate.spool-id < 0 ? Theme.accent : Theme.muted;
                 font-size: Theme.font-small;
                 overflow: elide;
             }
@@ -207,15 +208,18 @@ export component BypassTile inherits SlotTile {
     }
 }
 
-// The scale of the buffer: tension at the left, compression at the right. The marker is the bias, the stroke in the
-// middle neutral, the stroke at the left the tension from which tangle prevention raises the gear current, and the
+// The scale of the buffer: tension at the left, compression at the right. The marker is the bias, the lighter ends
+// the zones from where a proportional sensor counts as extreme, the stroke in the middle neutral, the stroke at the left the tension from which tangle prevention raises the gear current, and the
 // strip growing from an end FlowGuard's level: how close it is to a tangle (left) or a clog (right) trigger. A side
 // that no sensor measures (a one-sided switch buffer) is an outline only; FlowGuard still infers it.
 component BufferScale inherits Rectangle {
     in property <float> bias;
     in property <string> sides;
     in property <float> level;
+    in property <bool> has-tangle-threshold;
     in property <float> tangle-threshold;
+    in property <bool> has-extreme-threshold;
+    in property <float> extreme-threshold;
     in property <color> marker-color;
     in property <color> level-color;
     property <length> marker-width: 8px;
@@ -242,12 +246,25 @@ component BufferScale inherits Rectangle {
         border-radius: Theme.radius-small;
         background: Theme.border;
     }
+    // The ends from where the sensor counts as extreme (FlowGuard's trigger zones), lighter than the sides.
+    if root.has-extreme-threshold && root.sides != "compression": Rectangle {
+        x: 0;
+        width: root.place(-root.extreme-threshold);
+        border-radius: Theme.radius-small;
+        background: Theme.flyout-border;
+    }
+    if root.has-extreme-threshold && root.sides != "tension": Rectangle {
+        x: root.place(root.extreme-threshold);
+        width: parent.width - self.x;
+        border-radius: Theme.radius-small;
+        background: Theme.flyout-border;
+    }
     Rectangle {
         x: (parent.width - self.width) / 2;
         width: 1px;
         background: Theme.muted;
     }
-    if root.tangle-threshold >= 0: Rectangle {
+    if root.has-tangle-threshold: Rectangle {
         x: root.place(-root.tangle-threshold) - self.width / 2;
         width: 2px;
         background: Theme.muted;
@@ -280,23 +297,27 @@ export component FlowGuardInstrument inherits VerticalLayout {
     property <string> buffer: Printer.mmu-buffer-state;
     property <string> guard: Printer.mmu-flowguard-state;
     property <bool> guarded: root.guard != "off";
-    property <float> level: root.guarded ? Printer.mmu-flowguard-level : 0;
-    // FlowGuard counts towards a trigger; small values come and go while the controller works.
-    property <bool> rising: root.guard != "triggered" && abs(root.level) >= 0.1;
-    property <color> tone: root.guard == "triggered" ? Theme.danger : root.rising || root.guard == "boosting" ? Theme.warning : Theme.muted;
-    property <bool> shows-flow: Printer.mmu-flow-rate >= 0 && (Printer.mmu-flow-measured || !root.measured-flow-only);
+    // What the line says, how big the level is and how much each part stands out: decided in the core.
+    property <string> kind: Printer.mmu-flowguard-statement;
+    property <float> level: Printer.mmu-flowguard-level;
+    property <int> percent: Printer.mmu-flowguard-percent;
+    property <color> tone: StateIcons.severity-color(Printer.mmu-flowguard-line);
+    property <bool> shows-flow: Printer.mmu-has-flow-rate && (Printer.mmu-flow-measured || !root.measured-flow-only);
     property <string> guard-word: root.guard == "monitoring" ? @tr("FlowGuard monitoring") : @tr("FlowGuard ready");
     property <string> statement: {
-        if (root.guard == "triggered") {
+        if (root.kind == "triggered") {
             return @tr("FlowGuard triggered") + (Printer.mmu-flowguard-detail == "" ? "" : ": " + Printer.mmu-flowguard-detail);
         }
-        if (root.rising && root.guard == "boosting") {
-            return @tr("Tangle prevention · FlowGuard tangle level {} %", round(abs(root.level) * 100));
+        if (root.kind == "tangle-boost") {
+            return @tr("Tangle prevention · FlowGuard tangle level {} %", root.percent);
         }
-        if (root.rising) {
-            return root.level > 0 ? @tr("FlowGuard: clog level {} %", round(root.level * 100)) : @tr("FlowGuard: tangle level {} %", round(-root.level * 100));
+        if (root.kind == "clog") {
+            return @tr("FlowGuard: clog level {} %", root.percent);
         }
-        if (root.guard == "boosting") {
+        if (root.kind == "tangle") {
+            return @tr("FlowGuard: tangle level {} %", root.percent);
+        }
+        if (root.kind == "boosting") {
             return @tr("Tangle prevention: gear current raised");
         }
         if (!root.has-buffer) {
@@ -338,7 +359,7 @@ export component FlowGuardInstrument inherits VerticalLayout {
         spacing: Theme.spacing;
         Text {
             text: root.guarded ? @tr("Tangle") : @tr("Tension");
-            color: root.level <= -0.1 ? root.tone : Theme.muted;
+            color: StateIcons.severity-color(Printer.mmu-flowguard-tangle-end);
             font-size: Theme.font-small;
             vertical-alignment: center;
         }
@@ -347,14 +368,16 @@ export component FlowGuardInstrument inherits VerticalLayout {
             bias: Printer.mmu-buffer-bias;
             sides: Printer.mmu-buffer-sides;
             level: root.level;
+            has-tangle-threshold: Printer.mmu-has-tangle-threshold;
             tangle-threshold: Printer.mmu-tangle-threshold;
-            level-color: root.guard == "triggered" ? Theme.danger : Theme.warning;
-            // Leaning to a side is the controller at work, not a deviation.
-            marker-color: root.tone != Theme.muted ? root.tone : root.buffer == "neutral" ? Theme.success : root.buffer == "tension" || root.buffer == "compressed" ? Theme.foreground : Theme.muted;
+            has-extreme-threshold: Printer.mmu-has-extreme-threshold;
+            extreme-threshold: Printer.mmu-extreme-threshold;
+            level-color: StateIcons.severity-color(Printer.mmu-flowguard-strip);
+            marker-color: StateIcons.severity-color(Printer.mmu-buffer-marker);
         }
         Text {
             text: root.guarded ? @tr("Clog") : @tr("Compression");
-            color: root.level >= 0.1 ? root.tone : Theme.muted;
+            color: StateIcons.severity-color(Printer.mmu-flowguard-clog-end);
             font-size: Theme.font-small;
             vertical-alignment: center;
         }

@@ -3,7 +3,7 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Dialogs, Printer } from "../state.slint";
-import { ButtonKind, IconButton } from "controls.slint";
+import { ButtonKind, IconButton, TextWithValue } from "controls.slint";
 import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
 
 // The mode Klipper waits in during a calibration (manual probe or bed screws), started here or elsewhere. It opens
@@ -104,11 +104,9 @@ export component CalibrationDialog inherits Scrim {
                 font-weight: 600;
                 overflow: elide;
             }
-            if !root.probing: Text {
-                text: (Printer.bed-screw-fine ? @tr("Fine adjustment") + " · " : "")
-                    + @tr("accepted in a row: {} of {}", Printer.bed-screws-accepted, Printer.bed-screws-count);
-                color: Theme.muted;
-                font-size: Theme.font-small;
+            if !root.probing: TextWithValue {
+                text: Printer.bed-screw-fine ? @tr("Fine adjustment") : "";
+                value: @tr("accepted in a row: {} of {}", Printer.bed-screws-accepted, Printer.bed-screws-count);
             }
 
             HorizontalLayout {

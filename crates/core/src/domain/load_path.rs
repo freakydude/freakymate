@@ -163,10 +163,10 @@ pub enum PathPart {
     Sensor {
         triggered: bool,
     },
-    /// A stretch of tube, filled from the lane's side: 0 empty to 1 full.
+    /// A stretch of tube, filled from the lane's side.
     Tube {
         stretch: Stretch,
-        fill: f64,
+        fill: Fill,
     },
     /// The encoder at the unit; `moving` while it counts filament passing.
     Encoder {
@@ -180,6 +180,26 @@ pub enum PathPart {
     Nozzle {
         reached: bool,
     },
+}
+
+/// How far a stretch of tube is filled. The scale has no measure inside a stretch, so a position between two points
+/// is only a stage ("somewhere in it"); how much of the drawing a stage fills is for the display to decide.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Fill {
+    Empty,
+    Full,
+    Stage(Stage),
+    /// How far a move has come, 0 to 1, as Happy Hare reports it in the bowden.
+    Measured(f64),
+}
+
+/// How far into a stretch the filament is, from the first reach to nearly through.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Stage {
+    Started,
+    Early,
+    Halfway,
+    Late,
 }
 
 /// The stretches of tube between the measuring points.
@@ -201,33 +221,32 @@ pub enum Stretch {
 }
 
 impl Stretch {
-    /// The filled share at `position`. The scale has no measure inside a stretch, so a position between two points
-    /// is drawn as a part of the stretch that only says "somewhere in it"; in the bowden Happy Hare reports how far
-    /// a move has come.
-    fn fill(self, position: i32, bowden_progress: Option<f64>) -> f64 {
-        const FULL: f64 = 1.0;
-        const EMPTY: f64 = 0.0;
+    /// The fill at `position`: a position between two points is a stage of the stretch; in the bowden Happy Hare
+    /// reports how far a move has come.
+    fn fill(self, position: i32, bowden_progress: Option<f64>) -> Fill {
         if position < PARKED {
-            return EMPTY;
+            return Fill::Empty;
         }
         match self {
-            Self::Lane if position >= AT_HUB => FULL,
-            Self::Lane => 0.6,
-            Self::Hub if position >= AT_HUB => FULL,
-            Self::Bowden if position >= BOWDEN_END => FULL,
-            Self::Bowden if position >= BOWDEN_START => {
-                bowden_progress.unwrap_or(if position == BOWDEN_START { 0.1 } else { 0.5 }).clamp(EMPTY, FULL)
-            }
-            Self::ExtruderEntry if position >= AT_GEARS => FULL,
-            Self::Extruder if position >= AT_TOOLHEAD_SENSOR => FULL,
+            Self::Lane if position >= AT_HUB => Fill::Full,
+            Self::Lane => Fill::Stage(Stage::Late),
+            Self::Hub if position >= AT_HUB => Fill::Full,
+            Self::Bowden if position >= BOWDEN_END => Fill::Full,
+            Self::Bowden if position >= BOWDEN_START => match bowden_progress {
+                Some(progress) => Fill::Measured(progress.clamp(0.0, 1.0)),
+                None if position == BOWDEN_START => Fill::Stage(Stage::Started),
+                None => Fill::Stage(Stage::Halfway),
+            },
+            Self::ExtruderEntry if position >= AT_GEARS => Fill::Full,
+            Self::Extruder if position >= AT_TOOLHEAD_SENSOR => Fill::Full,
             // The gears have pulled the filament in.
-            Self::Extruder if position == IN_GEARS => 0.3,
-            Self::Hotend if position >= LOADED => FULL,
-            Self::Hotend if position == PAST_TOOLHEAD_SENSOR => 0.5,
-            Self::GearsToNozzle if position >= LOADED => FULL,
-            Self::GearsToNozzle if position >= AT_TOOLHEAD_SENSOR => 0.6,
-            Self::GearsToNozzle if position == IN_GEARS => 0.2,
-            _ => EMPTY,
+            Self::Extruder if position == IN_GEARS => Fill::Stage(Stage::Early),
+            Self::Hotend if position >= LOADED => Fill::Full,
+            Self::Hotend if position == PAST_TOOLHEAD_SENSOR => Fill::Stage(Stage::Halfway),
+            Self::GearsToNozzle if position >= LOADED => Fill::Full,
+            Self::GearsToNozzle if position >= AT_TOOLHEAD_SENSOR => Fill::Stage(Stage::Late),
+            Self::GearsToNozzle if position == IN_GEARS => Fill::Stage(Stage::Early),
+            _ => Fill::Empty,
         }
     }
 }
@@ -648,7 +667,7 @@ mod tests {
         path
     }
 
-    fn fill_of(path: &LoadPath, wanted: Stretch) -> f64 {
+    fn fill_of(path: &LoadPath, wanted: Stretch) -> Fill {
         path.parts(PathScope::Whole)
             .into_iter()
             .find_map(|part| match part {
@@ -728,8 +747,8 @@ mod tests {
             .collect();
 
         assert_eq!(tubes, [Stretch::Lane, Stretch::Bowden, Stretch::GearsToNozzle]);
-        assert_eq!(fill_of(&path, Stretch::GearsToNozzle), 0.2);
-        assert_eq!(fill_of(&path_at(LOADED), Stretch::GearsToNozzle), 1.0);
+        assert_eq!(fill_of(&path, Stretch::GearsToNozzle), Fill::Stage(Stage::Early));
+        assert_eq!(fill_of(&path_at(LOADED), Stretch::GearsToNozzle), Fill::Full);
         assert!(matches!(
             path.parts(PathScope::HeadOnly).first(),
             Some(PathPart::Tube { stretch: Stretch::ExtruderEntry, .. })
@@ -738,17 +757,20 @@ mod tests {
 
     #[test]
     fn the_stretches_fill_with_the_position() {
-        assert_eq!(fill_of(&path_at(PARKED), Stretch::Lane), 0.6);
-        assert_eq!(fill_of(&path_at(PARKED), Stretch::Bowden), 0.0);
-        assert_eq!(fill_of(&path_at(AT_HUB), Stretch::Lane), 1.0);
-        assert_eq!(fill_of(&path_at(BOWDEN_START), Stretch::Bowden), 0.1);
-        assert_eq!(fill_of(&path_at(BOWDEN_START + 1), Stretch::Bowden), 0.5);
-        assert_eq!(fill_of(&path_at(BOWDEN_END), Stretch::Bowden), 1.0);
-        assert_eq!(fill_of(&with_head_sensors(path_at(AT_GEARS - 1)), Stretch::ExtruderEntry), 0.0);
-        assert_eq!(fill_of(&with_head_sensors(path_at(AT_GEARS)), Stretch::ExtruderEntry), 1.0);
-        assert_eq!(fill_of(&with_head_sensors(path_at(IN_GEARS)), Stretch::Extruder), 0.3);
-        assert_eq!(fill_of(&with_head_sensors(path_at(PAST_TOOLHEAD_SENSOR)), Stretch::Hotend), 0.5);
-        assert_eq!(fill_of(&with_head_sensors(path_at(LOADED)), Stretch::Hotend), 1.0);
+        assert_eq!(fill_of(&path_at(PARKED), Stretch::Lane), Fill::Stage(Stage::Late));
+        assert_eq!(fill_of(&path_at(PARKED), Stretch::Bowden), Fill::Empty);
+        assert_eq!(fill_of(&path_at(AT_HUB), Stretch::Lane), Fill::Full);
+        assert_eq!(fill_of(&path_at(BOWDEN_START), Stretch::Bowden), Fill::Stage(Stage::Started));
+        assert_eq!(fill_of(&path_at(BOWDEN_START + 1), Stretch::Bowden), Fill::Stage(Stage::Halfway));
+        assert_eq!(fill_of(&path_at(BOWDEN_END), Stretch::Bowden), Fill::Full);
+        assert_eq!(fill_of(&with_head_sensors(path_at(AT_GEARS - 1)), Stretch::ExtruderEntry), Fill::Empty);
+        assert_eq!(fill_of(&with_head_sensors(path_at(AT_GEARS)), Stretch::ExtruderEntry), Fill::Full);
+        assert_eq!(fill_of(&with_head_sensors(path_at(IN_GEARS)), Stretch::Extruder), Fill::Stage(Stage::Early));
+        assert_eq!(
+            fill_of(&with_head_sensors(path_at(PAST_TOOLHEAD_SENSOR)), Stretch::Hotend),
+            Fill::Stage(Stage::Halfway)
+        );
+        assert_eq!(fill_of(&with_head_sensors(path_at(LOADED)), Stretch::Hotend), Fill::Full);
     }
 
     #[test]
@@ -756,14 +778,14 @@ mod tests {
         let mut path = path_at(BOWDEN_START + 1);
         path.bowden_progress = Some(0.8);
 
-        assert_eq!(fill_of(&path, Stretch::Bowden), 0.8);
+        assert_eq!(fill_of(&path, Stretch::Bowden), Fill::Measured(0.8));
     }
 
     #[test]
     fn nothing_is_filled_and_reached_without_a_position() {
         let path = LoadPath::empty();
 
-        assert_eq!(fill_of(&path, Stretch::Lane), 0.0);
+        assert_eq!(fill_of(&path, Stretch::Lane), Fill::Empty);
         assert!(path.parts(PathScope::Whole).contains(&PathPart::Gears { reached: false }));
         assert!(!path.is_settled());
     }

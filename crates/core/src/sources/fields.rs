@@ -42,3 +42,10 @@ pub(super) fn vector(object: &Value, field: &str) -> [f64; 4] {
     }
     values
 }
+
+/// The section `<prefix><name>` of `configfile.settings`: Klipper writes the section names in lower case, while the
+/// objects keep the case of the config (`temperature_sensor M8P` is the section `temperature_sensor m8p`).
+pub(super) fn section<'a>(settings: &'a Value, prefix: &str, name: &str) -> Option<&'a Value> {
+    let full = format!("{prefix}{name}");
+    settings.get(&full).or_else(|| settings.get(full.to_lowercase()))
+}

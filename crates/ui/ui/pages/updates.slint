@@ -57,17 +57,18 @@ export component UpdatesPage inherits Rectangle {
             HorizontalLayout {
                 spacing: Theme.spacing;
                 // Why the buttons are grey; the busy wheel in the status bar shows the running command.
-                if Printer.updates-busy: IconLabel {
+                // Always in the row, so the stretch stays; shown only while busy.
+                IconLabel {
+                    visible: Printer.updates-busy;
                     horizontal-stretch: 1;
                     icon: Icons.ui-lock;
                     text: @tr("Locked while updating");
                     color: Theme.warning;
                     font-size: Theme.font-small;
                 }
-                if !Printer.updates-busy: Rectangle { horizontal-stretch: 1; }
                 IconButton {
                     width: 140px;
-                    height: 48px;
+                    height: Theme.touch;
                     icon: Icons.ui-refresh;
                     icon-size: Theme.icon-small;
                     horizontal: true;

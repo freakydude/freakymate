@@ -2,7 +2,8 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, FileItem, Navigation, Printer } from "../state.slint";
+import { Actions, Confirm, FileItem, Navigation, Printer, Severity } from "../state.slint";
+import { StateIcons } from "../state-icons.slint";
 import { ButtonKind, IconButton, ProgressBar, ValueTile } from "../components/controls.slint";
 import { ExcludeObjectsDialog, LayerPauseDialog } from "../components/print-dialogs.slint";
 import { Thumbnail } from "../components/thumbnail.slint";
@@ -72,7 +73,8 @@ component ActionTile inherits IconButton {
 }
 
 // A figure under the progress bar: what it is (a word or an icon), small, and its value. The value stays whole; the
-// word gives way when the card is narrow.
+// word gives way when the card is narrow. Not `TextWithValue`: the value is bold and bright against a muted word,
+// without a separator, and an icon can stand in for the word.
 component ProgressDetail inherits HorizontalLayout {
     in property <string> label;
     in property <image> icon;
@@ -108,6 +110,7 @@ component ProgressCard inherits Rectangle {
     in property <bool> finished;
     vertical-stretch: 0;
     property <string> state: Printer.print-state;
+    property <Severity> severity: StateIcons.print-severity(Printer.print-state);
     background: Theme.surface;
     border-radius: Theme.radius;
 
@@ -132,7 +135,7 @@ component ProgressCard inherits Rectangle {
                 width: Theme.icon-large;
                 height: Theme.icon-large;
                 source: !root.finished ? Icons.print-remaining : root.state == "complete" ? Icons.print-complete : root.state == "cancelled" ? Icons.print-cancel : Icons.state-error;
-                colorize: root.state == "complete" ? Theme.success : Theme.muted;
+                colorize: root.severity == Severity.fine || root.severity == Severity.error ? StateIcons.severity-color(root.severity) : Theme.muted;
             }
             // While it runs the time that is left; afterwards when it ended, which is longer and one step smaller.
             Text {
@@ -145,7 +148,7 @@ component ProgressCard inherits Rectangle {
         }
         ProgressBar {
             progress: Printer.progress;
-            bar-color: root.state == "paused" ? Theme.warning : root.state == "error" ? Theme.danger : Theme.accent;
+            bar-color: root.severity == Severity.attention || root.severity == Severity.error ? StateIcons.severity-color(root.severity) : Theme.accent;
         }
         HorizontalLayout {
             spacing: Theme.spacing;
@@ -191,7 +194,9 @@ component JobView inherits VerticalLayout {
     callback plan-layer-pause();
     // With Happy Hare the lower band needs the room of its strip (recover buttons under a pause); otherwise the preview
     // takes more of it.
-    property <length> top-height: Printer.has-mmu ? 220px : 272px;
+    property <length> strip-top-height: 220px;
+    property <length> plain-top-height: 272px;
+    property <length> top-height: Printer.has-mmu ? root.strip-top-height : root.plain-top-height;
 
     spacing: Theme.spacing;
     HorizontalLayout {
@@ -210,7 +215,7 @@ component JobView inherits VerticalLayout {
             // The status bar shows the state of the print. Long names have no spaces and keep what matters at the end
             // (a version): break anywhere, two lines at most.
             Text {
-                height: 48px;
+                height: Theme.name-height;
                 text: Printer.job-name;
                 color: Theme.foreground;
                 font-size: Theme.font-normal;
@@ -335,7 +340,7 @@ export component PrintPage inherits Rectangle {
             // Long names have no spaces and keep what matters at the end (a version): break anywhere, two lines at
             // most.
             Text {
-                height: 48px;
+                height: Theme.name-height;
                 text: root.prepared ? Printer.prepared.name : Printer.recent-files.length > 0 ? @tr("Recent files") : @tr("No print loaded");
                 color: root.idle ? Theme.muted : Theme.foreground;
                 font-size: Theme.font-normal;

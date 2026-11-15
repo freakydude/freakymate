@@ -2,6 +2,7 @@
 // for the start dialog. Only facts are shown and what differs is yellow; no sentence and no advice, the person decides.
 
 import { Theme } from "../theme.slint";
+import { TextWithValue } from "controls.slint";
 import { ToolLabel } from "tool-label.slint";
 import { ToolMatchItem } from "../structs.slint";
 import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
@@ -176,11 +177,9 @@ export component FilamentCompareRow inherits Rectangle {
                     font-size: Theme.font-normal;
                     overflow: elide;
                 }
-                Text {
-                    text: root.mapping.shared-tools != "" ? root.mapping.needed-weight + " · " + root.mapping.shared-tools : root.mapping.needed-weight;
-                    color: Theme.muted;
-                    font-size: Theme.font-small;
-                    overflow: elide;
+                TextWithValue {
+                    text: root.mapping.needed-weight;
+                    value: root.mapping.shared-tools;
                 }
             }
         }

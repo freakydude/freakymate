@@ -27,8 +27,8 @@ export struct ScaleItem {
     has-measured: bool,
     measured-low: float,
     measured-high: float,
-    // The colour of the number: 0 normal, 1 warning, 2 danger.
-    level: int,
+    // The colour of the number: neutral normal, attention a warning, error danger.
+    level: Severity,
     // "max 300 °C".
     max-text: string,
 }
@@ -208,6 +208,8 @@ export struct MmuGateItem {
     selected: bool,
     // The filament of this tile is in the toolhead (what Unload acts on).
     loaded: bool,
+    // Checking this gate makes Happy Hare unload the loaded filament first (decided in the core).
+    check-unloads-first: bool,
     // Remaining filament of the spool in the gate (for example "613 g"), empty without Spoolman or spool.
     spool-text: string,
     spool-low: bool,

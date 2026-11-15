@@ -142,25 +142,33 @@ export component BedMeshDialog inherits Scrim {
                 title: Printer.bed-mesh-active != "" ? @tr("Bed mesh: {}", Printer.bed-mesh-active) : @tr("Bed mesh");
                 close => { MeshDialogs.map-open = false; }
             }
-            if !Printer.bed-mesh-map.shown: Note {
+            // Fixed in the layout (no `if`): the note or the map is shown, the stretch stays.
+            Rectangle {
                 vertical-stretch: 1;
-                text: @tr("No mesh active.");
-            }
-            if Printer.bed-mesh-map.shown: HorizontalLayout {
-                vertical-stretch: 1;
-                spacing: 2 * Theme.spacing;
-                // Wrapper: the map keeps the shape of the measured area at the top left.
-                Rectangle {
-                    horizontal-stretch: 1;
-                    MeshMap {
-                        x: 0;
-                        y: 0;
-                        width: root.map-height * root.aspect;
-                        height: root.map-height;
-                        large: true;
-                    }
+                Note {
+                    visible: !Printer.bed-mesh-map.shown;
+                    width: parent.width;
+                    height: parent.height;
+                    text: @tr("No mesh active.");
                 }
-                MeshLegend { }
+                HorizontalLayout {
+                    visible: Printer.bed-mesh-map.shown;
+                    width: parent.width;
+                    height: parent.height;
+                    spacing: 2 * Theme.spacing;
+                    // Wrapper: the map keeps the shape of the measured area at the top left.
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        MeshMap {
+                            x: 0;
+                            y: 0;
+                            width: root.map-height * root.aspect;
+                            height: root.map-height;
+                            large: true;
+                        }
+                    }
+                    MeshLegend { }
+                }
             }
         }
     }

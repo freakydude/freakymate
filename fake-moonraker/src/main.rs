@@ -9,14 +9,17 @@ const DEFAULT_PORT: u16 = 7125;
 const DEFAULT_TIME_SCALE: f64 = 10.0;
 const DEFAULT_MMU_GATES: usize = 4;
 const USAGE: &str = "Usage: fake-moonraker [--port <port>] [--time-scale <factor>] \
-    [--profile basic|voron|happy-hare|ercf|toolchanger|toolchanger-required|happy-hare-units|toolchanger-mmu|afc|afc-toolchanger] \
-    [--gates <1-16>, only for happy-hare and ercf] [--auth <user>:<password>]";
+    [--profile basic|voron|happy-hare|ercf|happy-hare-encoder|happy-hare-co|happy-hare-to|toolchanger|toolchanger-required|happy-hare-units|toolchanger-mmu|afc|afc-toolchanger] \
+    [--gates <1-16>, only for the Happy Hare profiles] [--auth <user>:<password>]";
 
 enum Profile {
     Basic,
     Voron,
     HappyHare,
     Ercf,
+    HappyHareEncoder,
+    HappyHareCompression,
+    HappyHareTension,
     Toolchanger,
     ToolchangerRequired,
     HappyHareUnits,
@@ -40,6 +43,9 @@ impl Options {
             Profile::Voron => MachineProfile::voron(),
             Profile::HappyHare => MachineProfile::happy_hare(self.gates),
             Profile::Ercf => MachineProfile::ercf(self.gates),
+            Profile::HappyHareEncoder => MachineProfile::happy_hare_encoder(self.gates),
+            Profile::HappyHareCompression => MachineProfile::happy_hare_compression(self.gates),
+            Profile::HappyHareTension => MachineProfile::happy_hare_tension(self.gates),
             Profile::Toolchanger => MachineProfile::toolchanger(),
             Profile::ToolchangerRequired => MachineProfile::toolchanger_required(),
             Profile::HappyHareUnits => MachineProfile::happy_hare_units(),
@@ -86,6 +92,9 @@ fn parse_profile(value: &str) -> Result<Profile, String> {
         "voron" => Ok(Profile::Voron),
         "happy-hare" => Ok(Profile::HappyHare),
         "ercf" => Ok(Profile::Ercf),
+        "happy-hare-encoder" => Ok(Profile::HappyHareEncoder),
+        "happy-hare-co" => Ok(Profile::HappyHareCompression),
+        "happy-hare-to" => Ok(Profile::HappyHareTension),
         "toolchanger" => Ok(Profile::Toolchanger),
         "toolchanger-required" => Ok(Profile::ToolchangerRequired),
         "happy-hare-units" => Ok(Profile::HappyHareUnits),

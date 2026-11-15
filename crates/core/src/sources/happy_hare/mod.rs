@@ -12,11 +12,11 @@ mod sync_feedback;
 pub use gates::{BYPASS, GateAvailability, LoadedFilament, MmuGate};
 pub use sensors::{MmuSensor, PathSensor, is_shown_by_mmu};
 pub use sync_feedback::{
-    BufferSides, EncoderHeadroom, FlowGuard, FlowGuardState, ORIGIN_ENCODER, ORIGIN_SYNC_FEEDBACK, SyncFeedback,
-    SyncFeedbackState,
+    BufferSides, Emphasis, EncoderHeadroom, FlowGuard, FlowGuardReading, FlowGuardState, FlowGuardStatement,
+    ORIGIN_ENCODER, ORIGIN_SYNC_FEEDBACK, SyncFeedback, SyncFeedbackState,
 };
 
-use super::fields::{count, flag, integer, text};
+use super::fields::{count, flag, integer, section, text};
 use super::klipper::NOZZLE_HEATER;
 use super::objects::ObjectStore;
 use super::subscription::Subscription;
@@ -24,7 +24,9 @@ use crate::sourced::Sourced;
 use gates::{read_gates, read_tool_to_gate};
 use sensors::{listed_sensors, read_sensors};
 use serde_json::Value;
-use sync_feedback::{read_encoder_headroom, read_flow_rate, read_flowguard, read_sync_feedback};
+use sync_feedback::{
+    read_encoder_headroom, read_extreme_threshold, read_flow_rate, read_flowguard, read_sync_feedback,
+};
 
 /// Oldest Happy Hare the project supports; older versions report different fields.
 const MIN_VERSION: (u32, u32) = (4, 1);
@@ -131,6 +133,12 @@ impl MmuStatus {
     pub fn bypass_unit(&self) -> Option<usize> {
         self.units.iter().position(|unit| unit.has_bypass)
     }
+
+    /// Happy Hare unloads loaded filament before it checks another gate (and loads it again afterwards outside a
+    /// print); checking the selected gate leaves it where it is.
+    pub fn unloads_before_checking(&self, gate: usize) -> bool {
+        self.filament != LoadedFilament::Unloaded && usize::try_from(self.gate) != Ok(gate)
+    }
 }
 
 impl MmuUnit {
@@ -147,7 +155,7 @@ fn read_units(machine: &Value, num_units: usize, settings: &Value) -> Vec<MmuUni
             let unit = machine.get(format!("unit_{index}"))?;
             let name = text(unit, "name");
             let display_name = Some(text(unit, "display_name")).filter(|shown| !shown.is_empty()).unwrap_or(name);
-            let section = settings.get(format!("mmu_unit {}", name.to_lowercase()));
+            let section = section(settings, "mmu_unit ", name);
             let option = |key: &str| section.map(|section| text(section, key)).filter(|value| !value.is_empty());
             Some(MmuUnit {
                 name: name.to_owned(),
@@ -161,6 +169,25 @@ fn read_units(machine: &Value, num_units: usize, settings: &Value) -> Vec<MmuUni
             })
         })
         .collect()
+}
+
+/// The buffer on the way of the gate's unit; without a selected gate the first buffer there is.
+fn buffer_of_gate(units: &[MmuUnit], gate: i32) -> Option<&str> {
+    let holds_gate = |unit: &&MmuUnit| {
+        usize::try_from(gate).is_ok_and(|gate| (unit.first_gate..unit.first_gate + unit.num_gates).contains(&gate))
+    };
+    units
+        .iter()
+        .filter(holds_gate)
+        .find_map(|unit| unit.buffer.as_deref())
+        .or_else(|| units.iter().find_map(|unit| unit.buffer.as_deref()))
+}
+
+/// The name of the one `[mmu_buffer <name>]` section, for a machine whose units do not name a buffer.
+fn only_buffer_section(settings: &Value) -> Option<String> {
+    let mut names = settings.as_object()?.keys().filter_map(|section| section.strip_prefix("mmu_buffer "));
+    let name = names.next()?;
+    names.next().is_none().then(|| name.to_owned())
 }
 
 impl MmuStatus {
@@ -219,12 +246,20 @@ pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
     let sensors = read_sensors(mmu);
     let sync_feedback = read_sync_feedback(mmu, &sensors);
     let tool_to_gate = read_tool_to_gate(mmu);
+    let settings = store.object("configfile").and_then(|configfile| configfile.get("settings")).unwrap_or(&Value::Null);
+    let units = read_units(machine, num_units, settings);
+    let gate = integer(mmu, "gate", -1);
+    let mut flowguard = read_flowguard(mmu, &sensors);
+    if let Some(flowguard) = flowguard.as_mut() {
+        let buffer = buffer_of_gate(&units, gate).map(str::to_owned).or_else(|| only_buffer_section(settings));
+        flowguard.extreme_threshold = buffer.and_then(|buffer| read_extreme_threshold(settings, &buffer, &sensors));
+    }
     Some(MmuStatus {
         version: text(machine, "happy_hare_version").to_owned(),
         enabled: flag(mmu, "enabled"),
         num_gates,
         num_units,
-        gate: integer(mmu, "gate", -1),
+        gate,
         tool: integer(mmu, "tool", -1),
         action: text(mmu, "action").to_owned(),
         operation: text(mmu, "operation").to_owned(),
@@ -249,16 +284,12 @@ pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
             .and_then(Value::as_str)
             .map(ServoPosition::parse),
         gates: read_gates(mmu, num_gates, &tool_to_gate),
-        units: read_units(
-            machine,
-            num_units,
-            store.object("configfile").and_then(|configfile| configfile.get("settings")).unwrap_or(&Value::Null),
-        ),
+        units,
         tool_to_gate,
         endless_spool: flag(mmu, "endless_spool_enabled"),
         spoolman_support: text(mmu, "spoolman_support").to_owned(),
         flow_rate: read_flow_rate(mmu, &sensors),
-        flowguard: read_flowguard(mmu, &sensors),
+        flowguard,
         encoder_headroom: read_encoder_headroom(mmu),
         sensors,
         sync_feedback,
@@ -583,6 +614,51 @@ mod tests {
     }
 
     #[test]
+    fn the_extreme_zones_come_from_the_section_of_the_buffer_on_the_gates_unit() {
+        let threshold = |sensors: Value, gate: i32| {
+            read_mmu(&store(json!({
+                "mmu": { "gate": gate, "sensors": sensors, "flowguard": { "enabled": true } },
+                "mmu_machine": { "num_units": 2,
+                    "unit_0": { "name": "A", "first_gate": 0, "num_gates": 2 },
+                    "unit_1": { "name": "B", "first_gate": 2, "num_gates": 2 } },
+                "configfile": { "settings": {
+                    "mmu_unit a": { "buffer": "Left" }, "mmu_unit b": { "buffer": "Right" },
+                    "mmu_buffer left": { "analog_sensor_threshold": 0.8 },
+                    "mmu_buffer right": { "analog_sensor_threshold": 0.95 }
+                } }
+            })))
+            .unwrap()
+            .flowguard
+            .unwrap()
+            .extreme_threshold
+        };
+        let proportional = json!({ "filament_proportional": false });
+
+        assert_eq!(threshold(proportional.clone(), 0), Some(0.8));
+        assert_eq!(threshold(proportional.clone(), 3), Some(0.95));
+        assert_eq!(threshold(proportional, -1), Some(0.8));
+        assert_eq!(threshold(json!({ "filament_tension": true }), 0), None);
+    }
+
+    #[test]
+    fn a_machine_without_unit_sections_uses_its_only_buffer_section() {
+        let read = |settings: Value| {
+            read_mmu(&store(json!({
+                "mmu": { "sensors": { "filament_proportional": false }, "flowguard": { "enabled": true } },
+                "configfile": { "settings": settings }
+            })))
+            .unwrap()
+            .flowguard
+            .unwrap()
+            .extreme_threshold
+        };
+
+        assert_eq!(read(json!({ "mmu_buffer buf": { "analog_sensor_threshold": 0.85 } })), Some(0.85));
+        let two = json!({ "mmu_buffer a": { "analog_sensor_threshold": 0.8 }, "mmu_buffer b": {} });
+        assert_eq!(read(two), None);
+    }
+
+    #[test]
     fn flow_rate_comes_from_the_encoder_dictionary() {
         let store = store(json!({ "mmu": { "encoder": { "flow_rate": 97.5, "encoder_pos": 12.0 } } }));
         assert_eq!(read_mmu(&store).unwrap().flow_rate, Some(Sourced::measured(97.5, ORIGIN_ENCODER)));
@@ -717,5 +793,15 @@ mod tests {
         let listed: Vec<&str> = mmu.listed_sensors().iter().map(|sensor| sensor.name.as_str()).collect();
 
         assert_eq!(listed, ["encoder"]);
+    }
+
+    #[test]
+    fn checking_another_gate_unloads_loaded_filament_first() {
+        let mmu = |filament, gate| MmuStatus { filament, gate, ..MmuStatus::default() };
+        assert!(mmu(LoadedFilament::Loaded, 1).unloads_before_checking(2));
+        assert!(!mmu(LoadedFilament::Loaded, 2).unloads_before_checking(2));
+        assert!(!mmu(LoadedFilament::Unloaded, 1).unloads_before_checking(2));
+        // The bypass is selected (-2): any gate is another one.
+        assert!(mmu(LoadedFilament::Loaded, -2).unloads_before_checking(0));
     }
 }

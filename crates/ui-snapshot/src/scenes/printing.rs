@@ -98,7 +98,7 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
     tools_match_the_job(session)?;
     temperature_leads_to_heaters(session)?;
     nozzle_history(session)?;
-    tangle_boost(session)?;
+    flowguard_stress(session)?;
     session.show_page(Page::Temperature, "temperature-printing")?;
     session.show_page(Page::System, "system-printing")?;
     // The axes stand still: Axes and Calibrate are greyed out and the page shows Tune.
@@ -174,21 +174,37 @@ pub(super) fn print_error(session: &mut Session) -> Result<(), String> {
     session.capture("print-error")
 }
 
-/// Raises the tension in the fake's buffer until tangle prevention boosts the gear current, and takes it back after the
-/// picture. Skipped without a buffer that tangle prevention watches (Happy Hare with a proportional sensor).
-pub(super) fn tangle_boost(session: &mut Session) -> Result<(), String> {
-    let has_buffer = session.presenter.snapshot().status.mmu.as_ref().is_some_and(|mmu| mmu.flowguard.is_some());
-    if !has_buffer {
+/// Puts the fake's feedback under stress (`FAKE_MMU_TANGLE`) and takes it back after the picture: with a proportional
+/// sensor until tangle prevention boosts the gear current (`print-tangle-boost`), with a switch buffer until its
+/// switch is pressed, with an encoder until its headroom is half used (`print-flowguard-stress`). Skipped without
+/// anything FlowGuard watches.
+pub(super) fn flowguard_stress(session: &mut Session) -> Result<(), String> {
+    let watched = |snapshot: &freakymate_core::Snapshot| {
+        snapshot.status.mmu.as_ref().is_some_and(|mmu| mmu.flowguard.is_some() || mmu.encoder_headroom.is_some())
+    };
+    if !watched(&session.presenter.snapshot()) {
         return Ok(());
     }
-    let boosting = |snapshot: &freakymate_core::Snapshot| {
-        snapshot.status.mmu.as_ref().and_then(|mmu| mmu.flowguard.as_ref()).is_some_and(|flowguard| flowguard.boosting)
+    let proportional = session
+        .presenter
+        .snapshot()
+        .status
+        .mmu
+        .as_ref()
+        .and_then(|mmu| mmu.flowguard.as_ref())
+        .is_some_and(|flowguard| flowguard.tangle_threshold.is_some());
+    let stressed = |snapshot: &freakymate_core::Snapshot| {
+        snapshot.status.mmu.as_ref().is_some_and(|mmu| {
+            let flowguard = mmu.flowguard.as_ref();
+            flowguard.is_some_and(|flowguard| flowguard.boosting || flowguard.level != 0.0)
+                || mmu.encoder_headroom.is_some_and(|encoder| encoder.headroom < encoder.detection_length / 2.0)
+        })
     };
     session.service.send(Command::RunGcode { script: "FAKE_MMU_TANGLE BOOST=1".into() });
-    session.wait_until("tangle prevention boosting", boosting)?;
-    session.show_page(Page::Print, "print-tangle-boost")?;
+    session.wait_until("feedback under stress", stressed)?;
+    session.show_page(Page::Print, if proportional { "print-tangle-boost" } else { "print-flowguard-stress" })?;
     session.service.send(Command::RunGcode { script: "FAKE_MMU_TANGLE BOOST=0".into() });
-    session.wait_until("boost released", |snapshot| !boosting(snapshot))
+    session.wait_until("stress released", |snapshot| !stressed(snapshot))
 }
 
 /// Excludes one object of the print and checks that the Objects dialog data follows. In the reference layout it opens

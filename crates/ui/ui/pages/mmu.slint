@@ -69,10 +69,13 @@ export component MmuGatesTab inherits Rectangle {
         }
 
         HorizontalLayout {
-            spacing: Theme.spacing;
+            // The arrows stay in the row (no `if`), so the stretch of the tiles keeps its place; one page takes none.
+            spacing: root.pages > 1 ? Theme.spacing : 0px;
             height: 150px;
-            if root.pages > 1: IconButton {
-                width: 48px;
+            IconButton {
+                visible: root.pages > 1;
+                min-width: root.pages > 1 ? Theme.touch : 0px;
+                max-width: self.min-width;
                 icon: Icons.ui-chevron-left;
                 enabled: root.page > 0;
                 clicked => { Navigation.mmu-page = root.page - 1; }
@@ -100,8 +103,10 @@ export component MmuGatesTab inherits Rectangle {
                     }
                 }
             }
-            if root.pages > 1: IconButton {
-                width: 48px;
+            IconButton {
+                visible: root.pages > 1;
+                min-width: root.pages > 1 ? Theme.touch : 0px;
+                max-width: self.min-width;
                 icon: Icons.ui-chevron-right;
                 enabled: root.page < root.pages - 1;
                 clicked => { Navigation.mmu-page = root.page + 1; }
@@ -112,7 +117,7 @@ export component MmuGatesTab inherits Rectangle {
             title: @tr("Filament path");
             icon: Icons.filament-sensor;
             HorizontalLayout {
-                spacing: Theme.spacing;
+                spacing: Printer.has-mmu ? Theme.spacing : 0px;
                 VerticalLayout {
                     horizontal-stretch: 1;
                     spacing: Theme.spacing;
@@ -152,8 +157,10 @@ export component MmuGatesTab inherits Rectangle {
                     Rectangle { vertical-stretch: 1; }
                 }
                 // Unloading a lane of AFC is in its tile's dialog.
-                if Printer.has-mmu: VerticalLayout {
-                    width: 120px;
+                VerticalLayout {
+                    visible: Printer.has-mmu;
+                    min-width: Printer.has-mmu ? 120px : 0px;
+                    max-width: self.min-width;
                     spacing: Theme.spacing;
                     IconButton {
                         icon: Icons.mmu-unload;
@@ -195,12 +202,12 @@ export component MmuStrip inherits Rectangle {
                 source: Icons.mmu-unit;
                 colorize: Theme.muted;
             }
-            Text {
-                text: Printer.mmu-bypass ? @tr("Bypass") : Printer.mmu-gate >= 0 ? (Printer.mmu-tool >= 0 ? "T" + Printer.mmu-tool + " · " : "") + @tr("Gate {}", Printer.mmu-gate) : @tr("No gate");
+            TextWithValue {
+                text: Printer.mmu-bypass ? @tr("Bypass") : Printer.mmu-gate >= 0 ? (Printer.mmu-tool >= 0 ? "T" + Printer.mmu-tool : "") : @tr("No gate");
+                value: !Printer.mmu-bypass && Printer.mmu-gate >= 0 ? @tr("Gate {}", Printer.mmu-gate) : "";
                 color: Theme.foreground;
                 font-size: Theme.font-normal;
                 font-weight: 700;
-                vertical-alignment: center;
             }
             Rectangle { horizontal-stretch: 1; }
             // The spool of the gate in use: its colours, its filament and what is left of it.

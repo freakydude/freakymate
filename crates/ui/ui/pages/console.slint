@@ -212,12 +212,12 @@ export component ConsolePage inherits Rectangle {
                 }
             }
             // Marked while the temperature reports a heater sends during M109/M190 are shown; hidden by default.
-            IconButton {
+            ToggleRow {
+                width: 224px;
                 icon: Icons.nav-temperature;
-                width: Theme.touch;
+                text: @tr("Temperatures");
                 checked: !UiSettings.hide-temperature-reports;
-                accessible-label: @tr("Show temperature reports");
-                clicked => {
+                toggled => {
                     UiSettings.hide-temperature-reports = !UiSettings.hide-temperature-reports;
                     UiSettings.hide-temperature-reports-toggled(UiSettings.hide-temperature-reports);
                 }

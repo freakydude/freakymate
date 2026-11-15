@@ -10,10 +10,6 @@ import { GateAvailabilityLabel } from "../components/mmu-tiles.slint";
 
 // Happy Hare unloads loaded filament before it checks another gate, and loads it again afterwards outside a print.
 export global GateCheck {
-    pure public function unloads-first(gate: int) -> bool {
-        return Printer.mmu-filament != "unloaded" && gate != Printer.mmu-gate;
-    }
-
     public function ask(title: string, action: string, argument: string) {
         Confirm.ask(title, @tr("Happy Hare unloads the loaded filament first and, outside a print, loads it again afterwards."), action, argument, false);
     }
@@ -172,7 +168,7 @@ export component GateDialog inherits Scrim {
                     icon: Icons.mmu-check-gate;
                     text: @tr("Check");
                     clicked => {
-                        if (GateCheck.unloads-first(root.item.index)) {
+                        if (root.item.check-unloads-first) {
                             GateCheck.ask(@tr("Check gate {}", root.item.index), "mmu-check-gate", root.item.index);
                         } else {
                             Actions.mmu-check-gate(root.item.index);

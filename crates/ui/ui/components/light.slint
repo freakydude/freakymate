@@ -96,10 +96,10 @@ export component LightPanel inherits Rectangle {
                         width: Theme.icon;
                         height: Theme.icon;
                     }
-                    for effect in Printer.led-effects: IconButton {
+                    for effect in Printer.led-effects: ToggleRow {
                         text: effect.label;
                         checked: effect.enabled;
-                        clicked => { Actions.set-led-effect(effect.name, !effect.enabled); }
+                        toggled => { Actions.set-led-effect(effect.name, !effect.enabled); }
                     }
                 }
             }

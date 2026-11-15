@@ -2,7 +2,7 @@
 // stay inside its column and the columns of the figures must not move. Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
-import { Navigation, Page, Printer } from "../state.slint";
+import { Navigation, Page, Printer, Severity } from "../state.slint";
 import { Sample } from "sample.slint";
 
 export component PrintLongNamePreview inherits AppWindow {
@@ -18,6 +18,8 @@ export component PrintLongNamePreview inherits AppWindow {
         Printer.mmu-buffer-state = "neutral";
         Printer.mmu-buffer-bias = 0.08;
         Printer.mmu-flowguard-state = "monitoring";
+        Printer.mmu-buffer-marker = Severity.fine;
+        Printer.mmu-has-flow-rate = true;
         Printer.mmu-flow-rate = 99;
         Printer.remaining = "12h 34m";
         Printer.eta = "30.10. 03:58";
