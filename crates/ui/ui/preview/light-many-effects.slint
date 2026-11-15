@@ -1,0 +1,37 @@
+// Preview: the light panel with many led_effect effects, as on a Voron with light scenes: the grid of two columns
+// scrolls with the LED rows; the longest names stand first, to see whether they fit.
+// Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Backlight, Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component LightManyEffectsPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.temperature;
+        Backlight.available = true;
+        Backlight.brightness = 70;
+        Printer.led-effects = [
+            { name: "chamber_follow_y_left", label: "Chamber Follow Y Left", enabled: true },
+            { name: "chamber_follow_y_right", label: "Chamber Follow Y Right", enabled: true },
+            { name: "chamber_idle", label: "Chamber Idle", enabled: false },
+            { name: "chamber_heat", label: "Chamber Heat", enabled: false },
+            { name: "chamber_busy", label: "Chamber Busy", enabled: false },
+            { name: "chamber_print_front", label: "Chamber Print Front", enabled: true },
+            { name: "chamber_follow_x", label: "Chamber Follow X", enabled: false },
+            { name: "chamber_sides", label: "Chamber Sides", enabled: false },
+            { name: "chamber_pause_front", label: "Chamber Pause Front", enabled: false },
+            { name: "chamber_alert_front", label: "Chamber Alert Front", enabled: false },
+            { name: "chamber_done", label: "Chamber Done", enabled: false },
+            { name: "sb_idle", label: "Sb Idle", enabled: false },
+            { name: "sb_heat", label: "Sb Heat", enabled: false },
+            { name: "sb_busy", label: "Sb Busy", enabled: false },
+            { name: "sb_pause", label: "Sb Pause", enabled: false },
+            { name: "sb_nozzle_light", label: "Sb Nozzle Light", enabled: false },
+            { name: "sb_nozzle_off", label: "Sb Nozzle Off", enabled: false },
+            { name: "critical_error", label: "Critical Error", enabled: false },
+        ];
+        Navigation.light-open = true;
+    }
+}

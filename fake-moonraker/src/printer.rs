@@ -33,6 +33,9 @@ const MAX_EXTRUDER_TARGET: f64 = 300.0;
 const MAX_BED_TARGET: f64 = 120.0;
 const MIN_HEATER_TEMPERATURE: f64 = 10.0;
 const MAX_CHAMBER_TARGET: f64 = 70.0;
+/// Frank's Voron: `temp_coeff` of `[z_thermal_adjust]` and the `REF_TEMP` its start macro sets after the probing.
+const Z_THERMAL_TEMP_COEFF: f64 = -0.000315;
+const Z_THERMAL_REF_TEMP: f64 = 150.0;
 const HOST_TEMPERATURE: f64 = 45.0;
 const MAX_HOST_TEMPERATURE: f64 = 100.0;
 /// A warm MCU (85 of 0..105 °C): the temperature scale of the UI shows it yellow (assumption, not from a real printer).

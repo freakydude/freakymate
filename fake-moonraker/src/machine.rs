@@ -92,6 +92,8 @@ pub struct MachineProfile {
     pub afc: Option<AfcLayout>,
     /// Klipper `exclude_object` module with the objects of the print.
     pub exclude_object: bool,
+    /// Klipper's `z_thermal_adjust` module, driven by a `temperature_combined` sensor over the extruder.
+    pub z_thermal_adjust: bool,
     /// Moonraker's `spoolman` component with a few spools.
     pub spoolman: bool,
     /// Extra fans, LEDs with the led_effect plugin, a WLED strip of Moonraker, more temperature sensors and firmware
@@ -174,6 +176,7 @@ impl MachineProfile {
             mmu_units: None,
             afc: None,
             exclude_object: false,
+            z_thermal_adjust: false,
             spoolman: false,
             devices: false,
             filament_sensors: 0,
@@ -197,6 +200,7 @@ impl MachineProfile {
             mmu_units: None,
             afc: None,
             exclude_object: true,
+            z_thermal_adjust: true,
             spoolman: true,
             devices: true,
             filament_sensors: 2,
@@ -220,6 +224,7 @@ impl MachineProfile {
             mmu_units: None,
             afc: None,
             exclude_object: true,
+            z_thermal_adjust: false,
             spoolman: true,
             devices: true,
             filament_sensors: 5,

@@ -170,6 +170,8 @@ impl Setup {
             "firmware_retraction",
             Some(&["retract_length", "retract_speed", "unretract_extra_length", "unretract_speed"]),
         );
+        // Unconditional like `exclude_object`: Klipper skips an object it does not have.
+        subscription.add("z_thermal_adjust", Some(&["enabled", "current_z_adjust"]));
         subscription.add("exclude_object", Some(&["objects", "excluded_objects", "current_object"]));
         for heater in &self.extra_heaters {
             subscription.add(heater, None);

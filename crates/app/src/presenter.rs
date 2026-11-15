@@ -294,6 +294,8 @@ impl Presenter {
         printer.set_homed_y(motion.homed.y);
         printer.set_homed_z(motion.homed.z);
         printer.set_z_offset(motion.homing_origin[2] as f32);
+        printer.set_has_thermal_z(motion.thermal_z_adjust.is_some());
+        printer.set_thermal_z(motion.thermal_z_adjust.unwrap_or_default() as f32);
         printer.set_speed_factor((motion.speed_factor * 100.0) as f32);
         printer.set_live_velocity(motion.live_velocity as f32);
         let flow = estimates::volumetric_flow(motion.live_extruder_velocity, status.extruder.filament_diameter);

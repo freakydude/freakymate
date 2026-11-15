@@ -40,14 +40,21 @@ export component LightPanel inherits Rectangle {
     property <length> row-step: 64px;
     // The display row stands first, the LEDs below it.
     property <int> display-rows: Backlight.available ? 1 : 0;
+    // Effects stand in a grid below the LEDs; a printer may define many of them (scenes built from several effects).
+    property <int> effect-columns: 2;
+    property <int> effect-rows: ceil(Printer.led-effects.length / root.effect-columns);
+    property <int> effects-first-row: root.display-rows + Printer.leds.length;
+    property <int> rows: root.effects-first-row + root.effect-rows;
+    // Same inset as the LED rows, so the strip symbol stands in their symbol column.
+    property <length> effects-x: Theme.padding + Theme.icon + Theme.spacing;
+    property <length> effect-width: (list.row-width - root.effects-x - (root.effect-columns - 1) * Theme.spacing) / root.effect-columns;
 
     // Not modal: the page beside the panel stays usable; the close button or the light symbol closes it.
     FlyoutPanel {
         x: root.width - self.width - 8px;
         y: 52px;
         width: min(620px, root.width - 16px);
-        height: min(root.height - 60px, 64px + 2 * Theme.padding + Theme.spacing
-            + (root.display-rows + Printer.leds.length + (Printer.led-effects.length > 0 ? 1 : 0)) * root.row-step);
+        height: min(root.height - 60px, 64px + 2 * Theme.padding + Theme.spacing + root.rows * root.row-step);
 
         VerticalLayout {
             padding: Theme.padding;
@@ -71,7 +78,7 @@ export component LightPanel inherits Rectangle {
             }
             list := ScrollList {
                 vertical-stretch: 1;
-                content-height: (root.display-rows + Printer.leds.length + (Printer.led-effects.length > 0 ? 1 : 0)) * root.row-step;
+                content-height: root.rows * root.row-step;
                 if Backlight.available: DisplayRow {
                     y: 0;
                     width: list.row-width;
@@ -81,26 +88,23 @@ export component LightPanel inherits Rectangle {
                     width: list.row-width;
                     led: led;
                 }
-                // Effects side by side; a tap starts or stops one.
-                if Printer.led-effects.length > 0: HorizontalLayout {
-                    y: (root.display-rows + Printer.leds.length) * root.row-step;
-                    width: list.row-width;
+                // Effects in a grid beside the strip symbol; a tap starts or stops one.
+                if Printer.led-effects.length > 0: Image {
+                    x: Theme.padding;
+                    y: root.effects-first-row * root.row-step + (root.row-step - Theme.spacing - self.height) / 2;
+                    source: Icons.accessory-led-strip;
+                    colorize: Theme.muted;
+                    width: Theme.icon;
+                    height: Theme.icon;
+                }
+                for effect[index] in Printer.led-effects: ToggleRow {
+                    x: root.effects-x + mod(index, root.effect-columns) * (root.effect-width + Theme.spacing);
+                    y: (root.effects-first-row + floor(index / root.effect-columns)) * root.row-step;
+                    width: root.effect-width;
                     height: root.row-step - Theme.spacing;
-                    // Same inset as the LED rows, so the symbols stand in one column.
-                    padding-left: Theme.padding;
-                    spacing: Theme.spacing;
-                    Image {
-                        cross-axis-self-alignment: center;
-                        source: Icons.accessory-led-strip;
-                        colorize: Theme.muted;
-                        width: Theme.icon;
-                        height: Theme.icon;
-                    }
-                    for effect in Printer.led-effects: ToggleRow {
-                        text: effect.label;
-                        checked: effect.enabled;
-                        toggled => { Actions.set-led-effect(effect.name, !effect.enabled); }
-                    }
+                    text: effect.label;
+                    checked: effect.enabled;
+                    toggled => { Actions.set-led-effect(effect.name, !effect.enabled); }
                 }
             }
         }

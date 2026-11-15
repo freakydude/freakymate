@@ -71,6 +71,9 @@ export global Printer {
     in property <bool> homed-y;
     in property <bool> homed-z;
     in property <float> z-offset;
+    // `z_thermal_adjust`: the Z shift it applies on top of the babystep; shown only when the module is on.
+    in property <bool> has-thermal-z;
+    in property <float> thermal-z;
     in property <float> speed-factor: 100;
     in property <float> live-velocity;
     in property <float> live-flow;

@@ -1,6 +1,6 @@
 //! Axes and moves: `toolhead`, `motion_report` and `gcode_move`.
 
-use crate::sources::fields::{number, number_or, text, vector};
+use crate::sources::fields::{flag, number, number_or, text, vector};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,6 +99,9 @@ pub struct Motion {
     pub homing_origin: [f64; 4],
     pub speed_factor: f64,
     pub extrude_factor: f64,
+    /// The Z shift of `z_thermal_adjust` in mm, `None` without the module or while it is off. It moves Z as a
+    /// transformation, so `homing_origin` does not show it.
+    pub thermal_z_adjust: Option<f64>,
 }
 
 impl Motion {
@@ -110,7 +113,12 @@ impl Motion {
     }
 }
 
-pub(super) fn read_motion(toolhead: &Value, motion_report: &Value, gcode_move: &Value) -> Motion {
+pub(super) fn read_motion(
+    toolhead: &Value,
+    motion_report: &Value,
+    gcode_move: &Value,
+    z_thermal_adjust: &Value,
+) -> Motion {
     Motion {
         position: vector(toolhead, "position"),
         live_position: vector(motion_report, "live_position"),
@@ -127,6 +135,7 @@ pub(super) fn read_motion(toolhead: &Value, motion_report: &Value, gcode_move: &
         homing_origin: vector(gcode_move, "homing_origin"),
         speed_factor: number_or(gcode_move, "speed_factor", 1.0),
         extrude_factor: number_or(gcode_move, "extrude_factor", 1.0),
+        thermal_z_adjust: flag(z_thermal_adjust, "enabled").then(|| number(z_thermal_adjust, "current_z_adjust")),
     }
 }
 

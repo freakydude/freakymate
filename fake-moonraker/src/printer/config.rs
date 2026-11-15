@@ -59,6 +59,18 @@ impl Printer {
         if self.profile.quad_gantry_level {
             sections.insert("quad_gantry_level".to_owned(), json!({ "max_adjust": 10 }));
         }
+        if self.profile.z_thermal_adjust {
+            sections.insert(
+                "z_thermal_adjust".to_owned(),
+                json!({
+                    "temp_coeff": Z_THERMAL_TEMP_COEFF,
+                    "sensor_type": "temperature_combined",
+                    "sensor_list": "extruder",
+                    "combination_method": "mean",
+                    "maximum_deviation": 999.9,
+                }),
+            );
+        }
         for (name, template) in MACRO_TEMPLATES {
             let mut section = json!({ "gcode": template });
             if name == "PAUSE" {
