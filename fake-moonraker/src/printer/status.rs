@@ -33,6 +33,11 @@ impl Printer {
     fn heaters_json(&self, objects: &Map<String, Value>) -> Value {
         let sensors: Vec<String> = self.temperature_samples().into_iter().map(|(name, _)| name).collect();
         let monitors: Vec<&String> = objects.keys().filter(|name| name.starts_with("tmc2240 ")).collect();
+        let mut sensors = sensors;
+        if self.profile.z_thermal_adjust {
+            // The module registers its own sensor with `heaters`, which makes it an available sensor.
+            sensors.push("z_thermal_adjust".to_owned());
+        }
         json!({ "available_sensors": sensors, "available_monitors": monitors })
     }
 
@@ -43,6 +48,20 @@ impl Printer {
         }
         if self.profile.exclude_object {
             objects.insert("exclude_object".to_owned(), self.exclude_object_json());
+        }
+        if self.profile.z_thermal_adjust {
+            let temperature = self.extruder.reading();
+            objects.insert(
+                "z_thermal_adjust".to_owned(),
+                json!({
+                    "enabled": true,
+                    "temperature": temperature,
+                    "measured_min_temp": temperature,
+                    "measured_max_temp": temperature,
+                    // `-temp_coeff * (T - ref)` (`klippy/extras/z_thermal_adjust.py`)
+                    "current_z_adjust": -Z_THERMAL_TEMP_COEFF * (temperature - Z_THERMAL_REF_TEMP),
+                }),
+            );
         }
         objects.extend(self.calibration.status());
         if let Some(mmu) = &self.mmu {

@@ -221,6 +221,20 @@ fn basic_profile_has_no_optional_modules() {
 }
 
 #[test]
+fn voron_profile_adds_z_thermal_adjust_as_a_sensor_without_object() {
+    let printer = Printer::with_profile(1.0, MachineProfile::voron());
+    let status = printer.status();
+
+    let adjust = &status["z_thermal_adjust"];
+    assert_eq!(adjust["enabled"], true);
+    let expected = 0.000315 * (printer.extruder.reading() - 150.0);
+    assert!((adjust["current_z_adjust"].as_f64().unwrap() - expected).abs() < 1e-9);
+    assert!(status["heaters"]["available_sensors"].as_array().unwrap().contains(&json!("z_thermal_adjust")));
+    assert!(status["configfile"]["settings"]["z_thermal_adjust"].get("temp_coeff").is_some());
+    assert!(!names(&Printer::with_profile(1.0, MachineProfile::basic())).contains(&"z_thermal_adjust".to_owned()));
+}
+
+#[test]
 fn voron_profile_adds_quad_gantry_level() {
     let printer = Printer::with_profile(1.0, MachineProfile::voron());
 

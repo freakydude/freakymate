@@ -105,7 +105,12 @@ impl KlipperParts {
             klippy_message: text(webhooks, "state_message").trim().to_owned(),
             activity: Activity::parse(text(object("idle_timeout"), "state")),
             job: read_job(object("print_stats"), object("display_status"), object("virtual_sdcard")),
-            motion: read_motion(object("toolhead"), object("motion_report"), object("gcode_move")),
+            motion: read_motion(
+                object("toolhead"),
+                object("motion_report"),
+                object("gcode_move"),
+                object("z_thermal_adjust"),
+            ),
             extruder: read_extruder(object("extruder"), object("configfile").pointer("/settings/extruder")),
             heaters: read_heaters(store),
             sensors: read_sensors(store),
@@ -164,6 +169,7 @@ mod tests {
             "display_status": { "progress": 0.25 },
             "toolhead": { "position": [1.0, 2.0, 3.0, 4.0], "homed_axes": "xyz", "axis_maximum": [300.0, 300.0, 250.0, 0.0] },
             "gcode_move": { "homing_origin": [0.0, 0.0, 0.05, 0.0], "speed_factor": 1.2 },
+            "z_thermal_adjust": { "enabled": true, "current_z_adjust": 0.0125 },
             "extruder": { "temperature": 200.5, "target": 210.0, "pressure_advance": 0.04, "can_extrude": true },
             "heater_bed": { "temperature": 60.0, "target": 60.0 },
             "heater_generic chamber": { "temperature": 35.0, "target": 0.0 },
@@ -184,6 +190,7 @@ mod tests {
         assert!(status.motion.homed.all());
         assert_eq!(status.motion.homing_origin[2], 0.05);
         assert_eq!(status.motion.extrude_factor, 1.0);
+        assert_eq!(status.motion.thermal_z_adjust, Some(0.0125));
         assert!(status.extruder.can_extrude);
         let heaters: Vec<&str> = status.heaters.iter().map(|heater| heater.label.as_str()).collect();
         assert_eq!(heaters, ["Nozzle", "Bed", "Chamber"]);
@@ -205,6 +212,7 @@ mod tests {
         assert!(status.heaters.is_empty());
         assert!(status.fans.is_empty() && status.leds.is_empty() && status.retraction.is_none());
         assert_eq!(status.leveling_applied, None);
+        assert_eq!(status.motion.thermal_z_adjust, None, "no module, no line");
     }
 
     #[test]

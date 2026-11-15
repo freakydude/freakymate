@@ -137,6 +137,13 @@ export component TuneBasicsTab inherits Rectangle {
                     increase => { Actions.adjust-z-offset(UiSettings.z-offset-step); }
                     reset => { Actions.reset-z-offset(); }
                 }
+                // Applied by Klipper's z_thermal_adjust on top of the babystep, so it is not part of the value above.
+                if Printer.has-thermal-z: Text {
+                    text: @tr("Thermal {} mm", (Printer.thermal-z >= 0 ? "+" : "") + Printer.thermal-z.to-fixed(3));
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                    horizontal-alignment: center;
+                }
                 StepSelector {
                     values: [0.005, 0.01, 0.025, 0.05, 0.1];
                     unit: "";
