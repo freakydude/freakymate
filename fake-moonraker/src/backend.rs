@@ -7,7 +7,7 @@ use crate::machine::MachineProfile;
 use crate::printer::Printer;
 use crate::spoolman::Spoolman;
 use crate::wled::Wled;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;

@@ -32,9 +32,5 @@ pub(super) fn within_mode(command: Command, mode: Option<&CalibrationMode>) -> V
         Command::ScrewAdjusted => matches!(mode, Some(CalibrationMode::BedScrews { .. })),
         _ => mode.is_some(),
     };
-    if waiting {
-        vec![command]
-    } else {
-        Vec::new()
-    }
+    if waiting { vec![command] } else { Vec::new() }
 }

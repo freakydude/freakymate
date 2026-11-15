@@ -11,7 +11,7 @@ mod simulated;
 mod standby;
 mod sysfs;
 
-pub use ddcutil::{Ddcutil, Program, RunError, Runner, DEVICE_PREFIX};
+pub use ddcutil::{DEVICE_PREFIX, Ddcutil, Program, RunError, Runner};
 pub use service::{BacklightBackend, BacklightService};
 pub use standby::{Screen, Standby, StandbyTimeouts, WAKE_LOCK};
 pub use sysfs::Sysfs;
@@ -101,11 +101,7 @@ pub enum BacklightError {
 pub fn raw_from_percent(percent: u8, max: u32) -> u32 {
     let raw = (u64::from(percent.min(100)) * u64::from(max) + 50) / 100;
     let raw = u32::try_from(raw).unwrap_or(max);
-    if percent > 0 {
-        raw.max(1)
-    } else {
-        raw
-    }
+    if percent > 0 { raw.max(1) } else { raw }
 }
 
 pub fn percent_from_raw(raw: u32, max: u32) -> u8 {

@@ -1,8 +1,8 @@
 //! In-memory networks for development without NetworkManager (Windows, screenshots, tests).
 
 use super::{
-    wifi_networks, wifi_profile, AccessPoint, Availability, NetworkCommand, NetworkError, NetworkState, Security,
-    WiredLink,
+    AccessPoint, Availability, NetworkCommand, NetworkError, NetworkState, Security, WiredLink, wifi_networks,
+    wifi_profile,
 };
 use std::time::Duration;
 

@@ -5,8 +5,8 @@
 //! after a preset.
 
 use crate::moonraker::Call;
-use crate::sources::klipper::{label, Led};
-use serde_json::{json, Map, Value};
+use crate::sources::klipper::{Led, label};
+use serde_json::{Map, Value, json};
 
 /// Strips are named like Klipper's LED objects, `wled <strip>`, so they stand among them.
 const OBJECT_PREFIX: &str = "wled ";

@@ -1,6 +1,6 @@
 //! Simulated Moonraker host features: power devices, update manager and G-code history.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::VecDeque;
 
 const GCODE_STORE_SIZE: usize = 200;
@@ -83,10 +83,10 @@ impl Host {
     /// `machine.update.upgrade`: like Moonraker, refuses a name that is not exactly a section of the update manager
     /// (`Freakymate` for `freakymate` fails); without a name everything is updated.
     pub fn upgrade(&mut self, name: Option<&str>) -> Result<(), String> {
-        if let Some(name) = name {
-            if self.update_status()["version_info"].get(name).is_none() {
-                return Err(format!("Updater {name} not available"));
-            }
+        if let Some(name) = name
+            && self.update_status()["version_info"].get(name).is_none()
+        {
+            return Err(format!("Updater {name} not available"));
         }
         if matches!(name, None | Some("klipper")) {
             self.klipper_updated = true;

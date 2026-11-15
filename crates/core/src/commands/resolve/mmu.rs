@@ -1,8 +1,8 @@
 //! Happy Hare's gate map and EndlessSpool groups.
 
 use crate::commands::{Command, CommandError};
-use crate::sources::happy_hare::commands as mmu;
 use crate::sources::PrinterStatus;
+use crate::sources::happy_hare::commands as mmu;
 
 pub(super) fn set_gate_filament(
     status: &PrinterStatus,

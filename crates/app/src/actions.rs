@@ -404,13 +404,13 @@ fn parse_weight(text: &str) -> Option<f64> {
 }
 
 /// Callback without arguments that sends the command.
-fn send(service: &PrinterService, command: fn() -> Command) -> impl Fn() + 'static {
+fn send(service: &PrinterService, command: fn() -> Command) -> impl Fn() + 'static + use<> {
     let service = service.clone();
     move || service.send(command())
 }
 
 /// Callback with a gate number that sends the command for that gate; a negative number sends nothing.
-fn with_gate(service: &PrinterService, command: fn(usize) -> Command) -> impl Fn(i32) + 'static {
+fn with_gate(service: &PrinterService, command: fn(usize) -> Command) -> impl Fn(i32) + 'static + use<> {
     with(service, move |service, gate: i32| {
         if let Ok(gate) = usize::try_from(gate) {
             service.send(command(gate));
@@ -428,7 +428,7 @@ fn with_lane(
     service: &PrinterService,
     presenter: &Rc<Presenter>,
     command: fn(LaneId) -> Command,
-) -> impl Fn(i32) + 'static {
+) -> impl Fn(i32) + 'static + use<> {
     let (service, presenter) = (service.clone(), Rc::clone(presenter));
     move |row| {
         if let Some(lane) = lane_of_row(&presenter, row) {
@@ -438,7 +438,7 @@ fn with_lane(
 }
 
 /// Callback with one argument that receives the presenter.
-fn with_presenter<A, R, F>(presenter: &Rc<Presenter>, action: F) -> impl Fn(A) -> R + 'static
+fn with_presenter<A, R, F>(presenter: &Rc<Presenter>, action: F) -> impl Fn(A) -> R + 'static + use<A, R, F>
 where
     F: Fn(&Presenter, A) -> R + 'static,
 {
@@ -453,7 +453,7 @@ fn run_presenter<R>(presenter: &Rc<Presenter>, action: impl Fn(&Presenter) -> R 
 }
 
 /// Callback with arguments that receives a cloned service.
-fn with<A, F>(service: &PrinterService, action: F) -> impl Fn(A) + 'static
+fn with<A, F>(service: &PrinterService, action: F) -> impl Fn(A) + 'static + use<A, F>
 where
     F: Fn(&PrinterService, A) + 'static,
 {

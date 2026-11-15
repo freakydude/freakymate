@@ -1,12 +1,12 @@
 //! One connection to Moonraker: reconnecting, handshake and login, subscription and the loop that serves requests.
 
+use super::Snapshot;
 use super::dispatch::console_line;
 use super::queries::update_status_events;
 use super::trail;
-use super::Snapshot;
 use super::{
-    Access, Event, Outputs, Query, Request, SessionEnd, ACCESS_CHECK_INTERVAL, CLIENT_NAME, KLIPPY_POLL_INTERVAL,
-    PARALLEL_FILE_DETAILS, RECONNECT_DELAY, SPOOLMAN_POLL_INTERVAL, WLED_POLL_INTERVAL,
+    ACCESS_CHECK_INTERVAL, Access, CLIENT_NAME, Event, KLIPPY_POLL_INTERVAL, Outputs, PARALLEL_FILE_DETAILS, Query,
+    RECONNECT_DELAY, Request, SPOOLMAN_POLL_INTERVAL, SessionEnd, WLED_POLL_INTERVAL,
 };
 use crate::commands::CommandError;
 use crate::credentials::{Credential, CredentialStore};
@@ -18,12 +18,12 @@ use crate::sources::klipper::{FanWatch, HeightWatch, KlippyState, PendingTargets
 use crate::sources::moonraker_server::gcode_store::ConsoleKind;
 use crate::sources::moonraker_server::update_manager;
 use crate::sources::moonraker_server::wled::{self, WledStrip};
-use crate::sources::moonraker_server::{server_info, ServerComponents};
+use crate::sources::moonraker_server::{ServerComponents, server_info};
 use crate::sources::{ObjectStore, PrinterStatus, Sources};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::{Semaphore, mpsc};
 
 pub(super) async fn run(
     mut endpoint: Endpoint,

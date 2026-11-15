@@ -7,9 +7,9 @@
 //! `[AFC_extruder <name>]` is only in its configuration (`extruder_name`, the section's own name by default,
 //! `AFC_extruder.py` L222); a lane names its `AFC_extruder`, not the Klipper extruder.
 
+use super::ObjectStore;
 use super::fields::{count, flag, section, text};
 use super::subscription::Subscription;
-use super::ObjectStore;
 use crate::color::{self, Rgba};
 use serde_json::Value;
 

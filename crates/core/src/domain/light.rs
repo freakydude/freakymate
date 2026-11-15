@@ -1,7 +1,7 @@
 //! The main light, the quick switch in the status bar, among Klipper's LEDs and Moonraker's WLED strips.
 
-use crate::sources::klipper::{instance, Led};
 use crate::sources::Sources;
+use crate::sources::klipper::{Led, instance};
 
 /// Names that mark the light of the build chamber.
 const LIGHT_NAMES: [&str; 4] = ["chamber", "case", "light", "enclosure"];

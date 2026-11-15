@@ -3,14 +3,14 @@
 
 use super::calibration::CalibrationState;
 use super::devices::{self, Fan, Led};
-use super::exclude_object::{read_print_objects, PrintObject};
-use super::extruder::{read_extruder, ExtruderState};
-use super::filament_sensors::{read_filament_sensors, FilamentSensor};
-use super::firmware_retraction::{read_retraction, Retraction};
-use super::heaters::{read_heaters, read_sensors, Heater, TemperatureSensor};
-use super::job::{read_job, PrintJob};
+use super::exclude_object::{PrintObject, read_print_objects};
+use super::extruder::{ExtruderState, read_extruder};
+use super::filament_sensors::{FilamentSensor, read_filament_sensors};
+use super::firmware_retraction::{Retraction, read_retraction};
+use super::heaters::{Heater, TemperatureSensor, read_heaters, read_sensors};
+use super::job::{PrintJob, read_job};
 use super::leveling;
-use super::motion::{read_motion, Motion};
+use super::motion::{Motion, read_motion};
 use crate::sources::fields::{flag, text};
 use crate::sources::objects::ObjectStore;
 use serde_json::Value;
@@ -142,8 +142,8 @@ pub fn label(object: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sources::klipper::PrintState;
     use crate::sources::PrinterStatus;
+    use crate::sources::klipper::PrintState;
     use serde_json::json;
 
     fn store(status: Value) -> ObjectStore {

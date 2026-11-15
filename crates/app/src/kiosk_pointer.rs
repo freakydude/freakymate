@@ -35,8 +35,12 @@ pub fn hide() {
         .join("freakymate-cursors");
     match write_theme(&directory) {
         Ok(()) => {
-            std::env::set_var("XCURSOR_PATH", &directory);
-            std::env::set_var("XCURSOR_THEME", THEME);
+            // SAFETY: the caller runs this before any thread or window exists (see the function docs), so
+            // nothing reads or writes the environment concurrently.
+            unsafe {
+                std::env::set_var("XCURSOR_PATH", &directory);
+                std::env::set_var("XCURSOR_THEME", THEME);
+            }
         }
         Err(error) => log::warn!("cannot hide the pointer, {}: {error}", directory.display()),
     }

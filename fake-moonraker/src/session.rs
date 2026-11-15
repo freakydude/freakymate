@@ -6,7 +6,7 @@ use crate::files::GcodeFile;
 use crate::gcode::{self, CommandError};
 use crate::printer::Printer;
 use crate::subscription::Subscription;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::time::Duration;
 
 const INVALID_REQUEST: i64 = -32600;

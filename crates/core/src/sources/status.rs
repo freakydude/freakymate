@@ -87,11 +87,7 @@ impl PrinterStatus {
             ("tool changer", self.toolchanger.is_some()),
         ];
         let present: Vec<&str> = systems.iter().filter(|(_, present)| *present).map(|(name, _)| *name).collect();
-        if present.is_empty() {
-            "none".to_owned()
-        } else {
-            present.join(", ")
-        }
+        if present.is_empty() { "none".to_owned() } else { present.join(", ") }
     }
 
     /// A print is under way. After a shutdown `print_stats` keeps "printing" or "paused" (Klipper's virtual_sdcard

@@ -5,12 +5,12 @@
 //! extruder its unit feeds; AFC a lane per lane of its units, and on its own tool changer the heads. The Klipper extruder is the joint that attaches the lanes to a nozzle; a nozzle without
 //! lanes has the one direct feed.
 
+use crate::sources::PrinterStatus;
 use crate::sources::afc::AfcStatus;
 use crate::sources::happy_hare::MmuStatus;
 use crate::sources::spoolman::{Spool, SpoolmanState};
 use crate::sources::tool_macros::ToolSpool;
 use crate::sources::toolchanger::ToolHead;
-use crate::sources::PrinterStatus;
 
 /// The extruder of a printer with one nozzle, as Klipper names it.
 const MAIN_EXTRUDER: &str = "extruder";
@@ -159,11 +159,7 @@ impl MachineTree {
     /// The part cooling fan of the nozzle in use: with swappable heads the one the mounted head states (`None` while
     /// no head is mounted or the mounted one states none), else Klipper's `[fan]`.
     pub fn selected_part_fan(&self) -> Option<&str> {
-        if self.has_swappable_heads() {
-            self.selected_head()?.fan.as_deref()
-        } else {
-            Some(PART_FAN)
-        }
+        if self.has_swappable_heads() { self.selected_head()?.fan.as_deref() } else { Some(PART_FAN) }
     }
 
     /// The mounted head of a tool changer, else the fixed head.

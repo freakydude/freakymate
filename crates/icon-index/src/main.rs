@@ -1,7 +1,7 @@
 //! `cargo run -p icon-index` writes `crates/ui/ui/icons.slint` and `assets/icons/overview.html`;
 //! with `--check` it only checks (exit code 1 on errors).
 
-use icon_index::{check_icons, load_icons, overview_html, repository_root, slint_index, Layout};
+use icon_index::{Layout, check_icons, load_icons, overview_html, repository_root, slint_index};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -33,9 +33,5 @@ fn main() -> ExitCode {
         eprintln!("ERROR {problem}");
     }
     println!("{} icons checked, {} problems.", icons.len(), problems.len());
-    if problems.is_empty() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
-    }
+    if problems.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
 }

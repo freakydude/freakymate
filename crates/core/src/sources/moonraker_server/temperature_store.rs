@@ -2,7 +2,7 @@
 //! one value per second, for heaters and temperature sensors. Live values are appended while a chart is open.
 
 use crate::moonraker::Call;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 
 /// Moonraker keeps 1200 values by default (`temperature_store_size`); the live part keeps the same length.

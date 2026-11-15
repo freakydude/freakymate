@@ -1,9 +1,9 @@
 //! Spoolman, through Moonraker's `spoolman` component: the spools, the active spool and the connection state. Where
 //! the spools sit in the printer is answered in [`crate::domain::spools`].
 
-use crate::color::{parse_hex, Rgba};
+use crate::color::{Rgba, parse_hex};
 use crate::moonraker::{Call, Connection};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 
 /// A spool with less than this share of its start weight left is flagged.

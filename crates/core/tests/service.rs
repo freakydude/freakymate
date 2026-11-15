@@ -2,12 +2,13 @@
 
 use fake_moonraker::access::AccessConfig;
 use fake_moonraker::machine::MachineProfile;
-use fake_moonraker::server::{serve, ServerConfig};
+use fake_moonraker::server::{ServerConfig, serve};
 use freakymate_core::credentials::Credential;
 use freakymate_core::domain::filament::{self, FilamentHandling};
-use freakymate_core::domain::load_path::{head_path, load_path, BufferSide, LOADED};
+use freakymate_core::domain::load_path::{BufferSide, LOADED, head_path, load_path};
 use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::domain::{changer, heads, job_end, light, pause, spools};
+use freakymate_core::sources::PrinterStatus;
 use freakymate_core::sources::afc::HubReturnBlock;
 use freakymate_core::sources::happy_hare::commands::{Gates, ServoCommand};
 use freakymate_core::sources::happy_hare::{GateAvailability, LoadedFilament, PathSensor, ServoPosition};
@@ -15,7 +16,6 @@ use freakymate_core::sources::klipper::tuning::TuningKey;
 use freakymate_core::sources::klipper::{Axis, FanKind, KlippyState, Leveling, PrintState, WhiteChannel};
 use freakymate_core::sources::moonraker_server::files::ThumbnailImage;
 use freakymate_core::sources::moonraker_server::gcode_store::ConsoleKind;
-use freakymate_core::sources::PrinterStatus;
 use freakymate_core::{
     Access, Command, ConnectionState, CredentialStore, Endpoint, Event, PrinterService, Query, ServiceChannels,
     Snapshot,
@@ -545,10 +545,10 @@ async fn a_layer_pause_pauses_and_the_history_tells_when_the_job_ended() {
     let cancelled = wait_for(&mut channels, |snapshot| snapshot.status.job.state == PrintState::Cancelled).await;
     let ended = timeout(WAIT_LIMIT, async {
         loop {
-            if let Event::PrintHistory(history) = channels.events.recv().await.expect("service stopped") {
-                if let Some(end) = history.newest.and_then(|newest| job_end::ended_at(&cancelled.status.job, &newest)) {
-                    return end;
-                }
+            if let Event::PrintHistory(history) = channels.events.recv().await.expect("service stopped")
+                && let Some(end) = history.newest.and_then(|newest| job_end::ended_at(&cancelled.status.job, &newest))
+            {
+                return end;
             }
         }
     })
@@ -713,11 +713,13 @@ async fn fans_lights_sensors_and_tuning_values_follow_the_printer() {
     assert_eq!(klipper.white_channel("neopixel status"), WhiteChannel::None);
     assert!(snapshot.sources.led_effects.iter().any(|effect| effect == "led_effect rainbow"));
     assert_eq!(klipper.tuning.get(TuningKey::MaxAccel), Some(3000.0));
-    assert!(snapshot
-        .status
-        .sensors
-        .iter()
-        .any(|sensor| sensor.object == "tmc2240 stepper_x" && sensor.temperature.is_none()));
+    assert!(
+        snapshot
+            .status
+            .sensors
+            .iter()
+            .any(|sensor| sensor.object == "tmc2240 stepper_x" && sensor.temperature.is_none())
+    );
     assert_eq!(snapshot.status.fans[0].kind, FanKind::Part);
 
     service.send(Command::ToggleLight);

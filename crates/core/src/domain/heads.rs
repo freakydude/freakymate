@@ -5,7 +5,7 @@
 use super::machine_tree::{Lane, MachineTree};
 use crate::sources::klipper::Setup;
 use crate::sources::toolchanger::{self, ToolchangerStatus};
-use crate::sources::{afc, PrinterStatus};
+use crate::sources::{PrinterStatus, afc};
 
 /// How a head that is not mounted gets to the carriage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

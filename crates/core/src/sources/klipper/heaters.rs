@@ -51,11 +51,7 @@ impl Heater {
     pub fn stepped_target(&self, step: f64) -> f64 {
         let maximum = self.max_temp.unwrap_or(f64::INFINITY);
         let next = (self.target + step).min(maximum);
-        if next <= 0.0 || (step < 0.0 && next < self.min_temp) {
-            0.0
-        } else {
-            next.max(self.min_temp)
-        }
+        if next <= 0.0 || (step < 0.0 && next < self.min_temp) { 0.0 } else { next.max(self.min_temp) }
     }
 
     pub fn can_raise(&self) -> bool {

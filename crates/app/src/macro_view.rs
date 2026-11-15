@@ -2,7 +2,7 @@
 
 use crate::items::replace_rows;
 use crate::{MacroItem, MacroParamItem, Printer};
-use freakymate_core::sources::klipper::{offered_macros, MacroDetails, MacroForm};
+use freakymate_core::sources::klipper::{MacroDetails, MacroForm, offered_macros};
 use freakymate_core::sources::macro_conventions::PRINT_START_MACRO;
 use slint::{Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
@@ -48,10 +48,11 @@ impl MacroView {
         }
         *self.all.borrow_mut() = macros.to_vec();
         self.refresh();
-        if connected && !macros.is_empty() {
-            if let Some(handler) = self.loaded.borrow().as_ref() {
-                handler(macros);
-            }
+        if connected
+            && !macros.is_empty()
+            && let Some(handler) = self.loaded.borrow().as_ref()
+        {
+            handler(macros);
         }
     }
 

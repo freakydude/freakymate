@@ -16,12 +16,12 @@
 //! the file in one group share them.
 
 use super::spools::Lane;
-use crate::color::{is_clear, parse_hex, rgb, Rgba};
+use crate::color::{Rgba, is_clear, parse_hex, rgb};
+use crate::sources::PrinterStatus;
 use crate::sources::happy_hare::{GateAvailability, MmuGate};
 use crate::sources::klipper::Setup;
 use crate::sources::moonraker_server::files::FileMetadata;
 use crate::sources::spoolman::Spool;
-use crate::sources::PrinterStatus;
 use std::collections::HashMap;
 
 /// Colours further apart than this (distance in RGB, at most 441) count as different. Wide enough for "the same red
@@ -83,11 +83,7 @@ impl Verdict {
                 Verdict::Differs(_) | Verdict::GateEmpty | Verdict::NoGate => return verdict.clone(),
             }
         }
-        if all_fit == Some(true) {
-            Verdict::Fits
-        } else {
-            Verdict::Unknown
-        }
+        if all_fit == Some(true) { Verdict::Fits } else { Verdict::Unknown }
     }
 
     /// Something does not fit: a fact differs, the gate is empty or the printer has no such tool.
@@ -147,11 +143,7 @@ fn used_tools(metadata: &FileMetadata) -> Vec<usize> {
     }
     let weighed: Vec<usize> =
         (0..metadata.filament_weights.len()).filter(|tool| metadata.filament_weights[*tool] > 0.0).collect();
-    if weighed.is_empty() {
-        vec![0]
-    } else {
-        weighed
-    }
+    if weighed.is_empty() { vec![0] } else { weighed }
 }
 
 /// The entry of a tool in a list per filament; a single entry stands for every tool.

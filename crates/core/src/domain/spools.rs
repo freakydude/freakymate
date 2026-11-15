@@ -5,10 +5,10 @@ pub use super::machine_tree::{Lane, SpoolHolder};
 use crate::color::Rgba;
 use crate::commands::Command;
 use crate::domain::machine_tree::MachineTree;
+use crate::sources::PrinterStatus;
 use crate::sources::happy_hare::MmuGate;
 use crate::sources::klipper::BED_HEATER;
 use crate::sources::spoolman::{Spool, SpoolmanState};
-use crate::sources::PrinterStatus;
 
 /// A target that is further off than this from the temperature of the spool gets a hint, in °C.
 const TEMPERATURE_TOLERANCE: f64 = 5.0;

@@ -7,8 +7,8 @@ use crate::items::{
     replace_rows, reuse_flags, tool_match_item,
 };
 use crate::{
-    view, AfcHubReturnItem, AfcToolItem, FilamentPathItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem,
-    Printer, ToolMatchItem,
+    AfcHubReturnItem, AfcToolItem, FilamentPathItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem, Printer,
+    ToolMatchItem, view,
 };
 use freakymate_core::domain::changer;
 use freakymate_core::domain::filament_match::{self, ToolMatch, Verdict};
@@ -17,10 +17,10 @@ use freakymate_core::domain::heads::HeadRow;
 use freakymate_core::domain::load_path::{self, BufferSide, LoadPath, PathScope};
 use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::domain::spools::{FilamentColors, Lane};
+use freakymate_core::sources::PrinterStatus;
 use freakymate_core::sources::afc::HubReturnBlock;
 use freakymate_core::sources::happy_hare::{self, LoadedFilament, MmuStatus};
 use freakymate_core::sources::spoolman::Spool;
-use freakymate_core::sources::PrinterStatus;
 use slint::{Model, ModelRc, VecModel};
 use std::cell::RefCell;
 use std::rc::Rc;

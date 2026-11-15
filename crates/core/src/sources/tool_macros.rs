@@ -5,9 +5,9 @@
 //! `spool_id` holds the Spoolman spool of a tool: both clients assign it with `SET_GCODE_VARIABLE` and, if the printer
 //! has `[save_variables]`, keep it with `SAVE_VARIABLE` under `t<n>__spool_id`.
 
+use super::ObjectStore;
 use super::klipper::Setup;
 use super::subscription::Subscription;
-use super::ObjectStore;
 
 const SPOOL_VARIABLE: &str = "spool_id";
 const MACRO_PREFIX: &str = "gcode_macro ";
@@ -69,7 +69,7 @@ pub fn assign_spool(macro_name: &str, spool_id: Option<u32>, save_variables: boo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     fn spools(status: Value) -> Vec<ToolSpool> {
         let mut store = ObjectStore::default();

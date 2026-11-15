@@ -6,7 +6,7 @@ use freakymate::display::{DESIGN_HEIGHT, DESIGN_WIDTH};
 use freakymate::network_controller::NetworkController;
 use freakymate::presenter::Presenter;
 use freakymate::settings_controller::{Bridges, SettingsController};
-use freakymate::{actions, AppWindow, Navigation, Page};
+use freakymate::{AppWindow, Navigation, Page, actions};
 use freakymate_core::backlight::{BacklightBackend, BacklightService, BacklightState};
 use freakymate_core::network::{NetworkBackend, NetworkChannels, NetworkService};
 use freakymate_core::settings::{Settings, SettingsStore};

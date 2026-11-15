@@ -1,16 +1,16 @@
 //! End-to-end tests: real WebSocket client against the running Fake-Moonraker.
 
 use fake_moonraker::machine::MachineProfile;
-use fake_moonraker::server::{serve, ServerConfig};
+use fake_moonraker::server::{ServerConfig, serve};
 use futures_util::{SinkExt, StreamExt};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::timeout;
 use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 
 const WAIT_LIMIT: Duration = Duration::from_secs(10);
 

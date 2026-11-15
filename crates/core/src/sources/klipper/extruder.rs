@@ -25,11 +25,7 @@ impl ExtruderState {
     pub fn extrude_lengths(&self) -> Vec<f64> {
         let limit = self.max_extrude_only_mm.unwrap_or(DEFAULT_MAX_EXTRUDE_ONLY_MM);
         let lengths: Vec<f64> = EXTRUDE_LENGTHS_MM.into_iter().filter(|length| *length <= limit).collect();
-        if lengths.is_empty() {
-            vec![limit]
-        } else {
-            lengths
-        }
+        if lengths.is_empty() { vec![limit] } else { lengths }
     }
 }
 

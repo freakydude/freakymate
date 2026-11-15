@@ -5,7 +5,7 @@
 //! is valid for five seconds. Not simulated: the expiry of access and refresh tokens, trusted clients,
 //! `force_logins`, several users and LDAP.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};

@@ -15,8 +15,8 @@ mod device;
 mod input;
 mod presenter;
 
-use crate::backlight_controller::BacklightController;
 use crate::AppWindow;
+use crate::backlight_controller::BacklightController;
 use device::FrameBuffer;
 use input::Input;
 use presenter::Presenter;
@@ -141,10 +141,10 @@ impl Wake {
 
     fn notify(&self) {
         // A full socket already holds a wake-up.
-        if let Err(error) = (&self.sender).write(&[1]) {
-            if error.kind() != ErrorKind::WouldBlock {
-                log::warn!("cannot wake the event loop: {error}");
-            }
+        if let Err(error) = (&self.sender).write(&[1])
+            && error.kind() != ErrorKind::WouldBlock
+        {
+            log::warn!("cannot wake the event loop: {error}");
         }
     }
 }

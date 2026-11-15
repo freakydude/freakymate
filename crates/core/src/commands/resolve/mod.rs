@@ -10,7 +10,7 @@ mod mmu;
 
 use super::{Command, CommandError};
 use crate::domain::heads;
-use crate::sources::{afc, tool_macros, PrinterStatus, Sources};
+use crate::sources::{PrinterStatus, Sources, afc, tool_macros};
 
 impl Command {
     /// Turns an intent into the commands this printer needs; every other command stays as it is. `status` shows the

@@ -176,9 +176,5 @@ fn main() -> ExitCode {
         log::error!("{error}");
     }
     log::logger().flush();
-    if result.is_ok() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
-    }
+    if result.is_ok() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
 }

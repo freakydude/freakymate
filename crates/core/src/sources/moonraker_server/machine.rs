@@ -1,7 +1,7 @@
 //! Moonraker's `machine` component: what it reports about the printer host, and restarting its services or the host.
 
 use crate::moonraker::Call;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Network interface of the printer host as reported by Moonraker (read-only).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

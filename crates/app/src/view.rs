@@ -1,6 +1,6 @@
 //! Pure display derivations from the printer state; free of Slint types and therefore testable.
 
-use crate::{format, Severity};
+use crate::{Severity, format};
 use chrono::{DateTime, Local};
 use freakymate_core::domain::estimates;
 use freakymate_core::domain::filament_match::{self, Difference, ToolMatch, Verdict};

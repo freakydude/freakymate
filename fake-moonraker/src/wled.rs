@@ -2,7 +2,7 @@
 //! applies the initial preset, after which Moonraker does not know the brightness (`-1`), and `control` only acts
 //! while the strip is on.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 const INITIAL_PRESET: i64 = 1;
 

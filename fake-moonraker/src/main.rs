@@ -1,6 +1,6 @@
 use fake_moonraker::access::AccessConfig;
 use fake_moonraker::machine::MachineProfile;
-use fake_moonraker::server::{serve, ServerConfig};
+use fake_moonraker::server::{ServerConfig, serve};
 use std::process::ExitCode;
 use std::time::Duration;
 use tokio::net::TcpListener;

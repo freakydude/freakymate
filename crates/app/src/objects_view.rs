@@ -2,7 +2,7 @@
 //! when the objects or the bed change, not with every status: a slicer outline can have hundreds of points.
 
 use crate::items::replace_rows;
-use crate::{bed_map, BedMapItem, PrintObjectItem, Printer};
+use crate::{BedMapItem, PrintObjectItem, Printer, bed_map};
 use freakymate_core::sources::klipper::{Bed, BedPoint, PrintObject};
 use slint::{ModelRc, SharedString, VecModel};
 use std::cell::RefCell;

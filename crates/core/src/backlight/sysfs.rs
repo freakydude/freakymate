@@ -1,7 +1,7 @@
 //! Backlight through the kernel's backlight class (`/sys/class/backlight/<device>`): DSI and SPI displays
 //! (`gpio-backlight`, `pwm-backlight`) and laptops alike, the kernel already abstracts them.
 
-use super::{percent_from_raw, raw_from_percent, Backlight, BacklightError};
+use super::{Backlight, BacklightError, percent_from_raw, raw_from_percent};
 use std::fs::{self, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -156,11 +156,7 @@ fn describe_devices(root: &Path) -> String {
         })
         .collect();
     devices.sort();
-    if devices.is_empty() {
-        "none".to_owned()
-    } else {
-        devices.join(", ")
-    }
+    if devices.is_empty() { "none".to_owned() } else { devices.join(", ") }
 }
 
 fn is_device(dir: &Path) -> bool {

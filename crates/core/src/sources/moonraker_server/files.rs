@@ -2,7 +2,7 @@
 
 use crate::moonraker::Call;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone, PartialEq, Default, Deserialize)]
 pub struct FileEntry {
@@ -131,10 +131,10 @@ fn per_filament_texts<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Resu
 
 fn split_per_filament(text: &str) -> Vec<String> {
     let text = text.trim();
-    if text.starts_with('[') {
-        if let Ok(list) = serde_json::from_str::<Vec<String>>(text) {
-            return list.into_iter().map(|item| item.trim().to_owned()).collect();
-        }
+    if text.starts_with('[')
+        && let Ok(list) = serde_json::from_str::<Vec<String>>(text)
+    {
+        return list.into_iter().map(|item| item.trim().to_owned()).collect();
     }
     if text.is_empty() {
         return Vec::new();
