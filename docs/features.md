@@ -54,7 +54,7 @@ probe still counts as the probe).
 - **Light**: the light symbol in the status bar opens a panel with the main (chamber) light as a switch, every LED
   (`neopixel`, `led`, `dotstar`, …) on, off and dimmed as white light, and the effects of the
   [led_effect](https://github.com/julianschill/klipper-led_effect) plugin when it is installed.
-- **Tune** tab of Motion: what one corrects while watching a print: Z offset (babysteps, apply to probe/endstop, save config) and
+- **Tune** tab of Motion: what one corrects while watching a print: Z offset (babysteps, apply to probe/endstop, save config), below it the Z shift of Klipper's `z_thermal_adjust` as a separate line when that module is on, and
   the speed factor, with a quiet note that layer times then differ from the slicer's plan. The **Expert** tab holds
   the calibration values until the next restart: flow factor, pressure advance and smooth time, velocity and
   acceleration limits, square corner velocity, minimum cruise ratio and firmware retraction; it shows where a value
