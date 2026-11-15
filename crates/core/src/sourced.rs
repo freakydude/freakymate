@@ -24,6 +24,10 @@ impl<T> Sourced<T> {
     pub fn estimated(value: T, origin: &'static str) -> Self {
         Self { value, provenance: Provenance::Estimated, origin }
     }
+
+    pub fn is_measured(&self) -> bool {
+        self.provenance == Provenance::Measured
+    }
 }
 
 /// The measurement if there is one, else the estimate: a value the printer really produced always beats a prediction.

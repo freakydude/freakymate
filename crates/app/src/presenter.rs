@@ -8,8 +8,8 @@ use crate::files_view::{FileState, FilesView};
 use crate::history_view::HistoryView;
 use crate::items::{
     compared_tool_items, connection_name, fan_item, fans_part_fan_first, head_item, head_nozzles, heater_item,
-    heaters_by_head, host_interface_item, led_effect_item, led_item, no_head_selected, power_item, replace_rows,
-    selected_head, sensor_item, split_tuning, spool_in_use_target, spool_tool, tuning_item, update_item,
+    heaters_by_head, host_interface_item, keeping_parts, led_effect_item, led_item, no_head_selected, power_item,
+    replace_rows, selected_head, sensor_item, split_tuning, spool_in_use_target, spool_tool, tuning_item, update_item,
 };
 use crate::macro_view::MacroView;
 use crate::mmu_view::{JobFile, MmuView};
@@ -39,7 +39,7 @@ use freakymate_core::sources::spoolman::{Spool, SpoolmanState};
 use freakymate_core::sources::toolchanger::ToolchangerStatus;
 use freakymate_core::sources::PrinterStatus;
 use freakymate_core::{Access, Command, ConnectionState, Event, PrinterService, Query, Snapshot};
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -410,7 +410,14 @@ impl Presenter {
     fn show_heads(&self, printer: &Printer, snapshot: &Snapshot, lanes: &[Lane]) {
         let status = &snapshot.status;
         let rows = heads::head_rows(&snapshot.tree, status, lanes);
-        replace_rows(&self.heads, rows.iter().map(|row| head_item(row, status)).collect());
+        let heads = rows.iter().enumerate().map(|(index, row)| {
+            let mut item = head_item(row, status);
+            if let Some(shown) = self.heads.row_data(index) {
+                item.path = keeping_parts(item.path, &shown.path);
+            }
+            item
+        });
+        replace_rows(&self.heads, heads.collect());
         self.mmu.show_pages(status, lanes, &rows);
         printer.set_mounted_head(rows.iter().position(|row| row.mounted).map_or(-1, |row| row as i32));
         let changer = status.toolchanger.as_ref();

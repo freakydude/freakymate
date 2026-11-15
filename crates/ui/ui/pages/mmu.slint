@@ -9,7 +9,7 @@ import { StateIcons } from "../state-icons.slint";
 import { ButtonKind, Card, IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
 import { FilamentColors, FilamentSwatch } from "../components/filament-swatch.slint";
 import { FilamentPath } from "../components/filament-path.slint";
-import { BufferGauge, BypassTile, GateTile, MmuTexts, SlotTile } from "../components/mmu-tiles.slint";
+import { BypassTile, FlowGuardInstrument, GateTile, MmuTexts, SlotTile } from "../components/mmu-tiles.slint";
 
 // Recover and unlock while the MMU holds the print or is locked; the print page shows the same in its strip.
 component MmuRecoverRow inherits HorizontalLayout {
@@ -144,41 +144,10 @@ export component MmuGatesTab inherits Rectangle {
                         color: Theme.muted;
                         font-size: Theme.font-small;
                     }
-                    // Happy Hare's buffer is the selected gate's: another lane on the card has none to show.
-                    if Printer.mmu-has-buffer && Printer.lane-buffer != "" && !root.needs-recovery: VerticalLayout {
-                        spacing: Theme.spacing-small;
-                        IconLabel {
-                            icon: Icons.mmu-sync;
-                            text: @tr("Buffer: {}", MmuTexts.buffer(Printer.mmu-buffer-state));
-                            color: gauge.marker-color;
-                            font-size: Theme.font-small;
-                        }
-                        // The ends named beside the gauge, so the card keeps its height with the filament path above.
-                        HorizontalLayout {
-                            spacing: Theme.spacing;
-                            Text { text: @tr("Tension"); color: Theme.muted; font-size: Theme.font-small; vertical-alignment: center; }
-                            gauge := BufferGauge {
-                                horizontal-stretch: 1;
-                                bias: Printer.mmu-buffer-bias;
-                                state: Printer.mmu-buffer-state;
-                            }
-                            Text { text: @tr("Compression"); color: Theme.muted; font-size: Theme.font-small; vertical-alignment: center; }
-                        }
-                    }
-                    if Printer.has-mmu: HorizontalLayout {
-                        spacing: Theme.spacing;
-                        if Printer.mmu-flowguard-state != "off": IconLabel {
-                            icon: Icons.mmu-flowguard;
-                            text: MmuTexts.flowguard(Printer.mmu-flowguard-state, Printer.mmu-flowguard-detail);
-                            color: MmuTexts.flowguard-color(Printer.mmu-flowguard-state);
-                            font-size: Theme.font-small;
-                        }
-                        if Printer.mmu-flow-rate >= 0: IconLabel {
-                            icon: Icons.filament-flow;
-                            text: @tr("Flow {} %", round(Printer.mmu-flow-rate));
-                            color: Theme.muted;
-                            font-size: Theme.font-small;
-                        }
+                    // Buffer and FlowGuard are the selected gate's: another lane on the card has none to show. With an
+                    // encoder alone there is no buffer, but FlowGuard still has its line.
+                    if Printer.has-mmu && !root.needs-recovery && (Printer.mmu-flowguard-state != "off" || (Printer.mmu-has-buffer && Printer.lane-buffer != "")): FlowGuardInstrument {
+                        with-buffer: Printer.lane-buffer != "";
                     }
                     Rectangle { vertical-stretch: 1; }
                 }
@@ -206,22 +175,32 @@ export component MmuGatesTab inherits Rectangle {
     }
 }
 
-// Condensed state of the MMU for the print page: selected tool and gate, buffer, FlowGuard and, when the MMU paused the
-// print, the reason with the buttons to recover.
-export component MmuStrip inherits Card {
-    title: @tr("MMU");
-    icon: Icons.mmu-unit;
+// The filament in use on the print page with Happy Hare: tool and gate, the spool, and what the MMU does with it: the
+// way while the filament moves, buffer and FlowGuard while it prints and, when the MMU paused the print, the buttons to
+// recover.
+export component MmuStrip inherits Rectangle {
+    background: Theme.surface;
+    border-radius: Theme.radius;
     // Room left over goes evenly between the lines, not to one of them.
     VerticalLayout {
+        padding: Theme.padding;
         spacing: Theme.spacing-medium;
         alignment: space-between;
         HorizontalLayout {
             spacing: Theme.spacing;
+            Image {
+                cross-axis-self-alignment: center;
+                width: Theme.icon-small;
+                height: Theme.icon-small;
+                source: Icons.mmu-unit;
+                colorize: Theme.muted;
+            }
             Text {
                 text: Printer.mmu-bypass ? @tr("Bypass") : Printer.mmu-gate >= 0 ? (Printer.mmu-tool >= 0 ? "T" + Printer.mmu-tool + " · " : "") + @tr("Gate {}", Printer.mmu-gate) : @tr("No gate");
                 color: Theme.foreground;
                 font-size: Theme.font-normal;
                 font-weight: 700;
+                vertical-alignment: center;
             }
             Rectangle { horizontal-stretch: 1; }
             // The spool of the gate in use: its colours, its filament and what is left of it.
@@ -239,40 +218,11 @@ export component MmuStrip inherits Card {
                 color: Printer.spool-low ? Theme.warning : Theme.muted;
             }
         }
-        // Where the filament is, in the short form without the distance.
-        if !Printer.mmu-paused: FilamentPath { path: Printer.mmu-path; compact: true; }
+        // Where the filament is, while it is on its way: once loaded the line would only repeat itself.
+        if !Printer.mmu-paused && !Printer.mmu-path-settled: FilamentPath { path: Printer.mmu-path; compact: true; }
         // While the MMU holds the print, the reason and the buttons need the room; the reason already names the cause.
-        if Printer.mmu-has-buffer && !Printer.mmu-paused: VerticalLayout {
-            spacing: Theme.spacing-small;
-            IconLabel {
-                icon: Icons.mmu-sync;
-                text: @tr("Buffer: {}", MmuTexts.buffer(Printer.mmu-buffer-state));
-                color: strip-gauge.marker-color;
-                font-size: Theme.font-small;
-            }
-            strip-gauge := BufferGauge {
-                bias: Printer.mmu-buffer-bias;
-                state: Printer.mmu-buffer-state;
-            }
-        }
-        if !Printer.mmu-paused: HorizontalLayout {
-            spacing: Theme.spacing;
-            // The flow rate is short and stays whole; the FlowGuard text gives way when the strip is narrow.
-            if Printer.mmu-flowguard-state != "off": IconLabel {
-                icon: Icons.mmu-flowguard;
-                text: MmuTexts.flowguard(Printer.mmu-flowguard-state, Printer.mmu-flowguard-detail);
-                color: MmuTexts.flowguard-color(Printer.mmu-flowguard-state);
-                font-size: Theme.font-small;
-                horizontal-stretch: 1;
-                min-width: 0px;
-            }
-            if Printer.mmu-flow-rate >= 0: IconLabel {
-                icon: Icons.filament-flow;
-                text: @tr("Flow {} %", round(Printer.mmu-flow-rate));
-                color: Theme.muted;
-                font-size: Theme.font-small;
-                horizontal-stretch: 0;
-            }
+        if !Printer.mmu-paused && (Printer.mmu-has-buffer || Printer.mmu-flowguard-state != "off"): FlowGuardInstrument {
+            measured-flow-only: true;
         }
         // The reason of the pause stands in the banner of the print page.
         if Printer.mmu-paused || Printer.mmu-locked: MmuRecoverRow { }

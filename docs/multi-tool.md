@@ -517,6 +517,8 @@ Point     Free | Triggered | Disabled
 
 - `domain/load_path.rs` builds the chain for a lane from the tree: lane → unit → head. Both sources fill the same
   structs; the UI draws one card. `FilamentPath` of Happy Hare becomes one of its inputs.
+  `LoadPath::parts` lists what is drawn in the order the filament passes it (fitted sensors, hub, encoder, buffer,
+  gears, nozzle, and one stretch of tube between two points with its fill), so the UI holds no rule about positions.
 - Sensors owned by the filament changer leave the printer's sensor list (today only Happy Hare's do). What is left
   (a runout sensor of the printer) belongs to the machine.
 - Lane actions become one set of intents that the core resolves per source, like the existing commands:

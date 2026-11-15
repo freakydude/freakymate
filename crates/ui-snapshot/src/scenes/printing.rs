@@ -5,13 +5,16 @@ use super::temperature::{nozzle_history, temperature_leads_to_heaters};
 use super::STATUS_BAR_LIGHT;
 use crate::session::Session;
 use freakymate::{Actions, ChangerTab, Confirm, MmuDialogs, Navigation, Page, Printer};
+use freakymate_core::domain::load_path;
 use freakymate_core::sources::klipper::PrintState;
 use freakymate_core::Command;
 use slint::{ComponentHandle, Model};
 use std::time::Duration;
 
 /// The Layer tile of the print page and the main button of the layer pause dialog (800x480, no fitting).
-const LAYER_TILE: (f32, f32) = (580.0, 133.0);
+/// The spot lies in the tile with Happy Hare (small preview, tiles side by side) and without (large preview, tiles
+/// stacked).
+const LAYER_TILE: (f32, f32) = (430.0, 240.0);
 
 const LAYER_PAUSE_BUTTON: (f32, f32) = (440.0, 320.0);
 
@@ -27,6 +30,10 @@ const MAP_BENCHY_1: (f32, f32) = (275.0, 253.0);
 const EXCLUDE_BUTTON: (f32, f32) = (560.0, 432.0);
 
 const CLOSE_OBJECTS_BUTTON: (f32, f32) = (752.0, 92.0);
+
+/// A place the Exclude button covers while the dialog is open, where the print page behind it has nothing to tap: the
+/// gap between the job and the action column.
+const EXCLUDE_BUTTON_OVER_GAP: (f32, f32) = (684.0, 432.0);
 
 /// With Happy Hare Changer > Tools compares the tools with the file being printed.
 pub(super) fn tools_match_the_job(session: &mut Session) -> Result<(), String> {
@@ -64,7 +71,24 @@ fn tool_compare(session: &mut Session) -> Result<(), String> {
     Ok(())
 }
 
+/// Happy Hare loads the tool when a print starts; the fake leaves that to its commands, so the scene loads the selected
+/// gate first. A print with the filament still in the gate is a state no printer shows.
+fn load_selected_gate(session: &mut Session) -> Result<(), String> {
+    let snapshot = session.presenter.snapshot();
+    let Some(mmu) = snapshot.status.happy_hare() else {
+        return Ok(());
+    };
+    if mmu.gate < 0 || mmu.filament_pos == load_path::LOADED {
+        return Ok(());
+    }
+    session.service.send(Command::MmuLoad);
+    session.wait_until("filament loaded to the nozzle", |snapshot| {
+        snapshot.status.happy_hare().is_some_and(|mmu| mmu.filament_pos == load_path::LOADED)
+    })
+}
+
 pub(super) fn printing(session: &mut Session) -> Result<(), String> {
+    load_selected_gate(session)?;
     session.service.send(Command::StartPrint { filename: "benchy.gcode".into() });
     session.wait_until("print running", |snapshot| {
         snapshot.status.job.state == PrintState::Printing && snapshot.status.job.progress > 0.005
@@ -217,7 +241,7 @@ pub(super) fn status_bar_cancels_the_dialog(session: &mut Session) -> Result<(),
         return Err("a tap on the light symbol did not open the light panel".into());
     }
     navigation.set_light_open(false);
-    let (x, y) = EXCLUDE_BUTTON;
+    let (x, y) = EXCLUDE_BUTTON_OVER_GAP;
     session.tap(x, y);
     session.pump(Duration::from_secs(1));
     if session.presenter.snapshot().status.print_objects.iter().any(|object| object.excluded) {

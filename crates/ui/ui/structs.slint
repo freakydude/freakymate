@@ -122,21 +122,28 @@ export struct BarColors {
     longitudinal: bool,
 }
 
-// The way of the filament of a gate or lane on Happy Hare's `filament_pos` scale (see `FilamentPath`). Sensors: -1 not
-// fitted, 0 free, 1 triggered; in order along the way: gate entry, gate exit, hub, extruder, toolhead. `bowden-progress`
-// is 0 to 1 during a move through the bowden, -1 otherwise. The colours are those of the spool, as for `FilamentSwatch`.
+// What a piece of the filament's way is: a sensor, a stretch of tube (inside the lane, to the hub, the bowden, or one
+// of the short links at the head), the encoder, the buffer, the extruder gears or the nozzle.
+export enum PathPartKind { sensor, lane, hub, bowden, link, encoder, buffer, gears, nozzle }
+
+// One piece of the way, as the core lists them in the order the filament passes (`LoadPath::parts`).
+export struct PathPartItem {
+    kind: PathPartKind,
+    // A sensor: triggered. The encoder: it counts movement. Gears and nozzle: the filament has reached them. The
+    // buffer: it reports a side.
+    active: bool,
+    // A stretch of tube: the filled share, 0 to 1 from the lane's side.
+    fill: float,
+}
+
+// The way of the filament of a gate or lane (see `FilamentPath`): its pieces, the direction of a move (1 loading,
+// -1 unloading, 0 standing), the distance moved as text and the name of the lane. The colours are those of the spool,
+// as for `FilamentSwatch`.
 export struct FilamentPathItem {
-    position: int,
+    parts: [PathPartItem],
     direction: int,
     distance: string,
     gate-label: string,
-    bowden-progress: float,
-    gate-entry-sensor: int,
-    gate-sensor: int,
-    extruder-sensor: int,
-    toolhead-sensor: int,
-    // Where the lanes of a unit meet; -1 for none (drawn only when fitted).
-    hub-sensor: int,
     colors: BarColors,
 }
 

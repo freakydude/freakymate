@@ -2,17 +2,16 @@
 
 use crate::{format, view};
 use crate::{
-    BarColors, FanItem, FilamentPathItem, HeadItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, PowerItem,
-    ScaleItem, SensorItem, SpoolItem, ToolMatchItem, TuningItem, UpdateItem,
+    BarColors, FanItem, FilamentPathItem, HeadItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem,
+    PathPartItem, PathPartKind, PowerItem, ScaleItem, SensorItem, SpoolItem, ToolMatchItem, TuningItem, UpdateItem,
 };
 use freakymate_core::color::Rgba;
 use freakymate_core::domain::filament_match::{self, Difference, Supply, ToolMatch, Verdict};
 use freakymate_core::domain::heads::{HeadRow, PickUp};
-use freakymate_core::domain::load_path::{self, LoadPath};
+use freakymate_core::domain::load_path::{self, BufferSide, LoadPath, PathPart, PathScope, Stretch};
 use freakymate_core::domain::machine_tree::MachineTree;
 use freakymate_core::domain::spools::{self, FilamentColors, Lane, SpoolHolder};
 use freakymate_core::domain::temperature_limits::{self, Level, Limits};
-use freakymate_core::sources::happy_hare::PathSensor;
 use freakymate_core::sources::klipper::tuning::{TuningKey, TuningValue};
 use freakymate_core::sources::klipper::{Fan, Heater, Led, TemperatureSensor};
 use freakymate_core::sources::led_effect::LedEffect;
@@ -167,7 +166,7 @@ pub(crate) fn head_item(row: &HeadRow, status: &PrinterStatus) -> HeadItem {
         can_pick_spool: matches!(holder, Some(SpoolHolder::Tool(_) | SpoolHolder::ActiveSpool)),
         path: row.extruder.as_deref().map_or_else(no_path_item, |extruder| {
             let colors = row.lane.as_ref().map(|lane| lane_colors(status, lane)).unwrap_or_default();
-            load_path_item(&load_path::head_path(status, extruder), "", &colors)
+            load_path_item(&load_path::head_path(status, extruder), PathScope::HeadOnly, "", &colors)
         }),
     }
 }
@@ -352,45 +351,57 @@ pub(crate) fn tuning_item(value: &TuningValue) -> TuningItem {
     }
 }
 
-/// The state of a sensor on the path for the drawing: -1 not fitted, 0 free, 1 triggered.
-fn sensor_state(sensor: PathSensor) -> i32 {
-    match sensor {
-        PathSensor::Absent => -1,
-        PathSensor::Free => 0,
-        PathSensor::Triggered => 1,
-    }
-}
-
-/// The card without a lane to show: no filament, no sensors.
+/// The card without a lane to show: the way without filament and without sensors.
 pub(crate) fn no_path_item() -> FilamentPathItem {
-    FilamentPathItem {
-        position: load_path::UNKNOWN,
-        bowden_progress: -1.0,
-        gate_entry_sensor: -1,
-        gate_sensor: -1,
-        extruder_sensor: -1,
-        toolhead_sensor: -1,
-        hub_sensor: -1,
-        ..FilamentPathItem::default()
-    }
+    load_path_item(&LoadPath::empty(), PathScope::Whole, "", &FilamentColors::default())
 }
 
 /// The load path of a lane of either source; `label` names the lane's piece. A lane that holds no filament has no
 /// position, so nothing is drawn filled.
-pub(crate) fn load_path_item(path: &LoadPath, label: &str, colors: &FilamentColors) -> FilamentPathItem {
+pub(crate) fn load_path_item(
+    path: &LoadPath,
+    scope: PathScope,
+    label: &str,
+    colors: &FilamentColors,
+) -> FilamentPathItem {
+    let parts: Vec<PathPartItem> = path.parts(scope).into_iter().map(path_part_item).collect();
     FilamentPathItem {
-        position: path.position.unwrap_or(load_path::UNKNOWN),
+        parts: ModelRc::new(VecModel::from(parts)),
         direction: path.direction,
         distance: path.distance.map(view::path_distance).unwrap_or_default().into(),
         gate_label: label.into(),
-        bowden_progress: path.bowden_progress.map_or(-1.0, |progress| progress as f32),
-        gate_entry_sensor: sensor_state(path.entry),
-        gate_sensor: sensor_state(path.exit),
-        extruder_sensor: sensor_state(path.extruder),
-        toolhead_sensor: sensor_state(path.toolhead),
-        hub_sensor: sensor_state(path.hub),
         colors: bar_colors(colors),
     }
+}
+
+fn path_part_item(part: PathPart) -> PathPartItem {
+    let (kind, active, fill) = match part {
+        PathPart::Sensor { triggered } => (PathPartKind::Sensor, triggered, 0.0),
+        PathPart::Tube { stretch, fill } => (tube_kind(stretch), false, fill),
+        PathPart::Encoder { moving } => (PathPartKind::Encoder, moving, 0.0),
+        PathPart::Buffer(side) => (PathPartKind::Buffer, side != BufferSide::Unknown, 0.0),
+        PathPart::Gears { reached } => (PathPartKind::Gears, reached, 0.0),
+        PathPart::Nozzle { reached } => (PathPartKind::Nozzle, reached, 0.0),
+    };
+    PathPartItem { kind, active, fill: fill as f32 }
+}
+
+fn tube_kind(stretch: Stretch) -> PathPartKind {
+    match stretch {
+        Stretch::Lane => PathPartKind::Lane,
+        Stretch::Hub => PathPartKind::Hub,
+        Stretch::Bowden => PathPartKind::Bowden,
+        Stretch::ExtruderEntry | Stretch::Extruder | Stretch::Hotend | Stretch::GearsToNozzle => PathPartKind::Link,
+    }
+}
+
+/// `path` with the parts model of `previous` while the parts are the same: a new model counts as a change and would
+/// rebuild the drawn pieces on every status update.
+pub(crate) fn keeping_parts(mut path: FilamentPathItem, previous: &FilamentPathItem) -> FilamentPathItem {
+    if previous.parts.iter().eq(path.parts.iter()) {
+        path.parts = previous.parts.clone();
+    }
+    path
 }
 
 /// The colours of the filament in a lane: of a multi-colour spool, else the one colour its source reports (AFC falls

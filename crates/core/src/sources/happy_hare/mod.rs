@@ -12,7 +12,8 @@ mod sync_feedback;
 pub use gates::{GateAvailability, LoadedFilament, MmuGate, BYPASS};
 pub use sensors::{is_shown_by_mmu, MmuSensor, PathSensor};
 pub use sync_feedback::{
-    FlowGuard, FlowGuardState, SyncFeedback, SyncFeedbackState, ORIGIN_ENCODER, ORIGIN_SYNC_FEEDBACK,
+    BufferSides, EncoderHeadroom, FlowGuard, FlowGuardState, SyncFeedback, SyncFeedbackState, ORIGIN_ENCODER,
+    ORIGIN_SYNC_FEEDBACK,
 };
 
 use super::fields::{count, flag, integer, text};
@@ -23,7 +24,7 @@ use crate::sourced::Sourced;
 use gates::{read_gates, read_tool_to_gate};
 use sensors::{listed_sensors, read_sensors};
 use serde_json::Value;
-use sync_feedback::{read_flow_rate, read_flowguard, read_sync_feedback};
+use sync_feedback::{read_encoder_headroom, read_flow_rate, read_flowguard, read_sync_feedback};
 
 /// Oldest Happy Hare the project supports; older versions report different fields.
 const MIN_VERSION: (u32, u32) = (4, 1);
@@ -97,6 +98,8 @@ pub struct MmuStatus {
     pub sensors: Vec<MmuSensor>,
     pub sync_feedback: Option<SyncFeedback>,
     pub flowguard: Option<FlowGuard>,
+    /// With an armed encoder: how far FlowGuard is from tripping on it.
+    pub encoder_headroom: Option<EncoderHeadroom>,
     /// Flow rate in percent: measured by the encoder, else estimated by the sync-feedback controller with a
     /// proportional sensor. `None` if neither exists.
     pub flow_rate: Option<Sourced<f64>>,
@@ -214,6 +217,7 @@ pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
     let num_gates = count::<usize>(mmu, "num_gates").max(count(machine, "num_gates")).unwrap_or_default();
     let num_units = count::<usize>(machine, "num_units").unwrap_or_default().max(1);
     let sensors = read_sensors(mmu);
+    let sync_feedback = read_sync_feedback(mmu, &sensors);
     let tool_to_gate = read_tool_to_gate(mmu);
     Some(MmuStatus {
         version: text(machine, "happy_hare_version").to_owned(),
@@ -255,8 +259,9 @@ pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
         spoolman_support: text(mmu, "spoolman_support").to_owned(),
         flow_rate: read_flow_rate(mmu, &sensors),
         flowguard: read_flowguard(mmu, &sensors),
+        encoder_headroom: read_encoder_headroom(mmu),
         sensors,
-        sync_feedback: read_sync_feedback(mmu),
+        sync_feedback,
     })
 }
 /// `major.minor` of a version such as `4.1.0` or `v4.10`.
@@ -372,7 +377,10 @@ mod tests {
             mmu.gates,
             vec![MmuGate { index: 0, availability: GateAvailability::Empty, tools: vec![0], ..MmuGate::default() }]
         );
-        assert_eq!(mmu.sync_feedback, Some(SyncFeedback { state: SyncFeedbackState::Inactive, bias: -1.0 }));
+        assert_eq!(
+            mmu.sync_feedback,
+            Some(SyncFeedback { state: SyncFeedbackState::Inactive, bias: -1.0, sides: BufferSides::Both })
+        );
         let flowguard = mmu.flowguard.unwrap();
         assert!(flowguard.enabled && !flowguard.active);
         assert_eq!(mmu.servo, None);
@@ -512,6 +520,66 @@ mod tests {
         assert_eq!(state("something else").state, SyncFeedbackState::Disabled);
         assert_eq!(state("neutral").bias, 0.4);
         assert_eq!(read_mmu(&store(json!({ "mmu": { "sync_feedback_state": null } }))).unwrap().sync_feedback, None);
+    }
+
+    #[test]
+    fn the_fitted_sensors_say_which_sides_the_buffer_measures() {
+        let sides = |sensors: Value| {
+            read_mmu(&store(json!({ "mmu": { "sync_feedback_state": "neutral", "sensors": sensors } })))
+                .unwrap()
+                .sync_feedback
+                .unwrap()
+                .sides
+        };
+
+        assert_eq!(sides(json!({ "filament_compression": false })), BufferSides::CompressionOnly);
+        assert_eq!(sides(json!({ "filament_tension": true })), BufferSides::TensionOnly);
+        assert_eq!(sides(json!({ "filament_compression": false, "filament_tension": false })), BufferSides::Both);
+        assert_eq!(
+            sides(json!({ "filament_compression": false, "filament_tension": null })),
+            BufferSides::CompressionOnly
+        );
+        assert_eq!(
+            sides(json!({ "filament_compression": false, "filament_tension": false, "filament_proportional": false })),
+            BufferSides::Both
+        );
+    }
+
+    #[test]
+    fn the_headroom_is_read_from_an_armed_encoder_only() {
+        let headroom =
+            |encoder: Value| read_mmu(&store(json!({ "mmu": { "encoder": encoder } }))).unwrap().encoder_headroom;
+        let armed = json!({ "enabled": true, "detection_mode": 2, "headroom": 7.5, "detection_length": 12.0 });
+
+        assert_eq!(headroom(armed), Some(EncoderHeadroom { headroom: 7.5, detection_length: 12.0 }));
+        assert_eq!(
+            headroom(json!({ "enabled": false, "detection_mode": 2, "headroom": 7.5, "detection_length": 12.0 })),
+            None
+        );
+        assert_eq!(
+            headroom(json!({ "enabled": true, "detection_mode": 0, "headroom": 7.5, "detection_length": 12.0 })),
+            None
+        );
+        assert_eq!(headroom(Value::Null), None);
+    }
+
+    #[test]
+    fn the_tangle_threshold_is_known_while_tangle_prevention_can_work() {
+        let threshold = |sensors: Value, enabled: bool| {
+            read_mmu(&store(json!({ "mmu": {
+                "sensors": sensors,
+                "flowguard": { "enabled": true, "active": true, "level": -0.4 },
+                "tangle_prevention": { "enabled": enabled, "boosted": false, "threshold": 0.3 }
+            } })))
+            .unwrap()
+            .flowguard
+            .unwrap()
+            .tangle_threshold
+        };
+
+        assert_eq!(threshold(json!({ "filament_proportional": false }), true), Some(0.3));
+        assert_eq!(threshold(json!({ "filament_proportional": false }), false), None);
+        assert_eq!(threshold(json!({ "filament_tension": true }), true), None);
     }
 
     #[test]

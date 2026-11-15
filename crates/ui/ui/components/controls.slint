@@ -383,7 +383,8 @@ export component ValueTile inherits Rectangle {
     // A word under the action icon about what is set there (a planned pause); colours the icon with the accent.
     in property <string> action-note;
     callback clicked;
-    background: tile-touch.pressed ? Theme.surface-raised : Theme.surface;
+    // A tile that opens something is drawn as a field, lighter than a tile that only shows a value.
+    background: tile-touch.pressed ? Theme.surface-active : root.enabled-action ? Theme.surface-raised : Theme.surface;
     border-radius: Theme.radius;
     min-height: Theme.row-height-small;
     // The width of tiles side by side follows their `weight` only (default: equal), never their text:

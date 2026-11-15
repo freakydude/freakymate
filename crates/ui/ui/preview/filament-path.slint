@@ -1,6 +1,8 @@
-// Preview: the filament path in the states of a load and an unload, with the colour of the spool in the gate.
+// Preview: the filament path in the states of a load and an unload, with the colour of the spool in the gate, and
+// with the pieces a printer may or may not have (sensors, hub, encoder, buffer).
 
 import { Theme } from "../theme.slint";
+import { PathPartKind } from "../state.slint";
 import { Card } from "../components/controls.slint";
 import { FilamentPath } from "../components/filament-path.slint";
 
@@ -12,38 +14,50 @@ component State inherits Card {
 
 export component FilamentPathPreview inherits Window {
     width: 800px;
-    height: 680px;
+    height: 960px;
     background: Theme.background;
     VerticalLayout {
         padding: Theme.padding;
         spacing: Theme.spacing;
         State {
             caption: "Unloaded, parked in gate 0 (filament_pos 0)";
-            FilamentPath { path: { bowden-progress: -1, position: 0, colors: { first: #e31f2b, count: 1 }, gate-label: "Gate 0", gate-entry-sensor: 1, gate-sensor: 1, hub-sensor: -1, extruder-sensor: 0, toolhead-sensor: 0, distance: "0.0 mm" }; }
+            FilamentPath { path: { colors: { first: #e31f2b, count: 1 }, gate-label: "Gate 0", distance: "0.0 mm", parts: [{ kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.lane, fill: 0.6 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.bowden, fill: 0 }, { kind: PathPartKind.sensor, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.gears, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.sensor, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.nozzle, active: false }] }; }
         }
         State {
             caption: "Loading through the bowden (filament_pos 3, direction 1)";
-            FilamentPath { path: { bowden-progress: -1, position: 3, direction: 1, colors: { first: #2f9e44, count: 1 }, gate-label: "Gate 1", gate-entry-sensor: 1, gate-sensor: 1, hub-sensor: -1, extruder-sensor: 0, toolhead-sensor: 0, distance: "412.6 mm" }; }
+            FilamentPath { path: { direction: 1, colors: { first: #2f9e44, count: 1 }, gate-label: "Gate 1", distance: "412.6 mm", parts: [{ kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.lane, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.bowden, fill: 0.5 }, { kind: PathPartKind.sensor, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.gears, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.sensor, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.nozzle, active: false }] }; }
         }
         State {
             caption: "Coaxial three colours, at the toolhead sensor (filament_pos 8)";
-            FilamentPath { path: { bowden-progress: -1, position: 8, direction: 1, colors: { first: #ff0004, second: #ffa424, third: #000000, count: 3 }, gate-label: "Gate 2", gate-entry-sensor: 1, gate-sensor: 1, hub-sensor: -1, extruder-sensor: 1, toolhead-sensor: 1, distance: "1712.4 mm" }; }
+            FilamentPath { path: { direction: 1, colors: { first: #ff0004, second: #ffa424, third: #000000, count: 3 }, gate-label: "Gate 2", distance: "1712.4 mm", parts: [{ kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.lane, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.bowden, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.gears, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.nozzle, active: false }] }; }
         }
         State {
             caption: "Longitudinal two colours, in the extruder (filament_pos 7)";
-            FilamentPath { path: { bowden-progress: -1, position: 7, direction: 1, colors: { first: #7048e8, second: #15aabf, count: 2, longitudinal: true }, gate-label: "Gate 3", gate-entry-sensor: 1, gate-sensor: 1, hub-sensor: -1, extruder-sensor: 1, toolhead-sensor: 0, distance: "1690.0 mm" }; }
+            FilamentPath { path: { direction: 1, colors: { first: #7048e8, second: #15aabf, count: 2, longitudinal: true }, gate-label: "Gate 3", distance: "1690.0 mm", parts: [{ kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.lane, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.bowden, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.gears, active: true }, { kind: PathPartKind.link, fill: 0.3 }, { kind: PathPartKind.sensor, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.nozzle, active: false }] }; }
         }
         State {
             caption: "Loaded, unloading starts (filament_pos 10, direction -1)";
-            FilamentPath { path: { bowden-progress: -1, position: 10, direction: -1, colors: { first: #e31f2b, count: 1 }, gate-label: "Gate 0", gate-entry-sensor: 1, gate-sensor: 1, hub-sensor: -1, extruder-sensor: 1, toolhead-sensor: 1, distance: "-12.0 mm" }; }
+            FilamentPath { path: { direction: -1, colors: { first: #e31f2b, count: 1 }, gate-label: "Gate 0", distance: "-12.0 mm", parts: [{ kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.lane, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.bowden, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.gears, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.nozzle, active: true }] }; }
         }
         State {
             caption: "No sensors fitted (all are optional), loaded";
-            FilamentPath { path: { bowden-progress: -1, position: 10, colors: { first: #e31f2b, count: 1 }, gate-label: "Gate 0", gate-entry-sensor: -1, gate-sensor: -1, hub-sensor: -1, extruder-sensor: -1, toolhead-sensor: -1, distance: "1712.4 mm" }; }
+            FilamentPath { path: { colors: { first: #e31f2b, count: 1 }, gate-label: "Gate 0", distance: "1712.4 mm", parts: [{ kind: PathPartKind.lane, fill: 1 }, { kind: PathPartKind.bowden, fill: 1 }, { kind: PathPartKind.gears, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.nozzle, active: true }] }; }
         }
         State {
             caption: "Only a toolhead sensor, in the bowden";
-            FilamentPath { path: { position: 3, direction: 1, bowden-progress: 0.7, colors: { first: #2f9e44, count: 1 }, gate-label: "Gate 1", gate-entry-sensor: -1, gate-sensor: -1, hub-sensor: -1, extruder-sensor: -1, toolhead-sensor: 0, distance: "1202.0 mm" }; }
+            FilamentPath { path: { direction: 1, colors: { first: #2f9e44, count: 1 }, gate-label: "Gate 1", distance: "1202.0 mm", parts: [{ kind: PathPartKind.lane, fill: 1 }, { kind: PathPartKind.bowden, fill: 0.7 }, { kind: PathPartKind.gears, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.sensor, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.nozzle, active: false }] }; }
+        }
+        State {
+            caption: "Hub, encoder (counting) and buffer, loading (filament_pos 3)";
+            FilamentPath { path: { direction: 1, colors: { first: #4dabf7, count: 1 }, gate-label: "Gate 2", distance: "640.0 mm", parts: [{ kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.lane, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.hub, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.encoder, active: true }, { kind: PathPartKind.buffer, active: true }, { kind: PathPartKind.bowden, fill: 0.5 }, { kind: PathPartKind.sensor, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.gears, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.sensor, active: false }, { kind: PathPartKind.link, fill: 0 }, { kind: PathPartKind.nozzle, active: false }] }; }
+        }
+        State {
+            caption: "Black filament, loaded";
+            FilamentPath { path: { colors: { first: #000000, count: 1 }, gate-label: "Gate 3", distance: "1712.4 mm", parts: [{ kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.lane, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.bowden, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.gears, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.nozzle, active: true }] }; }
+        }
+        State {
+            caption: "The head of a tool changer: its own pieces only, loaded";
+            FilamentPath { path: { colors: { first: #e31f2b, count: 1 }, parts: [{ kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.gears, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.sensor, active: true }, { kind: PathPartKind.link, fill: 1 }, { kind: PathPartKind.nozzle, active: true }] }; }
         }
         Rectangle { vertical-stretch: 1; }
     }

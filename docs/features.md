@@ -5,7 +5,7 @@ What each page of FreakyMate does. Functions only appear when the printer has th
 shown, as in Mainsail: macros, heaters, temperature sensors, fans, LEDs, LED effects and filament sensors (a hidden
 probe still counts as the probe).
 
-- **Print**: thumbnail, progress, elapsed/remaining/ETA, layers with current and object height, filament; start, pause, resume, cancel, pause at a layer (planned pause shown), exclude objects (on a map of the bed if the slicer defines their outlines);
+- **Print**: thumbnail, progress and remaining time as the main figures with elapsed time, filament and ETA under the bar, layers with current and object height, speed and flow; start, pause, resume, cancel, pause at a layer (planned pause shown), exclude objects (on a map of the bed if the slicer defines their outlines);
   file browser with thumbnails, filament (material of each tool), nozzle and print time of each file.
   - **Prepare**: a tap on a file marks it; with one file marked, **Prepare** makes it the job of the print page and
     **Delete** removes it (with several marked, only **Delete**, which names the files first). Preparing happens only
@@ -77,7 +77,7 @@ probe still counts as the probe).
 
 | ![A prepared file on the print page](screenshots/print-prepared.png) | ![Pause at a layer](screenshots/layer-pause.png)            |
 | -------------------------------------------------------------------- | ----------------------------------------------------------- |
-| A prepared file with the filament check per tool                     | Pause at a layer, with the pause planned for layer 45       |
+| A prepared file with the filament check per tool                     | Pause at a layer, with the pause planned for layer 44       |
 | ![Exclude objects on the bed map](screenshots/objects-map.png)       | ![Calibrate tab](screenshots/calibrate.png)                 |
 | Exclude objects: the bed map with the outlines from the slicer       | The Calibrate tab: bed screws, Z height and the bed mesh    |
 | ![Bed mesh map](screenshots/bed-mesh.png)                   |                                                                       |
@@ -91,11 +91,17 @@ holds **Tools** and **Service**. The Gates tab and a strip on the print page sho
 - the gates and the bypass (five at a time): status, material, colour and the tools that take their filament from each
   gate; unload what is loaded, home, recover and unlock after a pause;
 - the way of the filament of the selected gate, from the gate through the bowden and the extruder to the nozzle,
-  filled in the colours of the spool as far as Happy Hare reports it (`filament_pos`), with the sensors on the way,
-  the direction and the distance; on the print page as a slim line;
-- the other MMU sensors, the sync-feedback buffer (tension, neutral, compression) and the FlowGuard state: ready, monitoring,
-  tangle prevention at work, or triggered with its reason;
-- the flow rate, measured by the encoder or estimated by the sync-feedback controller with a proportional sensor.
+  filled in the colours of the spool as far as Happy Hare reports it (`filament_pos`), with what is fitted on the
+  way (sensors, hub, encoder, buffer), the direction and the distance; on the print page as a slim line while the
+  filament is on its way (a load, an unload, a tool change);
+- the other MMU sensors;
+- the sync-feedback buffer and FlowGuard as one scale from tangle (tension) to clog (compression): where the buffer
+  stands, the tension from which tangle prevention raises the gear current, and how close FlowGuard is to a trigger;
+  a line above it states what stands out: ready, monitoring, tangle prevention at work, a rising clog or tangle
+  level, or triggered with its reason. A buffer with one switch shows the side it does not measure as an outline;
+- with an encoder, what is left before FlowGuard trips on it (headroom);
+- the flow rate, measured by the encoder or estimated by the sync-feedback controller with a proportional sensor
+  (the print page shows the measured one only).
 
 A tap on a gate opens what can be done with it: select, load, preload, check or eject it, and pick its spool. Without
 Spoolman the dialog sets material and colour of the gate in Happy Hare's gate map instead, from a set of common
@@ -114,7 +120,7 @@ gates and, on selectors with a servo, servo up and down.
 
 | ![Gates tab](screenshots/mmu.png)                                    | ![FlowGuard line while tangle prevention raises the gear current](screenshots/print-tangle-boost.png) |
 | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| The Gates tab: gates, sensors, buffer                                | The print page while tangle prevention raises the gear current (the FlowGuard line turns yellow)      |
+| The Gates tab: gates, sensors, buffer                                | The print page while tangle prevention raises the gear current (line and scale turn yellow)           |
 | ![Gate dialog](screenshots/gate-dialog.png)                          | ![Changer > Tools](screenshots/mmu-tools.png)                                                               |
 | A tap on a gate: select, load, preload, check, eject, pick its spool | Changer > Tools: T3 moved to gate 1, what each gate holds, EndlessSpool on                              |
 
