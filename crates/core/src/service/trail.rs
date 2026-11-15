@@ -98,10 +98,9 @@ pub(super) fn console_response(message: &str) {
 
 /// The followed fields of an object's changes; `None` for an object not followed or without such changes.
 fn followed_fields(name: &str, changes: &Value) -> Option<Map<String, Value>> {
-    let (_, fields) =
-        WATCHED
-            .iter()
-            .find(|(watched, _)| if watched.ends_with(' ') { name.starts_with(watched) } else { name == *watched })?;
+    let (_, fields) = WATCHED
+        .iter()
+        .find(|(watched, _)| if watched.ends_with(' ') { name.starts_with(watched) } else { name == *watched })?;
     let followed: Map<String, Value> = changes
         .as_object()?
         .iter()

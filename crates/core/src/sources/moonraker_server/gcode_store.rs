@@ -1,7 +1,7 @@
 //! The console: Moonraker's `gcode_store` of earlier lines and the responses Klipper sends as they come.
 
 use crate::moonraker::Call;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConsoleKind {
@@ -164,7 +164,9 @@ mod tests {
 
     #[test]
     fn plugin_markup_over_several_lines_loses_marker_and_tags() {
-        let art = response("// <span style=\"color:#C0C0C0\">(\\_/)</span>\n// <span style=\"color:#C0C0C0\">(\")_(\")</span> <b>Happy Hare</b>");
+        let art = response(
+            "// <span style=\"color:#C0C0C0\">(\\_/)</span>\n// <span style=\"color:#C0C0C0\">(\")_(\")</span> <b>Happy Hare</b>",
+        );
 
         assert_eq!(art.text(), "(\\_/)\n(\")_(\") Happy Hare");
     }

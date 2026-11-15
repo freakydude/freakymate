@@ -2,9 +2,9 @@
 //! report the same objects, `toolchanger` and one `tool <name>` per head. Fields that only one of them has are not
 //! read.
 
+use super::ObjectStore;
 use super::fields::{count, flag, text};
 use super::subscription::Subscription;
-use super::ObjectStore;
 use serde_json::Value;
 
 const TOOLCHANGER_OBJECT: &str = "toolchanger";
@@ -76,11 +76,7 @@ pub mod commands {
     pub const DROP: &str = "UNSELECT_TOOL";
 
     pub fn initialize(recover: bool) -> String {
-        if recover {
-            "INITIALIZE_TOOLCHANGER RECOVER=1".to_owned()
-        } else {
-            "INITIALIZE_TOOLCHANGER".to_owned()
-        }
+        if recover { "INITIALIZE_TOOLCHANGER RECOVER=1".to_owned() } else { "INITIALIZE_TOOLCHANGER".to_owned() }
     }
 }
 

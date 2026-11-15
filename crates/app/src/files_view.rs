@@ -1,7 +1,7 @@
 //! The file list: the files of the printer with their facts and thumbnails, and the files marked in the list.
 
 use crate::items::replace_rows;
-use crate::{format, view, FileItem, Printer};
+use crate::{FileItem, Printer, format, view};
 use freakymate_core::domain::file_catalog::FileCatalog;
 use freakymate_core::sources::moonraker_server::files::FileEntry;
 use slint::{Image, Model, ModelRc, SharedString, VecModel};

@@ -5,10 +5,10 @@
 
 use crate::session::Session;
 use freakymate::{Actions, ChangerTab, FilamentTab, MmuDialogs, Navigation, Page, Printer};
+use freakymate_core::Command;
 use freakymate_core::domain::changer;
 use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::sources::happy_hare::LoadedFilament;
-use freakymate_core::Command;
 use slint::{ComponentHandle, Model};
 use std::time::Duration;
 

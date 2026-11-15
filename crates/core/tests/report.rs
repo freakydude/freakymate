@@ -1,10 +1,10 @@
 //! The diagnostic report against the fake Moonraker in the same process.
 
 use fake_moonraker::machine::MachineProfile;
-use fake_moonraker::server::{serve, ServerConfig};
+use fake_moonraker::server::{ServerConfig, serve};
 use freakymate_core::report::collect;
 use freakymate_core::{CredentialStore, Endpoint};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::time::Duration;
 use tokio::net::TcpListener;
 

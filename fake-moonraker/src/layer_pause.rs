@@ -2,7 +2,7 @@
 //! the override of `SET_PRINT_STATS_INFO` that pauses on a layer change. The fake has to know what the macros do;
 //! FreakyMate does not and only calls them.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// `SET_PAUSE_NEXT_LAYER [ENABLE=0|1]` and `SET_PAUSE_AT_LAYER [ENABLE=0|1] [LAYER=<number>]`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

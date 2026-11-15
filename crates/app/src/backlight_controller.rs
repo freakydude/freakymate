@@ -3,9 +3,9 @@
 
 use crate::presenter::Presenter;
 use crate::{AppWindow, Backlight};
-use freakymate_core::backlight::{Availability, BacklightService, BacklightState, Screen};
-use freakymate_core::domain::screen_wake::{console_line_wake, WakeFacts};
 use freakymate_core::Snapshot;
+use freakymate_core::backlight::{Availability, BacklightService, BacklightState, Screen};
+use freakymate_core::domain::screen_wake::{WakeFacts, console_line_wake};
 use slint::ComponentHandle;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -82,10 +82,10 @@ impl BacklightController {
     fn observe_printer(&self, snapshot: &Snapshot) {
         let facts = WakeFacts::read(snapshot.connection, &snapshot.status);
         // The first snapshot is no change: the screen is lit at the start anyway.
-        if let Some(before) = self.facts.replace(Some(facts.clone())) {
-            if let Some(reason) = facts.wake_after(&before) {
-                self.service.wake(reason);
-            }
+        if let Some(before) = self.facts.replace(Some(facts.clone()))
+            && let Some(reason) = facts.wake_after(&before)
+        {
+            self.service.wake(reason);
         }
         if self.printing.replace(facts.printing()) != facts.printing() {
             self.service.set_printing(facts.printing());

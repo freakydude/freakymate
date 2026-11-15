@@ -1,6 +1,6 @@
 //! The parameters of `printer.objects.subscribe`. Every source adds its objects; only those Klipper lists are kept.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 pub(in crate::sources) struct Subscription<'a> {
     available: &'a [String],

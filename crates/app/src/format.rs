@@ -28,11 +28,7 @@ pub fn unix_moment(now: DateTime<Local>, unix_seconds: f64) -> String {
 }
 
 fn moment(now: DateTime<Local>, time: DateTime<Local>) -> String {
-    if time.date_naive() == now.date_naive() {
-        clock(time)
-    } else {
-        time.format("%d.%m. %H:%M").to_string()
-    }
+    if time.date_naive() == now.date_naive() { clock(time) } else { time.format("%d.%m. %H:%M").to_string() }
 }
 
 pub fn unix_clock(unix_seconds: f64) -> String {
@@ -61,11 +57,7 @@ pub fn filament_meters(millimeters: f64) -> String {
 
 /// Filament weight in grams; one decimal below 10 g.
 pub fn filament_weight(grams: f64) -> String {
-    if grams < 10.0 {
-        format!("{:.1} g", grams.max(0.0))
-    } else {
-        format!("{grams:.0} g")
-    }
+    if grams < 10.0 { format!("{:.1} g", grams.max(0.0)) } else { format!("{grams:.0} g") }
 }
 
 /// Display name of a G-code file: without folder and extension.

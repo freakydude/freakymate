@@ -4,8 +4,8 @@ use super::mmu::{mmu_bypass, mmu_gate, mmu_service, mmu_tools_and_groups};
 use super::temperature::heat_tabs;
 use crate::session::Session;
 use freakymate::{Actions, ChangerTab, Confirm, FilamentTab, MmuDialogs, MotionTab, Navigation, Page, Printer};
-use freakymate_core::sources::klipper::tuning::TuningKey;
 use freakymate_core::Command;
+use freakymate_core::sources::klipper::tuning::TuningKey;
 use slint::{ComponentHandle, Model, SharedString};
 use std::time::Duration;
 

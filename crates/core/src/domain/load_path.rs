@@ -9,10 +9,10 @@
 //! `AFC_extruder`.
 
 use super::machine_tree::LaneId;
+use crate::sources::PrinterStatus;
 use crate::sources::afc::{AfcStatus, BufferState};
 use crate::sources::happy_hare::{GateAvailability, MmuSensor, MmuStatus, MmuUnit, PathSensor, SyncFeedbackState};
 use crate::sources::klipper::FilamentSensor;
-use crate::sources::PrinterStatus;
 
 const SWITCH_SENSOR: &str = "filament_switch_sensor ";
 const GATE_ENTRY: &str = "mmu_entry";
@@ -422,11 +422,7 @@ fn generic(sensors: &[MmuSensor], name: &str) -> PathSensor {
 
 /// [`generic`] where `mmu.sensors` lists the sensor (a disabled one is absent), else `fallback`.
 fn generic_or(sensors: &[MmuSensor], name: &str, fallback: PathSensor) -> PathSensor {
-    if sensors.iter().any(|sensor| sensor.name == name) {
-        generic(sensors, name)
-    } else {
-        fallback
-    }
+    if sensors.iter().any(|sensor| sensor.name == name) { generic(sensors, name) } else { fallback }
 }
 
 /// A Klipper filament switch by its name; a disabled one counts as absent, as in `mmu.sensors`.
@@ -438,11 +434,7 @@ fn sensor(sensors: &[FilamentSensor], name: &str) -> PathSensor {
 
 /// A sensor owned by `owner`, which Happy Hare names only when it has several units.
 fn owned_sensor(sensors: &[FilamentSensor], single_unit: bool, owner: &str, name: &str) -> PathSensor {
-    if single_unit {
-        sensor(sensors, name)
-    } else {
-        sensor(sensors, &format!("{owner}:{name}"))
-    }
+    if single_unit { sensor(sensors, name) } else { sensor(sensors, &format!("{owner}:{name}")) }
 }
 
 #[cfg(test)]

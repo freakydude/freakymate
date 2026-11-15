@@ -1,7 +1,7 @@
 //! Queries the display asks Moonraker for: files, history, Spoolman, power devices and more.
 
 use super::session::Session;
-use super::{Event, Query, QUERY_TIMEOUT};
+use super::{Event, QUERY_TIMEOUT, Query};
 use crate::moonraker::access::{self};
 use crate::moonraker::{Call, Connection, Endpoint};
 use crate::sources::moonraker_server::files::{self, FileMetadata, ThumbnailImage};

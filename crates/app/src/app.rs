@@ -91,10 +91,10 @@ impl Application {
         }
         let window = AppWindow::new()?;
         // Wayland and X11 desktops find the icon through the app id and `freakymate.desktop`, not the window icon.
-        if !options.framebuffer {
-            if let Err(error) = slint::set_xdg_app_id("freakymate") {
-                log::warn!("cannot set the app id: {error}");
-            }
+        if !options.framebuffer
+            && let Err(error) = slint::set_xdg_app_id("freakymate")
+        {
+            log::warn!("cannot set the app id: {error}");
         }
         // Always in the user's configuration directory, also when the settings lie in printer_data/config.
         let (service, channels) =
@@ -180,10 +180,10 @@ pub fn watch_window_events(window: &AppWindow, backlight: Option<std::rc::Rc<Bac
     let fit = std::env::var_os("SLINT_SCALE_FACTOR").is_none();
     let weak = window.as_weak();
     window.window().on_winit_window_event(move |_, event| {
-        if let (Some(backlight), Some(activity)) = (&backlight, input_activity(event)) {
-            if backlight.input(activity) {
-                return EventResult::PreventDefault;
-            }
+        if let (Some(backlight), Some(activity)) = (&backlight, input_activity(event))
+            && backlight.input(activity)
+        {
+            return EventResult::PreventDefault;
         }
         match event {
             WindowEvent::Resized(_) if fit => {

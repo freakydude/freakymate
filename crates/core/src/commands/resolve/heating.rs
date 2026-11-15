@@ -2,9 +2,9 @@
 
 use crate::commands::{Command, CommandError};
 use crate::domain::machine_tree::MachineTree;
-use crate::sources::klipper::tuning::TuningKey;
-use crate::sources::klipper::{Setup, BED_HEATER};
 use crate::sources::PrinterStatus;
+use crate::sources::klipper::tuning::TuningKey;
+use crate::sources::klipper::{BED_HEATER, Setup};
 
 /// A heater target; never below zero, which is off.
 pub(super) fn target(heater: &str, target: f64) -> Command {

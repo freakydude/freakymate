@@ -470,11 +470,7 @@ fn tool_object_name(tool: usize) -> String {
 }
 
 pub(super) fn extruder_name(index: usize) -> String {
-    if index == 0 {
-        "extruder".to_owned()
-    } else {
-        format!("extruder{index}")
-    }
+    if index == 0 { "extruder".to_owned() } else { format!("extruder{index}") }
 }
 
 /// The settings of an extruder; `extruder` itself lists a few more (pressure advance, ...).

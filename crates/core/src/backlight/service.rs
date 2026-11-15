@@ -3,8 +3,8 @@
 #[cfg(feature = "dev-mode")]
 use super::simulated::Simulated;
 use super::{
-    usable_brightness, Availability, Backlight, BacklightError, BacklightSettings, BacklightState, Ddcutil, Program,
-    Screen, Standby, StandbyTimeouts, Sysfs, DEVICE_PREFIX,
+    Availability, Backlight, BacklightError, BacklightSettings, BacklightState, DEVICE_PREFIX, Ddcutil, Program,
+    Screen, Standby, StandbyTimeouts, Sysfs, usable_brightness,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -253,10 +253,10 @@ async fn run(
             return;
         }
     };
-    if let Some(percent) = settings.brightness {
-        if let Err(error) = backlight.set_brightness(usable_brightness(percent)) {
-            log::warn!("{error}");
-        }
+    if let Some(percent) = settings.brightness
+        && let Err(error) = backlight.set_brightness(usable_brightness(percent))
+    {
+        log::warn!("{error}");
     }
     let brightness = backlight.brightness().unwrap_or(100);
     let timeouts = settings.timeouts();

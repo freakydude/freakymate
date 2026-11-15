@@ -3,8 +3,8 @@
 use super::ask;
 use crate::session::Session;
 use freakymate::{Confirm, Navigation, Page};
-use freakymate_core::sources::klipper::{Activity, KlippyState};
 use freakymate_core::Command;
+use freakymate_core::sources::klipper::{Activity, KlippyState};
 use slint::ComponentHandle;
 use std::time::Duration;
 

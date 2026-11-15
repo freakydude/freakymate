@@ -1,14 +1,14 @@
 //! NetworkManager over D-Bus, see <https://networkmanager.dev/docs/api/latest/>.
 
 use super::{
-    wifi_networks, wifi_profile, AccessPoint, Availability, NetworkCommand, NetworkError, NetworkState, Security,
-    WiredLink,
+    AccessPoint, Availability, NetworkCommand, NetworkError, NetworkState, Security, WiredLink, wifi_networks,
+    wifi_profile,
 };
 use std::collections::HashMap;
 use std::time::Duration;
 use zbus::proxy::CacheProperties;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value};
-use zbus::{proxy, Connection};
+use zbus::{Connection, proxy};
 
 const DEVICE_TYPE_ETHERNET: u32 = 1;
 const DEVICE_TYPE_WIFI: u32 = 2;
@@ -233,11 +233,12 @@ impl NetworkManager {
         let (device, wireless) = self.wifi_device().await?;
         let saved = self.saved_wifi().await?;
         let existing: Vec<&SavedWifi> = saved.iter().filter(|saved| saved.ssid == ssid).collect();
-        if password.is_none() && !hidden {
-            if let Some(saved) = existing.first() {
-                let active = self.manager.activate_connection(&saved.path, &device, &no_object()).await?;
-                return self.wait_for_activation(&active, ssid).await;
-            }
+        if password.is_none()
+            && !hidden
+            && let Some(saved) = existing.first()
+        {
+            let active = self.manager.activate_connection(&saved.path, &device, &no_object()).await?;
+            return self.wait_for_activation(&active, ssid).await;
         }
         let (security, access_point) = if hidden {
             (Security::Open, no_object().into())

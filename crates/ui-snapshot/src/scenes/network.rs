@@ -3,8 +3,8 @@
 use super::ask;
 use crate::session::Session;
 use freakymate::{Confirm, Navigation, Page};
-use freakymate_core::network::{Availability, NetworkCommand, NetworkState};
 use freakymate_core::Query;
+use freakymate_core::network::{Availability, NetworkCommand, NetworkState};
 use slint::ComponentHandle;
 use std::time::Duration;
 

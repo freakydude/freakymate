@@ -4,7 +4,7 @@
 //! gate and its spool describe the same filament. Field names are those of Spoolman 0.2x as a real one returned them.
 
 use crate::happy_hare::{BASIC_FILAMENTS, SPOOLS};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const SPOOL_COUNT: u32 = 8;
 const START_WEIGHT: f64 = 1000.0;
@@ -66,11 +66,7 @@ impl Spoolman {
     }
 
     fn check(&self, id: u32) -> Result<(), String> {
-        if (1..=SPOOL_COUNT).contains(&id) {
-            Ok(())
-        } else {
-            Err(format!("No spool with ID {id} found."))
-        }
+        if (1..=SPOOL_COUNT).contains(&id) { Ok(()) } else { Err(format!("No spool with ID {id} found.")) }
     }
 
     fn spool(&self, id: u32) -> Result<Value, (u16, String)> {

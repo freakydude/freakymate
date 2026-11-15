@@ -2,8 +2,8 @@
 
 use crate::session::Session;
 use freakymate::{Actions, ChangerTab, FilamentTab, MmuDialogs, Navigation, Page, Printer};
-use freakymate_core::sources::happy_hare::ServoPosition;
 use freakymate_core::Command;
+use freakymate_core::sources::happy_hare::ServoPosition;
 use slint::ComponentHandle;
 use std::time::Duration;
 

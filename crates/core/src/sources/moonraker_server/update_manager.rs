@@ -1,7 +1,7 @@
 //! Moonraker's `update_manager` component: versions of the installed software and the system packages.
 
 use crate::moonraker::Call;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// The entry of the system packages (apt), next to the software repositories.
 const SYSTEM: &str = "system";

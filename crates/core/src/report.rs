@@ -9,11 +9,11 @@
 use crate::credentials::CredentialStore;
 use crate::domain::machine_tree::MachineTree;
 use crate::moonraker::{Connection, Endpoint, InvalidEndpoint};
-use crate::service::{introduce, Access};
+use crate::service::{Access, introduce};
 use crate::settings::{Settings, SettingsStore};
-use crate::sources::moonraker_server::{server_info, ServerComponents};
+use crate::sources::moonraker_server::{ServerComponents, server_info};
 use crate::sources::{ObjectStore, PrinterStatus, Sources};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::time::Duration;

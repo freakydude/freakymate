@@ -4,7 +4,7 @@ use crate::items::replace_rows;
 use crate::presenter::Presenter;
 use crate::{AppWindow, Network, WifiItem, WiredItem};
 use freakymate_core::network::{
-    signal_bars, Availability, NetworkChannels, NetworkCommand, NetworkNotice, NetworkService, NetworkState, Security,
+    Availability, NetworkChannels, NetworkCommand, NetworkNotice, NetworkService, NetworkState, Security, signal_bars,
 };
 use freakymate_core::{Endpoint, PrinterService, Query};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};

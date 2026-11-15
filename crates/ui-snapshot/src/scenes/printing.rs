@@ -1,13 +1,13 @@
 //! A running print: layer pause, objects, errors and the status bar.
 
+use super::STATUS_BAR_LIGHT;
 use super::ask;
 use super::temperature::{nozzle_history, temperature_leads_to_heaters};
-use super::STATUS_BAR_LIGHT;
 use crate::session::Session;
 use freakymate::{Actions, ChangerTab, Confirm, MmuDialogs, Navigation, Page, Printer};
+use freakymate_core::Command;
 use freakymate_core::domain::load_path;
 use freakymate_core::sources::klipper::PrintState;
-use freakymate_core::Command;
 use slint::{ComponentHandle, Model};
 use std::time::Duration;
 

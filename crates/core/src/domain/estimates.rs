@@ -1,7 +1,7 @@
 //! Values derived from several sources. Each rule prefers what the printer measured over what the slicer or
 //! Klipper predicted (see [`prefer_measured`]) and says which source it used.
 
-use crate::sourced::{prefer_measured, Sourced};
+use crate::sourced::{Sourced, prefer_measured};
 use crate::sources::klipper::PrintJob;
 use crate::sources::moonraker_server::files::FileMetadata;
 use crate::sources::moonraker_server::history::LastPrint;

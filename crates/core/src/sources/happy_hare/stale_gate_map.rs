@@ -11,7 +11,7 @@
 //! So when `gate_status` or `gate_color_rgb` changes, the fields Happy Hare clears in place are queried once more.
 //! Remove this module and its one call in `service.rs` once Happy Hare copies every list before changing it.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Fields that trigger the query; at least one of them arrives whenever Happy Hare empties a gate.
 const TRIGGERS: [&str; 2] = ["gate_status", "gate_color_rgb"];
@@ -40,8 +40,8 @@ pub fn query_after(changes: &Value) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sources::happy_hare::read_mmu;
     use crate::sources::ObjectStore;
+    use crate::sources::happy_hare::read_mmu;
 
     #[test]
     fn a_change_of_the_gate_status_or_colour_asks_again() {

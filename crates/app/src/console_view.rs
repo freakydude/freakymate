@@ -1,6 +1,6 @@
 //! The console list: the lines of Klipper's console as rows of fixed height, and the filter for temperature reports.
 
-use crate::{format, ConsoleItem, Printer};
+use crate::{ConsoleItem, Printer, format};
 use freakymate_core::sources::moonraker_server::gcode_store::{ConsoleKind, ConsoleLine};
 use slint::{Model, ModelRc, VecModel};
 use std::cell::Cell;

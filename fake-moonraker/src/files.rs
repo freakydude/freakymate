@@ -1,7 +1,7 @@
 //! Virtual G-code files with metadata and thumbnail.
 
 use crate::print_objects::Definitions;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::borrow::Cow;
 
 const PLACEHOLDER_SIZE: u32 = 300;
@@ -86,27 +86,15 @@ impl GcodeFile {
     /// Weight per filament; the long job is printed in two materials.
     fn filament_weights(&self) -> Vec<f64> {
         let total = self.filament_total() * 0.003;
-        if self.path == "long_job.gcode" {
-            vec![total * 0.4, 55.0]
-        } else {
-            vec![total]
-        }
+        if self.path == "long_job.gcode" { vec![total * 0.4, 55.0] } else { vec![total] }
     }
 
     fn filament_temps(&self) -> Vec<u32> {
-        if self.path == "long_job.gcode" {
-            vec![210, 235]
-        } else {
-            vec![210]
-        }
+        if self.path == "long_job.gcode" { vec![210, 235] } else { vec![210] }
     }
 
     fn filament_colors(&self) -> Vec<&'static str> {
-        if self.path == "long_job.gcode" {
-            vec!["#E6261F", "#2E7D32"]
-        } else {
-            vec!["#E6261F"]
-        }
+        if self.path == "long_job.gcode" { vec!["#E6261F", "#2E7D32"] } else { vec!["#E6261F"] }
     }
 
     /// What the slicer defined for `exclude_object`: the cube was sliced with label objects off, the long job by a

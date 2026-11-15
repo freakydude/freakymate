@@ -16,11 +16,11 @@ use crate::mmu_view::{JobFile, MmuView};
 use crate::objects_view::ObjectsView;
 use crate::spool_view::{SpoolView, SpoolmanLine};
 use crate::status_view::StatusView;
-use crate::{bed_map, format, thumbnail, view};
 use crate::{
     AppWindow, FanItem, FilamentSensorItem, HeadItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, Network,
     PowerItem, Printer, SensorItem, ToolMatchItem, TuningItem, UiSettings, UpdateItem,
 };
+use crate::{bed_map, format, thumbnail, view};
 use chrono::Local;
 use freakymate_core::domain::filament::{self, FilamentHandling};
 use freakymate_core::domain::filament_match::{self, ToolMatch};
@@ -30,14 +30,14 @@ use freakymate_core::domain::prepared_job::PreparedJob;
 use freakymate_core::domain::spools::{self, Lane};
 use freakymate_core::domain::temperature_limits::HeaterWatch;
 use freakymate_core::domain::{estimates, light, pause};
-use freakymate_core::sources::klipper::commands::{mesh_name_problem, MeshNameProblem};
-use freakymate_core::sources::klipper::{tuning, KlippyState, Leveling, BED_HEATER, NOZZLE_HEATER};
+use freakymate_core::sources::PrinterStatus;
+use freakymate_core::sources::klipper::commands::{MeshNameProblem, mesh_name_problem};
+use freakymate_core::sources::klipper::{BED_HEATER, KlippyState, Leveling, NOZZLE_HEATER, tuning};
 use freakymate_core::sources::moonraker_server::files::{FileEntry, FileMetadata, ThumbnailImage};
 use freakymate_core::sources::moonraker_server::gcode_store::{ConsoleKind, ConsoleLine};
 use freakymate_core::sources::moonraker_server::history::{FinishedJob, PrintHistory};
 use freakymate_core::sources::spoolman::{Spool, SpoolmanState};
 use freakymate_core::sources::toolchanger::ToolchangerStatus;
-use freakymate_core::sources::PrinterStatus;
 use freakymate_core::{Access, Command, ConnectionState, Event, PrinterService, Query, Snapshot};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;

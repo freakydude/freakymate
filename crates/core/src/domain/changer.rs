@@ -1,8 +1,8 @@
 //! What the Changer page shows of AFC (`docs/multi-tool.md`, D7): its tool map on Tools and its service on Service.
 //! Happy Hare keeps its own tabs; the tool changer's state card comes from `toolchanger` (see [`super::heads`]).
 
-use crate::sources::afc::{HubReturn, ToolLane};
 use crate::sources::PrinterStatus;
+use crate::sources::afc::{HubReturn, ToolLane};
 
 /// What the Service tab offers for AFC.
 #[derive(Debug, Clone, PartialEq, Eq)]

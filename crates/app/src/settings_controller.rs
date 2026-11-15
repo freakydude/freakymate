@@ -3,8 +3,8 @@
 use crate::network_controller::NetworkController;
 use crate::presenter::Presenter;
 use crate::{AppWindow, Backlight, PresetItem, UiSettings};
-use freakymate_core::backlight::{usable_brightness, BacklightService, BacklightSettings};
-use freakymate_core::settings::{Settings, SettingsStore, TemperaturePreset, MAX_SHOWN_PRESETS};
+use freakymate_core::backlight::{BacklightService, BacklightSettings, usable_brightness};
+use freakymate_core::settings::{MAX_SHOWN_PRESETS, Settings, SettingsStore, TemperaturePreset};
 use freakymate_core::{Endpoint, PrinterService};
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::cell::RefCell;

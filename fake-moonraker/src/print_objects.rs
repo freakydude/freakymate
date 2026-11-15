@@ -2,7 +2,7 @@
 //! (Klipper upper-cases the names). The fake does not read them from the file: each demo file says how much its
 //! slicer defined, the objects themselves are the same.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// How much the slicer wrote into a file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

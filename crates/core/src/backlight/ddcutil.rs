@@ -5,11 +5,11 @@
 //! [`Backlight`] return at once. The brightness shown is the one last set here; the buttons of the monitor are not
 //! followed. Some monitors no longer answer on DDC once switched off; then waking over DDC fails and the log says so.
 
-use super::{percent_from_raw, raw_from_percent, Backlight, BacklightError};
+use super::{Backlight, BacklightError, percent_from_raw, raw_from_percent};
 use std::io;
 use std::process::{Command, Stdio};
-use std::sync::mpsc;
 use std::sync::Arc;
+use std::sync::mpsc;
 
 /// Prefix of the `device` setting that names a DDC/CI monitor, e.g. `ddc:i2c-7`.
 pub const DEVICE_PREFIX: &str = "ddc:";

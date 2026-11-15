@@ -1,6 +1,6 @@
 //! JSON-RPC 2.0 messages as Moonraker exchanges them over the WebSocket.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use thiserror::Error;
 
 /// Error returned by Moonraker or Klipper for a request.

@@ -1,7 +1,7 @@
 //! Moonraker's temperature store (`server.temperature_store`): one value per simulated second for every heater and
 //! temperature sensor, the newest last.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::VecDeque;
 
 /// Moonraker's default `temperature_store_size`.

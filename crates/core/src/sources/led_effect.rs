@@ -49,11 +49,7 @@ pub(super) fn read_effects(store: &ObjectStore) -> Vec<LedEffect> {
 
 /// Starts or stops an effect.
 pub fn set_effect(effect: &str, on: bool) -> String {
-    if on {
-        format!("SET_LED_EFFECT EFFECT={effect}")
-    } else {
-        format!("SET_LED_EFFECT EFFECT={effect} STOP=1")
-    }
+    if on { format!("SET_LED_EFFECT EFFECT={effect}") } else { format!("SET_LED_EFFECT EFFECT={effect} STOP=1") }
 }
 
 #[cfg(test)]

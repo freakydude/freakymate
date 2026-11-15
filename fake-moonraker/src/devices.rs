@@ -2,7 +2,7 @@
 //! names follow Klipper's Status Reference and the led_effect plugin (`enabled`); values are made up.
 
 use crate::gcode::{CommandError, DeviceCommand};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
 /// Generic fans: name and the speed its tachometer reports at 100 %, `None` without a tachometer.

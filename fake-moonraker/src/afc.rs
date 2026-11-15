@@ -8,7 +8,7 @@
 use crate::gcode::{AfcCommand, CommandError};
 use crate::machine::AfcLayout;
 use crate::spoolman;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 /// `AFC.spoolman` is the server URL of Moonraker's `[spoolman]` section (`AFC.py` L409, `AFC_utils.py` L444-454). The
 /// fake has no such option; this is Spoolman's default port on the machine itself.
@@ -640,11 +640,7 @@ impl Afc {
     /// `AFC_buffer.last_state`. The fake does not keep the last state: `Advancing` while a lane feeds from the buffer,
     /// else the state before any switch moved. A buffer that was used keeps its last state in AFC.
     fn buffer_state(&self) -> &'static str {
-        if self.buffer_active_lane().is_some() {
-            BUFFER_STATE_ADVANCING
-        } else {
-            BUFFER_STATE_IDLE
-        }
+        if self.buffer_active_lane().is_some() { BUFFER_STATE_ADVANCING } else { BUFFER_STATE_IDLE }
     }
 
     /// The switch sensors AFC registers (`AFC_utils.add_filament_switch`) with the AFC state the fake keeps, named
@@ -945,11 +941,7 @@ fn head_settings(head: &Head) -> Value {
 
 /// `AFC.py` L1471-1475: `check_homed` refuses without `auto_home`.
 fn require_homed(homed: bool) -> Result<(), CommandError> {
-    if homed {
-        Ok(())
-    } else {
-        Err(CommandError::new("Please home printer before doing a tool load"))
-    }
+    if homed { Ok(()) } else { Err(CommandError::new("Please home printer before doing a tool load")) }
 }
 
 #[cfg(test)]
@@ -1057,11 +1049,12 @@ mod tests {
         assert_eq!(lane(&afc, "lane1")["load"], false);
         assert_eq!(lane(&afc, "lane1")["spool_id"], Value::Null);
         assert_eq!(lane(&afc, "lane2")["load"], true);
-        assert!(afc
-            .apply(AfcCommand::LaneUnload { lane: Some("lane3".into()) }, true, true)
-            .unwrap_err()
-            .message()
-            .contains("printing"));
+        assert!(
+            afc.apply(AfcCommand::LaneUnload { lane: Some("lane3".into()) }, true, true)
+                .unwrap_err()
+                .message()
+                .contains("printing")
+        );
     }
 
     #[test]

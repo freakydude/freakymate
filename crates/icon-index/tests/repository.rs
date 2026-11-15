@@ -1,7 +1,7 @@
 //! Checks the real icon set in the repository; fails if a file violates the rules
 //! or `crates/ui/ui/icons.slint` does not match the folder contents.
 
-use icon_index::{check_icons, load_icons, repository_root, slint_index, Layout};
+use icon_index::{Layout, check_icons, load_icons, repository_root, slint_index};
 
 #[test]
 fn repository_icon_set_is_valid_and_index_is_current() {

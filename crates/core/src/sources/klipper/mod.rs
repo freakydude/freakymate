@@ -25,22 +25,22 @@ pub use bed_mesh::{BedMesh, MeshPoint, MeshSpan};
 pub use calibration::{
     BedMeshState, CalibrationMode, CalibrationSetup, CalibrationState, PendingSection, ScrewAdjustment, TestZ,
 };
-pub use devices::{instance, is_hidden, is_led, white_channel, Fan, FanKind, Led, WhiteChannel};
-pub use exclude_object::{object_at, PrintObject};
+pub use devices::{Fan, FanKind, Led, WhiteChannel, instance, is_hidden, is_led, white_channel};
+pub use exclude_object::{PrintObject, object_at};
 pub use extruder::ExtruderState;
 pub use fan_watch::FanWatch;
 pub use filament_sensors::FilamentSensor;
 pub use firmware_retraction::Retraction;
-pub use heaters::{Heater, TemperatureSensor, BED_HEATER, NOZZLE_HEATER};
+pub use heaters::{BED_HEATER, Heater, NOZZLE_HEATER, TemperatureSensor};
 pub use height_watch::HeightWatch;
 pub use job::{PrintJob, PrintState};
 pub use leveling::Leveling;
 pub use macros::{
-    details_from_settings, macro_script, offered_macros, MacroDetails, MacroField, MacroForm, MacroParam,
-    MacroValueError, OfferedMacro,
+    MacroDetails, MacroField, MacroForm, MacroParam, MacroValueError, OfferedMacro, details_from_settings,
+    macro_script, offered_macros,
 };
 pub use motion::{Axis, Bed, BedPoint, HomedAxes, Motion};
 pub use pending::PendingTargets;
-pub use setup::{lists_command, tool_commands, Setup};
+pub use setup::{Setup, lists_command, tool_commands};
 pub(in crate::sources) use status::KlipperParts;
-pub use status::{label, Activity, KlippyState};
+pub use status::{Activity, KlippyState, label};

@@ -2,7 +2,7 @@
 
 use crate::moonraker::Call;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
 pub struct PowerDevice {

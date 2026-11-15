@@ -1,6 +1,6 @@
 //! The gates of the MMU: availability, loaded filament, colours and tool mapping.
 
-use crate::color::{parse_hex, Rgba};
+use crate::color::{Rgba, parse_hex};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

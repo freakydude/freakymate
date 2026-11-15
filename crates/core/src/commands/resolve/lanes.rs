@@ -3,7 +3,7 @@
 use super::mmu;
 use crate::commands::{Command, CommandError};
 use crate::domain::machine_tree::LaneId;
-use crate::sources::{afc, PrinterStatus};
+use crate::sources::{PrinterStatus, afc};
 
 pub(super) fn load(status: &PrinterStatus, lane: LaneId) -> Result<Vec<Command>, CommandError> {
     Ok(vec![match lane {

@@ -4,16 +4,16 @@ use crate::access::AccessConfig;
 use crate::backend::Backend;
 use crate::machine::MachineProfile;
 use crate::session::Session;
+use axum::Router;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use axum::Router;
 use std::collections::HashMap;
 use std::io;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
 
@@ -117,10 +117,10 @@ async fn run_session(mut socket: WebSocket, state: AppState, connection_id: u64)
             },
         };
 
-        if let Some(message) = outgoing {
-            if socket.send(Message::Text(message.into())).await.is_err() {
-                break;
-            }
+        if let Some(message) = outgoing
+            && socket.send(Message::Text(message.into())).await.is_err()
+        {
+            break;
         }
     }
 }

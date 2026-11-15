@@ -42,7 +42,7 @@ pub struct Move {
 }
 
 impl Move {
-    pub fn linear_axes(&self) -> impl Iterator<Item = (Axis, f64)> {
+    pub fn linear_axes(&self) -> impl Iterator<Item = (Axis, f64)> + use<> {
         [(Axis::X, self.x), (Axis::Y, self.y), (Axis::Z, self.z)]
             .into_iter()
             .filter_map(|(axis, value)| value.map(|value| (axis, value)))

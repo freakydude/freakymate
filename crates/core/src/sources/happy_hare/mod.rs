@@ -9,11 +9,11 @@ mod sensors;
 pub mod stale_gate_map;
 mod sync_feedback;
 
-pub use gates::{GateAvailability, LoadedFilament, MmuGate, BYPASS};
-pub use sensors::{is_shown_by_mmu, MmuSensor, PathSensor};
+pub use gates::{BYPASS, GateAvailability, LoadedFilament, MmuGate};
+pub use sensors::{MmuSensor, PathSensor, is_shown_by_mmu};
 pub use sync_feedback::{
-    BufferSides, EncoderHeadroom, FlowGuard, FlowGuardState, SyncFeedback, SyncFeedbackState, ORIGIN_ENCODER,
-    ORIGIN_SYNC_FEEDBACK,
+    BufferSides, EncoderHeadroom, FlowGuard, FlowGuardState, ORIGIN_ENCODER, ORIGIN_SYNC_FEEDBACK, SyncFeedback,
+    SyncFeedbackState,
 };
 
 use super::fields::{count, flag, integer, text};

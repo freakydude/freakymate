@@ -1,11 +1,11 @@
 //! When the printer wakes a dark screen: something needs a look (pause, error, shutdown, lost connection), or a
 //! print starts or ends. The standby itself lives in [`crate::backlight`]; this only reads the printer.
 
-use super::pause::{interruption, Interruption};
+use super::pause::{Interruption, interruption};
 use crate::moonraker::ConnectionState;
+use crate::sources::PrinterStatus;
 use crate::sources::klipper::{KlippyState, PrintState};
 use crate::sources::moonraker_server::gcode_store::ConsoleLine;
-use crate::sources::PrinterStatus;
 
 /// The parts of the printer state whose change can wake the screen.
 #[derive(Debug, Clone, PartialEq, Default)]

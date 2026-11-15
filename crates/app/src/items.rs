@@ -1,10 +1,11 @@
 //! Turns core values into the row structs of the Slint models, and keeps those models up to date.
 
-use crate::{format, view};
 use crate::{
     BarColors, FanItem, FilamentPathItem, HeadItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem,
     PathPartItem, PathPartKind, PowerItem, ScaleItem, SensorItem, SpoolItem, ToolMatchItem, TuningItem, UpdateItem,
 };
+use crate::{format, view};
+use freakymate_core::ConnectionState;
 use freakymate_core::color::Rgba;
 use freakymate_core::domain::filament_match::{self, Difference, Supply, ToolMatch, Verdict};
 use freakymate_core::domain::heads::{HeadRow, PickUp};
@@ -12,6 +13,7 @@ use freakymate_core::domain::load_path::{self, BufferSide, LoadPath, PathPart, P
 use freakymate_core::domain::machine_tree::MachineTree;
 use freakymate_core::domain::spools::{self, FilamentColors, Lane, SpoolHolder};
 use freakymate_core::domain::temperature_limits::{self, Level, Limits};
+use freakymate_core::sources::PrinterStatus;
 use freakymate_core::sources::klipper::tuning::{TuningKey, TuningValue};
 use freakymate_core::sources::klipper::{Fan, Heater, Led, TemperatureSensor};
 use freakymate_core::sources::led_effect::LedEffect;
@@ -19,8 +21,6 @@ use freakymate_core::sources::moonraker_server::machine::HostInterface;
 use freakymate_core::sources::moonraker_server::power::PowerDevice;
 use freakymate_core::sources::moonraker_server::update_manager::UpdateInfo;
 use freakymate_core::sources::spoolman::Spool;
-use freakymate_core::sources::PrinterStatus;
-use freakymate_core::ConnectionState;
 use slint::{Model, ModelRc, SharedString, VecModel};
 
 pub(crate) fn connection_name(state: ConnectionState) -> &'static str {

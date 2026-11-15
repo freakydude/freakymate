@@ -5,7 +5,7 @@
 //! 2026-10-29); measured values are made up.
 
 use crate::gcode::CommandError;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 
 /// Largest step of a bisecting `TESTZ`, as in `manual_probe.py`.
@@ -381,11 +381,7 @@ impl Calibration {
 }
 
 fn must_be_homed(homed: bool) -> Result<(), CommandError> {
-    if homed {
-        Ok(())
-    } else {
-        Err(CommandError::new("Must home axis first"))
-    }
+    if homed { Ok(()) } else { Err(CommandError::new("Must home axis first")) }
 }
 
 fn command_name(command: &CalibrationCommand) -> &'static str {

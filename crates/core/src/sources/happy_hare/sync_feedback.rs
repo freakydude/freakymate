@@ -1,7 +1,7 @@
 //! The sync-feedback buffer, its flow rate and FlowGuard.
 
-use super::sensors::{has_proportional_sensor, MmuSensor};
-use crate::sourced::{prefer_measured, Sourced};
+use super::sensors::{MmuSensor, has_proportional_sensor};
+use crate::sourced::{Sourced, prefer_measured};
 use crate::sources::fields::{flag, text};
 use serde_json::Value;
 

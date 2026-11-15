@@ -5,7 +5,7 @@
 
 use crate::gcode::{CommandError, MmuCommand, ServoPosition};
 use crate::machine::MmuUnitSpec;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 const VERSION: &str = "4.1.0";
 const NONE_SELECTED: i32 = -1;
@@ -599,19 +599,11 @@ impl HappyHare {
     }
 
     fn require_homed(&self) -> Result<(), CommandError> {
-        if self.homed {
-            Ok(())
-        } else {
-            Err(CommandError::new("MMU is not homed"))
-        }
+        if self.homed { Ok(()) } else { Err(CommandError::new("MMU is not homed")) }
     }
 
     fn check_gate(&self, gate: usize) -> Result<(), CommandError> {
-        if gate < self.gates {
-            Ok(())
-        } else {
-            Err(CommandError::new(format!("Gate {gate} does not exist")))
-        }
+        if gate < self.gates { Ok(()) } else { Err(CommandError::new(format!("Gate {gate} does not exist"))) }
     }
 
     fn require_filament_at(&self, gate: usize) -> Result<(), CommandError> {

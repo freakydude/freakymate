@@ -128,11 +128,7 @@ fn wants_dark_text(cell: [u8; 3]) -> bool {
 fn luminance(colour: [u8; 3]) -> f64 {
     let linear = |channel: u8| {
         let value = f64::from(channel) / 255.0;
-        if value <= 0.040_45 {
-            value / 12.92
-        } else {
-            ((value + 0.055) / 1.055).powf(2.4)
-        }
+        if value <= 0.040_45 { value / 12.92 } else { ((value + 0.055) / 1.055).powf(2.4) }
     };
     0.2126 * linear(colour[0]) + 0.7152 * linear(colour[1]) + 0.0722 * linear(colour[2])
 }

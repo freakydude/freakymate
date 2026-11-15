@@ -231,11 +231,7 @@ impl StatusLog {
 
 /// How long a message stays in the status bar as an event.
 pub fn display_time(text: &str, is_error: bool) -> Duration {
-    if is_error {
-        ERROR_DISPLAY_TIME
-    } else {
-        info_display_time(text)
-    }
+    if is_error { ERROR_DISPLAY_TIME } else { info_display_time(text) }
 }
 
 /// How long an information stays in the status bar.

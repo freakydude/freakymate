@@ -1,7 +1,7 @@
 //! What Klipper is told: its methods behind Moonraker's `printer.*` and its own G-code. G-code of the plugins and
 //! macros reaches Klipper through [`run_gcode`] as well.
 
-use super::{instance, Axis, FanKind, Motion, TestZ, BED_HEATER, NOZZLE_HEATER};
+use super::{Axis, BED_HEATER, FanKind, Motion, NOZZLE_HEATER, TestZ, instance};
 use crate::moonraker::Call;
 use serde_json::json;
 

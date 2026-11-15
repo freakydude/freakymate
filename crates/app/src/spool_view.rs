@@ -1,7 +1,7 @@
 //! Spoolman on screen: the spool in use on the print and temperature pages, and the picker's rows.
 
 use crate::items::{id_or_none, replace_rows, spool_colors, spool_rows};
-use crate::{view, Printer, SpoolItem};
+use crate::{Printer, SpoolItem, view};
 use freakymate_core::domain::spools::Lane;
 use freakymate_core::sources::spoolman::Spool;
 use slint::{Model, ModelRc, VecModel};

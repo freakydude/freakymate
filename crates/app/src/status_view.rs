@@ -1,8 +1,8 @@
 //! The status bar and its flyout: the event the bar shows, the counter of unread errors and the list of all messages.
 
 use crate::items::replace_rows;
-use crate::status_log::{display_time, StatusLog};
-use crate::{format, AppWindow, MessageItem, Printer};
+use crate::status_log::{StatusLog, display_time};
+use crate::{AppWindow, MessageItem, Printer, format};
 use freakymate_core::sources::moonraker_server::gcode_store::ConsoleLine;
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use std::cell::RefCell;

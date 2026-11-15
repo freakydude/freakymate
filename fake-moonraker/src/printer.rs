@@ -10,9 +10,9 @@ use crate::gcode::{
 use crate::happy_hare::HappyHare;
 use crate::history::{Sample, TemperatureStore};
 use crate::layer_pause::LayerPause;
-use crate::machine::{MachineProfile, FILAMENT_SENSORS};
+use crate::machine::{FILAMENT_SENSORS, MachineProfile};
 use crate::print_objects::{self, Definitions};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::time::Duration;
 
 mod afc;
@@ -76,7 +76,10 @@ const MACRO_TEMPLATES: [(&str, &str); 10] = [
     ("PARK", "{% set Z = params.Z|default(10) %}\nG91\nG1 Z{Z}\nG90"),
     ("_PURGE_HELPER", "G1 E{params.AMOUNT|default(5)}"),
     ("PAUSE", "PAUSE_BASE"),
-    (LAYER_PAUSE_NEXT_MACRO, "{% set ENABLE = params.ENABLE|default(1)|int != 0 %}\n{% set MACRO = params.MACRO|default('PAUSE') %}"),
+    (
+        LAYER_PAUSE_NEXT_MACRO,
+        "{% set ENABLE = params.ENABLE|default(1)|int != 0 %}\n{% set MACRO = params.MACRO|default('PAUSE') %}",
+    ),
     (
         LAYER_PAUSE_AT_MACRO,
         "{% set ENABLE = params.ENABLE|int != 0 if params.ENABLE is defined else params.LAYER is defined %}\n{% set LAYER = params.LAYER|default(0)|int %}\n{% set MACRO = params.MACRO|default('PAUSE') %}",
@@ -616,12 +619,11 @@ impl Printer {
 
     fn apply_device(&mut self, command: DeviceCommand) -> Result<(), CommandError> {
         // `SET_FAN_SPEED` of a head's fan (`toolchanger.py` Z.837-838) is no device of the machine.
-        if let DeviceCommand::SetFanSpeed { fan, speed } = &command {
-            if let Some(toolchanger) = self.toolchanger.as_mut() {
-                if toolchanger.set_head_fan_speed(fan, *speed).is_some() {
-                    return Ok(());
-                }
-            }
+        if let DeviceCommand::SetFanSpeed { fan, speed } = &command
+            && let Some(toolchanger) = self.toolchanger.as_mut()
+            && toolchanger.set_head_fan_speed(fan, *speed).is_some()
+        {
+            return Ok(());
         }
         match self.devices.as_mut() {
             Some(devices) => devices.apply(command),
@@ -637,10 +639,10 @@ impl Printer {
             }
             // With a tool changer `T<n>` mounts a tool instead of changing a gate; with Happy Hare as well only the
             // numbers of its tools do, the others are gates.
-            if self.mmu.is_none() || self.toolchanger_has_tool(tool) {
-                if let Some(result) = self.select_tool(tool) {
-                    return result;
-                }
+            if (self.mmu.is_none() || self.toolchanger_has_tool(tool))
+                && let Some(result) = self.select_tool(tool)
+            {
+                return result;
             }
         }
         match self.mmu.as_mut() {
@@ -758,11 +760,7 @@ impl Printer {
     }
 
     fn resolve(&self, current: f64, value: f64) -> f64 {
-        if self.relative_positioning {
-            current + value
-        } else {
-            value
-        }
+        if self.relative_positioning { current + value } else { value }
     }
 
     fn set_z_offset(&mut self, z: Option<f64>, z_adjust: Option<f64>) {
@@ -820,11 +818,7 @@ impl Printer {
 }
 
 fn step_towards(current: f64, goal: f64, max_step: f64) -> f64 {
-    if (goal - current).abs() <= max_step {
-        goal
-    } else {
-        current + max_step * (goal - current).signum()
-    }
+    if (goal - current).abs() <= max_step { goal } else { current + max_step * (goal - current).signum() }
 }
 
 fn round(value: f64, decimals: i32) -> f64 {

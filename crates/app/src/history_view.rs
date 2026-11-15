@@ -2,9 +2,9 @@
 //! Moonraker keeps in its temperature store (`server.temperature_store`) is shown; objects it does not keep (for
 //! example stepper drivers) have no history.
 
-use crate::{chart, AppWindow, ChartLabel, Navigation, Printer};
-use freakymate_core::sources::moonraker_server::temperature_store::TemperatureSeries;
+use crate::{AppWindow, ChartLabel, Navigation, Printer, chart};
 use freakymate_core::sources::PrinterStatus;
+use freakymate_core::sources::moonraker_server::temperature_store::TemperatureSeries;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
