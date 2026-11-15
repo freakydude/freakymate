@@ -96,6 +96,75 @@
     {
       "type": "lldb",
       "request": "launch",
+      "name": "debug: freakymate (fake Moonraker, Encoder)",
+      "cargo": {
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
+      },
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (Encoder)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: freakymate (fake Moonraker, CO buffer)",
+      "cargo": {
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
+      },
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (CO buffer)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "debug: freakymate (fake Moonraker, TO buffer)",
+      "cargo": {
+        "args": [
+          "build",
+          "-p",
+          "freakymate",
+          "--bin",
+          "freakymate"
+        ]
+      },
+      "args": [
+        "--moonraker",
+        "http://127.0.0.1:7125"
+      ],
+      "env": {
+        "RUST_LOG": "info,freakymate_core=debug"
+      },
+      "preLaunchTask": "run: fake-moonraker (TO buffer)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
       "name": "debug: freakymate (fake Moonraker, Tool changer)",
       "cargo": {
         "args": [
@@ -276,6 +345,9 @@
         "basic",
         "happy-hare",
         "ercf",
+        "happy-hare-encoder",
+        "happy-hare-co",
+        "happy-hare-to",
         "toolchanger",
         "toolchanger-required",
         "happy-hare-units",

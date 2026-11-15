@@ -293,7 +293,8 @@ impl Printer {
             mmu: match (profile.mmu_units, profile.mmu_gates) {
                 (Some(units), _) => Some(HappyHare::with_units(units, profile.spoolman)),
                 (None, gates) => gates.map(|gates| HappyHare::new(gates, profile.spoolman)),
-            },
+            }
+            .map(|hare| hare.with_feedback(profile.buffer, profile.encoder)),
             toolchanger: if profile.tools > 0 {
                 Some(toolchanger::Toolchanger::new(&profile))
             } else {

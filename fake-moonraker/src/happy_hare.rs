@@ -4,7 +4,7 @@
 //! elapsed time: `action` is always `Idle`, loading and unloading complete immediately.
 
 use crate::gcode::{CommandError, MmuCommand, ServoPosition};
-use crate::machine::MmuUnitSpec;
+use crate::machine::{BufferKind, MmuUnitSpec};
 use serde_json::{json, Map, Value};
 
 const VERSION: &str = "4.1.0";
@@ -120,6 +120,10 @@ pub struct HappyHare {
     boosting: bool,
     /// `mmu.selector.servo` of a linear selector with a servo, as on an ERCF.
     servo: &'static str,
+    /// The sync-feedback buffer; the variant shows in `mmu.sensors` and in what the buffer fields hold.
+    buffer: BufferKind,
+    /// An encoder: `mmu.encoder`, `mmu.sensors.encoder` and the encoder mode of FlowGuard.
+    encoder: bool,
     /// The units of a v4 machine with several; empty for the older profiles, whose one unit is `unit0`.
     units: Vec<MmuUnitSpec>,
     /// `mmu.unit`: the unit of the selected gate, which stays when no gate is selected (`mmu_controller.py` L325-327,
@@ -157,6 +161,8 @@ const SENSOR_EXTRUDER: &str = "extruder";
 const SENSOR_TOOLHEAD: &str = "toolhead";
 const SENSOR_COMPRESSION: &str = "filament_compression";
 const SENSOR_TENSION: &str = "filament_tension";
+const SENSOR_PROPORTIONAL: &str = "filament_proportional";
+const SENSOR_ENCODER: &str = "encoder";
 
 /// What `filament_sensors` needs of a unit. Profile choices: every gate has an entry and an exit sensor (as on the
 /// recorded single-lane machine; `Kconfig.ercf` and `Kconfig.tradrack` make both optional), and every unit has a
@@ -230,9 +236,18 @@ impl HappyHare {
             spoolman,
             boosting: false,
             servo: SERVO_UP,
+            buffer: BufferKind::Proportional,
+            encoder: false,
             units,
             unit_selected: 0,
         }
+    }
+
+    /// Replaces the proportional buffer without encoder of the default machine.
+    pub fn with_feedback(mut self, buffer: BufferKind, encoder: bool) -> Self {
+        self.buffer = buffer;
+        self.encoder = encoder;
+        self
     }
 
     /// The units to describe: the profile's, or the one `unit0` of the older profiles.
@@ -734,7 +749,7 @@ impl HappyHare {
             "gate_spool_id": self.gate_spool.iter().map(|id| id.map_or(-1, i64::from)).collect::<Vec<_>>(),
             "spoolman_support": if self.spoolman { "push" } else { "off" },
             "pending_spool_id": -1,
-            "encoder": null,
+            "encoder": self.encoder_json(printing),
             "selector": { "has_bypass": self.selected_unit_has_bypass(), "servo": self.servo },
         });
         let (Some(fields), Value::Object(buffer)) = (mmu.as_object_mut(), self.buffer_fields(printing)) else {
@@ -765,42 +780,103 @@ impl HappyHare {
         self.units.get(self.unit_selected).is_some_and(|unit| vendor_profile(unit.vendor).has_bypass)
     }
 
-    /// The fields of a proportional buffer, as on the real device (no encoder), made up from the print state.
+    /// The sync-feedback fields of the buffer, made up from the print state. Proportional as on the real device;
+    /// the switch variants and the machine without buffer follow `happy-hare.md` (variants, Encoder). Without a
+    /// buffer all `sync_feedback_*` and `tangle_prevention` are `None` and an encoder leaves `flowguard` shortened
+    /// to `active`, `enabled` and `encoder_mode` (`unit/mmu_sync_feedback.py` L437-446 at c176ecc).
     fn buffer_fields(&self, printing: bool) -> Value {
-        let buffer = self.buffer(printing);
+        let Some(buffer) = self.buffer(printing) else {
+            let flowguard = self.encoder.then(|| {
+                // Assumption: `encoder_mode` is a boolean; the reference names the key but not the type.
+                json!({ "active": printing, "enabled": printing, "encoder_mode": true })
+            });
+            return json!({
+                "sync_feedback_enabled": null,
+                "sync_feedback_state": null,
+                "sync_feedback_bias_raw": null,
+                "sync_feedback_bias_modelled": null,
+                "sync_feedback_flow_rate": null,
+                "flowguard": flowguard,
+                "tangle_prevention": null,
+            });
+        };
+        let mut flowguard = json!({
+            "enabled": true,
+            "active": printing,
+            "trigger": "",
+            "reason": "",
+            "level": buffer.flowguard_level,
+            "max_clog": buffer.flowguard_level.max(0.0),
+            "max_tangle": buffer.flowguard_level.min(0.0),
+        });
+        if self.encoder {
+            flowguard["encoder_mode"] = json!(true);
+        }
         json!({
             "sync_feedback_enabled": 1,
             "sync_feedback_state": buffer.state,
             "sync_feedback_bias_raw": buffer.bias,
             "sync_feedback_bias_modelled": buffer.bias,
             "sync_feedback_flow_rate": buffer.flow_rate,
-            "flowguard": {
-                "enabled": true,
-                "active": printing,
-                "trigger": "",
-                "reason": "",
-                "level": buffer.flowguard_level,
-                "max_clog": 0.0,
-                "max_tangle": buffer.flowguard_level.min(0.0),
-            },
+            "flowguard": flowguard,
+            // Tangle prevention only acts with a proportional sensor: the dict exists for the switches, `active` stays
+            // false there.
             "tangle_prevention": {
                 "enabled": true,
-                "active": printing,
-                "boosted": printing && self.boosting,
+                "active": printing && self.buffer == BufferKind::Proportional,
+                "boosted": printing && self.boosting && self.buffer == BufferKind::Proportional,
                 "threshold": TANGLE_THRESHOLD,
                 "release": TANGLE_RELEASE,
             },
         })
     }
 
-    /// The proportional buffer in the three situations the UI tells apart: idle, printing in the middle, and
-    /// printing with the filament pulling at the stop. Values are made up and simplified.
-    fn buffer(&self, printing: bool) -> Buffer {
-        match (printing, self.boosting) {
-            (false, _) => Buffer { state: "inactive", bias: 0.0, flow_rate: 100.0, flowguard_level: 0.0 },
-            (true, false) => Buffer { state: "neutral", bias: 0.05, flow_rate: 98.47, flowguard_level: 0.0 },
-            (true, true) => Buffer { state: "tension", bias: -0.93, flow_rate: 98.47, flowguard_level: -0.4 },
+    /// The buffer in the three situations the UI tells apart: idle, printing in the middle, and printing with the
+    /// filament at the stop (`FAKE_MMU_TANGLE`). A switch reports only its own side: the neutral state is never the
+    /// opposite side (`mmu_sync_feedback.py` L174-181), the raw bias is 0 or +/-1, the flow rate stays at its start
+    /// value 100. The modelled bias equals the raw one here (assumption; Happy Hare estimates it while printing).
+    /// Values are made up and simplified. `None` without a buffer.
+    fn buffer(&self, printing: bool) -> Option<Buffer> {
+        let switch = |state, bias, flowguard_level| Buffer { state, bias, flow_rate: 100.0, flowguard_level };
+        let stressed = printing && self.boosting;
+        Some(match (self.buffer, printing, stressed) {
+            (BufferKind::None, ..) => return None,
+            (_, false, _) => Buffer { state: "inactive", bias: 0.0, flow_rate: 100.0, flowguard_level: 0.0 },
+            (BufferKind::Proportional, true, false) => {
+                Buffer { state: "neutral", bias: 0.05, flow_rate: 98.47, flowguard_level: 0.0 }
+            }
+            (BufferKind::Proportional, true, true) => {
+                Buffer { state: "tension", bias: -0.93, flow_rate: 98.47, flowguard_level: -0.4 }
+            }
+            (_, true, false) => switch("neutral", 0.0, 0.0),
+            (BufferKind::Compression, true, true) => switch("compressed", 1.0, 0.4),
+            (_, true, true) => switch("tension", -1.0, -0.4),
+        })
+    }
+
+    /// `mmu.encoder` (`unit/mmu_encoder.py` L471-481 at c176ecc), `None` without an encoder. The numbers are made
+    /// up (assumptions): a 15 mm detection window in automatic mode, the headroom full when idle, part used while
+    /// printing and nearly used up with the filament at the stop; the stop lets the flow rate fall.
+    fn encoder_json(&self, printing: bool) -> Value {
+        if !self.encoder {
+            return Value::Null;
         }
+        const DETECTION_LENGTH: f64 = 15.0;
+        let (headroom, flow_rate) = match (printing, self.boosting) {
+            (false, _) => (DETECTION_LENGTH, 100.0),
+            (true, false) => (11.0, 99.2),
+            (true, true) => (2.5, 91.0),
+        };
+        json!({
+            "encoder_pos": PATH_LENGTH * f64::from(self.filament_position().max(0)) / f64::from(FILAMENT_POSITION_LOADED),
+            "detection_length": DETECTION_LENGTH,
+            "headroom": headroom,
+            "min_headroom": 0.0,
+            "desired_headroom": 6.0,
+            "detection_mode": 2,
+            "enabled": printing,
+            "flow_rate": flow_rate,
+        })
     }
 
     /// `mmu.sensors` with generic names; the Happy Hare 3 aliases are included as Happy Hare 4.1 does for older UIs.
@@ -817,10 +893,29 @@ impl HappyHare {
             "toolhead": past(FILAMENT_POSITION_TOOLHEAD_SENSOR),
             "mmu_pre_gate": at_entry,
             "mmu_gear": past(FILAMENT_POSITION_GATE_SENSOR),
-            "filament_compression": false,
-            "filament_tension": printing && self.boosting,
-            "filament_proportional": false,
         });
+        // The buffer variant shows in which keys exist (a missing key is not fitted); only a proportional sensor
+        // has `filament_proportional`, then with the virtual switches (`unit/mmu_buffer.py` L90-103).
+        let stressed = printing && self.boosting;
+        let sensor_map = sensors.as_object_mut().expect("a JSON object");
+        match self.buffer {
+            BufferKind::Proportional => {
+                sensor_map.insert(SENSOR_COMPRESSION.to_owned(), json!(false));
+                sensor_map.insert(SENSOR_TENSION.to_owned(), json!(stressed));
+                sensor_map.insert(SENSOR_PROPORTIONAL.to_owned(), json!(false));
+            }
+            BufferKind::Compression => {
+                sensor_map.insert(SENSOR_COMPRESSION.to_owned(), json!(stressed));
+            }
+            BufferKind::Tension => {
+                sensor_map.insert(SENSOR_TENSION.to_owned(), json!(stressed));
+            }
+            BufferKind::None => {}
+        }
+        if self.encoder {
+            // "Movement detected", not "filament present" (`mmu_encoder.py`): true while the filament runs.
+            sensor_map.insert(SENSOR_ENCODER.to_owned(), json!(printing));
+        }
         // The active map holds the sensors of the selected gate's unit, its shared exit too (`mmu_sensor_manager.py`
         // L190-206, generic names without owner).
         let selected = usize::try_from(self.gate).ok();
@@ -878,8 +973,13 @@ impl HappyHare {
             add(owned(unit.toolhead, SENSOR_EXTRUDER), active && past(FILAMENT_POSITION_EXTRUDER_SENSOR));
             if let Some(buffer) = unit.buffer {
                 // `mmu_buffer.py` L64, L77: compression and tension belong to the buffer.
-                add(owned(buffer, SENSOR_COMPRESSION), false);
-                add(owned(buffer, SENSOR_TENSION), active && printing && self.boosting);
+                let stressed = active && printing && self.boosting;
+                if matches!(self.buffer, BufferKind::Proportional | BufferKind::Compression) {
+                    add(owned(buffer, SENSOR_COMPRESSION), self.buffer == BufferKind::Compression && stressed);
+                }
+                if matches!(self.buffer, BufferKind::Proportional | BufferKind::Tension) {
+                    add(owned(buffer, SENSOR_TENSION), stressed);
+                }
             }
         }
         sensors
@@ -1298,6 +1398,70 @@ mod tests {
         let names: Vec<&str> = objects.keys().map(String::as_str).collect();
         assert_eq!(names, ["mmu", "mmu_extruder extruder", "mmu_machine", "mmu_stepper unit0_gear"]);
         assert_eq!(objects["mmu_machine"]["unit_0"]["num_gates"], 4);
+    }
+
+    fn stressed_print(buffer: BufferKind, encoder: bool) -> Value {
+        let mut hare = HappyHare::new(4, false).with_feedback(buffer, encoder);
+        hare.apply(MmuCommand::FakeTangle { boosting: true }, IDLE).unwrap();
+        hare.status("printing")["mmu"].clone()
+    }
+
+    #[test]
+    fn a_compression_only_buffer_reports_only_its_own_side() {
+        let printing = stressed_print(BufferKind::Compression, true);
+
+        assert_eq!(printing["sync_feedback_state"], "compressed");
+        assert_eq!(printing["sync_feedback_bias_raw"], 1.0);
+        assert_eq!(printing["sync_feedback_flow_rate"], 100.0);
+        assert_eq!(printing["sensors"]["filament_compression"], true);
+        assert!(printing["sensors"].get("filament_tension").is_none());
+        assert!(printing["sensors"].get("filament_proportional").is_none());
+        assert_eq!(printing["tangle_prevention"]["active"], false);
+        assert_eq!(printing["flowguard"]["level"], 0.4);
+        let hare = HappyHare::new(4, false).with_feedback(BufferKind::Compression, false);
+        assert_eq!(hare.status("printing")["mmu"]["sync_feedback_state"], "neutral");
+    }
+
+    #[test]
+    fn a_tension_only_buffer_reports_only_its_own_side() {
+        let printing = stressed_print(BufferKind::Tension, false);
+
+        assert_eq!(printing["sync_feedback_state"], "tension");
+        assert_eq!(printing["sync_feedback_bias_raw"], -1.0);
+        assert_eq!(printing["sensors"]["filament_tension"], true);
+        assert!(printing["sensors"].get("filament_compression").is_none());
+        assert!(printing["sensors"].get("encoder").is_none());
+        assert!(printing["encoder"].is_null());
+        assert_eq!(printing["tangle_prevention"]["boosted"], false);
+        let names: Vec<String> = HappyHare::new(4, false)
+            .with_feedback(BufferKind::Tension, false)
+            .filament_sensors("standby")
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect();
+        assert!(names.contains(&"filament_switch_sensor filament_tension".to_owned()));
+        assert!(!names.contains(&"filament_switch_sensor filament_compression".to_owned()));
+    }
+
+    #[test]
+    fn an_encoder_without_buffer_leaves_a_shortened_flowguard() {
+        let hare = HappyHare::new(4, false).with_feedback(BufferKind::None, true);
+        let idle = hare.status("standby")["mmu"].clone();
+        let printing = stressed_print(BufferKind::None, true);
+
+        assert!(printing["sync_feedback_state"].is_null());
+        assert!(printing["tangle_prevention"].is_null());
+        let flowguard = printing["flowguard"].as_object().unwrap();
+        assert_eq!(flowguard.keys().map(String::as_str).collect::<Vec<_>>(), ["active", "enabled", "encoder_mode"]);
+        assert_eq!(idle["encoder"].as_object().unwrap().len(), 8);
+        assert_eq!(idle["encoder"]["headroom"], idle["encoder"]["detection_length"]);
+        assert_eq!(idle["encoder"]["enabled"], false);
+        assert_eq!(printing["encoder"]["enabled"], true);
+        assert!(printing["encoder"]["headroom"].as_f64().unwrap() < 6.0);
+        assert_eq!(printing["sensors"]["encoder"], true);
+        assert!(printing["sensors"].get("filament_compression").is_none());
+        let names: Vec<String> = hare.filament_sensors("standby").into_iter().map(|(name, _)| name).collect();
+        assert!(!names.iter().any(|name| name.contains("compression") || name.contains("tension")));
     }
 
     #[test]
