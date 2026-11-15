@@ -145,7 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn sensors_turn_yellow_in_the_last_quarter_and_red_in_the_last_eighth_percent() {
+    fn sensors_turn_yellow_in_the_last_quarter_and_red_in_the_last_8_percent() {
         let level = |temperature| sensor_limits(&sensor(temperature)).unwrap().level;
         assert_eq!(level(74.0), Level::Normal);
         assert_eq!(level(75.0), Level::Warning);

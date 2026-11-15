@@ -83,6 +83,14 @@ export global StateIcons {
         return "";
     }
 
+    // What a state of the print means: paused asks for a human, error is one, complete is fine; the rest is neutral.
+    public pure function print-severity(state: string) -> Severity {
+        if (state == "paused") { return Severity.attention; }
+        if (state == "error") { return Severity.error; }
+        if (state == "complete") { return Severity.fine; }
+        return Severity.neutral;
+    }
+
     // The one place that says what a state means; the colour follows from it (see `severity-color`).
     public pure function summary-severity() -> Severity {
         if (!Printer.ready) {
@@ -91,9 +99,7 @@ export global StateIcons {
             if (Printer.is-connected && Printer.klippy-state == "startup") { return Severity.info; }
             return Severity.error;
         }
-        if (Printer.print-state == "paused") { return Severity.attention; }
-        if (Printer.print-state == "error") { return Severity.error; }
-        if (Printer.print-state == "complete") { return Severity.fine; }
+        if (Printer.print-state != "standby") { return self.print-severity(Printer.print-state); }
         // Ready is the normal state and stays grey; colour is for a result or a deviation.
         if (Printer.print-state == "standby" && Printer.activity != "busy") { return Severity.calm; }
         return Severity.neutral;

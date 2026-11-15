@@ -1,7 +1,7 @@
 // Preview: print paused by the MMU with the reason and the buttons to recover. Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
-import { Navigation, Page, Printer } from "../state.slint";
+import { Navigation, Page, Printer, Severity } from "../state.slint";
 import { Sample } from "sample.slint";
 
 export component PrintMmuPausedPreview inherits AppWindow {
@@ -20,5 +20,10 @@ export component PrintMmuPausedPreview inherits AppWindow {
         Printer.mmu-buffer-bias = -1;
         Printer.mmu-flowguard-state = "triggered";
         Printer.mmu-flowguard-detail = "clog";
+        Printer.mmu-flowguard-statement = "triggered";
+        Printer.mmu-flowguard-line = Severity.error;
+        Printer.mmu-flowguard-clog-end = Severity.error;
+        Printer.mmu-flowguard-strip = Severity.error;
+        Printer.mmu-buffer-marker = Severity.error;
     }
 }

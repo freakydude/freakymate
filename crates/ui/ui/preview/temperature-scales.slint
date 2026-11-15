@@ -1,0 +1,14 @@
+// Preview: the scales under the temperatures: nozzle with window, target and extrusion mark, bed and chamber with
+// zones, a sensor with its lowest and highest reading.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component TemperatureScalesPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Sample.temperature-scales();
+        Navigation.page = Page.temperature;
+    }
+}

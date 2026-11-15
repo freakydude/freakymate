@@ -1,7 +1,7 @@
 // Preview: Gates tab with eight gates on the second page with the bypass, a loaded filament and FlowGuard watching. Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
-import { FilamentTab, Navigation, Page, Printer } from "../state.slint";
+import { FilamentTab, Navigation, Page, Printer, Severity } from "../state.slint";
 import { Sample } from "sample.slint";
 
 export component FilamentMmuEightPreview inherits AppWindow {
@@ -30,6 +30,8 @@ export component FilamentMmuEightPreview inherits AppWindow {
         Printer.mmu-buffer-state = "neutral";
         Printer.mmu-buffer-bias = 0.05;
         Printer.mmu-flowguard-state = "monitoring";
+        Printer.mmu-buffer-marker = Severity.fine;
+        Printer.mmu-has-flow-rate = true;
         Printer.mmu-flow-rate = 98;
     }
 }

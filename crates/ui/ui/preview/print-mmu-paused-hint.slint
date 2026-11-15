@@ -1,7 +1,7 @@
 // Preview: print paused by the MMU with reason, hint and where the print stands, reason, a two-line hint and where the print stands. Render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
-import { Navigation, Page, Printer } from "../state.slint";
+import { Navigation, Page, Printer, Severity } from "../state.slint";
 import { Sample } from "sample.slint";
 
 export component PrintMmuPausedHintPreview inherits AppWindow {
@@ -21,5 +21,10 @@ export component PrintMmuPausedHintPreview inherits AppWindow {
         Printer.mmu-buffer-bias = -1;
         Printer.mmu-flowguard-state = "triggered";
         Printer.mmu-flowguard-detail = "clog";
+        Printer.mmu-flowguard-statement = "triggered";
+        Printer.mmu-flowguard-line = Severity.error;
+        Printer.mmu-flowguard-clog-end = Severity.error;
+        Printer.mmu-flowguard-strip = Severity.error;
+        Printer.mmu-buffer-marker = Severity.error;
     }
 }

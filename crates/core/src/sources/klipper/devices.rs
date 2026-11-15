@@ -3,6 +3,7 @@
 //! Field names follow Klipper's Status Reference (`speed`, `rpm`, `color_data`).
 
 use super::status::label;
+use crate::sources::fields::section;
 use crate::sources::objects::ObjectStore;
 use serde_json::Value;
 
@@ -156,7 +157,7 @@ pub(super) fn read_fans(store: &ObjectStore) -> Vec<Fan> {
         .filter_map(|name| Some((name, FanKind::of(name)?)))
         .filter_map(|(name, kind)| {
             let value = store.object(name)?;
-            let section = settings.and_then(|settings| settings.get(name.to_lowercase()));
+            let section = settings.and_then(|settings| section(settings, "", name));
             let setting = |key: &str| section.and_then(|section| section.get(key)).and_then(Value::as_f64);
             Some(Fan {
                 object: name.to_owned(),

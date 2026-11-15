@@ -116,6 +116,24 @@ pub struct MachineProfile {
     /// `error_gcode: PAUSE` of `[toolchanger]` (viesturz example `examples/dock location/fixed/toolchanger.cfg` Z.23-26
     /// at 94756df): an error of the changer pauses the print. Unset by default.
     pub error_gcode_pause: bool,
+    /// The buffer of the Happy Hare machine (a proportional one as on the real device, unless a profile says otherwise).
+    pub buffer: BufferKind,
+    /// An encoder on the Happy Hare machine (`mmu.encoder`, `mmu.sensors.encoder`).
+    pub encoder: bool,
+}
+
+/// Which sync-feedback buffer the Happy Hare machine has; the variant follows from the sensors in `mmu.sensors`
+/// (`_get_sensor_type`, `unit/mmu_sync_feedback.py` L880-896 at c176ecc).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BufferKind {
+    /// P: a proportional sensor, with the virtual compression and tension switches it derives.
+    Proportional,
+    /// CO: only the compression switch.
+    Compression,
+    /// TO: only the tension switch.
+    Tension,
+    /// No buffer (with an encoder, FlowGuard still runs).
+    None,
 }
 
 /// When the plugin initialises itself (viesturz `klipper/extras/toolchanger.py` Z.105-110 at 94756df).
@@ -166,6 +184,8 @@ impl MachineProfile {
             require_tool_present: false,
             initialize_on: InitializeOn::FirstUse,
             error_gcode_pause: false,
+            buffer: BufferKind::Proportional,
+            encoder: false,
         }
     }
 
@@ -187,6 +207,8 @@ impl MachineProfile {
             require_tool_present: false,
             initialize_on: InitializeOn::FirstUse,
             error_gcode_pause: false,
+            buffer: BufferKind::Proportional,
+            encoder: false,
         }
     }
 
@@ -208,6 +230,8 @@ impl MachineProfile {
             require_tool_present: false,
             initialize_on: InitializeOn::FirstUse,
             error_gcode_pause: false,
+            buffer: BufferKind::Proportional,
+            encoder: false,
         }
     }
 
@@ -251,6 +275,23 @@ impl MachineProfile {
     /// Happy Hare without Moonraker's Spoolman: material and colour of the gates live in Happy Hare's gate map.
     pub fn ercf(gates: usize) -> Self {
         Self { spoolman: false, ..Self::happy_hare(gates) }
+    }
+}
+
+impl MachineProfile {
+    /// Happy Hare with an encoder and no buffer: FlowGuard runs on the encoder alone.
+    pub fn happy_hare_encoder(gates: usize) -> Self {
+        Self { buffer: BufferKind::None, encoder: true, ..Self::happy_hare(gates) }
+    }
+
+    /// Happy Hare with a buffer that has only the compression switch (CO) and an encoder.
+    pub fn happy_hare_compression(gates: usize) -> Self {
+        Self { buffer: BufferKind::Compression, encoder: true, ..Self::happy_hare(gates) }
+    }
+
+    /// Happy Hare with a buffer that has only the tension switch (TO), no encoder.
+    pub fn happy_hare_tension(gates: usize) -> Self {
+        Self { buffer: BufferKind::Tension, ..Self::happy_hare(gates) }
     }
 }
 

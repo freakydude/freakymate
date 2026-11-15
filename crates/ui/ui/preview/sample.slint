@@ -1,7 +1,7 @@
 // Sample data for previews (VS Code Slint preview, slint-viewer, scripts/ui-preview.sh).
 // Not part of the app: nothing in app.slint imports this folder. In the app, Rust fills these globals.
 
-import { MotionTab, Navigation, Network, Page, PathPartKind, Printer, UiSettings } from "../state.slint";
+import { MotionTab, Navigation, Network, Page, PathPartKind, Printer, Severity, UiSettings } from "../state.slint";
 
 export global Sample {
     // Connected Voron-like printer, homed, nozzle and bed at temperature, no job.
@@ -286,6 +286,93 @@ export global Sample {
             { object: "extruder2", label: "Nozzle T2", temperature: 24, target: 0, power: 0, can-raise: true, nozzle: true },
             { object: "heater_bed", label: "Bed", temperature: 59.8, target: 60, power: 0.3, can-raise: true },
             { object: "heater_generic chamber", label: "Chamber", temperature: 38.2, target: 0, power: 0, can-raise: true },
+        ];
+    }
+
+    // Heaters and sensors with the scale under their temperature (`TemperatureScale`): a nozzle with target, window and
+    // lowest extrusion temperature, a bed in the yellow zone, an idle chamber and a sensor with its lowest and highest
+    // reading. Call after `ready-printer()`: it replaces heaters and sensors.
+    public function temperature-scales() {
+        Printer.heaters = [
+            {
+                object: "extruder",
+                label: "Nozzle",
+                temperature: 214.6,
+                target: 215,
+                power: 0.42,
+                can-raise: true,
+                nozzle: true,
+                scale: {
+                    shown: true,
+                    min: 0,
+                    max: 300,
+                    has-window: true,
+                    window-low: 213,
+                    window-high: 217,
+                    danger-from: 285,
+                    target: 215,
+                    min-extrude: 170,
+                    level: Severity.calm,
+                    max-text: "max 300 °C"
+                }
+            },
+            {
+                object: "heater_bed",
+                label: "Bed",
+                temperature: 112,
+                target: 0,
+                power: 0,
+                can-raise: true,
+                scale: {
+                    shown: true,
+                    min: 0,
+                    max: 120,
+                    has-warning: true,
+                    warning-from: 100,
+                    danger-from: 110,
+                    level: Severity.error,
+                    max-text: "max 120 °C"
+                }
+            },
+            {
+                object: "heater_generic chamber",
+                label: "Chamber",
+                temperature: 38.2,
+                target: 0,
+                power: 0,
+                can-raise: true,
+                scale: {
+                    shown: true,
+                    min: 0,
+                    max: 70,
+                    has-warning: true,
+                    warning-from: 60,
+                    danger-from: 66,
+                    level: Severity.calm,
+                    max-text: "max 70 °C"
+                }
+            },
+        ];
+        Printer.sensors = [
+            {
+                object: "temperature_sensor raspberry_pi",
+                label: "Raspberry Pi",
+                temperature: 72,
+                known: true,
+                scale: {
+                    shown: true,
+                    min: 0,
+                    max: 100,
+                    has-warning: true,
+                    warning-from: 70,
+                    danger-from: 85,
+                    has-measured: true,
+                    measured-low: 38,
+                    measured-high: 78,
+                    level: Severity.attention,
+                    max-text: "max 100 °C"
+                }
+            },
         ];
     }
 

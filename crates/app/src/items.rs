@@ -3,12 +3,13 @@
 use crate::{format, view};
 use crate::{
     BarColors, FanItem, FilamentPathItem, HeadItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem,
-    PathPartItem, PathPartKind, PowerItem, ScaleItem, SensorItem, SpoolItem, ToolMatchItem, TuningItem, UpdateItem,
+    PathPartItem, PathPartKind, PowerItem, ScaleItem, SensorItem, Severity, SpoolItem, ToolMatchItem, TuningItem,
+    UpdateItem,
 };
 use freakymate_core::color::Rgba;
 use freakymate_core::domain::filament_match::{self, Difference, Supply, ToolMatch, Verdict};
 use freakymate_core::domain::heads::{HeadRow, PickUp};
-use freakymate_core::domain::load_path::{self, BufferSide, LoadPath, PathPart, PathScope, Stretch};
+use freakymate_core::domain::load_path::{self, BufferSide, Fill, LoadPath, PathPart, PathScope, Stage, Stretch};
 use freakymate_core::domain::machine_tree::MachineTree;
 use freakymate_core::domain::spools::{self, FilamentColors, Lane, SpoolHolder};
 use freakymate_core::domain::temperature_limits::{self, Level, Limits};
@@ -239,9 +240,9 @@ fn scale_item(limits: Option<Limits>) -> ScaleItem {
         measured_low: limits.measured.map_or(0.0, |measured| measured.0) as f32,
         measured_high: limits.measured.map_or(0.0, |measured| measured.1) as f32,
         level: match limits.level {
-            Level::Normal => 0,
-            Level::Warning => 1,
-            Level::Danger => 2,
+            Level::Normal => Severity::Neutral,
+            Level::Warning => Severity::Attention,
+            Level::Danger => Severity::Error,
         },
         max_text: format!("max {:.0} °C", limits.max).into(),
     }
@@ -377,13 +378,31 @@ pub(crate) fn load_path_item(
 fn path_part_item(part: PathPart) -> PathPartItem {
     let (kind, active, fill) = match part {
         PathPart::Sensor { triggered } => (PathPartKind::Sensor, triggered, 0.0),
-        PathPart::Tube { stretch, fill } => (tube_kind(stretch), false, fill),
+        PathPart::Tube { stretch, fill } => (tube_kind(stretch), false, fill_share(fill)),
         PathPart::Encoder { moving } => (PathPartKind::Encoder, moving, 0.0),
         PathPart::Buffer(side) => (PathPartKind::Buffer, side != BufferSide::Unknown, 0.0),
         PathPart::Gears { reached } => (PathPartKind::Gears, reached, 0.0),
         PathPart::Nozzle { reached } => (PathPartKind::Nozzle, reached, 0.0),
     };
-    PathPartItem { kind, active, fill: fill as f32 }
+    PathPartItem { kind, active, fill }
+}
+
+/// How much of a drawn stretch each stage fills; the core knows only the stages.
+const STARTED_SHARE: f32 = 0.1;
+const EARLY_SHARE: f32 = 0.25;
+const HALFWAY_SHARE: f32 = 0.5;
+const LATE_SHARE: f32 = 0.6;
+
+fn fill_share(fill: Fill) -> f32 {
+    match fill {
+        Fill::Empty => 0.0,
+        Fill::Full => 1.0,
+        Fill::Stage(Stage::Started) => STARTED_SHARE,
+        Fill::Stage(Stage::Early) => EARLY_SHARE,
+        Fill::Stage(Stage::Halfway) => HALFWAY_SHARE,
+        Fill::Stage(Stage::Late) => LATE_SHARE,
+        Fill::Measured(progress) => progress as f32,
+    }
 }
 
 fn tube_kind(stretch: Stretch) -> PathPartKind {
@@ -547,6 +566,79 @@ pub(crate) fn reuse_flags(old: Option<ModelRc<bool>>, flags: Option<Vec<bool>>) 
 mod tests {
     use super::*;
     use freakymate_core::domain::filament_match::ToolRequest;
+
+    fn part(fill: Fill) -> PathPartItem {
+        path_part_item(PathPart::Tube { stretch: Stretch::Bowden, fill })
+    }
+
+    #[test]
+    fn a_tube_is_drawn_with_the_share_of_its_fill() {
+        assert_eq!(part(Fill::Empty).fill, 0.0);
+        assert_eq!(part(Fill::Full).fill, 1.0);
+        assert_eq!(part(Fill::Stage(Stage::Started)).fill, STARTED_SHARE);
+        assert_eq!(part(Fill::Stage(Stage::Late)).fill, LATE_SHARE);
+        assert_eq!(part(Fill::Measured(0.8)).fill, 0.8);
+    }
+
+    #[test]
+    fn a_part_is_active_when_its_sensor_or_gears_have_reached_it() {
+        let sensor = path_part_item(PathPart::Sensor { triggered: true });
+        assert_eq!((sensor.kind, sensor.active, sensor.fill), (PathPartKind::Sensor, true, 0.0));
+        assert!(!path_part_item(PathPart::Gears { reached: false }).active);
+        assert!(path_part_item(PathPart::Nozzle { reached: true }).active);
+        assert!(!path_part_item(PathPart::Buffer(BufferSide::Unknown)).active);
+        assert!(path_part_item(PathPart::Buffer(BufferSide::Tension)).active);
+    }
+
+    fn path_with(fills: &[Fill]) -> FilamentPathItem {
+        let parts: Vec<PathPartItem> = fills.iter().copied().map(part).collect();
+        FilamentPathItem { parts: ModelRc::new(VecModel::from(parts)), ..Default::default() }
+    }
+
+    #[test]
+    fn equal_parts_keep_the_model_so_the_drawing_is_not_rebuilt() {
+        let previous = path_with(&[Fill::Full, Fill::Empty]);
+        let kept = keeping_parts(path_with(&[Fill::Full, Fill::Empty]), &previous);
+        // Changing the previous model shows through the kept one only if both are the same model.
+        let model = previous.parts.as_any().downcast_ref::<VecModel<PathPartItem>>().unwrap();
+        model.push(part(Fill::Full));
+        assert_eq!(kept.parts.row_count(), 3);
+    }
+
+    #[test]
+    fn changed_parts_get_their_new_model() {
+        let previous = path_with(&[Fill::Full, Fill::Empty]);
+        let changed = keeping_parts(path_with(&[Fill::Full, Fill::Full]), &previous);
+        let model = previous.parts.as_any().downcast_ref::<VecModel<PathPartItem>>().unwrap();
+        model.push(part(Fill::Full));
+        assert_eq!(changed.parts.row_count(), 2);
+    }
+
+    #[test]
+    fn a_scale_shows_levels_as_severity() {
+        let limits = |level| Limits { max: 100.0, danger_from: 92.0, level, ..Limits::default() };
+        assert_eq!(scale_item(Some(limits(Level::Normal))).level, Severity::Neutral);
+        assert_eq!(scale_item(Some(limits(Level::Warning))).level, Severity::Attention);
+        assert_eq!(scale_item(Some(limits(Level::Danger))).level, Severity::Error);
+    }
+
+    #[test]
+    fn a_scale_without_limits_is_not_shown_and_optional_marks_say_whether_they_exist() {
+        assert!(!scale_item(None).shown);
+        let plain = scale_item(Some(Limits { max: 300.0, danger_from: 280.0, ..Limits::default() }));
+        assert!(plain.shown && !plain.has_warning && !plain.has_window && !plain.has_measured);
+        assert_eq!(plain.max_text, "max 300 °C");
+        let with = scale_item(Some(Limits {
+            max: 300.0,
+            danger_from: 280.0,
+            warning_from: Some(250.0),
+            window: Some((195.0, 205.0)),
+            measured: Some((20.0, 210.0)),
+            ..Limits::default()
+        }));
+        assert!(with.has_warning && with.has_window && with.has_measured);
+        assert_eq!((with.window_low, with.window_high, with.measured_high), (195.0, 205.0, 210.0));
+    }
 
     fn lane(gate: Option<usize>, head: Option<&str>, spool_id: Option<u32>) -> Lane {
         Lane {

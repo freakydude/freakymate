@@ -2,6 +2,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
+import { StateIcons } from "../state-icons.slint";
 import { Actions, FanItem, HeaterItem, HeatTab, Navigation, Printer, SensorItem, UiSettings } from "../state.slint";
 import { TemperatureScale } from "../components/temperature-scale.slint";
 import { NumberEntryDialog } from "../components/entry-dialogs.slint";
@@ -69,7 +70,7 @@ component HeaterRow inherits Rectangle {
                 spacing: Theme.spacing;
                 Text {
                     text: root.heater.temperature.to-fixed(1) + " °C";
-                    color: Theme.level-color(root.heater.scale.level);
+                    color: StateIcons.severity-color(root.heater.scale.level);
                     font-size: Theme.font-large;
                     font-weight: 600;
                 }
@@ -326,7 +327,7 @@ component SensorsTab inherits Rectangle {
                     spacing: Theme.spacing;
                     Text {
                         text: sensor.known ? sensor.temperature.to-fixed(1) + " °C" : "–";
-                        color: sensor.known ? Theme.level-color(sensor.scale.level) : Theme.muted;
+                        color: sensor.known ? StateIcons.severity-color(sensor.scale.level) : Theme.muted;
                         font-size: Theme.font-large;
                         font-weight: 600;
                     }

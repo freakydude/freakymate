@@ -3,7 +3,7 @@
 
 use super::setup::is_additional_extruder;
 use super::status::label;
-use crate::sources::fields::number;
+use crate::sources::fields::{number, section};
 use crate::sources::objects::ObjectStore;
 use serde_json::Value;
 
@@ -97,18 +97,12 @@ fn history_objects(store: &ObjectStore) -> Vec<&str> {
         .unwrap_or_default()
 }
 
-/// The configuration section of an object: Klipper writes the section names of `configfile.settings` in lower case,
-/// while the objects keep the case of the config (`temperature_sensor M8P` is the section `temperature_sensor m8p`).
-fn section_of<'a>(settings: &'a Value, object: &str) -> Option<&'a Value> {
-    settings.get(object).or_else(|| settings.get(object.to_lowercase()))
-}
-
 /// Extruder first, then bed, then additional heaters in object order.
 pub(super) fn read_heaters(store: &ObjectStore) -> Vec<Heater> {
     let settings = store.object("configfile").and_then(|configfile| configfile.get("settings"));
     let with_history = history_objects(store);
     let heater = |name: &str, value: &Value| {
-        let section = |name: &str| settings.and_then(|settings| section_of(settings, name));
+        let section = |name: &str| settings.and_then(|settings| section(settings, "", name));
         let verify = section(&format!("verify_heater {}", name.rsplit(' ').next().unwrap_or(name)));
         heater(name, value, section(name), verify, with_history.contains(&name))
     };
@@ -177,7 +171,7 @@ pub(super) fn read_sensors(store: &ObjectStore) -> Vec<TemperatureSensor> {
     let settings = store.object("configfile").and_then(|configfile| configfile.get("settings"));
     let setting = |name: &str, key: &str| {
         settings
-            .and_then(|settings| section_of(settings, name))
+            .and_then(|settings| section(settings, "", name))
             .and_then(|section| section.get(key))
             .and_then(Value::as_f64)
     };
