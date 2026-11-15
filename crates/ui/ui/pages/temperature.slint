@@ -44,6 +44,18 @@ component HeaterRow inherits Rectangle {
                     color: Theme.muted;
                     font-size: Theme.font-small;
                     overflow: elide;
+                    horizontal-stretch: 1;
+                }
+                // The spool recommends another temperature than the target: a quiet note, nothing is changed. In a
+                // narrow row the spool icon stands for the word. The name takes the free room, so the note ends at
+                // the right edge like the maximum below it.
+                if root.heater.spool-hint != "": IconLabel {
+                    horizontal-stretch: 0;
+                    icon: root.compact ? Icons.filament-spool : Icons.ui-warning;
+                    icon-size: Theme.icon-compact;
+                    text: root.compact ? root.heater.spool-hint : @tr("Spool {}", root.heater.spool-hint);
+                    color: Theme.warning;
+                    font-size: Theme.font-small;
                 }
                 if root.heater.has-history: Image {
                     cross-axis-self-alignment: center;
@@ -51,15 +63,6 @@ component HeaterRow inherits Rectangle {
                     colorize: Theme.muted;
                     width: Theme.icon-compact;
                     height: Theme.icon-compact;
-                }
-                // The spool recommends another temperature than the target: a quiet note, nothing is changed. In a
-                // narrow row the spool icon stands for the word.
-                if root.heater.spool-hint != "": IconLabel {
-                    icon: root.compact ? Icons.filament-spool : Icons.ui-warning;
-                    icon-size: Theme.icon-compact;
-                    text: root.compact ? root.heater.spool-hint : @tr("Spool {}", root.heater.spool-hint);
-                    color: Theme.warning;
-                    font-size: Theme.font-small;
                 }
             }
             HorizontalLayout {
