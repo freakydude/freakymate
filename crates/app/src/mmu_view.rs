@@ -3,8 +3,8 @@
 //! the MMU.
 
 use crate::items::{
-    bar_colors, compared_tool_items, fill_loaded, id_or_none, lane_colors, load_path_item, no_path_item, replace_rows,
-    reuse_flags, tool_match_item,
+    bar_colors, compared_tool_items, fill_loaded, id_or_none, keeping_parts, lane_colors, load_path_item, no_path_item,
+    replace_rows, reuse_flags, tool_match_item,
 };
 use crate::{
     view, AfcHubReturnItem, AfcToolItem, FilamentPathItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem,
@@ -14,7 +14,7 @@ use freakymate_core::domain::changer;
 use freakymate_core::domain::filament_match::{self, ToolMatch, Verdict};
 use freakymate_core::domain::gate_pages::{self, BypassAt, GatePage};
 use freakymate_core::domain::heads::HeadRow;
-use freakymate_core::domain::load_path::{self, BufferSide, LoadPath};
+use freakymate_core::domain::load_path::{self, BufferSide, LoadPath, PathScope};
 use freakymate_core::domain::machine_tree::LaneId;
 use freakymate_core::domain::spools::{FilamentColors, Lane};
 use freakymate_core::sources::afc::HubReturnBlock;
@@ -115,12 +115,16 @@ impl MmuView {
             happy_hare::BYPASS => Some((LaneId::Bypass, "Bypass".to_owned())),
             gate => usize::try_from(gate).ok().map(|gate| (LaneId::Gate(gate), format!("Gate {gate}"))),
         };
+        let selected_label = selected_lane.as_ref().map(|(_, label)| label.clone());
         let path = match selected_lane {
-            Some((lane, label)) => load_path::load_path(status, &lane)
-                .map_or_else(no_path_item, |path| load_path_item(&path, &label, &colors)),
-            None => without_gate_item(&load_path::without_gate_path(mmu)),
+            Some((lane, _)) => load_path::load_path(status, &lane),
+            None => Some(load_path::without_gate_path(mmu)),
         };
-        printer.set_mmu_path(path);
+        // Loaded to the nozzle the way says nothing new: the print page leaves it out then.
+        printer.set_mmu_path_settled(path.as_ref().is_some_and(LoadPath::is_settled));
+        let label = selected_label.as_deref().unwrap_or("No gate");
+        let item = path.map_or_else(no_path_item, |path| load_path_item(&path, PathScope::Whole, label, &colors));
+        show_path(printer, Shown::Selected, item);
         let sensors = mmu
             .listed_sensors()
             .into_iter()
@@ -178,12 +182,12 @@ impl MmuView {
         let Some(lane) = shown else {
             // Happy Hare without a gate still reports the sensors at the head.
             let path = status.happy_hare().map(load_path::without_gate_path);
-            printer.set_lane_path(path.map_or_else(no_path_item, |path| without_gate_item(&path)));
+            show_path(printer, Shown::Lane, path.map_or_else(no_path_item, |path| without_gate_item(&path)));
             printer.set_lane_buffer("".into());
             return;
         };
         let Some(path) = load_path::load_path(status, &lane) else {
-            printer.set_lane_path(no_path_item());
+            show_path(printer, Shown::Lane, no_path_item());
             printer.set_lane_buffer("".into());
             return;
         };
@@ -206,7 +210,7 @@ impl MmuView {
                     .unwrap_or_default(),
             ),
         };
-        printer.set_lane_path(load_path_item(&path, &label, &colors));
+        show_path(printer, Shown::Lane, load_path_item(&path, PathScope::Whole, &label, &colors));
         printer.set_lane_buffer(path.buffer.map_or("", buffer_word).into());
     }
 
@@ -338,9 +342,24 @@ fn loaded_lane(status: &PrinterStatus, lanes: &[Lane]) -> Option<LaneId> {
     tile_lanes(status, lanes).iter().find(|lane| lane.active).and_then(Lane::id)
 }
 
+/// Which of the two paths of the UI: the one of the tapped lane (Gates tab) or of the selected gate (print page).
+#[derive(Clone, Copy)]
+enum Shown {
+    Lane,
+    Selected,
+}
+
+/// Sets a path, keeping the parts model that is shown while the parts are the same.
+fn show_path(printer: &Printer, shown: Shown, path: FilamentPathItem) {
+    match shown {
+        Shown::Lane => printer.set_lane_path(keeping_parts(path, &printer.get_lane_path())),
+        Shown::Selected => printer.set_mmu_path(keeping_parts(path, &printer.get_mmu_path())),
+    }
+}
+
 /// The card of Happy Hare with no gate selected; the filament's colour is not known.
 fn without_gate_item(path: &LoadPath) -> FilamentPathItem {
-    load_path_item(path, "No gate", &FilamentColors::default())
+    load_path_item(path, PathScope::Whole, "No gate", &FilamentColors::default())
 }
 
 /// The side the buffer leans to as the word the UI maps (`MmuTexts.buffer`).
@@ -444,12 +463,17 @@ fn show_state(printer: &Printer, mmu: &MmuStatus) {
     let feedback = mmu.sync_feedback.unwrap_or_default();
     printer.set_mmu_buffer_state(view::mmu_buffer_state(feedback.state).into());
     printer.set_mmu_buffer_bias(feedback.bias as f32);
+    printer.set_mmu_buffer_sides(view::mmu_buffer_sides(feedback.sides).into());
     let flowguard = mmu.flowguard.clone().unwrap_or_default();
     printer.set_mmu_flowguard_state(view::mmu_flowguard_state(flowguard.state()).into());
     let detail: Vec<&str> =
         [flowguard.trigger.as_str(), flowguard.reason.as_str()].into_iter().filter(|part| !part.is_empty()).collect();
     printer.set_mmu_flowguard_detail(detail.join(": ").into());
+    printer.set_mmu_flowguard_level(flowguard.level as f32);
+    printer.set_mmu_tangle_threshold(flowguard.tangle_threshold.map_or(-1.0, |threshold| threshold as f32));
     printer.set_mmu_flow_rate(mmu.flow_rate.map_or(-1.0, |rate| rate.value as f32));
+    printer.set_mmu_flow_measured(mmu.flow_rate.is_some_and(|rate| rate.is_measured()));
+    printer.set_mmu_encoder_headroom(mmu.encoder_headroom.map(view::encoder_headroom).unwrap_or_default().into());
 }
 
 /// The spool Spoolman knows in a gate.

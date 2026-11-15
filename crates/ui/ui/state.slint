@@ -2,10 +2,10 @@
 
 import { Icons } from "icons.slint";
 import { Theme } from "theme.slint";
-import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 import { Actions } from "actions.slint";
 
-export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 export { Actions } from "actions.slint";
 
 
@@ -193,11 +193,21 @@ export global Printer {
     in property <string> mmu-buffer-state;
     // -1 (tension) over 0 (neutral) to +1 (compressed).
     in property <float> mmu-buffer-bias;
+    // both | compression | tension: the sides a sensor measures (a one-sided switch buffer has only one).
+    in property <string> mmu-buffer-sides: "both";
     // off | ready | monitoring | boosting (tangle prevention raises the gear current) | triggered
     in property <string> mmu-flowguard-state;
     in property <string> mmu-flowguard-detail;
-    // Percent from the encoder, -1 without an encoder.
+    // How close FlowGuard is to a trigger: 0 at rest, +1 a clog (compression side), -1 a tangle (tension side).
+    in property <float> mmu-flowguard-level;
+    // The tension (0 to 1 of the bias) from which tangle prevention raises the gear current; -1 while it cannot work.
+    in property <float> mmu-tangle-threshold: -1;
+    // With an armed encoder: what is left before FlowGuard trips on it, of the length it watches ("7.5 / 12.0 mm").
+    in property <string> mmu-encoder-headroom;
+    // Percent: measured by the encoder, else the estimate of the sync controller; -1 without either.
     in property <float> mmu-flow-rate: -1;
+    // The flow rate is the encoder's, not the estimate.
+    in property <bool> mmu-flow-measured;
 
     // What the sources of this printer offer (see Sources in the core)
     in property <bool> can-quad-gantry-level;
@@ -265,6 +275,8 @@ export global Printer {
     in property <BarColors> spool-colors;
     // Where the filament of the selected gate is, for the drawing of its way.
     in property <FilamentPathItem> mmu-path;
+    // The filament of the selected gate is loaded to the nozzle: the way says nothing new.
+    in property <bool> mmu-path-settled;
     // The load path card of the Gates tab: the lane whose tile was tapped last, else the loaded one.
     in property <FilamentPathItem> lane-path;
     // The buffer on the way of that lane: "" none, tension | neutral | compressed | unknown. With Happy Hare the

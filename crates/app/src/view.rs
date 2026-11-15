@@ -8,7 +8,7 @@ use freakymate_core::domain::file_catalog::FileInfo;
 use freakymate_core::domain::job_end;
 use freakymate_core::domain::pause::{Interruption, InterruptionFact};
 use freakymate_core::sources::happy_hare::{
-    FlowGuardState, GateAvailability, LoadedFilament, ServoPosition, SyncFeedbackState,
+    BufferSides, EncoderHeadroom, FlowGuardState, GateAvailability, LoadedFilament, ServoPosition, SyncFeedbackState,
 };
 use freakymate_core::sources::klipper::tuning::TuningRange;
 use freakymate_core::sources::klipper::{FanKind, PrintJob, PrintState};
@@ -327,6 +327,20 @@ pub fn gate_tools_text(tools: &[usize]) -> String {
 /// The distance on the filament path, e.g. `412.6 mm`.
 pub fn path_distance(millimetres: f64) -> String {
     format!("{millimetres:.1} mm")
+}
+
+/// The sides the buffer measures, as the word the UI maps (`BufferScale`).
+pub fn mmu_buffer_sides(sides: BufferSides) -> &'static str {
+    match sides {
+        BufferSides::Both => "both",
+        BufferSides::CompressionOnly => "compression",
+        BufferSides::TensionOnly => "tension",
+    }
+}
+
+/// What the encoder leaves before FlowGuard trips, of the length it watches, e.g. `7.5 / 12.0 mm`.
+pub fn encoder_headroom(encoder: EncoderHeadroom) -> String {
+    format!("{:.1} / {:.1} mm", encoder.headroom, encoder.detection_length)
 }
 
 /// `triggered` means filament is present at the sensor; `None` is a disabled sensor.

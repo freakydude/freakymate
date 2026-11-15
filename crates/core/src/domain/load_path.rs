@@ -20,6 +20,7 @@ const GATE_EXIT: &str = "mmu_exit";
 const SHARED_EXIT: &str = "mmu_shared_exit";
 const EXTRUDER_ENTRY: &str = "extruder";
 const TOOLHEAD: &str = "toolhead";
+const ENCODER: &str = "encoder";
 
 /// Where the filament is, on Happy Hare's scale (`filament_pos`, `mmu_constants.py` L84-95): -1 unknown, 0 parked in
 /// the lane, 1 at the hub, 2 to 4 in the bowden, 5 at the extruder sensor, 7 in the extruder entry, 8 at the toolhead
@@ -28,6 +29,12 @@ pub const UNKNOWN: i32 = -1;
 pub const PARKED: i32 = 0;
 pub const AT_HUB: i32 = 1;
 pub const LOADED: i32 = 10;
+const BOWDEN_START: i32 = 2;
+const BOWDEN_END: i32 = 4;
+const AT_GEARS: i32 = 6;
+const IN_GEARS: i32 = 7;
+const AT_TOOLHEAD_SENSOR: i32 = 8;
+const PAST_TOOLHEAD_SENSOR: i32 = 9;
 
 /// The side the buffer on the way leans to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,6 +56,10 @@ pub struct LoadPath {
     pub exit: PathSensor,
     /// Where the lanes of a unit meet (Happy Hare `mmu_shared_exit`, AFC hub).
     pub hub: PathSensor,
+    /// Happy Hare's encoder at the unit, before the bowden (`gate_endstop_to_encoder` in `mmu_parameters.cfg`; one
+    /// per unit, reported for the selected gate). It has no presence switch: triggered means it counts movement
+    /// (`unit/mmu_encoder.py` L425-468 at c176ecc).
+    pub encoder: PathSensor,
     /// Before the extruder gears (Happy Hare `extruder`, AFC `tool_start`).
     pub extruder: PathSensor,
     /// After the extruder gears (Happy Hare `toolhead`, AFC `tool_end`).
@@ -66,11 +77,13 @@ pub struct LoadPath {
 }
 
 impl LoadPath {
-    fn empty() -> Self {
+    /// A way without sensors and without filament.
+    pub fn empty() -> Self {
         Self {
             entry: PathSensor::Absent,
             exit: PathSensor::Absent,
             hub: PathSensor::Absent,
+            encoder: PathSensor::Absent,
             extruder: PathSensor::Absent,
             toolhead: PathSensor::Absent,
             buffer: None,
@@ -78,6 +91,143 @@ impl LoadPath {
             direction: 0,
             distance: None,
             bowden_progress: None,
+        }
+    }
+
+    /// The filament is loaded to the nozzle: nothing about the way changes until the next unload. The direction does
+    /// not count, as Happy Hare keeps the one of the last move.
+    pub fn is_settled(&self) -> bool {
+        self.position == Some(LOADED)
+    }
+
+    /// What is drawn of the way, in the order the filament passes it: the fitted sensors, the stretches between them
+    /// and how far the filament fills each, the buffer, the extruder gears and the nozzle.
+    pub fn parts(&self, scope: PathScope) -> Vec<PathPart> {
+        let position = self.position.unwrap_or(UNKNOWN);
+        let tube = |stretch: Stretch| PathPart::Tube { stretch, fill: stretch.fill(position, self.bowden_progress) };
+        let sensor = |sensor: PathSensor| match sensor {
+            PathSensor::Absent => None,
+            PathSensor::Free => Some(PathPart::Sensor { triggered: false }),
+            PathSensor::Triggered => Some(PathPart::Sensor { triggered: true }),
+        };
+        let mut parts = Vec::new();
+        if scope == PathScope::Whole {
+            parts.extend(sensor(self.entry));
+            parts.push(tube(Stretch::Lane));
+            parts.extend(sensor(self.exit));
+            // Where the lanes of a unit meet, when the printer has a sensor there.
+            if self.hub != PathSensor::Absent {
+                parts.push(tube(Stretch::Hub));
+                parts.extend(sensor(self.hub));
+            }
+            match self.encoder {
+                PathSensor::Absent => {}
+                PathSensor::Free => parts.push(PathPart::Encoder { moving: false }),
+                PathSensor::Triggered => parts.push(PathPart::Encoder { moving: true }),
+            }
+            parts.extend(self.buffer.map(PathPart::Buffer));
+            parts.push(tube(Stretch::Bowden));
+        }
+        // Between two points lies one stretch. Without an extruder sensor the bowden runs up to the gears (the head
+        // alone keeps the piece that leads to them); without a toolhead sensor one stretch runs from the gears to the
+        // nozzle.
+        parts.extend(sensor(self.extruder));
+        if self.extruder != PathSensor::Absent || scope == PathScope::HeadOnly {
+            parts.push(tube(Stretch::ExtruderEntry));
+        }
+        parts.push(PathPart::Gears { reached: position >= AT_GEARS });
+        if self.toolhead == PathSensor::Absent {
+            parts.push(tube(Stretch::GearsToNozzle));
+        } else {
+            parts.push(tube(Stretch::Extruder));
+            parts.extend(sensor(self.toolhead));
+            parts.push(tube(Stretch::Hotend));
+        }
+        parts.push(PathPart::Nozzle { reached: position >= LOADED });
+        parts
+    }
+}
+
+/// How much of the way is drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PathScope {
+    /// From the lane to the nozzle.
+    Whole,
+    /// The part at the head only: its sensors, the extruder gears and the nozzle.
+    HeadOnly,
+}
+
+/// One drawn piece of the way.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PathPart {
+    Sensor {
+        triggered: bool,
+    },
+    /// A stretch of tube, filled from the lane's side: 0 empty to 1 full.
+    Tube {
+        stretch: Stretch,
+        fill: f64,
+    },
+    /// The encoder at the unit; `moving` while it counts filament passing.
+    Encoder {
+        moving: bool,
+    },
+    Buffer(BufferSide),
+    /// The extruder gears; `reached` once the filament is at them.
+    Gears {
+        reached: bool,
+    },
+    Nozzle {
+        reached: bool,
+    },
+}
+
+/// The stretches of tube between the measuring points.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stretch {
+    /// Inside the lane, up to its exit.
+    Lane,
+    /// From the lane's exit to where the lanes meet.
+    Hub,
+    Bowden,
+    /// From the extruder sensor (the end of the bowden) to the extruder gears.
+    ExtruderEntry,
+    /// From the gears to the toolhead sensor.
+    Extruder,
+    /// From the toolhead sensor to the nozzle.
+    Hotend,
+    /// From the gears to the nozzle, where no toolhead sensor divides the way.
+    GearsToNozzle,
+}
+
+impl Stretch {
+    /// The filled share at `position`. The scale has no measure inside a stretch, so a position between two points
+    /// is drawn as a part of the stretch that only says "somewhere in it"; in the bowden Happy Hare reports how far
+    /// a move has come.
+    fn fill(self, position: i32, bowden_progress: Option<f64>) -> f64 {
+        const FULL: f64 = 1.0;
+        const EMPTY: f64 = 0.0;
+        if position < PARKED {
+            return EMPTY;
+        }
+        match self {
+            Self::Lane if position >= AT_HUB => FULL,
+            Self::Lane => 0.6,
+            Self::Hub if position >= AT_HUB => FULL,
+            Self::Bowden if position >= BOWDEN_END => FULL,
+            Self::Bowden if position >= BOWDEN_START => {
+                bowden_progress.unwrap_or(if position == BOWDEN_START { 0.1 } else { 0.5 }).clamp(EMPTY, FULL)
+            }
+            Self::ExtruderEntry if position >= AT_GEARS => FULL,
+            Self::Extruder if position >= AT_TOOLHEAD_SENSOR => FULL,
+            // The gears have pulled the filament in.
+            Self::Extruder if position == IN_GEARS => 0.3,
+            Self::Hotend if position >= LOADED => FULL,
+            Self::Hotend if position == PAST_TOOLHEAD_SENSOR => 0.5,
+            Self::GearsToNozzle if position >= LOADED => FULL,
+            Self::GearsToNozzle if position >= AT_TOOLHEAD_SENSOR => 0.6,
+            Self::GearsToNozzle if position == IN_GEARS => 0.2,
+            _ => EMPTY,
         }
     }
 }
@@ -174,6 +324,7 @@ fn gate_path(mmu: &MmuStatus, sensors: &[FilamentSensor], gate: usize) -> Option
         path.hub = generic_or(reported, SHARED_EXIT, path.hub);
         path.extruder = generic_or(reported, EXTRUDER_ENTRY, path.extruder);
         path.toolhead = generic_or(reported, TOOLHEAD, path.toolhead);
+        path.encoder = generic(reported, ENCODER);
         path.position = Some(mmu.filament_pos);
         path.direction = mmu.filament_direction.signum();
         path.distance = Some(mmu.filament_position);
@@ -236,6 +387,7 @@ fn afc_lane_path(afc: &AfcStatus, name: &str) -> Option<LoadPath> {
         entry: PathSensor::of_switch(lane.prep),
         exit: PathSensor::of_switch(lane.load),
         hub: PathSensor::of_switch(lane.hub.as_deref().and_then(|hub| afc.hub(hub)).and_then(|hub| hub.switch)),
+        encoder: PathSensor::Absent,
         extruder: PathSensor::of_switch(own.and_then(|own| own.tool_start)),
         toolhead: PathSensor::of_switch(own.and_then(|own| own.tool_end)),
         buffer: lane.buffer.as_deref().and_then(|buffer| afc.buffer(buffer)).map(|buffer| afc_side(buffer.state)),
@@ -341,7 +493,11 @@ mod tests {
                 MmuSensor { name: "extruder".into(), triggered: Some(true) },
                 MmuSensor { name: "toolhead".into(), triggered: None },
             ],
-            sync_feedback: Some(SyncFeedback { state: SyncFeedbackState::Tension, bias: -1.0 }),
+            sync_feedback: Some(SyncFeedback {
+                state: SyncFeedbackState::Tension,
+                bias: -1.0,
+                ..SyncFeedback::default()
+            }),
             units: vec![unit("ercf", 0, "extruder", "t0"), unit("tradrack", 4, "extruder1", "t1")],
             gates,
             ..MmuStatus::default()
@@ -488,5 +644,145 @@ mod tests {
         let path = head_path(&box_turtle(), "extruder");
 
         assert_eq!((path.extruder, path.position), (PathSensor::Triggered, Some(LOADED)));
+    }
+
+    fn path_at(position: i32) -> LoadPath {
+        LoadPath { entry: PathSensor::Triggered, exit: PathSensor::Free, position: Some(position), ..LoadPath::empty() }
+    }
+
+    fn with_head_sensors(mut path: LoadPath) -> LoadPath {
+        path.extruder = PathSensor::Free;
+        path.toolhead = PathSensor::Free;
+        path
+    }
+
+    fn fill_of(path: &LoadPath, wanted: Stretch) -> f64 {
+        path.parts(PathScope::Whole)
+            .into_iter()
+            .find_map(|part| match part {
+                PathPart::Tube { stretch, fill } if stretch == wanted => Some(fill),
+                _ => None,
+            })
+            .unwrap()
+    }
+
+    #[test]
+    fn the_parts_follow_the_way_and_leave_out_what_is_not_fitted() {
+        let mut path = path_at(LOADED);
+        path.toolhead = PathSensor::Triggered;
+
+        let parts = path.parts(PathScope::Whole);
+
+        assert_eq!(parts.first(), Some(&PathPart::Sensor { triggered: true }));
+        assert_eq!(parts.get(2), Some(&PathPart::Sensor { triggered: false }));
+        assert_eq!(parts.last(), Some(&PathPart::Nozzle { reached: true }));
+        assert!(!parts.iter().any(|part| matches!(part, PathPart::Tube { stretch: Stretch::Hub, .. })));
+        assert!(!parts.iter().any(|part| matches!(part, PathPart::Buffer(_))));
+        assert_eq!(parts.iter().filter(|part| matches!(part, PathPart::Sensor { .. })).count(), 3);
+    }
+
+    #[test]
+    fn hub_and_buffer_are_parts_where_the_lane_has_them() {
+        let mut path = path_at(PARKED);
+        path.hub = PathSensor::Free;
+        path.buffer = Some(BufferSide::Neutral);
+
+        let parts = path.parts(PathScope::Whole);
+        let hub = parts.iter().position(|part| matches!(part, PathPart::Tube { stretch: Stretch::Hub, .. })).unwrap();
+        let buffer = parts.iter().position(|part| *part == PathPart::Buffer(BufferSide::Neutral)).unwrap();
+        let bowden =
+            parts.iter().position(|part| matches!(part, PathPart::Tube { stretch: Stretch::Bowden, .. })).unwrap();
+
+        assert!(hub < buffer && buffer < bowden);
+    }
+
+    #[test]
+    fn the_encoder_stands_between_the_lane_and_the_buffer() {
+        let mut path = path_at(LOADED);
+        path.encoder = PathSensor::Triggered;
+        path.buffer = Some(BufferSide::Neutral);
+
+        let parts = path.parts(PathScope::Whole);
+        let encoder = parts.iter().position(|part| *part == PathPart::Encoder { moving: true }).unwrap();
+        let buffer = parts.iter().position(|part| matches!(part, PathPart::Buffer(_))).unwrap();
+
+        assert!(encoder < buffer);
+        assert!(!path.parts(PathScope::HeadOnly).iter().any(|part| matches!(part, PathPart::Encoder { .. })));
+    }
+
+    #[test]
+    fn the_head_only_scope_starts_at_the_extruder_sensor() {
+        let mut path = path_at(LOADED);
+        path.extruder = PathSensor::Triggered;
+
+        let parts = path.parts(PathScope::HeadOnly);
+
+        assert_eq!(parts.first(), Some(&PathPart::Sensor { triggered: true }));
+        assert!(matches!(parts.get(1), Some(PathPart::Tube { stretch: Stretch::ExtruderEntry, .. })));
+        assert_eq!(parts.get(2), Some(&PathPart::Gears { reached: true }));
+        assert!(!parts.iter().any(|part| matches!(part, PathPart::Tube { stretch: Stretch::Bowden, .. })));
+    }
+
+    #[test]
+    fn stretches_merge_where_no_sensor_divides_them() {
+        let path = path_at(IN_GEARS);
+        let parts = path.parts(PathScope::Whole);
+        let tubes: Vec<Stretch> = parts
+            .iter()
+            .filter_map(|part| match part {
+                PathPart::Tube { stretch, .. } => Some(*stretch),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(tubes, [Stretch::Lane, Stretch::Bowden, Stretch::GearsToNozzle]);
+        assert_eq!(fill_of(&path, Stretch::GearsToNozzle), 0.2);
+        assert_eq!(fill_of(&path_at(LOADED), Stretch::GearsToNozzle), 1.0);
+        assert!(matches!(
+            path.parts(PathScope::HeadOnly).first(),
+            Some(PathPart::Tube { stretch: Stretch::ExtruderEntry, .. })
+        ));
+    }
+
+    #[test]
+    fn the_stretches_fill_with_the_position() {
+        assert_eq!(fill_of(&path_at(PARKED), Stretch::Lane), 0.6);
+        assert_eq!(fill_of(&path_at(PARKED), Stretch::Bowden), 0.0);
+        assert_eq!(fill_of(&path_at(AT_HUB), Stretch::Lane), 1.0);
+        assert_eq!(fill_of(&path_at(BOWDEN_START), Stretch::Bowden), 0.1);
+        assert_eq!(fill_of(&path_at(BOWDEN_START + 1), Stretch::Bowden), 0.5);
+        assert_eq!(fill_of(&path_at(BOWDEN_END), Stretch::Bowden), 1.0);
+        assert_eq!(fill_of(&with_head_sensors(path_at(AT_GEARS - 1)), Stretch::ExtruderEntry), 0.0);
+        assert_eq!(fill_of(&with_head_sensors(path_at(AT_GEARS)), Stretch::ExtruderEntry), 1.0);
+        assert_eq!(fill_of(&with_head_sensors(path_at(IN_GEARS)), Stretch::Extruder), 0.3);
+        assert_eq!(fill_of(&with_head_sensors(path_at(PAST_TOOLHEAD_SENSOR)), Stretch::Hotend), 0.5);
+        assert_eq!(fill_of(&with_head_sensors(path_at(LOADED)), Stretch::Hotend), 1.0);
+    }
+
+    #[test]
+    fn the_bowden_fills_as_far_as_happy_hare_reports_the_move() {
+        let mut path = path_at(BOWDEN_START + 1);
+        path.bowden_progress = Some(0.8);
+
+        assert_eq!(fill_of(&path, Stretch::Bowden), 0.8);
+    }
+
+    #[test]
+    fn nothing_is_filled_and_reached_without_a_position() {
+        let path = LoadPath::empty();
+
+        assert_eq!(fill_of(&path, Stretch::Lane), 0.0);
+        assert!(path.parts(PathScope::Whole).contains(&PathPart::Gears { reached: false }));
+        assert!(!path.is_settled());
+    }
+
+    #[test]
+    fn a_path_is_settled_once_loaded_whatever_the_last_direction() {
+        let mut path = path_at(LOADED);
+        path.direction = 1;
+
+        assert!(path.is_settled());
+        assert!(!path_at(PAST_TOOLHEAD_SENSOR).is_settled());
+        assert!(!path_at(BOWDEN_END).is_settled());
     }
 }

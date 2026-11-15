@@ -16,18 +16,6 @@ export global MmuTexts {
         if (state == "inactive") { return @tr("Inactive"); }
         return @tr("Off");
     }
-    pure public function flowguard(state: string, detail: string) -> string {
-        if (state == "triggered") { return @tr("FlowGuard triggered") + (detail == "" ? "" : ": " + detail); }
-        if (state == "boosting") { return @tr("FlowGuard: tangle prevention"); }
-        if (state == "monitoring") { return @tr("FlowGuard monitoring"); }
-        return @tr("FlowGuard ready");
-    }
-    // Ready and monitoring are the normal state and stay grey; tangle prevention is a deviation, triggered an error.
-    pure public function flowguard-color(state: string) -> color {
-        if (state == "triggered") { return Theme.danger; }
-        if (state == "boosting") { return Theme.warning; }
-        return Theme.muted;
-    }
     pure public function availability(availability: string) -> string {
         if (availability == "available") { return @tr("Available"); }
         if (availability == "buffered") { return @tr("Buffered"); }
@@ -219,29 +207,156 @@ export component BypassTile inherits SlotTile {
     }
 }
 
-// Position of the filament in the buffer: tension on the left, compression on the right, the neutral zone in the middle.
-export component BufferGauge inherits Rectangle {
+// The scale of the buffer: tension at the left, compression at the right. The marker is the bias, the stroke in the
+// middle neutral, the stroke at the left the tension from which tangle prevention raises the gear current, and the
+// strip growing from an end FlowGuard's level: how close it is to a tangle (left) or a clog (right) trigger. A side
+// that no sensor measures (a one-sided switch buffer) is an outline only; FlowGuard still infers it.
+component BufferScale inherits Rectangle {
     in property <float> bias;
-    in property <string> state;
-    // Only a measuring buffer marks its neutral zone as the place where all is fine.
-    property <bool> measuring: root.state == "neutral" || root.state == "tension" || root.state == "compressed";
-    out property <color> marker-color: root.state == "neutral" ? Theme.success : root.state == "tension" || root.state == "compressed" ? Theme.warning : Theme.muted;
+    in property <string> sides;
+    in property <float> level;
+    in property <float> tangle-threshold;
+    in property <color> marker-color;
+    in property <color> level-color;
+    property <length> marker-width: 8px;
+    // Where a bias sits: the marker's middle runs between the ends.
+    pure function place(bias: float) -> length {
+        return root.marker-width / 2 + clamp((bias + 1) / 2, 0, 1) * (root.width - root.marker-width);
+    }
 
     height: 18px;
     Rectangle {
+        border-radius: Theme.radius-small;
+        border-width: 1px;
+        border-color: Theme.border;
+    }
+    if root.sides != "compression": Rectangle {
+        x: 0;
+        width: parent.width / 2;
+        border-radius: Theme.radius-small;
+        background: Theme.border;
+    }
+    if root.sides != "tension": Rectangle {
+        x: parent.width / 2;
+        width: parent.width / 2;
         border-radius: Theme.radius-small;
         background: Theme.border;
     }
     Rectangle {
         x: (parent.width - self.width) / 2;
-        width: parent.width * 0.1;
-        background: root.measuring ? Theme.success.with-alpha(0.35) : Theme.surface-active;
+        width: 1px;
+        background: Theme.muted;
+    }
+    if root.tangle-threshold >= 0: Rectangle {
+        x: root.place(-root.tangle-threshold) - self.width / 2;
+        width: 2px;
+        background: Theme.muted;
+    }
+    if root.level != 0: Rectangle {
+        x: root.level < 0 ? 0 : parent.width - self.width;
+        y: parent.height - self.height;
+        width: abs(root.level) * parent.width / 2;
+        height: 5px;
+        border-radius: Theme.radius-small;
+        background: root.level-color;
     }
     Rectangle {
-        width: 8px;
-        height: parent.height;
-        x: clamp((root.bias + 1) / 2, 0, 1) * (parent.width - self.width);
+        width: root.marker-width;
+        x: root.place(root.bias) - self.width / 2;
         border-radius: Theme.radius-small;
         background: root.marker-color;
+    }
+}
+
+// Buffer, tangle prevention and FlowGuard of Happy Hare as one instrument, as all of them read the buffer: one line
+// that states what stands out most, and the scale. Without a buffer (an encoder alone) only the line.
+export component FlowGuardInstrument inherits VerticalLayout {
+    // The print page shows the flow rate only where an encoder measures it; the estimate stays on the Filament page.
+    in property <bool> measured-flow-only;
+    // The buffer is the selected gate's: the card of another lane keeps FlowGuard's line and leaves the scale out.
+    in property <bool> with-buffer: true;
+
+    property <bool> has-buffer: Printer.mmu-has-buffer && root.with-buffer;
+    property <string> buffer: Printer.mmu-buffer-state;
+    property <string> guard: Printer.mmu-flowguard-state;
+    property <bool> guarded: root.guard != "off";
+    property <float> level: root.guarded ? Printer.mmu-flowguard-level : 0;
+    // FlowGuard counts towards a trigger; small values come and go while the controller works.
+    property <bool> rising: root.guard != "triggered" && abs(root.level) >= 0.1;
+    property <color> tone: root.guard == "triggered" ? Theme.danger : root.rising || root.guard == "boosting" ? Theme.warning : Theme.muted;
+    property <bool> shows-flow: Printer.mmu-flow-rate >= 0 && (Printer.mmu-flow-measured || !root.measured-flow-only);
+    property <string> guard-word: root.guard == "monitoring" ? @tr("FlowGuard monitoring") : @tr("FlowGuard ready");
+    property <string> statement: {
+        if (root.guard == "triggered") {
+            return @tr("FlowGuard triggered") + (Printer.mmu-flowguard-detail == "" ? "" : ": " + Printer.mmu-flowguard-detail);
+        }
+        if (root.rising && root.guard == "boosting") {
+            return @tr("Tangle prevention · FlowGuard tangle level {} %", round(abs(root.level) * 100));
+        }
+        if (root.rising) {
+            return root.level > 0 ? @tr("FlowGuard: clog level {} %", round(root.level * 100)) : @tr("FlowGuard: tangle level {} %", round(-root.level * 100));
+        }
+        if (root.guard == "boosting") {
+            return @tr("Tangle prevention: gear current raised");
+        }
+        if (!root.has-buffer) {
+            return root.guard-word;
+        }
+        return @tr("Buffer: {}", MmuTexts.buffer(root.buffer)) + (root.guarded ? " · " + root.guard-word : "");
+    }
+
+    spacing: Theme.spacing-small;
+
+    HorizontalLayout {
+        spacing: Theme.spacing;
+        // The figures are short and stay whole; the statement gives way when the line is narrow.
+        IconLabel {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            icon: root.guarded ? Icons.mmu-flowguard : Icons.mmu-sync;
+            text: root.statement;
+            color: root.tone;
+            font-size: Theme.font-small;
+        }
+        if Printer.mmu-encoder-headroom != "": IconLabel {
+            horizontal-stretch: 0;
+            icon: Icons.mmu-encoder;
+            text: @tr("Headroom {}", Printer.mmu-encoder-headroom);
+            color: Theme.muted;
+            font-size: Theme.font-small;
+        }
+        if root.shows-flow: IconLabel {
+            horizontal-stretch: 0;
+            icon: Icons.filament-flow;
+            text: @tr("Flow {} %", round(Printer.mmu-flow-rate));
+            color: Theme.muted;
+            font-size: Theme.font-small;
+        }
+    }
+    // The ends are named by what FlowGuard makes of them, while it watches.
+    if root.has-buffer: HorizontalLayout {
+        spacing: Theme.spacing;
+        Text {
+            text: root.guarded ? @tr("Tangle") : @tr("Tension");
+            color: root.level <= -0.1 ? root.tone : Theme.muted;
+            font-size: Theme.font-small;
+            vertical-alignment: center;
+        }
+        BufferScale {
+            horizontal-stretch: 1;
+            bias: Printer.mmu-buffer-bias;
+            sides: Printer.mmu-buffer-sides;
+            level: root.level;
+            tangle-threshold: Printer.mmu-tangle-threshold;
+            level-color: root.guard == "triggered" ? Theme.danger : Theme.warning;
+            // Leaning to a side is the controller at work, not a deviation.
+            marker-color: root.tone != Theme.muted ? root.tone : root.buffer == "neutral" ? Theme.success : root.buffer == "tension" || root.buffer == "compressed" ? Theme.foreground : Theme.muted;
+        }
+        Text {
+            text: root.guarded ? @tr("Clog") : @tr("Compression");
+            color: root.level >= 0.1 ? root.tone : Theme.muted;
+            font-size: Theme.font-small;
+            vertical-alignment: center;
+        }
     }
 }

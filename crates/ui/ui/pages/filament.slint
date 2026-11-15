@@ -117,7 +117,6 @@ component ExtruderTab inherits Rectangle {
                     icon: Icons.filament-sensor;
                     FilamentPath {
                         path: root.head.path;
-                        head-only: true;
                     }
                 }
                 if !root.has-head && Printer.filament-sensors.length > 0: Card {

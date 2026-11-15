@@ -1,21 +1,11 @@
-// The way of the filament from the gate or lane to the nozzle, drawn from the state of Happy Hare or AFC (position on
-// Happy Hare's `filament_pos` scale, direction, sensors, colour): a tube that fills in the colour of the spool. With
-// `head-only` just the part at the head: extruder sensor, extruder gears, sensor behind them and nozzle.
+// The way of the filament from the gate or lane to the nozzle, drawn from the state of Happy Hare or AFC: the pieces
+// the core lists in the order the filament passes them (`LoadPath::parts`), a tube that fills in the colour of the
+// spool. The head of a tool changer shows only its own pieces: extruder sensor, gears, sensor behind them and nozzle.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
-import { BarColors, FilamentPathItem } from "../state.slint";
-
-// A sensor on the way: -1 not fitted (not drawn), 0 free (dim), 1 triggered (bright). The symbol, not a coloured dot,
-// so it stands out from any filament colour.
-component SensorMark inherits Image {
-    in property <int> state;
-    width: root.state < 0 ? 0px : Theme.icon-small;
-    height: Theme.icon-small;
-    source: Icons.filament-sensor;
-    colorize: root.state == 1 ? Theme.foreground : Theme.disabled-foreground;
-}
+import { BarColors, FilamentPathItem, PathPartItem, PathPartKind } from "../state.slint";
 
 // One piece of tube, filled to `fill` (0 to 1) from the left in the colours of the filament (see `FilamentSwatch`).
 component Tube inherits Rectangle {
@@ -35,28 +25,64 @@ component Tube inherits Rectangle {
     }
 }
 
-component Label inherits Text {
-    color: Theme.muted;
-    font-size: Theme.font-small;
-    horizontal-alignment: center;
+// One piece of the way with its name under it: the symbol or the tube on the middle line of the row.
+component PathPart inherits VerticalLayout {
+    in property <PathPartItem> part;
+    in property <BarColors> filament;
+    in property <string> lane-label;
+    in property <bool> labelled;
+
+    property <PathPartKind> kind: root.part.kind;
+    property <bool> tube: root.kind == PathPartKind.lane || root.kind == PathPartKind.hub || root.kind == PathPartKind.bowden || root.kind == PathPartKind.link;
+    // The symbol, not a coloured dot, so it stands out from any filament colour.
+    property <image> symbol: root.kind == PathPartKind.gears ? Icons.filament-extruder-gears : root.kind == PathPartKind.nozzle ? Icons.thermal-nozzle : root.kind == PathPartKind.encoder ? Icons.mmu-encoder : root.kind == PathPartKind.buffer ? Icons.mmu-sync : Icons.filament-sensor;
+    property <bool> large: root.kind == PathPartKind.gears || root.kind == PathPartKind.nozzle;
+    property <length> symbol-size: root.large ? Theme.icon-large : Theme.icon-small;
+    property <string> label: root.kind == PathPartKind.lane ? root.lane-label : root.kind == PathPartKind.hub ? @tr("Hub") : root.kind == PathPartKind.bowden ? @tr("Bowden") : root.kind == PathPartKind.encoder ? @tr("Encoder") : root.kind == PathPartKind.buffer ? @tr("Buffer") : root.kind == PathPartKind.gears ? @tr("Extruder") : root.kind == PathPartKind.nozzle ? @tr("Nozzle") : "";
+
+    // The bowden is the long piece; the other tubes share what is left, symbols take what they need.
+    horizontal-stretch: root.kind == PathPartKind.bowden ? 5 : root.tube ? 1 : 0;
+    spacing: Theme.spacing-small;
+
+    Rectangle {
+        height: Theme.icon-large;
+        min-width: root.tube ? 12px : root.symbol-size;
+        if root.tube: Tube {
+            y: (parent.height - self.height) / 2;
+            width: parent.width;
+            fill: root.part.fill;
+            filament: root.filament;
+        }
+        if !root.tube: Image {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: root.symbol-size;
+            height: root.symbol-size;
+            source: root.symbol;
+            // Bright once the filament is there (gears, nozzle) or while the piece reports something (sensors,
+            // encoder, buffer), dim otherwise. Only the tube carries the filament's colour: a red or black symbol
+            // would read as a state, or not at all.
+            colorize: root.part.active ? Theme.foreground : root.large ? Theme.muted : Theme.disabled-foreground;
+        }
+    }
+    if root.labelled: Text {
+        text: root.label;
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        horizontal-alignment: center;
+    }
 }
 
-export component FilamentPath inherits VerticalLayout {
-    // `position` is Happy Hare's `filament_pos`: -1 unknown, 0 parked in the gate, 1 at the gate sensor, 2 to 4 in
-    // the bowden, 5 at the extruder entry sensor, 6 at the extruder gears, 7 gripped by them, 8 at the toolhead
-    // sensor, 9 past it, 10 loaded to the nozzle. `direction`: 1 loading, -1 unloading, 0 standing.
+export component FilamentPath inherits HorizontalLayout {
     in property <FilamentPathItem> path;
-    // Print page: one line without labels.
+    // Print page: one line without names and without the distance.
     in property <bool> compact;
-    // The head's part only (the Extruder view of a tool changer head): nothing of gate, hub and bowden.
-    in property <bool> head-only;
 
-    property <bool> has-hub: root.path.hub-sensor >= 0;
-    property <int> position: root.path.position;
     property <int> direction: root.path.direction;
     property <string> distance: root.compact ? "" : root.path.distance;
-    // Unknown position, or a gate without colour: a neutral filament.
-    property <bool> neutral: root.position < 0 || root.path.colors.count < 1;
+    // A gate without colour: a neutral filament.
+    property <bool> neutral: root.path.colors.count < 1;
+    property <color> line-color: root.neutral ? Theme.muted : root.path.colors.first;
     // The colours of the tubes: the neutral line colour, or the filament's own colours.
     property <BarColors> tube-colors: {
         first: root.line-color,
@@ -65,68 +91,32 @@ export component FilamentPath inherits VerticalLayout {
         count: root.neutral ? 1 : root.path.colors.count,
         longitudinal: root.path.colors.longitudinal,
     };
-    property <color> line-color: root.neutral ? Theme.muted : root.path.colors.first;
-
-    // How far each piece is filled at the current position.
-    pure function fill(piece: int) -> float {
-        if (root.position < 0) { return 0; }
-        if (piece == 0) { return root.position >= 1 ? 1 : 0.6; }
-        // In the bowden Happy Hare reports how far a move has come; without it the middle stands for "somewhere".
-        if (piece == 1) {
-            if (root.position >= 4) { return 1; }
-            if (root.position >= 2 && root.path.bowden-progress >= 0) { return root.path.bowden-progress; }
-            return root.position == 3 ? 0.5 : root.position == 2 ? 0.1 : 0;
-        }
-        if (piece == 2) { return root.position >= 5 ? 1 : 0; }
-        // From the lane's exit to the hub.
-        if (piece == 5) { return root.position >= 1 ? 1 : 0; }
-        // Behind the extruder gears: 7 means the gears have pulled the filament in.
-        if (piece == 3) { return root.position >= 8 ? 1 : root.position == 7 ? 0.3 : 0; }
-        return root.position >= 10 ? 1 : root.position == 9 ? 0.5 : 0;
-    }
 
     spacing: Theme.spacing-small;
 
-    // Symbols, tubes and distance all sit on the middle line of the row.
-    HorizontalLayout {
-        spacing: Theme.spacing-small;
-        alignment: stretch;
-        cross-axis-alignment: center;
-        // Direction of movement at the left: the gate pushes or pulls.
+    // Direction of movement at the left: the gate pushes or pulls.
+    VerticalLayout {
+        alignment: start;
         Image {
             width: Theme.icon-small;
-            height: Theme.icon-small;
+            height: Theme.icon-large;
+            image-fit: contain;
             source: root.direction < 0 ? Icons.ui-chevron-left : Icons.ui-chevron-right;
             colorize: Theme.accent;
             // The place stays, so the tube does not move when the filament starts or stops.
             opacity: root.direction == 0 ? 0 : 1;
         }
-        if !root.head-only: SensorMark { state: root.path.gate-entry-sensor; }
-        if !root.head-only: Tube { horizontal-stretch: 1; fill: root.fill(0); filament: root.tube-colors; }
-        if !root.head-only: SensorMark { state: root.path.gate-sensor; }
-        // Where the lanes of a unit meet, when the printer has a sensor there.
-        if !root.head-only && root.has-hub: Tube { horizontal-stretch: 1; fill: root.fill(5); filament: root.tube-colors; }
-        if !root.head-only && root.has-hub: SensorMark { state: root.path.hub-sensor; }
-        if !root.head-only: Tube { horizontal-stretch: 5; fill: root.fill(1); filament: root.tube-colors; }
-        if !root.head-only: Tube { horizontal-stretch: 1; fill: root.fill(2); filament: root.tube-colors; }
-        SensorMark { state: root.path.extruder-sensor; }
-        // The extruder gears: lit once the filament has reached them (6) or they have it (7 and on).
-        Image {
-            width: Theme.icon-large;
+    }
+    for part in root.path.parts: PathPart {
+        part: part;
+        filament: root.tube-colors;
+        lane-label: root.path.gate-label;
+        labelled: !root.compact;
+    }
+    if root.distance != "": VerticalLayout {
+        alignment: start;
+        Text {
             height: Theme.icon-large;
-            source: Icons.filament-extruder-gears;
-            colorize: root.position >= 6 ? root.line-color : Theme.muted;
-        }
-        Tube { horizontal-stretch: 1; fill: root.fill(3); filament: root.tube-colors; }
-        SensorMark { state: root.path.toolhead-sensor; }
-        Tube { horizontal-stretch: 1; fill: root.fill(4); filament: root.tube-colors; }
-        Image {
-            width: Theme.icon-large;
-            height: Theme.icon-large;
-            source: Icons.thermal-nozzle;
-            colorize: root.position >= 10 ? root.line-color : Theme.muted;
-        }
-        if root.distance != "": Text {
             min-width: 70px;
             text: root.distance;
             color: Theme.muted;
@@ -134,22 +124,5 @@ export component FilamentPath inherits VerticalLayout {
             horizontal-alignment: right;
             vertical-alignment: center;
         }
-    }
-
-    // Names under the stations; left out on the print page.
-    if !root.compact && !root.head-only: HorizontalLayout {
-        padding-left: 24px;
-        padding-right: root.distance != "" ? 100px : 26px;
-        Label { text: root.path.gate-label; horizontal-stretch: 1; horizontal-alignment: left; }
-        if root.has-hub: Label { text: @tr("Hub"); horizontal-stretch: 1; }
-        Label { text: @tr("Bowden"); horizontal-stretch: 5; }
-        Label { text: @tr("Extruder"); horizontal-stretch: 3; }
-        Label { text: @tr("Nozzle"); horizontal-stretch: 1; horizontal-alignment: right; }
-    }
-    if !root.compact && root.head-only: HorizontalLayout {
-        padding-left: 24px;
-        padding-right: 26px;
-        Label { text: @tr("Extruder"); horizontal-stretch: 3; horizontal-alignment: left; }
-        Label { text: @tr("Nozzle"); horizontal-stretch: 1; horizontal-alignment: right; }
     }
 }

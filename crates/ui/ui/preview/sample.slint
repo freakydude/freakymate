@@ -1,7 +1,7 @@
 // Sample data for previews (VS Code Slint preview, slint-viewer, scripts/ui-preview.sh).
 // Not part of the app: nothing in app.slint imports this folder. In the app, Rust fills these globals.
 
-import { MotionTab, Navigation, Network, Page, Printer, UiSettings } from "../state.slint";
+import { MotionTab, Navigation, Network, Page, PathPartKind, Printer, UiSettings } from "../state.slint";
 
 export global Sample {
     // Connected Voron-like printer, homed, nozzle and bed at temperature, no job.
@@ -176,13 +176,41 @@ export global Sample {
         ];
         Printer.mmu-has-buffer = true;
         Printer.mmu-path = {
-            bowden-progress: -1, position: 10, direction: 1, distance: "1712.4 mm", gate-label: "Gate 2",
-            gate-entry-sensor: 1, gate-sensor: 1, hub-sensor: -1, extruder-sensor: 1, toolhead-sensor: 1,
+            direction: 1, distance: "1712.4 mm", gate-label: "Gate 2",
+            parts: [
+                { kind: PathPartKind.sensor, active: true },
+                { kind: PathPartKind.lane, fill: 1 },
+                { kind: PathPartKind.sensor, active: true },
+                { kind: PathPartKind.buffer, active: true },
+                { kind: PathPartKind.bowden, fill: 1 },
+                { kind: PathPartKind.sensor, active: true },
+                { kind: PathPartKind.link, fill: 1 },
+                { kind: PathPartKind.gears, active: true },
+                { kind: PathPartKind.link, fill: 1 },
+                { kind: PathPartKind.sensor, active: true },
+                { kind: PathPartKind.link, fill: 1 },
+                { kind: PathPartKind.nozzle, active: true },
+            ],
             colors: { first: #4dabf7, count: 1, longitudinal: false },
         };
         Printer.lane-path = {
-            bowden-progress: -1, position: 10, direction: 1, distance: "1712.4 mm", gate-label: "Gate 2",
-            gate-entry-sensor: 1, gate-sensor: 1, hub-sensor: 1, extruder-sensor: 1, toolhead-sensor: 1,
+            direction: 1, distance: "1712.4 mm", gate-label: "Gate 2",
+            parts: [
+                { kind: PathPartKind.sensor, active: true },
+                { kind: PathPartKind.lane, fill: 1 },
+                { kind: PathPartKind.sensor, active: true },
+                { kind: PathPartKind.hub, fill: 1 },
+                { kind: PathPartKind.sensor, active: true },
+                { kind: PathPartKind.buffer, active: true },
+                { kind: PathPartKind.bowden, fill: 1 },
+                { kind: PathPartKind.sensor, active: true },
+                { kind: PathPartKind.link, fill: 1 },
+                { kind: PathPartKind.gears, active: true },
+                { kind: PathPartKind.link, fill: 1 },
+                { kind: PathPartKind.sensor, active: true },
+                { kind: PathPartKind.link, fill: 1 },
+                { kind: PathPartKind.nozzle, active: true },
+            ],
             colors: { first: #4dabf7, count: 1, longitudinal: false },
         };
         Printer.lane-buffer = "tension";
