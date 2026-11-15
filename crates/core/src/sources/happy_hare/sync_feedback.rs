@@ -2,7 +2,7 @@
 
 use super::sensors::{has_proportional_sensor, MmuSensor};
 use crate::sourced::{prefer_measured, Sourced};
-use crate::sources::fields::{flag, text};
+use crate::sources::fields::{flag, section, text};
 use serde_json::Value;
 
 pub const ORIGIN_ENCODER: &str = "encoder";
@@ -112,6 +112,85 @@ impl FlowGuard {
     }
 }
 
+/// From this level on FlowGuard counts as rising towards a trigger; smaller values come and go while the controller
+/// works.
+pub const RISING_LEVEL: f64 = 0.1;
+
+/// How much a part of the FlowGuard line stands out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Emphasis {
+    Calm,
+    Attention,
+    Error,
+}
+
+/// What the FlowGuard line says, most important first: a trigger, tangle prevention at work on a rising tangle, a
+/// rising level, tangle prevention alone, and otherwise nothing of its own (the buffer's state fills the line).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowGuardStatement {
+    Triggered,
+    TangleBoost,
+    Clog,
+    Tangle,
+    Boosting,
+    Quiet,
+}
+
+/// FlowGuard as the display needs it: the statement, the level in percent and how much each part stands out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FlowGuardReading {
+    pub statement: FlowGuardStatement,
+    /// Distance to a trigger, 0 to 100.
+    pub percent: u32,
+    /// The line itself.
+    pub line: Emphasis,
+    /// The label of the tangle end (tension) of the scale, and of the clog end (compression).
+    pub tangle_end: Emphasis,
+    pub clog_end: Emphasis,
+    /// The strip growing from an end of the scale.
+    pub strip: Emphasis,
+}
+
+impl FlowGuard {
+    /// The level that counts: FlowGuard that is off has none.
+    pub fn active_level(&self) -> f64 {
+        if self.enabled {
+            self.level
+        } else {
+            0.0
+        }
+    }
+
+    pub fn reading(&self) -> FlowGuardReading {
+        let level = self.active_level();
+        let triggered = self.state() == FlowGuardState::Triggered;
+        let rising = !triggered && level.abs() >= RISING_LEVEL;
+        let statement = match (triggered, rising, self.boosting) {
+            (true, _, _) => FlowGuardStatement::Triggered,
+            (_, true, true) => FlowGuardStatement::TangleBoost,
+            (_, true, false) if level > 0.0 => FlowGuardStatement::Clog,
+            (_, true, false) => FlowGuardStatement::Tangle,
+            (_, false, true) => FlowGuardStatement::Boosting,
+            _ => FlowGuardStatement::Quiet,
+        };
+        let line = if triggered {
+            Emphasis::Error
+        } else if rising || self.boosting {
+            Emphasis::Attention
+        } else {
+            Emphasis::Calm
+        };
+        FlowGuardReading {
+            statement,
+            percent: (level.abs() * 100.0).round() as u32,
+            line,
+            tangle_end: if level <= -RISING_LEVEL { line } else { Emphasis::Calm },
+            clog_end: if level >= RISING_LEVEL { line } else { Emphasis::Calm },
+            strip: if triggered { Emphasis::Error } else { Emphasis::Attention },
+        }
+    }
+}
+
 /// Happy Hare keeps `sync_feedback_flow_rate` at 100 for every buffer and only estimates it when an enabled
 /// proportional sensor exists (`mmu_sync_feedback.py`), so the field alone says nothing without that sensor.
 pub(super) fn read_flow_rate(mmu: &Value, sensors: &[MmuSensor]) -> Option<Sourced<f64>> {
@@ -190,9 +269,54 @@ pub(super) fn read_extreme_threshold(settings: &Value, buffer: &str, sensors: &[
     if !has_proportional_sensor(sensors) {
         return None;
     }
-    settings
-        .get(format!("mmu_buffer {}", buffer.to_lowercase()))?
+    section(settings, "mmu_buffer ", buffer)?
         .get("analog_sensor_threshold")?
         .as_f64()
         .filter(|threshold| (0.5..=1.0).contains(threshold))
+}
+
+#[cfg(test)]
+mod reading_tests {
+    use super::*;
+
+    fn guard(level: f64, boosting: bool, trigger: &str) -> FlowGuard {
+        FlowGuard { enabled: true, boosting, trigger: trigger.into(), level, ..FlowGuard::default() }
+    }
+
+    #[test]
+    fn a_trigger_outranks_everything() {
+        let reading = guard(0.6, true, "clog").reading();
+        assert_eq!(reading.statement, FlowGuardStatement::Triggered);
+        assert_eq!(
+            (reading.line, reading.strip, reading.clog_end),
+            (Emphasis::Error, Emphasis::Error, Emphasis::Error)
+        );
+    }
+
+    #[test]
+    fn a_rising_tangle_with_boost_comes_before_the_level_alone() {
+        let reading = guard(-0.35, true, "").reading();
+        assert_eq!(reading.statement, FlowGuardStatement::TangleBoost);
+        assert_eq!(reading.percent, 35);
+        assert_eq!((reading.tangle_end, reading.clog_end), (Emphasis::Attention, Emphasis::Calm));
+    }
+
+    #[test]
+    fn the_sign_tells_clog_from_tangle() {
+        assert_eq!(guard(0.2, false, "").reading().statement, FlowGuardStatement::Clog);
+        assert_eq!(guard(-0.2, false, "").reading().statement, FlowGuardStatement::Tangle);
+    }
+
+    #[test]
+    fn small_levels_are_not_rising_and_boost_alone_still_counts() {
+        assert_eq!(guard(0.05, false, "").reading().statement, FlowGuardStatement::Quiet);
+        let boosting = guard(0.05, true, "").reading();
+        assert_eq!((boosting.statement, boosting.line), (FlowGuardStatement::Boosting, Emphasis::Attention));
+    }
+
+    #[test]
+    fn flowguard_that_is_off_has_no_level() {
+        let off = FlowGuard { enabled: false, level: 0.9, ..FlowGuard::default() };
+        assert_eq!((off.reading().statement, off.reading().percent), (FlowGuardStatement::Quiet, 0));
+    }
 }

@@ -7,6 +7,7 @@ use super::filament_sensors::is_filament_sensor;
 use super::leveling::Leveling;
 use super::macros::{self, MacroDetails};
 use super::tuning::TuningConfig;
+use crate::sources::fields::section;
 use crate::sources::subscription::Subscription;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -90,7 +91,7 @@ impl Setup {
     /// What only the configuration tells: macro parameters, LEDs with white, the configured tuning values.
     pub fn apply_settings(&mut self, settings: Option<&Value>) {
         self.macro_details = Arc::new(macros::details_from_settings(settings));
-        let section = |object: &str| settings.and_then(|settings| settings.get(object.to_lowercase()));
+        let section = |object: &str| settings.and_then(|settings| section(settings, "", object));
         self.led_white = self.leds.iter().map(|led| (led.clone(), devices::white_channel(section(led)))).collect();
         self.tuning = TuningConfig::from_settings(settings);
         self.calibration.apply_settings(settings);

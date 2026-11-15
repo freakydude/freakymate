@@ -12,11 +12,11 @@ mod sync_feedback;
 pub use gates::{GateAvailability, LoadedFilament, MmuGate, BYPASS};
 pub use sensors::{is_shown_by_mmu, MmuSensor, PathSensor};
 pub use sync_feedback::{
-    BufferSides, EncoderHeadroom, FlowGuard, FlowGuardState, SyncFeedback, SyncFeedbackState, ORIGIN_ENCODER,
-    ORIGIN_SYNC_FEEDBACK,
+    BufferSides, Emphasis, EncoderHeadroom, FlowGuard, FlowGuardReading, FlowGuardState, FlowGuardStatement,
+    SyncFeedback, SyncFeedbackState, ORIGIN_ENCODER, ORIGIN_SYNC_FEEDBACK,
 };
 
-use super::fields::{count, flag, integer, text};
+use super::fields::{count, flag, integer, section, text};
 use super::klipper::NOZZLE_HEATER;
 use super::objects::ObjectStore;
 use super::subscription::Subscription;
@@ -133,6 +133,12 @@ impl MmuStatus {
     pub fn bypass_unit(&self) -> Option<usize> {
         self.units.iter().position(|unit| unit.has_bypass)
     }
+
+    /// Happy Hare unloads loaded filament before it checks another gate (and loads it again afterwards outside a
+    /// print); checking the selected gate leaves it where it is.
+    pub fn unloads_before_checking(&self, gate: usize) -> bool {
+        self.filament != LoadedFilament::Unloaded && usize::try_from(self.gate) != Ok(gate)
+    }
 }
 
 impl MmuUnit {
@@ -149,7 +155,7 @@ fn read_units(machine: &Value, num_units: usize, settings: &Value) -> Vec<MmuUni
             let unit = machine.get(format!("unit_{index}"))?;
             let name = text(unit, "name");
             let display_name = Some(text(unit, "display_name")).filter(|shown| !shown.is_empty()).unwrap_or(name);
-            let section = settings.get(format!("mmu_unit {}", name.to_lowercase()));
+            let section = section(settings, "mmu_unit ", name);
             let option = |key: &str| section.map(|section| text(section, key)).filter(|value| !value.is_empty());
             Some(MmuUnit {
                 name: name.to_owned(),
@@ -787,5 +793,15 @@ mod tests {
         let listed: Vec<&str> = mmu.listed_sensors().iter().map(|sensor| sensor.name.as_str()).collect();
 
         assert_eq!(listed, ["encoder"]);
+    }
+
+    #[test]
+    fn checking_another_gate_unloads_loaded_filament_first() {
+        let mmu = |filament, gate| MmuStatus { filament, gate, ..MmuStatus::default() };
+        assert!(mmu(LoadedFilament::Loaded, 1).unloads_before_checking(2));
+        assert!(!mmu(LoadedFilament::Loaded, 2).unloads_before_checking(2));
+        assert!(!mmu(LoadedFilament::Unloaded, 1).unloads_before_checking(2));
+        // The bypass is selected (-2): any gate is another one.
+        assert!(mmu(LoadedFilament::Loaded, -2).unloads_before_checking(0));
     }
 }

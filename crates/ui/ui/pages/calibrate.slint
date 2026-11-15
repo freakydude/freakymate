@@ -4,6 +4,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
+import { StateIcons } from "../state-icons.slint";
 import { Actions, Confirm, MeshDialogs, Printer, ScrewItem } from "../state.slint";
 import { ButtonKind, Card, IconButton, Note, ScrollList } from "../components/controls.slint";
 import { MeshMap } from "../components/bed-mesh.slint";
@@ -35,7 +36,7 @@ component ScrewRow inherits HorizontalLayout {
     // A screw that needs under 00:10 is done: a tick in the success colour instead of a direction.
     if !root.screw.is-base: Image {
         source: root.screw.level ? Icons.ui-check : root.screw.clockwise ? Icons.calibration-screw-clockwise : Icons.calibration-screw-counterclockwise;
-        colorize: root.screw.level ? Theme.success : Theme.foreground;
+        colorize: StateIcons.ok-color(root.screw.level, Theme.foreground);
         width: Theme.icon;
         height: Theme.icon;
         cross-axis-self-alignment: center;
@@ -44,7 +45,7 @@ component ScrewRow inherits HorizontalLayout {
     }
     Text {
         text: root.screw.is-base ? @tr("base") : root.screw.turns;
-        color: root.screw.is-base ? Theme.muted : root.screw.level ? Theme.success : Theme.foreground;
+        color: StateIcons.ok-color(root.screw.level && !root.screw.is-base, root.screw.is-base ? Theme.muted : Theme.foreground);
         font-size: Theme.font-normal;
         font-weight: root.screw.is-base ? 400 : 700;
         vertical-alignment: center;

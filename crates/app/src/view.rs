@@ -1,6 +1,6 @@
 //! Pure display derivations from the printer state; free of Slint types and therefore testable.
 
-use crate::format;
+use crate::{format, Severity};
 use chrono::{DateTime, Local};
 use freakymate_core::domain::estimates;
 use freakymate_core::domain::filament_match::{self, Difference, ToolMatch, Verdict};
@@ -8,7 +8,8 @@ use freakymate_core::domain::file_catalog::FileInfo;
 use freakymate_core::domain::job_end;
 use freakymate_core::domain::pause::{Interruption, InterruptionFact};
 use freakymate_core::sources::happy_hare::{
-    BufferSides, EncoderHeadroom, FlowGuardState, GateAvailability, LoadedFilament, ServoPosition, SyncFeedbackState,
+    BufferSides, Emphasis, EncoderHeadroom, FlowGuardState, FlowGuardStatement, GateAvailability, LoadedFilament,
+    ServoPosition, SyncFeedbackState,
 };
 use freakymate_core::sources::klipper::tuning::TuningRange;
 use freakymate_core::sources::klipper::{FanKind, PrintJob, PrintState};
@@ -390,6 +391,35 @@ pub fn mmu_buffer_state(state: SyncFeedbackState) -> &'static str {
     }
 }
 
+pub fn flowguard_statement(statement: FlowGuardStatement) -> &'static str {
+    match statement {
+        FlowGuardStatement::Triggered => "triggered",
+        FlowGuardStatement::TangleBoost => "tangle-boost",
+        FlowGuardStatement::Clog => "clog",
+        FlowGuardStatement::Tangle => "tangle",
+        FlowGuardStatement::Boosting => "boosting",
+        FlowGuardStatement::Quiet => "quiet",
+    }
+}
+
+pub fn emphasis_severity(emphasis: Emphasis) -> Severity {
+    match emphasis {
+        Emphasis::Calm => Severity::Calm,
+        Emphasis::Attention => Severity::Attention,
+        Emphasis::Error => Severity::Error,
+    }
+}
+
+/// The marker of the buffer scale: FlowGuard's emphasis while it has one; otherwise the buffer's state (leaning to a
+/// side is the controller at work, not a deviation).
+pub fn buffer_marker_severity(line: Emphasis, buffer: SyncFeedbackState) -> Severity {
+    match (line, buffer) {
+        (Emphasis::Calm, SyncFeedbackState::Neutral) => Severity::Fine,
+        (Emphasis::Calm, SyncFeedbackState::Tension | SyncFeedbackState::Compressed) => Severity::Neutral,
+        _ => emphasis_severity(line),
+    }
+}
+
 pub fn mmu_flowguard_state(state: FlowGuardState) -> &'static str {
     match state {
         FlowGuardState::Off => "off",
@@ -424,6 +454,26 @@ mod tests {
     use super::*;
     use chrono::TimeZone;
     use freakymate_core::sources::moonraker_server::files::FileEntry;
+
+    #[test]
+    fn a_buffer_names_the_sides_a_sensor_measures() {
+        assert_eq!(mmu_buffer_sides(BufferSides::Both), "both");
+        assert_eq!(mmu_buffer_sides(BufferSides::CompressionOnly), "compression");
+        assert_eq!(mmu_buffer_sides(BufferSides::TensionOnly), "tension");
+    }
+
+    #[test]
+    fn the_encoder_headroom_reads_as_used_of_watched_length() {
+        assert_eq!(encoder_headroom(EncoderHeadroom { headroom: 7.5, detection_length: 12.0 }), "7.5 / 12.0 mm");
+    }
+
+    #[test]
+    fn the_buffer_marker_follows_flowguard_before_the_buffer() {
+        assert_eq!(buffer_marker_severity(Emphasis::Error, SyncFeedbackState::Neutral), Severity::Error);
+        assert_eq!(buffer_marker_severity(Emphasis::Calm, SyncFeedbackState::Neutral), Severity::Fine);
+        assert_eq!(buffer_marker_severity(Emphasis::Calm, SyncFeedbackState::Tension), Severity::Neutral);
+        assert_eq!(buffer_marker_severity(Emphasis::Calm, SyncFeedbackState::Inactive), Severity::Calm);
+    }
 
     fn now() -> DateTime<Local> {
         Local.with_ymd_and_hms(2026, 10, 21, 12, 0, 0).unwrap()

@@ -457,14 +457,14 @@ export component ToolDialog inherits Scrim {
                 spacing: Theme.spacing;
                 if root.mapping.gate >= 0: OpenGateButton {
                     width: 200px;
-                    height: 48px;
+                    height: Theme.touch;
                     gate: root.mapping.gate;
                     gate-row: root.mapping.gate-row;
                     opened => { root.close(); }
                 }
                 if Printer.has-spoolman && root.mapping.gate >= 0: IconButton {
                     width: 200px;
-                    height: 48px;
+                    height: Theme.touch;
                     icon: Icons.filament-spool;
                     text: @tr("Change spool");
                     horizontal: true;
@@ -475,7 +475,7 @@ export component ToolDialog inherits Scrim {
                 }
                 if Printer.mmu-gates.length > 1 && root.mapping.gate >= 0: IconButton {
                     width: 200px;
-                    height: 48px;
+                    height: Theme.touch;
                     text: @tr("Choose gate");
                     clicked => {
                         MmuDialogs.tool-gate = MmuDialogs.tool;
@@ -574,7 +574,7 @@ export component ToolGateDialog inherits Scrim {
                 }
                 Rectangle { vertical-stretch: 1; }
                 if root.mapping.gate >= 0: OpenGateButton {
-                    height: 48px;
+                    height: Theme.touch;
                     gate: root.mapping.gate;
                     gate-row: root.mapping.gate-row;
                     opened => { root.close(); }

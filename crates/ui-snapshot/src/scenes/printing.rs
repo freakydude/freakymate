@@ -98,7 +98,7 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
     tools_match_the_job(session)?;
     temperature_leads_to_heaters(session)?;
     nozzle_history(session)?;
-    tangle_boost(session)?;
+    flowguard_stress(session)?;
     session.show_page(Page::Temperature, "temperature-printing")?;
     session.show_page(Page::System, "system-printing")?;
     // The axes stand still: Axes and Calibrate are greyed out and the page shows Tune.
@@ -178,7 +178,7 @@ pub(super) fn print_error(session: &mut Session) -> Result<(), String> {
 /// sensor until tangle prevention boosts the gear current (`print-tangle-boost`), with a switch buffer until its
 /// switch is pressed, with an encoder until its headroom is half used (`print-flowguard-stress`). Skipped without
 /// anything FlowGuard watches.
-pub(super) fn tangle_boost(session: &mut Session) -> Result<(), String> {
+pub(super) fn flowguard_stress(session: &mut Session) -> Result<(), String> {
     let watched = |snapshot: &freakymate_core::Snapshot| {
         snapshot.status.mmu.as_ref().is_some_and(|mmu| mmu.flowguard.is_some() || mmu.encoder_headroom.is_some())
     };

@@ -7,7 +7,7 @@
 //! `[AFC_extruder <name>]` is only in its configuration (`extruder_name`, the section's own name by default,
 //! `AFC_extruder.py` L222); a lane names its `AFC_extruder`, not the Klipper extruder.
 
-use super::fields::{count, flag, text};
+use super::fields::{count, flag, section, text};
 use super::subscription::Subscription;
 use super::ObjectStore;
 use crate::color::{self, Rgba};
@@ -213,7 +213,7 @@ fn distinct<'a>(names: impl Iterator<Item = &'a str>) -> impl Iterator<Item = &'
 fn read_lane(store: &ObjectStore, settings: &Value, name: &str) -> Option<AfcLane> {
     let lane = LANE_PREFIXES.iter().find_map(|prefix| store.object(&format!("{prefix}{name}")))?;
     let afc_extruder = lane.get("extruder").and_then(Value::as_str)?;
-    let section = LANE_SECTIONS.iter().find_map(|prefix| settings.get(format!("{prefix}{}", name.to_lowercase())));
+    let section = LANE_SECTIONS.iter().find_map(|prefix| section(settings, prefix, name));
     // A switch exists where its pin is configured (`AFC_lane.py` L224-232); the lanes AFC creates for the heads of its
     // tool changer have no section and no switches of their own (`AFC_extruder.py` L327-332).
     let switch = |key: &str| section.filter(|section| !text(section, key).is_empty()).map(|_| flag(lane, key));
@@ -239,7 +239,7 @@ fn read_lane(store: &ObjectStore, settings: &Value, name: &str) -> Option<AfcLan
 
 /// A hub with its switch; a virtual hub (`switch_pin: virtual`) or one whose section is unknown has none.
 fn read_hub(store: &ObjectStore, settings: &Value, name: &str) -> AfcHub {
-    let pin = settings.get(format!("{HUB_SECTION}{}", name.to_lowercase())).map(|section| text(section, "switch_pin"));
+    let pin = section(settings, HUB_SECTION, name).map(|section| text(section, "switch_pin"));
     let object = store.object(&format!("{HUB_PREFIX}{name}")).unwrap_or(&Value::Null);
     let switch = pin.filter(|pin| !pin.is_empty() && *pin != "virtual").map(|_| flag(object, "state"));
     AfcHub { name: name.to_owned(), switch }
@@ -373,7 +373,7 @@ impl AfcStatus {
 
 /// The Klipper extruder of an `AFC_extruder`: `extruder_name` in its section, else its own name.
 fn klipper_extruder(settings: &Value, afc_extruder: &str) -> String {
-    let section = settings.get(format!("{EXTRUDER_SECTION}{}", afc_extruder.to_lowercase()));
+    let section = section(settings, EXTRUDER_SECTION, afc_extruder);
     let configured = section.map(|section| text(section, "extruder_name")).filter(|name| !name.is_empty());
     configured.unwrap_or(afc_extruder).to_owned()
 }
@@ -384,7 +384,7 @@ fn read_heads(store: &ObjectStore, settings: &Value, lanes: &[AfcLane]) -> Vec<A
     let mut heads: Vec<AfcHead> = Vec::new();
     let names = store.names().filter_map(|object| object.strip_prefix(EXTRUDER_PREFIX));
     let swappable = |name: &&str| {
-        let section = settings.get(format!("{EXTRUDER_SECTION}{}", name.to_lowercase()));
+        let section = section(settings, EXTRUDER_SECTION, name);
         section.is_some_and(|section| !text(section, "toolchanger_unit").is_empty())
     };
     for name in names.filter(swappable) {

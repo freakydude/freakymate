@@ -908,7 +908,7 @@ impl HappyHare {
         // The buffer variant shows in which keys exist (a missing key is not fitted); only a proportional sensor
         // has `filament_proportional`, then with the virtual switches (`unit/mmu_buffer.py` L90-103).
         let stressed = printing && self.boosting;
-        let sensor_map = sensors.as_object_mut().expect("a JSON object");
+        let sensor_map = sensors.as_object_mut().expect("sensors is built by json! as an object above");
         match self.buffer {
             BufferKind::Proportional => {
                 sensor_map.insert(SENSOR_COMPRESSION.to_owned(), json!(false));

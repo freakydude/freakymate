@@ -122,7 +122,7 @@ impl MmuView {
         };
         // Loaded to the nozzle the way says nothing new: the print page leaves it out then.
         printer.set_mmu_path_settled(path.as_ref().is_some_and(LoadPath::is_settled));
-        let label = selected_label.as_deref().unwrap_or("No gate");
+        let label = selected_label.as_deref().unwrap_or(NO_GATE_LABEL);
         let item = path.map_or_else(no_path_item, |path| load_path_item(&path, PathScope::Whole, label, &colors));
         show_path(printer, Shown::Selected, item);
         let sensors = mmu
@@ -359,7 +359,7 @@ fn show_path(printer: &Printer, shown: Shown, path: FilamentPathItem) {
 
 /// The card of Happy Hare with no gate selected; the filament's colour is not known.
 fn without_gate_item(path: &LoadPath) -> FilamentPathItem {
-    load_path_item(path, PathScope::Whole, "No gate", &FilamentColors::default())
+    load_path_item(path, PathScope::Whole, NO_GATE_LABEL, &FilamentColors::default())
 }
 
 /// The side the buffer leans to as the word the UI maps (`MmuTexts.buffer`).
@@ -371,6 +371,9 @@ fn buffer_word(side: BufferSide) -> &'static str {
         BufferSide::Unknown => "unknown",
     }
 }
+
+/// Names the piece of the load path while no gate is selected.
+const NO_GATE_LABEL: &str = "No gate";
 
 /// Tiles on a page of the Gates tab, the bypass included.
 const SLOTS_PER_PAGE: usize = 5;
@@ -415,6 +418,7 @@ fn gate_items(mmu: &MmuStatus, lanes: &[Lane], matches: &[ToolMatch]) -> Vec<Mmu
                 .into(),
                 group: id_or_none(gate.endless_spool_group),
                 selected,
+                check_unloads_first: mmu.unloads_before_checking(gate.index),
             }
         })
         .collect()
@@ -444,6 +448,7 @@ fn lane_items(status: &PrinterStatus, tiles: &[Lane]) -> Vec<MmuGateItem> {
                 group: -1,
                 selected: lane.active,
                 loaded: lane.active,
+                check_unloads_first: false,
             }
         })
         .collect()
@@ -469,10 +474,21 @@ fn show_state(printer: &Printer, mmu: &MmuStatus) {
     let detail: Vec<&str> =
         [flowguard.trigger.as_str(), flowguard.reason.as_str()].into_iter().filter(|part| !part.is_empty()).collect();
     printer.set_mmu_flowguard_detail(detail.join(": ").into());
-    printer.set_mmu_flowguard_level(flowguard.level as f32);
-    printer.set_mmu_tangle_threshold(flowguard.tangle_threshold.map_or(-1.0, |threshold| threshold as f32));
-    printer.set_mmu_extreme_threshold(flowguard.extreme_threshold.map_or(-1.0, |threshold| threshold as f32));
-    printer.set_mmu_flow_rate(mmu.flow_rate.map_or(-1.0, |rate| rate.value as f32));
+    let reading = flowguard.reading();
+    printer.set_mmu_flowguard_level(flowguard.active_level() as f32);
+    printer.set_mmu_flowguard_statement(view::flowguard_statement(reading.statement).into());
+    printer.set_mmu_flowguard_percent(reading.percent as i32);
+    printer.set_mmu_flowguard_line(view::emphasis_severity(reading.line));
+    printer.set_mmu_flowguard_tangle_end(view::emphasis_severity(reading.tangle_end));
+    printer.set_mmu_flowguard_clog_end(view::emphasis_severity(reading.clog_end));
+    printer.set_mmu_flowguard_strip(view::emphasis_severity(reading.strip));
+    printer.set_mmu_buffer_marker(view::buffer_marker_severity(reading.line, feedback.state));
+    printer.set_mmu_has_tangle_threshold(flowguard.tangle_threshold.is_some());
+    printer.set_mmu_tangle_threshold(flowguard.tangle_threshold.unwrap_or_default() as f32);
+    printer.set_mmu_has_extreme_threshold(flowguard.extreme_threshold.is_some());
+    printer.set_mmu_extreme_threshold(flowguard.extreme_threshold.unwrap_or_default() as f32);
+    printer.set_mmu_has_flow_rate(mmu.flow_rate.is_some());
+    printer.set_mmu_flow_rate(mmu.flow_rate.map_or(0.0, |rate| rate.value as f32));
     printer.set_mmu_flow_measured(mmu.flow_rate.is_some_and(|rate| rate.is_measured()));
     printer.set_mmu_encoder_headroom(mmu.encoder_headroom.map(view::encoder_headroom).unwrap_or_default().into());
 }

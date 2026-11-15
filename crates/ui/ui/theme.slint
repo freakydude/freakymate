@@ -29,10 +29,6 @@ export global Theme {
     out property <color> success: #51cf66;
     // A deviation that deserves attention, never an error.
     out property <color> warning: #f59f00;
-    // The colour of a temperature by its level (`ScaleItem.level`): 0 normal, 1 warning, 2 danger.
-    pure public function level-color(level: int) -> color {
-        return level >= 2 ? Theme.danger : level == 1 ? Theme.warning : Theme.foreground;
-    }
     // Neutral information: messages, Klipper starting up, secondary chart lines.
     out property <color> info: #4dabf7;
     out property <color> disabled-foreground: #5c656f;
@@ -76,6 +72,8 @@ export global Theme {
     // Rows of controls (label, slider, buttons) and the narrow square-ish buttons in them.
     out property <length> row-height: 60px;
     out property <length> row-height-small: 52px;
+    // A file or job name: room for two lines of `font-normal`.
+    out property <length> name-height: 48px;
     out property <length> button-narrow: 64px;
 
     out property <length> font-small: 13px;

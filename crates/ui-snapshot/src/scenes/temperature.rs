@@ -74,16 +74,20 @@ pub(super) fn heat_tabs(session: &mut Session) -> Result<(), String> {
 /// the tolerance window on the scale. Afterwards the nozzle is off again.
 fn heater_deviation(session: &mut Session) -> Result<(), String> {
     const TARGET: f64 = 50.0;
+    // Settled: within `SETTLED_TOLERANCE` of the target. Deviating: more than `OVERSHOOT_SEEN` above it, half of the
+    // 20 °C that `FAKE_OVERSHOOT` adds, so the reading has certainly left the target.
+    const SETTLED_TOLERANCE: f64 = 2.0;
+    const OVERSHOOT_SEEN: f64 = 10.0;
     let nozzle = |snapshot: &Snapshot| snapshot.status.heater("extruder").map(|heater| heater.temperature);
     session.service.send(Command::RunGcode { script: format!("M104 S{TARGET}") });
     session.wait_until("the nozzle to reach its target", |snapshot| {
-        nozzle(snapshot).is_some_and(|temperature| (temperature - TARGET).abs() < 2.0)
+        nozzle(snapshot).is_some_and(|temperature| (temperature - TARGET).abs() < SETTLED_TOLERANCE)
     })?;
     // The target has been held for a status update, so the deviation counts as one.
     session.pump(Duration::from_millis(500));
     session.service.send(Command::RunGcode { script: "FAKE_OVERSHOOT HEATER=extruder DELTA=20".into() });
     session.wait_until("the nozzle to read above its window", |snapshot| {
-        nozzle(snapshot).is_some_and(|temperature| temperature > TARGET + 10.0)
+        nozzle(snapshot).is_some_and(|temperature| temperature > TARGET + OVERSHOOT_SEEN)
     })?;
     session.show_page(Page::Temperature, "temperature-deviation")?;
     session.service.send(Command::RunGcode { script: "FAKE_OVERSHOOT HEATER=extruder DELTA=0\nM104 S0".into() });

@@ -42,11 +42,11 @@ export global Printer {
     // Height of the current layer and of the object, e.g. "2.40 / 24.0 mm"; empty if neither is known.
     in property <string> print-heights;
     in property <string> filament;
-    // When a finished job ended, from the job history; "-" if unknown.
+    // When a finished job ended, from the job history; "-" if unknown (`mmu-has-extreme-threshold` false).
     in property <string> ended;
     // What the sources state about a pause or an error, one fact per line; empty if nothing is stated.
     in property <string> interruption-text;
-    // Where the print stands at a pause or an error ("Layer 50 · 10.00 mm"); empty if unknown.
+    // Where the print stands at a pause or an error ("Layer 50 · 10.00 mm"); empty if unknown (`mmu-has-extreme-threshold` false).
     in property <string> interruption-position;
     // The first fact of it alone, for the status bar.
     in property <string> interruption-headline;
@@ -200,14 +200,28 @@ export global Printer {
     in property <string> mmu-flowguard-detail;
     // How close FlowGuard is to a trigger: 0 at rest, +1 a clog (compression side), -1 a tangle (tension side).
     in property <float> mmu-flowguard-level;
-    // The tension (0 to 1 of the bias) from which tangle prevention raises the gear current; -1 while it cannot work.
-    in property <float> mmu-tangle-threshold: -1;
-    // The bias (0 to 1) from which a proportional sensor counts as at its end, where FlowGuard takes it as extreme; -1 if unknown.
-    in property <float> mmu-extreme-threshold: -1;
+    // The statement of the FlowGuard line (decided in the core): triggered | tangle-boost | clog | tangle | boosting | quiet
+    // (quiet: nothing of its own, the buffer's state fills the line); `percent` is the level's size.
+    in property <string> mmu-flowguard-statement: "quiet";
+    in property <int> mmu-flowguard-percent;
+    // How much each part stands out: the line, the labels of the tangle (tension) and clog (compression) ends, the
+    // strip growing from an end, and the marker of the buffer scale.
+    in property <Severity> mmu-flowguard-line: Severity.calm;
+    in property <Severity> mmu-flowguard-tangle-end: Severity.calm;
+    in property <Severity> mmu-flowguard-clog-end: Severity.calm;
+    in property <Severity> mmu-flowguard-strip: Severity.attention;
+    in property <Severity> mmu-buffer-marker: Severity.calm;
+    // The tension (0 to 1 of the bias) from which tangle prevention raises the gear current; -1 while it cannot work (`mmu-has-tangle-threshold` false).
+    in property <bool> mmu-has-tangle-threshold;
+    in property <float> mmu-tangle-threshold;
+    // The bias (0 to 1) from which a proportional sensor counts as at its end, where FlowGuard takes it as extreme; -1 if unknown (`mmu-has-extreme-threshold` false).
+    in property <bool> mmu-has-extreme-threshold;
+    in property <float> mmu-extreme-threshold;
     // With an armed encoder: what is left before FlowGuard trips on it, of the length it watches ("7.5 / 12.0 mm").
     in property <string> mmu-encoder-headroom;
-    // Percent: measured by the encoder, else the estimate of the sync controller; -1 without either.
-    in property <float> mmu-flow-rate: -1;
+    // Percent: measured by the encoder, else the estimate of the sync controller; `mmu-has-flow-rate` false without either.
+    in property <bool> mmu-has-flow-rate;
+    in property <float> mmu-flow-rate;
     // The flow rate is the encoder's, not the estimate.
     in property <bool> mmu-flow-measured;
 

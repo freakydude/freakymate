@@ -1,0 +1,27 @@
+// Preview: print page while FlowGuard sees a clog level rising (line, label and strip in yellow). Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer, Severity } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintMmuClogRisingPreview inherits AppWindow {
+    init => {
+        Sample.mmu();
+        Sample.printing();
+        Navigation.page = Page.print;
+        Printer.mmu-gate = 2;
+        Printer.mmu-tool = 2;
+        Printer.mmu-filament = "loaded";
+        Printer.mmu-buffer-state = "compressed";
+        Printer.mmu-buffer-bias = 0.8;
+        Printer.mmu-flowguard-state = "monitoring";
+        Printer.mmu-flowguard-statement = "clog";
+        Printer.mmu-flowguard-level = 0.45;
+        Printer.mmu-flowguard-percent = 45;
+        Printer.mmu-flowguard-line = Severity.attention;
+        Printer.mmu-flowguard-clog-end = Severity.attention;
+        Printer.mmu-buffer-marker = Severity.attention;
+        Printer.mmu-has-flow-rate = true;
+        Printer.mmu-flow-rate = 98;
+    }
+}
