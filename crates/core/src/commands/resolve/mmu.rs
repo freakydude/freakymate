@@ -25,6 +25,19 @@ pub(super) fn set_gate_filament(
     Ok(vec![Command::RunGcode { script: mmu::set_gate_filament(gate, material.as_deref(), color, temperature)? }])
 }
 
+pub(super) fn set_gate_temperature(
+    status: &PrinterStatus,
+    gate: usize,
+    temperature: f64,
+) -> Result<Vec<Command>, CommandError> {
+    let state = status.mmu.as_ref().ok_or(CommandError::NoMmu)?;
+    if !state.gate_map_is_local() {
+        return Err(CommandError::GateMapFromSpoolman);
+    }
+    state.gates.get(gate).ok_or(CommandError::UnknownGate(gate))?;
+    Ok(vec![Command::RunGcode { script: mmu::set_gate_filament(gate, None, None, Some(temperature))? }])
+}
+
 pub(super) fn set_endless_spool_group(
     status: &PrinterStatus,
     gate: usize,

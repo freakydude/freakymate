@@ -236,6 +236,12 @@ fn bind_lanes(actions: &Actions, service: &PrinterService, presenter: &Rc<Presen
             service_for_color.send(Command::SetLaneFilament { lane, material: None, color });
         }
     });
+    let (service_for_temperature, presenter_for_temperature) = (service.clone(), Rc::clone(presenter));
+    actions.on_set_lane_temperature(move |row, temperature| {
+        if let Some(lane) = lane_of_row(&presenter_for_temperature, row) {
+            service_for_temperature.send(Command::SetLaneTemperature { lane, temperature: f64::from(temperature) });
+        }
+    });
 }
 
 /// Spoolman: the spool in use, the picker, weighing and the spool's temperatures.

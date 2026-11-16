@@ -9,6 +9,7 @@
 
 use super::ObjectStore;
 use super::fields::{count, flag, section, text};
+use super::klipper::DEFAULT_MIN_EXTRUDE_TEMP;
 use super::subscription::Subscription;
 use crate::color::{self, Rgba};
 use serde_json::Value;
@@ -24,7 +25,7 @@ const BUFFER_PREFIX: &str = "AFC_buffer ";
 const LANE_SECTIONS: [&str; 2] = ["afc_stepper ", "afc_lane "];
 const HUB_SECTION: &str = "afc_hub ";
 const AFC_FIELDS: [&str; 4] = ["current_load", "current_state", "error_state", "lanes"];
-const LANE_FIELDS: [&str; 13] = [
+const LANE_FIELDS: [&str; 14] = [
     "unit",
     "extruder",
     "hub",
@@ -33,6 +34,7 @@ const LANE_FIELDS: [&str; 13] = [
     "spool_id",
     "color",
     "material",
+    "extruder_temp",
     "load",
     "prep",
     "loaded_to_hub",
@@ -89,6 +91,10 @@ pub struct AfcLane {
     pub spool_id: Option<u32>,
     pub color: Option<Rgba>,
     pub material: String,
+    /// The lane's own nozzle temperature in °C (`extruder_temp`: from Spoolman or `AFC_SET_SPOOL_TEMP`), if it has one.
+    pub extruder_temp: Option<f64>,
+    /// What AFC heats the nozzle to when it loads the lane outside a print (see [`load_temperature`]).
+    pub load_temperature: f64,
     /// Filament sits in the lane (`prep` or `load`).
     pub filled: bool,
     /// The prep switch where the spool's filament enters; `None` without one (`prep:` in the section).
@@ -174,8 +180,12 @@ pub(super) fn read_afc(store: &ObjectStore) -> Option<AfcStatus> {
     let afc = store.object(AFC_OBJECT)?;
     let settings = store.object("configfile").and_then(|configfile| configfile.get("settings")).unwrap_or(&Value::Null);
     let names = afc.get("lanes").and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
-    let lanes: Vec<AfcLane> =
-        names.iter().filter_map(Value::as_str).filter_map(|name| read_lane(store, settings, name)).collect();
+    let material_temps = read_material_temps(settings);
+    let lanes: Vec<AfcLane> = names
+        .iter()
+        .filter_map(Value::as_str)
+        .filter_map(|name| read_lane(store, settings, &material_temps, name))
+        .collect();
     let heads = read_heads(store, settings, &lanes);
     let several_units = lanes.iter().any(|lane| lane.unit != lanes[0].unit);
     Some(AfcStatus {
@@ -210,24 +220,34 @@ fn distinct<'a>(names: impl Iterator<Item = &'a str>) -> impl Iterator<Item = &'
 }
 
 /// A lane reports nothing until AFC has finished starting up (`AFC_lane.py` L2183); such a lane is skipped.
-fn read_lane(store: &ObjectStore, settings: &Value, name: &str) -> Option<AfcLane> {
+fn read_lane(store: &ObjectStore, settings: &Value, material_temps: &[MaterialTemp], name: &str) -> Option<AfcLane> {
     let lane = LANE_PREFIXES.iter().find_map(|prefix| store.object(&format!("{prefix}{name}")))?;
     let afc_extruder = lane.get("extruder").and_then(Value::as_str)?;
     let section = LANE_SECTIONS.iter().find_map(|prefix| section(settings, prefix, name));
     // A switch exists where its pin is configured (`AFC_lane.py` L224-232); the lanes AFC creates for the heads of its
     // tool changer have no section and no switches of their own (`AFC_extruder.py` L327-332).
     let switch = |key: &str| section.filter(|section| !text(section, key).is_empty()).map(|_| flag(lane, key));
+    let extruder = klipper_extruder(settings, afc_extruder);
+    let min_extrude_temp = settings
+        .get(&extruder)
+        .and_then(|section| section.get("min_extrude_temp"))
+        .and_then(Value::as_f64)
+        .unwrap_or(DEFAULT_MIN_EXTRUDE_TEMP);
+    let extruder_temp = lane.get("extruder_temp").and_then(Value::as_f64);
+    let material = text(lane, "material");
     Some(AfcLane {
         name: name.to_owned(),
         unit: text(lane, "unit").to_owned(),
         afc_extruder: afc_extruder.to_owned(),
-        extruder: klipper_extruder(settings, afc_extruder),
+        load_temperature: load_temperature(extruder_temp, material, material_temps, min_extrude_temp),
+        extruder_temp,
+        extruder,
         hub: Some(text(lane, "hub")).filter(|hub| !hub.is_empty() && !DIRECT_HUBS.contains(hub)).map(str::to_owned),
         buffer: Some(text(lane, "buffer")).filter(|buffer| !buffer.is_empty()).map(str::to_owned),
         tool: text(lane, "map").strip_prefix('T').and_then(|number| number.parse().ok()),
         spool_id: count(lane, "spool_id"),
         color: color::parse_hex(text(lane, "color")),
-        material: text(lane, "material").to_owned(),
+        material: material.to_owned(),
         filled: flag(lane, "prep") || flag(lane, "load"),
         prep: switch("prep"),
         load: switch("load"),
@@ -235,6 +255,44 @@ fn read_lane(store: &ObjectStore, settings: &Value, name: &str) -> Option<AfcLan
         in_tool: flag(lane, "tool_loaded"),
         status: text(lane, "status").to_owned(),
     })
+}
+
+/// One entry of AFC's `default_material_temps` (`PLA:210`, `default: 235`), the key lowercased.
+#[derive(Debug, Clone, PartialEq)]
+struct MaterialTemp {
+    key: String,
+    temperature: f64,
+}
+
+/// `default_material_temps` of `[AFC]`; Klipper lists the default (`AFC.py` L161-162) when the option is not set. It
+/// comes as the list `getlists` returns, or as one text where an older Klipper keeps the raw value.
+fn read_material_temps(settings: &Value) -> Vec<MaterialTemp> {
+    let entries: Vec<&str> = match settings.get("afc").and_then(|afc| afc.get("default_material_temps")) {
+        Some(Value::Array(entries)) => entries.iter().filter_map(Value::as_str).collect(),
+        Some(Value::String(text)) => text.split(',').collect(),
+        _ => Vec::new(),
+    };
+    entries
+        .into_iter()
+        .filter_map(|entry| {
+            let (key, temperature) = entry.split_once(':')?;
+            Some(MaterialTemp { key: key.trim().to_lowercase(), temperature: temperature.trim().parse().ok()? })
+        })
+        .collect()
+}
+
+/// The nozzle temperature AFC loads a lane at outside a print, as `AFC._get_default_material_temps` (`AFC.py`,
+/// main 2026-11) picks it: the lane's own above `min_extrude_temp`, else the first entry of the table whose key is part
+/// of the material (case aside), else the entry `default`, else `min_extrude_temp` + 5.
+fn load_temperature(own: Option<f64>, material: &str, table: &[MaterialTemp], min_extrude_temp: f64) -> f64 {
+    const ABOVE_MIN_EXTRUDE_C: f64 = 5.0;
+    if let Some(own) = own.filter(|own| *own > min_extrude_temp) {
+        return own;
+    }
+    let material = material.trim().to_lowercase();
+    let by_material = table.iter().find(|entry| !material.is_empty() && material.contains(&entry.key));
+    let by_default = || table.iter().find(|entry| entry.key.contains("default"));
+    by_material.or_else(by_default).map_or(min_extrude_temp + ABOVE_MIN_EXTRUDE_C, |entry| entry.temperature)
 }
 
 /// A hub with its switch; a virtual hub (`switch_pin: virtual`) or one whose section is unknown has none.
@@ -444,11 +502,16 @@ pub fn eject_lane(lane: &str) -> String {
 /// main 2026-11). So a new material clears it: 0 is below `min_extrude_temp`, and AFC takes the temperature of the
 /// material from that table again (`AFC_spool.py` `cmd_AFC_SET_SPOOL_TEMP`, L120-150).
 pub fn set_filament(lane: &str, material: Option<&str>, color: Option<[u8; 3]>) -> String {
-    let material = material.filter(|material| !material.is_empty()).map(|material| {
-        format!("SET_MATERIAL LANE={lane} MATERIAL={material}\nAFC_SET_SPOOL_TEMP LANE={lane} EXTRUDER_TEMP=0")
-    });
+    let material = material
+        .filter(|material| !material.is_empty())
+        .map(|material| format!("SET_MATERIAL LANE={lane} MATERIAL={material}\n{}", set_temperature(lane, 0.0)));
     let color = color.map(|[red, green, blue]| format!("SET_COLOR LANE={lane} COLOR={red:02X}{green:02X}{blue:02X}"));
     material.into_iter().chain(color).collect::<Vec<_>>().join("\n")
+}
+
+/// The lane's own nozzle temperature in whole °C (`AFC_SET_SPOOL_TEMP`, which takes an integer of at least 0).
+pub fn set_temperature(lane: &str, celsius: f64) -> String {
+    format!("AFC_SET_SPOOL_TEMP LANE={lane} EXTRUDER_TEMP={}", celsius.round().max(0.0))
 }
 
 /// `SET_SPOOL_ID` puts a spool into a lane; without `SPOOL_ID` it takes it out (`AFC_spool.py` L325). AFC refuses a
@@ -536,5 +599,37 @@ mod tests {
     fn a_spool_goes_into_a_lane_and_comes_out_without_id() {
         assert_eq!(assign_spool("lane2", Some(7)), "SET_SPOOL_ID LANE=lane2 SPOOL_ID=7");
         assert_eq!(assign_spool("lane2", None), "SET_SPOOL_ID LANE=lane2");
+    }
+
+    #[test]
+    fn the_temperature_of_a_lane_is_sent_in_whole_degrees() {
+        assert_eq!(set_temperature("lane2", 214.6), "AFC_SET_SPOOL_TEMP LANE=lane2 EXTRUDER_TEMP=215");
+        assert_eq!(set_temperature("lane2", 0.0), "AFC_SET_SPOOL_TEMP LANE=lane2 EXTRUDER_TEMP=0");
+    }
+
+    /// AFC's own default table (`AFC.py` L161-162), as Klipper lists it in `configfile.settings`.
+    #[test]
+    fn the_load_temperature_follows_the_lane_then_the_material_table_of_afc() {
+        let lane = |extruder_temp: Value, material: &str| json!({ "unit": "Turtle_1", "extruder": "extruder", "material": material, "extruder_temp": extruder_temp });
+        let read = |settings: Value| {
+            let store = store(json!({
+                "AFC": { "lanes": ["lane1", "lane2", "lane3", "lane4", "lane5"] },
+                "AFC_stepper lane1": lane(json!(255), "ASA"),
+                "AFC_stepper lane2": lane(json!(0), "pla+"),
+                "AFC_stepper lane3": lane(json!(null), "PETG"),
+                "AFC_stepper lane4": lane(json!(null), "PEEK"),
+                "AFC_stepper lane5": lane(json!(null), ""),
+                "configfile": { "settings": settings },
+            }));
+            read_afc(&store).unwrap().lanes.iter().map(|lane| lane.load_temperature).collect::<Vec<_>>()
+        };
+        let table = json!(["default: 235", "PLA:210", "PETG:240"]);
+
+        assert_eq!(read(json!({ "afc": { "default_material_temps": table } })), [255.0, 210.0, 240.0, 235.0, 235.0]);
+        let text = json!("default: 230, PLA:205");
+        assert_eq!(read(json!({ "afc": { "default_material_temps": text } })), [255.0, 205.0, 230.0, 230.0, 230.0]);
+        let without_default = json!({ "afc": { "default_material_temps": ["PLA:210"] },
+                                      "extruder": { "min_extrude_temp": 180.0 } });
+        assert_eq!(read(without_default), [255.0, 210.0, 185.0, 185.0, 185.0]);
     }
 }

@@ -255,6 +255,13 @@ fn a_new_material_takes_the_default_temperature_of_happy_hare() {
 
     assert_eq!(set("PLA"), Ok(vec![Command::RunGcode { script: "MMU_GATE_MAP GATE=0 MATERIAL=PLA TEMP=200".into() }]));
     assert_eq!(set("asa"), Ok(vec![Command::RunGcode { script: "MMU_GATE_MAP GATE=0 MATERIAL=asa TEMP=255".into() }]));
+    let typed = Command::SetLaneTemperature { lane: LaneId::Gate(0), temperature: 244.6 };
+    assert_eq!(
+        typed.resolve(&printer(&[]), &status),
+        Ok(vec![Command::RunGcode { script: "MMU_GATE_MAP GATE=0 TEMP=245".into() }])
+    );
+    let unknown = Command::SetLaneTemperature { lane: LaneId::Gate(4), temperature: 245.0 };
+    assert!(unknown.resolve(&printer(&[]), &status).is_err());
 }
 
 #[test]
@@ -461,6 +468,14 @@ fn a_lane_command_becomes_the_g_code_of_its_source() {
         gcode("SET_COLOR LANE=lane2 COLOR=FF1000")
     );
     assert_eq!(resolve(Command::SetLaneFilament { lane: afc(), material: None, color: None }), Ok(Vec::new()));
+    assert_eq!(
+        resolve(Command::SetLaneTemperature { lane: afc(), temperature: 230.0 }),
+        gcode("AFC_SET_SPOOL_TEMP LANE=lane2 EXTRUDER_TEMP=230")
+    );
+    assert_eq!(
+        resolve(Command::SetLaneTemperature { lane: LaneId::Bypass, temperature: 230.0 }),
+        Err(CommandError::NotForBypass)
+    );
     assert_eq!(resolve(Command::LoadLane { lane: LaneId::Gate(3) }), Ok(vec![Command::MmuLoadGate { gate: 3 }]));
     assert_eq!(resolve(Command::UnloadLane { lane: LaneId::Gate(3) }), Ok(vec![Command::MmuUnload]));
     assert_eq!(resolve(Command::EjectLane { lane: LaneId::Gate(3) }), Ok(vec![Command::MmuEject { gate: Some(3) }]));

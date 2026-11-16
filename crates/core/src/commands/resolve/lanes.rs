@@ -60,6 +60,18 @@ pub(super) fn set_filament(
     }
 }
 
+pub(super) fn set_temperature(
+    status: &PrinterStatus,
+    lane: LaneId,
+    temperature: f64,
+) -> Result<Vec<Command>, CommandError> {
+    Ok(vec![match lane {
+        LaneId::Gate(gate) => return mmu::set_gate_temperature(status, gate, temperature),
+        LaneId::Bypass => return Err(CommandError::NotForBypass),
+        LaneId::Afc(name) => gcode(afc::set_temperature(afc_lane(status, &name)?, temperature)),
+    }])
+}
+
 /// Happy Hare stores materials in capitals, so `pla` is no new material for a gate with `PLA`.
 pub(super) fn is_new_material(current: &str, new: Option<&str>) -> bool {
     new.is_some_and(|new| !new.eq_ignore_ascii_case(current))

@@ -31,7 +31,7 @@ pub use extruder::ExtruderState;
 pub use fan_watch::FanWatch;
 pub use filament_sensors::FilamentSensor;
 pub use firmware_retraction::Retraction;
-pub use heaters::{BED_HEATER, Heater, NOZZLE_HEATER, TemperatureSensor};
+pub use heaters::{BED_HEATER, DEFAULT_MIN_EXTRUDE_TEMP, Heater, NOZZLE_HEATER, TemperatureSensor};
 pub use height_watch::HeightWatch;
 pub use job::{PrintJob, PrintState};
 pub use leveling::Leveling;

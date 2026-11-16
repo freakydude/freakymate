@@ -272,6 +272,11 @@ pub enum Command {
         material: Option<String>,
         color: Option<[u8; 3]>,
     },
+    /// Sets the nozzle temperature in °C the source loads the lane at outside a print, where it keeps one.
+    SetLaneTemperature {
+        lane: LaneId,
+        temperature: f64,
+    },
     /// Maps the slicer tool `T<tool>` to the lane; AFC swaps it with the lane that had it.
     MapToolToLane {
         tool: usize,
@@ -427,6 +432,7 @@ impl Command {
             | Self::EjectLane { .. }
             | Self::AssignLaneSpool { .. }
             | Self::SetLaneFilament { .. }
+            | Self::SetLaneTemperature { .. }
             | Self::MapToolToLane { .. }
             | Self::ResetToolMap
             | Self::AfcResetFailure

@@ -38,7 +38,7 @@ const UNSET_MAX_TEMP: f64 = 1_000_000.0;
 /// Klipper's default of `verify_heater` `hysteresis` (°C).
 pub const DEFAULT_HYSTERESIS: f64 = 5.0;
 /// Klipper's default of the extruder's `min_extrude_temp` (°C).
-const DEFAULT_MIN_EXTRUDE_TEMP: f64 = 170.0;
+pub const DEFAULT_MIN_EXTRUDE_TEMP: f64 = 170.0;
 
 impl Heater {
     /// The heater of a nozzle: Klipper's `extruder`, or `extruder1`, `extruder2`, … of a printer with several.

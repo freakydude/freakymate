@@ -863,8 +863,16 @@ impl Afc {
     /// the only place that names the head's Klipper extruder.
     pub fn config_sections(&self) -> Vec<(String, Value)> {
         let mut sections = vec![
-            // `AFC.py` L228: without `auto_home` a tool load on an unhomed printer is refused.
-            ("afc".to_owned(), json!({ "auto_home": false, "enable_sensors_in_gui": true })),
+            // `AFC.py` L228: without `auto_home` a tool load on an unhomed printer is refused. Klipper lists the default
+            // of `default_material_temps` (`AFC.py` L161-162, main 2026-11) as the list `getlists` returns.
+            (
+                "afc".to_owned(),
+                json!({
+                    "auto_home": false,
+                    "enable_sensors_in_gui": true,
+                    "default_material_temps": ["default: 235", "PLA:210", "PETG:235", "ABS:235", "ASA:235"],
+                }),
+            ),
         ];
         match self.layout {
             AfcLayout::BoxTurtle => self.box_turtle_sections(&mut sections),

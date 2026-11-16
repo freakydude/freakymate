@@ -1,0 +1,22 @@
+// Preview: dialog of a gate with a spool of Spoolman: material, colour and nozzle temperature belong to the spool, the
+// temperature is only shown beside what is left. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { FilamentTab, MmuDialogs, Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component FilamentMmuGateSpoolPreview inherits AppWindow {
+    init => {
+        Sample.mmu();
+        Navigation.page = Page.filament;
+        Navigation.filament-tab = FilamentTab.gates;
+        Printer.has-spoolman = true;
+        Printer.mmu-gates = [
+            { title: "Gate 0", index: 0, availability: "available", name: "Silk Red", material: "PLA", colors: { first: #e31f2b, count: 1 }, has-color: true, tools: "T0", selected: true, spool-text: "613 g", spool-low: false, spool-id: 18, temperature: 215 },
+            { title: "Gate 1", index: 1, availability: "available", name: "", material: "ASA", colors: { first: #808080, count: 1 }, has-color: true, tools: "T1", selected: false, spool-text: "", spool-low: false, spool-id: -1, temperature: 255 },
+            { title: "Gate 2", index: 2, availability: "available", name: "Teal PETG", material: "PETG", colors: { first: #26a69a, count: 1 }, has-color: true, tools: "T2", selected: false, spool-text: "870 g", spool-low: false, spool-id: 7, temperature: 240 },
+            { title: "Gate 3", index: 3, availability: "empty", name: "", material: "", colors: { first: #000000, count: 0 }, has-color: false, tools: "T3", selected: false, spool-text: "", spool-low: false, spool-id: -1 },
+        ];
+        MmuDialogs.gate-row = 0;
+    }
+}
