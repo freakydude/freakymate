@@ -70,11 +70,18 @@ impl SettingsController {
         self.settings.borrow().fullscreen
     }
 
+    pub fn keep_screen_on(&self) -> bool {
+        self.settings.borrow().keep_screen_on
+    }
+
     fn show(&self, window: &AppWindow, endpoint: &Endpoint) {
         let ui = window.global::<UiSettings>();
         let settings = self.settings.borrow();
         ui.set_moonraker(endpoint.display().into());
         ui.set_fullscreen(settings.fullscreen);
+        ui.set_fullscreen_available(cfg!(not(target_os = "android")));
+        ui.set_keep_screen_on_available(cfg!(target_os = "android"));
+        ui.set_keep_screen_on(settings.keep_screen_on);
         ui.set_hide_temperature_reports(settings.hide_temperature_reports);
         ui.set_move_step(settings.steps.move_mm as f32);
         ui.set_z_offset_step(settings.steps.z_offset_mm as f32);
@@ -109,6 +116,14 @@ impl SettingsController {
         ui.on_fullscreen_toggled(move |fullscreen| {
             if let Some(controller) = controller.upgrade() {
                 controller.change_fullscreen(fullscreen);
+            }
+        });
+        let controller = Rc::downgrade(self);
+        ui.on_keep_screen_on_toggled(move |on| {
+            if let Some(controller) = controller.upgrade() {
+                #[cfg(target_os = "android")]
+                crate::android::keep_screen_on(on);
+                controller.update(|settings| settings.keep_screen_on = on);
             }
         });
         let controller = Rc::downgrade(self);

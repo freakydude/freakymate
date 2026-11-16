@@ -72,12 +72,20 @@ component DisplayCard inherits Card {
 
     VerticalLayout {
         spacing: Theme.spacing;
-        ToggleRow {
+        if UiSettings.fullscreen-available: ToggleRow {
             text: @tr("Fullscreen");
             checked: UiSettings.fullscreen;
             toggled => {
                 UiSettings.fullscreen = !UiSettings.fullscreen;
                 UiSettings.fullscreen-toggled(UiSettings.fullscreen);
+            }
+        }
+        if UiSettings.keep-screen-on-available: ToggleRow {
+            text: @tr("Keep the screen on");
+            checked: UiSettings.keep-screen-on;
+            toggled => {
+                UiSettings.keep-screen-on = !UiSettings.keep-screen-on;
+                UiSettings.keep-screen-on-toggled(UiSettings.keep-screen-on);
             }
         }
         // Only where the backlight can be controlled.

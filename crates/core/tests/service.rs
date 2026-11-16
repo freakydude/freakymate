@@ -688,6 +688,17 @@ async fn a_macro_appears_in_the_console_like_a_typed_command() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn reconnects_on_request_although_the_connection_is_alive() {
+    let endpoint = start_fake().await;
+    let (service, mut channels) = start_service(endpoint, CredentialStore::in_memory());
+    wait_for(&mut channels, ready).await;
+
+    service.reconnect();
+    wait_for(&mut channels, |snapshot| snapshot.connection == ConnectionState::Connecting).await;
+    wait_for(&mut channels, ready).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn reports_disconnected_when_server_is_missing() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let endpoint = Endpoint::parse(&listener.local_addr().unwrap().to_string()).unwrap();

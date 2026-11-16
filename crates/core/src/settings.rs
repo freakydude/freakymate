@@ -26,6 +26,8 @@ pub struct Settings {
     /// Address of the Moonraker server, e.g. `http://127.0.0.1:7125`.
     pub moonraker: String,
     pub fullscreen: bool,
+    /// Android: the screen stays on while FreakyMate is in front, like a touch screen at the printer.
+    pub keep_screen_on: bool,
     pub steps: Steps,
     /// Edited in the settings file only; the Thermal page shows the first [`MAX_SHOWN_PRESETS`].
     pub temperature_presets: Vec<TemperaturePreset>,
@@ -81,6 +83,7 @@ impl Default for Settings {
         Self {
             moonraker: "http://127.0.0.1:7125".to_owned(),
             fullscreen: false,
+            keep_screen_on: true,
             steps: Steps::default(),
             temperature_presets: vec![
                 TemperaturePreset::new("PLA", 210.0, 60.0),

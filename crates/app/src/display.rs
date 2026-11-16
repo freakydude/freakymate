@@ -3,7 +3,7 @@
 //! system instead; it is never smaller than 800x480 (`AppWindow`), and a larger one shows more room.
 
 use slint::platform::WindowEvent;
-use slint::{LogicalSize, Window};
+use slint::{LogicalSize, PhysicalSize, Window};
 
 /// The size the pages are laid out for: the BTT HDMI5.
 pub const DESIGN_WIDTH: f32 = 800.0;
@@ -22,13 +22,22 @@ pub fn fits_to_display(fullscreen: bool, width: u32, height: u32, system_scale: 
     fullscreen || (width as f32) < DESIGN_WIDTH * system_scale || (height as f32) < DESIGN_HEIGHT * system_scale
 }
 
+/// [`fit_scale`] for the part of a window that the system does not draw over (`covered`: the sum of both edges per
+/// axis, e.g. Android's navigation bar and a camera cutout).
+pub fn fit_scale_inside(size: PhysicalSize, covered: PhysicalSize) -> Option<f32> {
+    fit_scale(size.width.saturating_sub(covered.width), size.height.saturating_sub(covered.height))
+}
+
 /// Scales the layout to the current size of the window (fullscreen). Does nothing at the design size, so the
 /// primary display is not touched.
 pub fn apply_fit(window: &Window) {
-    let size = window.size();
-    if let Some(scale) = fit_scale(size.width, size.height) {
-        apply_scale(window, scale);
-    }
+    apply_fit_inside(window, PhysicalSize::default());
+}
+
+/// Scales the layout into the part of the window the system leaves free (see [`fit_scale_inside`]); whether the
+/// scale changed.
+pub fn apply_fit_inside(window: &Window, covered: PhysicalSize) -> bool {
+    fit_scale_inside(window.size(), covered).is_some_and(|scale| apply_scale(window, scale))
 }
 
 /// Back to the scale of the system (a window, also after leaving fullscreen).
@@ -36,19 +45,20 @@ pub fn apply_system_scale(window: &Window, system_scale: f32) {
     apply_scale(window, system_scale);
 }
 
-fn apply_scale(window: &Window, scale: f32) {
+fn apply_scale(window: &Window, scale: f32) -> bool {
     let size = window.size();
     if (scale - window.scale_factor()).abs() < 0.001 {
-        return;
+        return false;
     }
     let logical = LogicalSize::new(size.width as f32 / scale, size.height as f32 / scale);
     for event in [WindowEvent::ScaleFactorChanged { scale_factor: scale }, WindowEvent::Resized { size: logical }] {
         if let Err(error) = window.dispatch_event_with_result(event) {
             log::warn!("cannot scale the window ({}x{}): {error}", size.width, size.height);
-            return;
+            return false;
         }
     }
     log::info!("window {}x{} shown with scale factor {scale:.3}", size.width, size.height);
+    true
 }
 
 #[cfg(test)]
@@ -77,6 +87,19 @@ mod tests {
             assert!(width as f32 / scale >= DESIGN_WIDTH - 0.01, "{width}x{height}");
             assert!(height as f32 / scale >= DESIGN_HEIGHT - 0.01, "{width}x{height}");
         }
+    }
+
+    #[test]
+    fn the_layout_fits_beside_the_edges_the_system_covers() {
+        // A 20:9 phone in landscape with the navigation bar (126 px) at the side: the height limits, the free width
+        // shows more room.
+        let scale = fit_scale_inside(PhysicalSize::new(2400, 1080), PhysicalSize::new(126, 0)).unwrap();
+        assert_eq!(scale, 2.25);
+        assert!((2400.0 - 126.0) / scale > DESIGN_WIDTH);
+        // A bar so large that it leaves less than the width: the width limits.
+        let scale = fit_scale_inside(PhysicalSize::new(1024, 600), PhysicalSize::new(224, 0)).unwrap();
+        assert_eq!(scale, 1.0);
+        assert_eq!(fit_scale_inside(PhysicalSize::new(100, 480), PhysicalSize::new(200, 0)), None);
     }
 
     #[test]

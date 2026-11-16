@@ -315,6 +315,116 @@
       }
     },
     {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, Happy Hare)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (Happy Hare)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, Basic)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (Basic)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, ERCF)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (ERCF)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, Encoder)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (Encoder)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, CO buffer)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (CO buffer)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, TO buffer)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (TO buffer)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, Tool changer)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (Tool changer)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, Happy Hare units)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (Happy Hare units)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, Tool changer + Happy Hare)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (Tool changer + Happy Hare)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, AFC)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (AFC)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, AFC tool changer)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (AFC tool changer)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (fake Moonraker, Tool changer, UNSELECT_TOOL absent)",
+      "command": "scripts/android-run.sh --fresh",
+      "preLaunchTask": "run: fake-moonraker (Tool changer, UNSELECT_TOOL absent)",
+      "postDebugTask": "stop: fake-moonraker"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "android: freakymate (saved settings)",
+      "command": "scripts/android-run.sh"
+    },
+    {
       "type": "lldb",
       "request": "launch",
       "name": "debug: fake-moonraker (choose profile)",

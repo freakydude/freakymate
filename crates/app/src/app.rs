@@ -2,6 +2,7 @@
 
 use crate::actions;
 use crate::backlight_controller::BacklightController;
+#[cfg(not(target_os = "android"))]
 use crate::display;
 use crate::network_controller::NetworkController;
 use crate::presenter::Presenter;
@@ -144,6 +145,8 @@ impl Application {
         // (800x445 instead of 800x480). This covers compositors without xdg-decoration as well.
         window.set_kiosk(options.fullscreen);
         window.global::<UiSettings>().set_setup_command(options.setup_command.unwrap_or_default().into());
+        // Slint's fullscreen on Android hides no system bar and only drops the safe area (see `android.rs`).
+        #[cfg(not(target_os = "android"))]
         if options.fullscreen || settings.fullscreen() {
             window.window().set_fullscreen(true);
         }
@@ -158,7 +161,14 @@ impl Application {
             watch_window_events(&window, Some(backlight.clone()));
         }
         #[cfg(target_os = "android")]
-        watch_window_size(&window);
+        {
+            crate::android::hide_status_bar();
+            crate::android::hide_system_keyboard();
+            crate::android::keep_screen_on(settings.keep_screen_on());
+            crate::android::watch_window_size(&window);
+            let service = service.clone();
+            crate::android::on_return_from_background(move || service.reconnect());
+        }
         Ok(Self {
             window,
             presenter,
@@ -226,13 +236,12 @@ fn input_activity(event: &WindowEvent) -> Option<bool> {
 }
 
 /// Fullscreen fits the layout to the display; a window shows it at the scale of the system (see
-/// [`display::fits_to_display`]).
+/// [`display::fits_to_display`]). Android fits on its own (`android.rs`).
+#[cfg(not(target_os = "android"))]
 pub(crate) fn scale_to_mode(window: &slint::Window) {
     let system_scale = system_scale(window);
     let size = window.size();
-    // An Android app always fills the screen, whether or not the system reports it as fullscreen.
-    let fullscreen = window.is_fullscreen() || cfg!(target_os = "android");
-    if display::fits_to_display(fullscreen, size.width, size.height, system_scale) {
+    if display::fits_to_display(window.is_fullscreen(), size.width, size.height, system_scale) {
         display::apply_fit(window);
     } else {
         display::apply_system_scale(window, system_scale);
@@ -247,29 +256,4 @@ pub(crate) fn scale_to_mode(window: &slint::Window) {
 #[cfg(not(target_os = "android"))]
 fn system_scale(window: &slint::Window) -> f32 {
     window.with_winit_window(|winit_window| winit_window.scale_factor() as f32).unwrap_or(1.0)
-}
-
-/// Android has no winit window: the scale of the system is the one Slint starts with.
-#[cfg(target_os = "android")]
-fn system_scale(window: &slint::Window) -> f32 {
-    window.scale_factor()
-}
-
-/// Slint reports no size change on Android, so the size is looked at twice a second (rotation, split screen) and the
-/// layout fitted again when it changed. The scale the fit sets is not the system's, so only the pixel size counts.
-#[cfg(target_os = "android")]
-fn watch_window_size(window: &AppWindow) {
-    const POLL: Duration = Duration::from_millis(500);
-    let weak = window.as_weak();
-    let last = std::cell::Cell::new(slint::PhysicalSize::default());
-    let timer = Timer::default();
-    timer.start(TimerMode::Repeated, POLL, move || {
-        let Some(window) = weak.upgrade() else { return };
-        let size = window.window().size();
-        if size != last.replace(size) {
-            scale_to_mode(window.window());
-        }
-    });
-    // The timer lives as long as the application.
-    std::mem::forget(timer);
 }

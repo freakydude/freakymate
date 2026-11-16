@@ -5,8 +5,9 @@
 #[unsafe(no_mangle)]
 fn android_main(app: android_activity::AndroidApp) {
     let data_dir = app.internal_data_path();
+    freakymate::android::init(app.clone());
     // Slint takes the activity for the window and the input; without it nothing can be shown.
-    if let Err(error) = slint::android::init(app) {
+    if let Err(error) = slint::android::init_with_event_listener(app, freakymate::android::event_listener()) {
         eprintln!("cannot start the Slint backend: {error}");
         return;
     }

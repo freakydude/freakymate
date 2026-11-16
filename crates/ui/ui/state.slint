@@ -359,6 +359,10 @@ export global Printer {
 export global UiSettings {
     in-out property <string> moonraker;
     in-out property <bool> fullscreen;
+    // An Android app always fills the screen; it offers to keep the screen on instead.
+    in property <bool> fullscreen-available: true;
+    in property <bool> keep-screen-on-available;
+    in-out property <bool> keep-screen-on: true;
     // The console leaves out Klipper's temperature reports while it waits for a heater.
     in-out property <bool> hide-temperature-reports: true;
     in-out property <float> move-step: 10;
@@ -376,6 +380,7 @@ export global UiSettings {
     callback steps-changed();
     callback moonraker-entered(string);
     callback fullscreen-toggled(bool);
+    callback keep-screen-on-toggled(bool);
     callback hide-temperature-reports-toggled(bool);
 }
 

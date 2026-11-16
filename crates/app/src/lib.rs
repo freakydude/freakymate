@@ -6,6 +6,8 @@
 pub use freakymate_ui::*;
 
 pub mod actions;
+#[cfg(target_os = "android")]
+pub mod android;
 pub mod app;
 pub mod backlight_controller;
 mod bed_map;
