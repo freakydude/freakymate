@@ -235,6 +235,29 @@ fn the_filament_of_a_gate_is_set_unless_happy_hare_takes_it_from_spoolman() {
 }
 
 #[test]
+fn a_new_material_takes_the_default_temperature_of_happy_hare() {
+    let status = PrinterStatus {
+        mmu: Some(crate::sources::happy_hare::MmuStatus {
+            default_extruder_temp: 200.0,
+            gates: vec![crate::sources::happy_hare::MmuGate {
+                material: "ASA".into(),
+                temperature: Some(255.0),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }),
+        ..PrinterStatus::default()
+    };
+    let set = |material: &str| {
+        Command::SetGateFilament { gate: 0, material: Some(material.into()), color: None }
+            .resolve(&printer(&[]), &status)
+    };
+
+    assert_eq!(set("PLA"), Ok(vec![Command::RunGcode { script: "MMU_GATE_MAP GATE=0 MATERIAL=PLA TEMP=200".into() }]));
+    assert_eq!(set("asa"), Ok(vec![Command::RunGcode { script: "MMU_GATE_MAP GATE=0 MATERIAL=asa TEMP=255".into() }]));
+}
+
+#[test]
 fn bypass_tool_map_and_endless_spool_are_happy_hare_gcode() {
     assert_eq!(script(Command::MmuSelectBypass), "MMU_SELECT BYPASS=1");
     assert_eq!(script(Command::MmuLoadBypass), "MMU_SELECT BYPASS=1\nMMU_LOAD");
@@ -409,7 +432,7 @@ fn a_tool_spool_goes_into_the_afc_lane_mapped_to_the_tool() {
 fn a_lane_command_becomes_the_g_code_of_its_source() {
     use crate::sources::afc::{AfcLane, AfcStatus};
     use crate::sources::happy_hare::MmuStatus;
-    let lane = AfcLane { name: "lane2".into(), ..AfcLane::default() };
+    let lane = AfcLane { name: "lane2".into(), material: "ASA".into(), ..AfcLane::default() };
     let status = PrinterStatus {
         afc: Some(AfcStatus { lanes: vec![lane], ..AfcStatus::default() }),
         mmu: Some(MmuStatus::default()),
@@ -428,7 +451,14 @@ fn a_lane_command_becomes_the_g_code_of_its_source() {
     );
     assert_eq!(
         resolve(Command::SetLaneFilament { lane: afc(), material: Some("PETG".into()), color: Some([255, 16, 0]) }),
-        gcode("SET_MATERIAL LANE=lane2 MATERIAL=PETG\nSET_COLOR LANE=lane2 COLOR=FF1000")
+        gcode(
+            "SET_MATERIAL LANE=lane2 MATERIAL=PETG\nAFC_SET_SPOOL_TEMP LANE=lane2 EXTRUDER_TEMP=0\n\
+             SET_COLOR LANE=lane2 COLOR=FF1000"
+        )
+    );
+    assert_eq!(
+        resolve(Command::SetLaneFilament { lane: afc(), material: Some("asa".into()), color: Some([255, 16, 0]) }),
+        gcode("SET_COLOR LANE=lane2 COLOR=FF1000")
     );
     assert_eq!(resolve(Command::SetLaneFilament { lane: afc(), material: None, color: None }), Ok(Vec::new()));
     assert_eq!(resolve(Command::LoadLane { lane: LaneId::Gate(3) }), Ok(vec![Command::MmuLoadGate { gate: 3 }]));

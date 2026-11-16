@@ -96,9 +96,9 @@ pub fn assign_gate_spool(gate: usize, spool_id: Option<u32>) -> String {
     format!("MMU_GATE_MAP GATE={gate} SPOOLID={}", spool_id.map_or(-1, i64::from))
 }
 
-/// Sets material or colour of a gate in Happy Hare's gate map; `None` keeps what the gate has. Without `TEMP` Happy
-/// Hare puts the temperature of the gate back to `default_extruder_temp` (`mmu_gate_map.py`), so the current one goes
-/// along. The material is one word of letters, digits and `+-_.`, as G-code parameters cannot hold spaces.
+/// Sets material or colour of a gate in Happy Hare's gate map; `None` keeps what the gate has. `temperature` goes
+/// along as `TEMP`, so the gate's temperature never depends on how a Happy Hare version treats a missing one. The
+/// material is one word of letters, digits and `+-_.`, as G-code parameters cannot hold spaces.
 pub fn set_gate_filament(
     gate: usize,
     material: Option<&str>,

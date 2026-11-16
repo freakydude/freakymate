@@ -51,10 +51,18 @@ pub(super) fn set_filament(
         LaneId::Gate(gate) => mmu::set_gate_filament(status, gate, material, color),
         LaneId::Bypass => Err(CommandError::NotForBypass),
         LaneId::Afc(name) => {
-            let script = afc::set_filament(afc_lane(status, &name)?, material.as_deref(), color);
+            let afc = status.afc.as_ref().ok_or(CommandError::NoAfc)?;
+            let current = afc.lane(&name).ok_or_else(|| CommandError::UnknownLane(name.clone()))?;
+            let material = material.as_deref().filter(|material| is_new_material(&current.material, Some(material)));
+            let script = afc::set_filament(&name, material, color);
             Ok(if script.is_empty() { Vec::new() } else { vec![gcode(script)] })
         }
     }
+}
+
+/// Happy Hare stores materials in capitals, so `pla` is no new material for a gate with `PLA`.
+pub(super) fn is_new_material(current: &str, new: Option<&str>) -> bool {
+    new.is_some_and(|new| !new.eq_ignore_ascii_case(current))
 }
 
 pub(super) fn map_tool(status: &PrinterStatus, tool: usize, lane: LaneId) -> Result<Vec<Command>, CommandError> {

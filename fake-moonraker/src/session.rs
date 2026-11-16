@@ -360,7 +360,7 @@ fn printer_info(backend: &Backend) -> Value {
 }
 
 /// Commands AFC registers for its lanes, its map and its errors (the `T<n>` of the lanes come from `AFC.maps`).
-const AFC_COMMANDS: [&str; 11] = [
+const AFC_COMMANDS: [&str; 12] = [
     "CHANGE_TOOL",
     "TOOL_LOAD",
     "TOOL_UNLOAD",
@@ -368,6 +368,7 @@ const AFC_COMMANDS: [&str; 11] = [
     "SET_SPOOL_ID",
     "SET_COLOR",
     "SET_MATERIAL",
+    "AFC_SET_SPOOL_TEMP",
     "SET_MAP",
     "RESET_AFC_MAPPING",
     "RESET_FAILURE",

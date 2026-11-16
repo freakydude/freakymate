@@ -439,11 +439,14 @@ pub fn eject_lane(lane: &str) -> String {
 }
 
 /// Material and colour of a lane (`SET_MATERIAL`, `SET_COLOR` with a hex code, `AFC_spool.py` L205-299), one line
-/// each; an empty material is not sent.
+/// each; an empty material is not sent. `SET_MATERIAL` keeps the lane's nozzle temperature (from Spoolman or
+/// `AFC_SET_SPOOL_TEMP`), which then outranks AFC's `default_material_temps` (`AFC.py` `_get_default_material_temps`,
+/// main 2026-11). So a new material clears it: 0 is below `min_extrude_temp`, and AFC takes the temperature of the
+/// material from that table again (`AFC_spool.py` `cmd_AFC_SET_SPOOL_TEMP`, L120-150).
 pub fn set_filament(lane: &str, material: Option<&str>, color: Option<[u8; 3]>) -> String {
-    let material = material
-        .filter(|material| !material.is_empty())
-        .map(|material| format!("SET_MATERIAL LANE={lane} MATERIAL={material}"));
+    let material = material.filter(|material| !material.is_empty()).map(|material| {
+        format!("SET_MATERIAL LANE={lane} MATERIAL={material}\nAFC_SET_SPOOL_TEMP LANE={lane} EXTRUDER_TEMP=0")
+    });
     let color = color.map(|[red, green, blue]| format!("SET_COLOR LANE={lane} COLOR={red:02X}{green:02X}{blue:02X}"));
     material.into_iter().chain(color).collect::<Vec<_>>().join("\n")
 }

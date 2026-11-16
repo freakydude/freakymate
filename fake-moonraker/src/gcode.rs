@@ -183,6 +183,8 @@ pub enum AfcCommand {
     SetColor { lane: Option<String>, color: Option<String> },
     /// `SET_MATERIAL LANE= MATERIAL=` (L261).
     SetMaterial { lane: Option<String>, material: Option<String> },
+    /// `AFC_SET_SPOOL_TEMP LANE= EXTRUDER_TEMP=` (`AFC_spool.py` L120-150, main 2026-11); `BED_TEMP` is not used.
+    SetSpoolTemp { lane: Option<String>, extruder_temp: Option<String> },
     /// `SET_MAP LANE= MAP=` (L148).
     SetMap { lane: Option<String>, map: Option<String> },
     /// `RESET_AFC_MAPPING [RUNOUT=]` (`AFC_spool.py` L44, L527-566); the fake has no runout lanes, so `RUNOUT` does

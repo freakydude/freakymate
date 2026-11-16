@@ -1,5 +1,6 @@
 //! Happy Hare's gate map and EndlessSpool groups.
 
+use super::lanes::is_new_material;
 use crate::commands::{Command, CommandError};
 use crate::sources::PrinterStatus;
 use crate::sources::happy_hare::commands as mmu;
@@ -14,7 +15,13 @@ pub(super) fn set_gate_filament(
     if !state.gate_map_is_local() {
         return Err(CommandError::GateMapFromSpoolman);
     }
-    let temperature = state.gates.get(gate).ok_or(CommandError::UnknownGate(gate))?.temperature;
+    let current = state.gates.get(gate).ok_or(CommandError::UnknownGate(gate))?;
+    // The old temperature belongs to the old material (ASA at 255 °C stays on a gate switched to PLA otherwise).
+    let temperature = if is_new_material(&current.material, material.as_deref()) {
+        Some(state.default_extruder_temp)
+    } else {
+        current.temperature
+    };
     Ok(vec![Command::RunGcode { script: mmu::set_gate_filament(gate, material.as_deref(), color, temperature)? }])
 }
 
