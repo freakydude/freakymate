@@ -156,10 +156,11 @@ export component ToggleRow inherits Rectangle {
     }
 }
 
-// Panel of a flyout over the page: slightly see-through, with an outline and a shadow so its edge stands out. The
-// software renderer draws no shadows, so the outline alone must carry it there. Taps inside stay inside.
+// Panel of a flyout over the page: slightly see-through and blurred behind (FemtoVG; the software renderer shows the
+// page sharp), with an outline and a shadow so its edge stands out. Taps inside stay inside.
 export component FlyoutPanel inherits Rectangle {
     background: Theme.surface.with-alpha(Theme.flyout-opacity);
+    backdrop-blur: Theme.glass-blur;
     border-radius: Theme.radius;
     border-width: 1px;
     border-color: Theme.flyout-border;

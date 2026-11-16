@@ -17,7 +17,8 @@ export component Scrim inherits Rectangle {
 // Surface with an outline, red for dangerous actions.
 export component DialogPanel inherits Rectangle {
     in property <bool> danger;
-    background: Theme.surface;
+    background: Theme.surface.with-alpha(Theme.dialog-opacity);
+    backdrop-blur: Theme.glass-blur;
     border-radius: Theme.radius;
     border-width: 1px;
     border-color: root.danger ? Theme.danger : Theme.border;

@@ -34,6 +34,10 @@ export global Theme {
     out property <color> disabled-foreground: #5c656f;
     // Flyouts (messages, light) let the page shine through a little, so it is clear that they lie above it.
     out property <float> flyout-opacity: 0.8;
+    // Dialogs are a little less see-through (15 %, flyouts 20 %): they carry more text and sit on the dimmed scrim.
+    out property <float> dialog-opacity: 0.85;
+    // Blur of what lies behind a flyout or a dialog (FemtoVG only; the software renderer shows it sharp).
+    out property <length> glass-blur: 12px;
     // Outline of flyouts: lighter than `border`, so their edge stands out from the page below.
     out property <color> flyout-border: #4f5761;
     // Darkens the content area behind a dialog.

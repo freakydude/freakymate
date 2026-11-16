@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Renders the UI previews in crates/ui/ui/preview with slint-viewer, without building the app.
 # Usage (repo root): scripts/ui-preview.sh [-n print-printing,temperature] [-o <folder>]
-# Uses slint-viewer from PATH; otherwise compiles the version matching Cargo.lock into ~/.local/bin (first run only).
+# Uses slint-viewer from PATH or ~/.local/bin if its version matches Cargo.lock; otherwise compiles the version matching Cargo.lock into ~/.local/bin (first run only).
 # Exit code 0 on success; the PNG paths are printed.
 set -euo pipefail
 
@@ -23,12 +23,14 @@ slint_version() {
 }
 
 find_viewer() {
-    if command -v slint-viewer > /dev/null; then
-        command -v slint-viewer
-        return
-    fi
-    local version
+    local version candidate
     version=$(slint_version)
+    for candidate in "$(command -v slint-viewer || true)" "$HOME/.local/bin/slint-viewer"; do
+        if [[ -x $candidate && $("$candidate" --version 2>/dev/null) == "slint-viewer $version" ]]; then
+            echo "$candidate"
+            return
+        fi
+    done
     echo "slint-viewer $version not found, compiling it (first run only)..." >&2
     cargo install slint-viewer --version "$version" --locked --root "$HOME/.local" >&2
     echo "$HOME/.local/bin/slint-viewer"
@@ -40,7 +42,7 @@ selected() {
 }
 
 render() {
-    if "$viewer" --screenshot "$2" "$1"; then
+    if "$viewer" --edition 1.18 --screenshot "$2" "$1"; then
         echo "$2"
     else
         echo "WARN $(basename "$1") failed" >&2
