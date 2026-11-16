@@ -82,6 +82,7 @@ impl SettingsController {
         ui.set_fullscreen_available(cfg!(not(target_os = "android")));
         ui.set_keep_screen_on_available(cfg!(target_os = "android"));
         ui.set_keep_screen_on(settings.keep_screen_on);
+        ui.set_log_export_available(cfg!(target_os = "android"));
         ui.set_hide_temperature_reports(settings.hide_temperature_reports);
         ui.set_move_step(settings.steps.move_mm as f32);
         ui.set_z_offset_step(settings.steps.z_offset_mm as f32);
@@ -128,6 +129,11 @@ impl SettingsController {
                 controller.update(|settings| settings.keep_screen_on = on);
             }
         });
+        #[cfg(target_os = "android")]
+        {
+            let window = window.as_weak();
+            ui.on_log_export_clicked(move || export_log(&window));
+        }
         let controller = Rc::downgrade(self);
         ui.on_hide_temperature_reports_toggled(move |hide| {
             if let Some(controller) = controller.upgrade() {
@@ -247,4 +253,27 @@ fn minutes_setting(minutes: i32) -> Option<u32> {
 
 fn preset_item(preset: &TemperaturePreset) -> PresetItem {
     PresetItem { name: preset.name.as_str().into(), extruder: preset.extruder as f32, bed: preset.bed as f32 }
+}
+
+/// Copies the log into the Download folder and shows where it went (Android).
+#[cfg(target_os = "android")]
+fn export_log(window: &slint::Weak<AppWindow>) {
+    let Some(strong) = window.upgrade() else { return };
+    let ui = strong.global::<UiSettings>();
+    ui.set_log_export_running(true);
+    ui.set_log_export_result("".into());
+    let window = window.clone();
+    crate::android::log_export::start(move |result| {
+        // Nothing to do when the window is gone by then.
+        let _ = slint::invoke_from_event_loop(move || {
+            let Some(window) = window.upgrade() else { return };
+            let ui = window.global::<UiSettings>();
+            ui.set_log_export_running(false);
+            let text = match result {
+                Ok(path) => slint::format!("Saved to {path}"),
+                Err(reason) => slint::format!("Export failed: {reason}"),
+            };
+            ui.set_log_export_result(text);
+        });
+    });
 }

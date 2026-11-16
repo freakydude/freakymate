@@ -40,6 +40,8 @@ slint = { workspace = true, features = [
 # Android: Slint's android-activity backend, which draws with Skia (winit and FemtoVG are not built there).
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.15.1"
+# The version Slint's Android backend already uses, so only one copy is built.
+jni = "0.22.4"
 slint = { workspace = true, features = ["backend-android-activity-06", "renderer-skia"] }
 
 # Fallback for displays without DRM/KMS (`--framebuffer`): a platform of its own draws with Slint's software renderer

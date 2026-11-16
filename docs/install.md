@@ -17,8 +17,8 @@ Neither is an untested nightly: a change only reaches `main` through a reviewed 
 Beyond that, testing on real printers is limited to a few machines (see [Requirements and hardware](hardware.md)), so
 the note in the README applies to both builds.
 
-**Builds of a pull request.** Every open pull request is built as well. The packages (`packages-<version>`, the same
-zips and `.deb` files as a release) are listed under Artifacts on the page of its CI run; a pull request from a branch
+**Builds of a pull request.** Every open pull request is built as well. The packages (`packages-<target>`, the same
+zips, `.deb` and Arch packages as a release) are listed under Artifacts on the page of its CI run; a pull request from a branch
 of this repository also gets a comment with the link. Downloading them needs a GitHub login.
 Install such a zip by hand as in step 2 below. Moonraker does not offer pull request builds as updates: on the `beta`
 channel the next pre-release replaces it, on `stable` the next release. Pick the release if you want few updates, the
@@ -150,8 +150,8 @@ Besides the Moonraker route there are plain packages, for example to try it on a
   sudo apt remove freakymate && sudo systemctl enable getty@tty1
   ```
 
-- **Arch Linux package**: each release also contains `freakymate-<version>-1-<arch>.pkg.tar.zst` for `x86_64` and
-  `aarch64` (Arch Linux ARM). It is built in CI from the same binary as the `.deb`, with the same files and kiosk
+- **Arch Linux package**: each release also contains `freakymate-<version>-1-<arch>.pkg.tar.zst` for `x86_64`,
+  `aarch64` and `armv7h` (Arch Linux ARM). It is built in CI from the same binary as the `.deb`, with the same files and kiosk
   service, and has had little testing. There is no repository: download the file and update by installing the next one.
   As with the `.deb`, use either the zip installer or the package, not both (they would compete for `tty1`).
 

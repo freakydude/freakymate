@@ -13,7 +13,7 @@ if [ "${1:-}" = "--container" ]; then
   useradd -m builder
   mkdir -p /home/builder/out
   chown builder /home/builder/out
-  runuser -u builder -- env FM_NO_DOCKER=1 FM_ARCH="$FM_ARCH" FM_OUT=/home/builder/out bash "$0" "$2" "$3"
+  runuser -u builder -- env FM_NO_DOCKER=1 FM_ARCH="$FM_ARCH" FM_DEPENDS="$FM_DEPENDS" FM_OUT=/home/builder/out bash "$0" "$2" "$3"
   cp /home/builder/out/*.pkg.tar.zst /out/
   exit 0
 fi
@@ -25,22 +25,24 @@ release="$2"
 case "${FM_ARCH:-$artifact}" in
   *x86_64*) arch=x86_64 ;;
   *aarch64*) arch=aarch64 ;;
+  *armv7*) arch=armv7h ;;
   *) echo "no Arch package for '$artifact'"; exit 1 ;;
 esac
 
 # pacman forbids '-' in the version; the pre-release suffix keeps its meaning after '_'.
 pkgver=$(echo "${release#v}" | tr '-' '_')
 
+# Read here, not in the container: the archlinux image has no Python.
+depends="${FM_DEPENDS:-$(python3 -c 'import json, sys; print(" ".join("\x27" + name + "\x27" for name in json.load(open(sys.argv[1]))["arch"]))' \
+  "$repo/scripts/system-dependencies.json")}"
+
 if [ -z "${FM_NO_DOCKER:-}" ]; then
   docker run --rm \
-    -v "$repo:/repo:ro" -v "$artifact:/artifact:ro" -v "$PWD:/out" -e FM_ARCH="$arch" \
+    -v "$repo:/repo:ro" -v "$artifact:/artifact:ro" -v "$PWD:/out" -e FM_ARCH="$arch" -e FM_DEPENDS="$depends" \
     archlinux:latest bash /repo/.github/scripts/build-arch.sh --container /artifact "$release"
   ls "freakymate-${pkgver}-1-${arch}.pkg.tar.zst"
   exit 0
 fi
-
-depends=$(python3 -c 'import json, sys; print(" ".join("\x27" + name + "\x27" for name in json.load(open(sys.argv[1]))["arch"]))' \
-  "$repo/scripts/system-dependencies.json")
 
 work=$(mktemp -d)
 sed -e "s|@PKGVER@|$pkgver|" -e "s|@ARCH@|$arch|" -e "s|@DEPENDS@|$depends|" \

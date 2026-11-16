@@ -148,7 +148,7 @@ impl Cli {
             fullscreen: true,
             settings: Some(data_dir.join("settings.conf")),
             credentials: Some(data_dir.join("credentials.json")),
-            logfile: None,
+            logfile: Some(data_dir.join("logs").join("freakymate.log")),
             #[cfg(feature = "dev-mode")]
             simulate_network: false,
             #[cfg(feature = "dev-mode")]

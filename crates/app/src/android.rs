@@ -16,6 +16,8 @@ const SIZE_POLL: Duration = Duration::from_millis(500);
 /// 15 s anyway (`moonraker::connection`).
 const RECONNECT_AFTER_BACKGROUND: Duration = Duration::from_secs(15);
 
+pub(crate) mod log_export;
+
 type ReturnAction = Box<dyn Fn() + Send + Sync>;
 
 static ACTIVITY: OnceLock<AndroidApp> = OnceLock::new();

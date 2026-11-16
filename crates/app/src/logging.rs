@@ -38,6 +38,9 @@ pub struct Config {
 /// Installs the logger. `RUST_LOG` decides what is logged when set; otherwise the program logs at info, and
 /// [`set_verbose`] raises its own modules to debug.
 pub fn init(config: Config) -> io::Result<()> {
+    if let Some(path) = &config.file {
+        let _ = LOG_FILE.set(path.clone());
+    }
     let writer = config.file.map(|path| spawn_writer(path, config.header)).transpose()?;
     let logger = Logger::new(writer, std::env::var("RUST_LOG").ok().as_deref());
     log::set_max_level(logger.max_level());
@@ -64,6 +67,12 @@ pub fn header(name: &str, value: &str) {
 }
 
 static LOGGER: OnceLock<Logger> = OnceLock::new();
+static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
+
+/// The current log file, when the log is written to one.
+pub fn file_path() -> Option<&'static Path> {
+    LOG_FILE.get().map(PathBuf::as_path)
+}
 
 struct Logger {
     /// From `RUST_LOG`.
@@ -303,7 +312,7 @@ fn dated_name(path: &Path, day: NaiveDate) -> PathBuf {
 }
 
 /// The rotated files of this log with the day in their name.
-fn old_files(path: &Path) -> Vec<(NaiveDate, PathBuf)> {
+pub(crate) fn old_files(path: &Path) -> Vec<(NaiveDate, PathBuf)> {
     let (Some(directory), Some(name)) = (path.parent(), path.file_name().and_then(|name| name.to_str())) else {
         return Vec::new();
     };

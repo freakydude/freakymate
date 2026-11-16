@@ -363,6 +363,11 @@ export global UiSettings {
     in property <bool> fullscreen-available: true;
     in property <bool> keep-screen-on-available;
     in-out property <bool> keep-screen-on: true;
+    // Android only: copies the log into the Download folder, for a bug report.
+    in property <bool> log-export-available;
+    in property <bool> log-export-running;
+    // Where the file is, or why there is none; empty before the first export.
+    in property <string> log-export-result;
     // The console leaves out Klipper's temperature reports while it waits for a heater.
     in-out property <bool> hide-temperature-reports: true;
     in-out property <float> move-step: 10;
@@ -381,6 +386,7 @@ export global UiSettings {
     callback moonraker-entered(string);
     callback fullscreen-toggled(bool);
     callback keep-screen-on-toggled(bool);
+    callback log-export-clicked();
     callback hide-temperature-reports-toggled(bool);
 }
 

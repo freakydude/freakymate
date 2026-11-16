@@ -1,6 +1,10 @@
 name: Build
 
-# Reusable: tests and release builds for all target platforms; results as artifacts.
+# Reusable: tests, release builds and packages for all target platforms, as artifacts "packages-<target>" and
+# "android-apk". With a release id each package is attached to that (draft) release as soon as it is ready.
+# The jobs take the token permissions of the calling job: read for pull requests, contents write to attach files, and
+# actions write as well to stop a release at the first failure. The workflow "CI" finds failed tests by the job names
+# "Format, Clippy, Tests (Linux)" and "Windows tests"; keep them.
 on:
   workflow_call:
     inputs:
@@ -8,9 +12,14 @@ on:
         description: "Version baked into the binaries (see .github/scripts/version.sh)"
         type: string
         required: true
-
-permissions:
-  contents: read
+      release-id:
+        description: "Id of the draft release that gets the packages; empty: artifacts only"
+        type: string
+        default: ""
+      cancel-on-failure:
+        description: "The first failing job cancels the whole run (releases are all or nothing)"
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -43,6 +52,16 @@ jobs:
         run: cargo ndk -t arm64-v8a clippy -p freakymate-android -- -D warnings
       - name: Licenses of dependencies (allow list in deny.toml)
         run: cargo deny check licenses
+      - &cancel-on-failure
+        name: Cancel the run (release)
+        # In the Linux container curl comes with the toolchain step; if that step fails, the run still fails as a whole.
+        if: failure() && inputs.cancel-on-failure
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          curl --fail-with-body --silent --show-error -X POST -H "Authorization: Bearer $GH_TOKEN"
+          "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/cancel"
 
   # Tests and release build as separate jobs: in sequence they make Windows the longest job of the run.
   windows-test:
@@ -54,6 +73,7 @@ jobs:
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - run: cargo test --workspace
+      - *cancel-on-failure
 
   windows:
     name: Windows build
@@ -77,6 +97,7 @@ jobs:
         with:
           name: freakymate-x86_64-pc-windows-msvc
           path: dist/
+      - *cancel-on-failure
 
   android:
     name: Android APK
@@ -124,6 +145,7 @@ jobs:
         with:
           name: android-apk
           path: android/app/build/outputs/apk/*/release/*.apk
+      - *cancel-on-failure
 
   linux:
     name: Linux ${{ matrix.target }}
@@ -206,3 +228,74 @@ jobs:
         with:
           name: freakymate-${{ matrix.target }}
           path: dist/
+      - *cancel-on-failure
+
+  package:
+    name: Package ${{ matrix.target }}
+    needs: [linux, windows]
+    # Each target on its own: a failed build leaves the packages of the others.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+          - armv7-unknown-linux-gnueabihf
+          - x86_64-pc-windows-msvc
+    env:
+      ARTIFACT: freakymate-${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: ${{ env.ARTIFACT }}
+          path: artifacts/${{ env.ARTIFACT }}
+      - name: Pack
+        working-directory: artifacts
+        run: |
+          bash ../.github/scripts/pack-artifacts.sh "v$FREAKYMATE_VERSION" "$ARTIFACT"
+          if [[ "$ARTIFACT" == *linux* ]]; then
+            unzip -Z -l "$ARTIFACT.zip"
+            unzip -p "$ARTIFACT.zip" release_info.json | python3 -m json.tool
+            dpkg-deb --info ./*.deb
+            dpkg-deb --contents ./*.deb
+            tar --zstd -tf ./*.pkg.tar.zst
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: packages-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            artifacts/*.zip
+            artifacts/*.deb
+            artifacts/*.pkg.tar.zst
+      - name: Attach to the release draft
+        if: inputs.release-id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release-id }}
+        run: |
+          # Windows has a zip only.
+          shopt -s nullglob
+          bash .github/scripts/attach-to-release.sh "$RELEASE_ID" artifacts/*.zip artifacts/*.deb artifacts/*.pkg.tar.zst
+      - *cancel-on-failure
+
+  attach-apk:
+    name: Attach APK
+    needs: android
+    if: inputs.release-id != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: android-apk
+          path: apk
+      - name: Attach to the release draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release-id }}
+        run: bash .github/scripts/attach-to-release.sh "$RELEASE_ID" apk/*.apk
+      - *cancel-on-failure

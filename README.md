@@ -72,6 +72,10 @@ been tried in the Android emulator only, not yet on many real devices.
 2. Updates: add the repository `freakydude/freakymate` to [Obtainium](https://github.com/ImranR98/Obtainium) and enable
    pre-releases.
 
+For a bug report, Settings has "Export log": it copies the log of the last days into one text file you can attach to the
+issue. On Android 10 and newer it lands in `Download/FreakyMate`; on Android 7 to 9 in the app's own folder
+(`Android/data/de.freakydu.freakymate/files/Download`), which the screen names after the export.
+
 The APK is signed with a release key; `apksigner verify --print-certs <apk>` shows the SHA-256 fingerprint of its
 certificate, which must be <!-- TODO Frank: SHA-256 fingerprint of the release certificate -->.
 

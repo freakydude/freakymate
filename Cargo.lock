@@ -1528,6 +1528,7 @@ dependencies = [
  "freakymate-core",
  "freakymate-ui",
  "input",
+ "jni 0.22.4",
  "libc",
  "log",
  "memmap2",

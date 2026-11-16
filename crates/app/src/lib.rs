@@ -25,6 +25,7 @@ mod history_view;
 mod items;
 #[cfg(not(target_os = "android"))]
 pub mod kiosk_pointer;
+mod log_export;
 pub mod logging;
 mod macro_view;
 mod mmu_view;
