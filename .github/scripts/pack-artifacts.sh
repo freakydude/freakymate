@@ -1,5 +1,5 @@
 #!/bin/bash
-# Packs the downloaded build artifacts (one folder per target) into release zips and builds a .deb per Linux target.
+# Packs the downloaded build artifacts (one folder per target) into release zips and builds a .deb per Linux target and an Arch package per x86_64/aarch64 target.
 # Linux packages get release_info.json for the Moonraker update manager (type: zip); get-freakymate.sh goes next to them.
 # Run in the folder containing the artifact subfolders: pack-artifacts.sh <release-tag>
 set -euo pipefail
@@ -20,8 +20,11 @@ EOF
     # upload-artifact loses the execute bits; Moonraker restores them from the zip when extracting.
     chmod 0755 "$name/freakymate" "$name/install.sh" "$name/uninstall.sh"
     bash "$(dirname "${BASH_SOURCE[0]}")/build-deb.sh" "$name" "$version"
+    if [[ "$name" == *x86_64* || "$name" == *aarch64* ]]; then
+      bash "$(dirname "${BASH_SOURCE[0]}")/build-arch.sh" "$name" "$version"
+    fi
   fi
   (cd "$name" && zip -qr "../$name.zip" .)
 done
 install -m 0755 "$(dirname "${BASH_SOURCE[0]}")/../../scripts/get-freakymate.sh" .
-ls -l ./*.zip ./*.deb get-freakymate.sh
+ls -l ./*.zip ./*.deb ./*.pkg.tar.zst get-freakymate.sh

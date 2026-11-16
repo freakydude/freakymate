@@ -34,6 +34,36 @@ pub const VERSION: &str = match option_env!("FREAKYMATE_VERSION") {
     None => concat!(env!("CARGO_PKG_VERSION"), "-dev"),
 };
 
+/// Only builds from main (releases X.Y.0 and pre-releases X.Y.Z) are FreakyMate; a version with a suffix (`-dev`
+/// locally and on other branches, `-pr.N.M` for a pull request, see `.github/scripts/version.sh`) is a test build.
+pub fn is_test_build() -> bool {
+    is_test_version(VERSION)
+}
+
+/// The folder in the user's configuration directory: test builds keep their settings and logins apart, so trying one
+/// never changes the installed display.
+pub fn config_folder() -> &'static str {
+    if is_test_build() { "freakymate-dev" } else { "freakymate" }
+}
+
+fn is_test_version(version: &str) -> bool {
+    version.contains('-')
+}
+
 /// Log target for facts about the machine and the printer (`name: value`); the log file repeats the latest of each
 /// in its header.
 pub const HEADER_TARGET: &str = "freakymate::header";
+
+#[cfg(test)]
+mod tests {
+    use super::is_test_version;
+
+    #[test]
+    fn only_versions_from_main_are_no_test_builds() {
+        assert!(!is_test_version("0.6.0"), "release");
+        assert!(!is_test_version("0.6.3"), "pre-release from main");
+        assert!(is_test_version("0.6.3-pr.214.2"), "pull request");
+        assert!(is_test_version("0.6.3-dev.ea5d135"), "other branch");
+        assert!(is_test_version("0.0.1-dev"), "local build");
+    }
+}

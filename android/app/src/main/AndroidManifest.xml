@@ -6,7 +6,7 @@
 
     <!-- Moonraker is reached over plain http/ws inside the home network; Android blocks that by default. -->
     <application
-        android:label="FreakyMate"
+        android:label="${appLabel}"
         android:icon="@mipmap/ic_launcher"
         android:hasCode="false"
         android:usesCleartextTraffic="true"

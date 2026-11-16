@@ -1,0 +1,29 @@
+# Packages the prebuilt binary, nothing is compiled. Placeholders (@...@) are filled in by .github/scripts/build-arch.sh.
+# Maintainer: Frank Roth <developer@freakydu.de>
+pkgname=freakymate
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc='Touch screen UI for Klipper printers via Moonraker (experimental)'
+arch=('@ARCH@')
+url='https://github.com/freakydude/freakymate'
+license=('GPL-3.0-or-later')
+depends=(@DEPENDS@)
+optdepends=('networkmanager: Wi-Fi settings')
+options=('!strip' '!debug')
+install=freakymate.install
+
+# FM_ARTIFACT (folder with the binary) and FM_REPO (repository checkout) come from the environment.
+package() {
+  install -D -m 0755 "$FM_ARTIFACT/freakymate" "$pkgdir/usr/bin/freakymate"
+  install -D -m 0644 "$FM_REPO/scripts/debian/freakymate@.service" "$pkgdir/usr/lib/systemd/system/freakymate@.service"
+  install -D -m 0644 "$FM_REPO/scripts/polkit/50-freakymate.rules" "$pkgdir/usr/share/polkit-1/rules.d/50-freakymate.rules"
+  install -D -m 0644 "$FM_REPO/scripts/udev/70-freakymate-backlight.rules" "$pkgdir/usr/lib/udev/rules.d/70-freakymate-backlight.rules"
+  install -D -m 0644 "$FM_REPO/LICENSE" "$pkgdir/usr/share/licenses/freakymate/LICENSE"
+  install -D -m 0644 "$FM_ARTIFACT/THIRD-PARTY-LICENSES.html" "$pkgdir/usr/share/licenses/freakymate/THIRD-PARTY-LICENSES.html"
+  install -D -m 0644 "$FM_REPO/scripts/debian/freakymate.desktop" "$pkgdir/usr/share/applications/freakymate.desktop"
+  install -D -m 0644 "$FM_REPO/assets/logo/freakymate.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/freakymate.svg"
+  local size
+  for size in 16 24 32; do
+    install -D -m 0644 "$FM_REPO/assets/logo/freakymate-small.svg" "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/freakymate.svg"
+  done
+}

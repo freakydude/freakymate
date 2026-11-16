@@ -88,7 +88,9 @@ impl SettingsController {
         ui.set_temperature_step(settings.steps.temperature as f32);
         ui.set_extrude_length(settings.steps.extrude_mm as f32);
         ui.set_extrude_speed(settings.steps.extrude_speed as f32);
-        ui.set_settings_file(self.store.path().display().to_string().into());
+        if cfg!(not(target_os = "android")) {
+            ui.set_settings_file(self.store.path().display().to_string().into());
+        }
         ui.set_version(freakymate_core::VERSION.into());
         let backlight = window.global::<Backlight>();
         backlight.set_idle_minutes(minutes_shown(settings.backlight.off_when_idle_minutes));

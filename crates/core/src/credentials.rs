@@ -6,7 +6,6 @@
 
 use crate::atomic_file::write_atomically;
 use crate::moonraker::Endpoint;
-use crate::settings::APP_FOLDER;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -51,9 +50,10 @@ impl CredentialStore {
         Self { path: Some(path.into()) }
     }
 
-    /// Default location: `<config dir>/freakymate/credentials.json`; none if the system has no such directory.
+    /// Default location: `<config dir>/<`[`crate::config_folder`]`>/credentials.json`; none if the system has no such
+    /// directory.
     pub fn default_location() -> Self {
-        Self { path: dirs::config_dir().map(|directory| directory.join(APP_FOLDER).join(FILE_NAME)) }
+        Self { path: dirs::config_dir().map(|directory| directory.join(crate::config_folder()).join(FILE_NAME)) }
     }
 
     /// A store that keeps nothing.

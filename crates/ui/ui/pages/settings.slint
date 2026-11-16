@@ -133,7 +133,9 @@ export component SettingsPage inherits Rectangle {
                 }
                 Rectangle { vertical-stretch: 1; }
                 Text {
-                    text: @tr("FreakyMate {}\nSaved in {}", UiSettings.version, UiSettings.settings-file);
+                    // Without a file the user can reach (Android keeps it in the app's private folder) only the version.
+                    text: UiSettings.settings-file == "" ? @tr("FreakyMate {}", UiSettings.version)
+                        : @tr("FreakyMate {}\nSaved in {}", UiSettings.version, UiSettings.settings-file);
                     color: Theme.disabled-foreground;
                     font-size: Theme.font-small;
                     wrap: word-wrap;

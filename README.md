@@ -57,7 +57,8 @@ The script picks the build for your system, installs the few packages it needs a
 starts on the display at every boot, and new versions show up in the update list of Mainsail, Fluidd and its own
 System page.
 
-Pre-release channel, install by hand, Debian package, desktop window and uninstall: [Install and update](docs/install.md).
+Pre-release channel, install by hand, Debian and Arch Linux packages, desktop window and uninstall:
+[Install and update](docs/install.md).
 
 ### Android
 
@@ -65,16 +66,17 @@ An old Android phone or tablet near the printer can serve as touch screen: the s
 or newer on a 64-bit ARM device, and Moonraker must be reachable over the home network (plain `http`/`ws`). So far it has
 been tried in the Android emulator only, not yet on many real devices.
 
-1. Download `freakymate-<version>-arm64-v8a-release.apk` from the latest [pre-release](https://github.com/freakydude/freakymate/releases) and
-   open it on the device; allow installing from unknown sources when Android asks.
+1. Download `freakymate-<version>-arm64-v8a-prod-release.apk` from the latest
+   [pre-release](https://github.com/freakydude/freakymate/releases) and open it on the device; allow installing from
+   unknown sources when Android asks.
 2. Updates: add the repository `freakydude/freakymate` to [Obtainium](https://github.com/ImranR98/Obtainium) and enable
    pre-releases.
 
 The APK is signed with a release key; `apksigner verify --print-certs <apk>` shows the SHA-256 fingerprint of its
 certificate, which must be <!-- TODO Frank: SHA-256 fingerprint of the release certificate -->.
 
-The APKs in the artifacts of a pull request are signed with a debug key. If you installed one, uninstall it before you
-install a pre-release APK, because Android refuses an update with a different signature.
+The APK in the artifacts of a pull request (`…-dev-release.apk`) is a test build: it installs as a separate app,
+FreakyMate Dev, with its own settings, and leaves an installed FreakyMate alone.
 
 ## Builds
 

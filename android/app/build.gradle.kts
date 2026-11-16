@@ -1,9 +1,9 @@
 // A native activity without Java code: Gradle only builds libfreakymate.so with cargo-ndk, packs it with the manifest
 // and signs the APK.
-//   ./gradlew assembleRelease -PappVersion=0.6.1      (appVersion as .github/scripts/version.sh prints it)
+//   ./gradlew assembleDevRelease -PappVersion=0.6.1-dev   (appVersion as .github/scripts/version.sh prints it)
+//   ./gradlew assembleProdRelease -PappVersion=0.6.3      (CI on main only, needs the release key)
 // -Pabis=x86_64 builds for the emulator (`rustup target add x86_64-linux-android`); the release is arm64 only.
-// Signing: ANDROID_KEYSTORE (file), ANDROID_KEYSTORE_PASSWORD, alias `freakymate`. Without them the APK gets the debug
-// key of the machine; it must be uninstalled before a release APK can be installed.
+// Release key: ANDROID_KEYSTORE (file), ANDROID_KEYSTORE_PASSWORD, alias `freakymate`.
 plugins {
     id("com.android.application")
 }
@@ -18,6 +18,7 @@ fun versionCodeOf(version: String): Int {
 }
 
 val abis = providers.gradleProperty("abis").orElse("arm64-v8a").get().split(",")
+val releaseKeystore: String? = System.getenv("ANDROID_KEYSTORE")
 val androidHome: String = System.getenv("ANDROID_HOME") ?: error("set ANDROID_HOME")
 val jniLibs = layout.buildDirectory.dir("jniLibs")
 val cargoNdk by tasks.registering(Exec::class) {
@@ -53,7 +54,7 @@ android {
     packaging.jniLibs.useLegacyPackaging = true
 
     signingConfigs {
-        System.getenv("ANDROID_KEYSTORE")?.let { keystore ->
+        releaseKeystore?.let { keystore ->
             create("release") {
                 storeFile = file(keystore)
                 storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
@@ -63,11 +64,26 @@ android {
         }
     }
 
-    buildTypes {
-        release {
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+    // prod is FreakyMate, built only from main and always with the release key; dev is every other build (local, pull
+    // request): its own app beside it with its own data, signed with the debug key of the machine.
+    flavorDimensions += "identity"
+    productFlavors {
+        create("prod") {
+            dimension = "identity"
+            manifestPlaceholders["appLabel"] = "FreakyMate"
+            signingConfig = signingConfigs.findByName("release")
+        }
+        create("dev") {
+            dimension = "identity"
+            applicationIdSuffix = ".dev"
+            manifestPlaceholders["appLabel"] = "FreakyMate Dev"
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
 
 tasks.named("preBuild") { dependsOn(cargoNdk) }
+// Without the key Gradle would pack an unsigned or debug-signed prod APK that no later release could update.
+tasks.matching { it.name == "preProdReleaseBuild" }.configureEach {
+    doFirst { check(releaseKeystore != null) { "prod needs the release key: set ANDROID_KEYSTORE and ANDROID_KEYSTORE_PASSWORD" } }
+}

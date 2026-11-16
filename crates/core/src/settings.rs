@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 use toml_edit::DocumentMut;
 
-pub(crate) const APP_FOLDER: &str = "freakymate";
 const FILE_NAME: &str = "settings.conf";
 const EXTENSION: &str = "conf";
 /// Up to 0.3.8 the settings were JSON; such a file stays where it is and is no longer read.
@@ -144,7 +143,7 @@ impl SettingsStore {
     /// Default location: `<config dir>/freakymate/settings.conf`.
     pub fn default_location() -> Result<Self, SettingsError> {
         let directory = dirs::config_dir().ok_or(SettingsError::NoConfigDirectory)?;
-        Ok(Self::new(directory.join(APP_FOLDER).join(FILE_NAME)))
+        Ok(Self::new(directory.join(crate::config_folder()).join(FILE_NAME)))
     }
 
     pub fn path(&self) -> &Path {

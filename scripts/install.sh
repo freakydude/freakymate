@@ -80,6 +80,12 @@ if ! "$SOURCE_DIR/$NAME" --version > /dev/null 2>&1; then
   echo "The program in this folder does not run on this system ($(uname -m)); download the zip for its architecture."
   exit 1
 fi
+# A package (.deb, Arch) brings its own kiosk service freakymate@<user>; it and this one both want tty1.
+for packaged in /etc/systemd/system/multi-user.target.wants/freakymate@*.service; do
+  [ -e "$packaged" ] || continue
+  echo "Note: the kiosk of the FreakyMate package is enabled too ($(basename "$packaged")); both want tty1."
+  echo "Keep one of them, e.g.: sudo systemctl disable --now $(basename "$packaged")"
+done
 
 report "Installing system packages"
 mapfile -t packages < <(python3 -c 'import json, sys; print("\n".join(json.load(open(sys.argv[1]))["debian"]))' \

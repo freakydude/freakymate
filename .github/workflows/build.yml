@@ -81,9 +81,12 @@ jobs:
   android:
     name: Android APK
     runs-on: ubuntu-latest
-    # Release signing only for pushes to main (environment with branch rule main and the keystore secrets);
-    # pull requests build with a debug key and never see a secret.
-    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'android-signing' || '' }}
+    # Builds from main (pre-releases on push, releases by workflow_dispatch) are the app FreakyMate (flavor prod) and
+    # get the keystore from the environment, whose branch rule is main; every other build is FreakyMate Dev (flavor dev,
+    # debug key) and never sees a secret. The same condition twice: `environment` cannot read the job's env.
+    environment: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'android-signing' || '' }}
+    env:
+      FLAVOR: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'Prod' || 'Dev' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
@@ -107,6 +110,7 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
+          # Without the secrets (not on main) the prod build stops with a message instead of signing with a debug key.
           if [ -n "$KEYSTORE_BASE64" ]; then
             ANDROID_KEYSTORE=$(mktemp "$RUNNER_TEMP/keystore.XXXXXX")
             export ANDROID_KEYSTORE
@@ -114,12 +118,12 @@ jobs:
           else
             unset ANDROID_KEYSTORE_PASSWORD
           fi
-          (cd android && ./gradlew assembleRelease "-PappVersion=$FREAKYMATE_VERSION")
+          (cd android && ./gradlew "assemble${FLAVOR}Release" "-PappVersion=$FREAKYMATE_VERSION")
           rm -f "$ANDROID_KEYSTORE"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: android-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          path: android/app/build/outputs/apk/*/release/*.apk
 
   linux:
     name: Linux ${{ matrix.target }}

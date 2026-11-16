@@ -7,7 +7,8 @@
 # (x86_64-linux-android for the emulator). Without a device it starts the AVD $FREAKYMATE_AVD (default freakymate-test).
 set -euo pipefail
 
-readonly package=de.freakydu.freakymate
+# A local build is always the app FreakyMate Dev (flavor dev), beside an installed FreakyMate.
+readonly package=de.freakydu.freakymate.dev
 readonly moonraker_port=7125
 fresh=false
 case "${1:-}" in
@@ -18,16 +19,17 @@ esac
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
 sdk=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}
-[ -n "$sdk" ] || { echo "set ANDROID_HOME to the Android SDK" >&2; exit 1; }
-export ANDROID_HOME=$sdk
+# A desktop session keeps the environment of its login, also an SDK path that has moved since; then the adb on the
+# PATH tells where the SDK is (<sdk>/platform-tools/adb).
+if [ ! -x "$sdk/platform-tools/adb" ] && path_adb=$(command -v adb); then
+  echo "ANDROID_HOME=${sdk:-(unset)} holds no SDK; using the one of $path_adb" >&2
+  sdk=$(dirname "$(dirname "$(readlink -f "$path_adb")")")
+fi
+adb=$sdk/platform-tools/adb
+[ -x "$adb" ] || { echo "no Android SDK: set ANDROID_HOME (no adb in ${sdk:-ANDROID_HOME}/platform-tools)" >&2; exit 1; }
+export ANDROID_HOME=$sdk ANDROID_SDK_ROOT=$sdk
 ndk_version=$(sed -n 's/^ *ndkVersion = "\(.*\)"/\1/p' "$repo/android/app/build.gradle.kts")
 export ANDROID_NDK_HOME=$sdk/ndk/$ndk_version
-adb=$sdk/platform-tools/adb
-if [ ! -x "$adb" ]; then
-  echo "no adb in $sdk/platform-tools: ANDROID_HOME=$sdk is not the SDK (an editor started before it moved keeps" >&2
-  echo "the old value; restart it)" >&2
-  exit 1
-fi
 
 start_emulator() {
   local avd=${FREAKYMATE_AVD:-freakymate-test}
@@ -47,11 +49,11 @@ version=$(bash "$repo/.github/scripts/version.sh")
 # The program shows it (crates/core VERSION), as in CI.
 export FREAKYMATE_VERSION=$version
 echo "building $version for $abi"
-(cd "$repo/android" && ./gradlew -q assembleRelease "-PappVersion=$version" "-Pabis=$abi")
-apk=$repo/android/app/build/outputs/apk/release/freakymate-$version-$abi-release.apk
+(cd "$repo/android" && ./gradlew -q assembleDevRelease "-PappVersion=$version" "-Pabis=$abi")
+apk=$repo/android/app/build/outputs/apk/dev/release/freakymate-$version-$abi-dev-release.apk
 
 if ! "$adb" install -r "$apk"; then
-  echo "install failed; an APK signed with another key (release, CI) must be uninstalled first:" >&2
+  echo "install failed; FreakyMate Dev from another machine or from CI (other debug key) must be uninstalled first:" >&2
   echo "  $adb uninstall $package" >&2
   exit 1
 fi

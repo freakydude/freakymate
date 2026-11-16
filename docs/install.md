@@ -150,6 +150,19 @@ Besides the Moonraker route there are plain packages, for example to try it on a
   sudo apt remove freakymate && sudo systemctl enable getty@tty1
   ```
 
+- **Arch Linux package**: each release also contains `freakymate-<version>-1-<arch>.pkg.tar.zst` for `x86_64` and
+  `aarch64` (Arch Linux ARM). It is built in CI from the same binary as the `.deb`, with the same files and kiosk
+  service, and has had little testing. There is no repository: download the file and update by installing the next one.
+  As with the `.deb`, use either the zip installer or the package, not both (they would compete for `tty1`).
+
+  ```bash
+  sudo pacman -U freakymate-<version>-1-x86_64.pkg.tar.zst
+  sudo systemctl disable getty@tty1                # free tty1 for the kiosk
+  sudo systemctl enable --now freakymate@$USER     # fullscreen on tty1 as this user
+  # remove again
+  sudo pacman -R freakymate && sudo systemctl enable getty@tty1
+  ```
+
 - **Windowed mode on a desktop** (Linux PC, Raspberry Pi OS with desktop, Windows): the program opens as a normal window
   and talks to any Moonraker over the network. On Debian and Ubuntu install the `.deb` and start FreakyMate from the
   application menu or with `freakymate` in a terminal (skip the `systemctl` lines above, they set up the kiosk); on Windows unpack
