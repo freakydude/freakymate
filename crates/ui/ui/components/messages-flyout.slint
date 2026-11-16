@@ -1,8 +1,9 @@
 // Flyout below the status bar with all errors and informations.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Navigation, Page, Printer } from "../state.slint";
+import { Actions, Navigation, Page, Printer, Severity } from "../state.slint";
 import { FlyoutPanel, IconButton, ScrollList } from "controls.slint";
 import { DialogHeader } from "dialog.slint";
 
@@ -67,7 +68,7 @@ export component MessagesFlyout inherits Rectangle {
                         Image {
                             y: 0px;
                             source: message.is-error ? Icons.ui-error : Icons.ui-info;
-                            colorize: message.is-error ? Theme.danger : Theme.info;
+                            colorize: message.is-error ? StateIcons.severity-color(Severity.error) : StateIcons.severity-color(Severity.info);
                             width: Theme.icon-small;
                             height: Theme.icon-small;
                         }

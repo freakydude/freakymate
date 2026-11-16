@@ -7,6 +7,11 @@ export global Theme {
     out property <color> surface: #1e2227;
     out property <color> surface-raised: #2a2f36;
     out property <color> surface-active: #3b424b;
+    // Track of a scale line (TemperatureScale): 3.27:1 on `surface-raised`, 3.87:1 on `surface` (WCAG 1.4.11 needs 3:1;
+    // `surface-active` has only 1.33:1).
+    out property <color> scale-track: #747e89;
+    // A filament whose colour nobody reported: a neutral slate, darker than usual grey filaments, never the accent.
+    out property <color> filament-unknown: #5c656f;
     out property <color> border: #343a42;
     // The two greys of the checkerboard behind a translucent filament colour.
     out property <color> checker-light: #c9ced4;
@@ -34,6 +39,10 @@ export global Theme {
     out property <color> disabled-foreground: #5c656f;
     // Flyouts (messages, light) let the page shine through a little, so it is clear that they lie above it.
     out property <float> flyout-opacity: 0.8;
+    // Dialogs are a little less see-through (15 %, flyouts 20 %): they carry more text and sit on the dimmed scrim.
+    out property <float> dialog-opacity: 0.85;
+    // Blur of what lies behind a flyout or a dialog (FemtoVG only; the software renderer shows it sharp).
+    out property <length> glass-blur: 12px;
     // Outline of flyouts: lighter than `border`, so their edge stands out from the page below.
     out property <color> flyout-border: #4f5761;
     // Darkens the content area behind a dialog.
@@ -51,6 +60,8 @@ export global Theme {
     out property <length> padding: 8px;
     // Inside the outline of a dialog.
     out property <length> dialog-padding: 12px;
+    // Gap between a dialog panel and the edge of the content area it opens in (also the plot inset of a history chart).
+    out property <length> dialog-inset: 8px;
     out property <length> spacing-tight: 2px;
     out property <length> spacing-small: 4px;
     out property <length> spacing-medium: 6px;

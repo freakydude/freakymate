@@ -64,7 +64,7 @@ export component AfcServiceTab inherits VerticalLayout {
             IconLabel {
                 horizontal-stretch: 1;
                 icon: root.error ? Icons.ui-error : Printer.afc-state == "Idle" ? Icons.ui-check : Icons.ui-info;
-                color: StateIcons.severity-color(root.error ? Severity.error : Printer.afc-state == "Idle" ? Severity.fine : Severity.info);
+                color: StateIcons.severity-color(root.error ? Severity.error : Printer.afc-state == "Idle" ? Severity.neutral : Severity.info);
                 text: Printer.afc-state == "" ? "-" : Printer.afc-state;
             }
             if root.error: IconButton {
@@ -83,12 +83,12 @@ export component AfcServiceTab inherits VerticalLayout {
         title: @tr("Pull a lane back out of the hub");
         icon: Icons.mmu-unload;
         returns := ScrollList {
-            property <length> row-step: 52px + Theme.spacing-small;
+            property <length> row-step: Theme.row-height-small + Theme.spacing-small;
             content-height: Printer.afc-hub-returns.length * self.row-step - Theme.spacing-small;
             for item[index] in Printer.afc-hub-returns: HubReturnRow {
                 y: index * returns.row-step;
                 width: returns.row-width;
-                height: 52px;
+                height: Theme.row-height-small;
                 item: item;
             }
         }

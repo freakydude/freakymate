@@ -2,13 +2,15 @@
 // gates, dialogs and the print page use the same pieces, so a filament looks the same everywhere.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
+import { Severity } from "../structs.slint";
 import { BarColors } from "../structs.slint";
 
-// A filament without a known colour shows in the accent colour as a generic filament, purely as a look; use where
-// there is filament (not for an empty gate).
+// A filament without a known colour shows in a neutral grey as a generic filament, purely as a look; use where there
+// is filament (not for an empty gate).
 export global FilamentColors {
     pure public function generic(colors: BarColors) -> BarColors {
-        return colors.count > 0 ? colors : { first: Theme.accent, count: 1 };
+        return colors.count > 0 ? colors : { first: Theme.filament-unknown, count: 1 };
     }
 }
 
@@ -124,7 +126,7 @@ export component FilamentSwatch inherits Rectangle {
         background: root.count == 1 ? root.nth(0) : root.colors.longitudinal ? @linear-gradient(90deg, root.blend-color(0) root.blend-at(0), root.blend-color(1) root.blend-at(1), root.blend-color(2) root.blend-at(2), root.blend-color(3) root.blend-at(3), root.blend-color(4) root.blend-at(4), root.blend-color(5) root.blend-at(5)) : @linear-gradient(135deg, root.split-color(0) root.split-at(0), root.split-color(1) root.split-at(1), root.split-color(2) root.split-at(2), root.split-color(3) root.split-at(3), root.split-color(4) root.split-at(4), root.split-color(5) root.split-at(5));
     }
 
-    if root.count > 1 && root.tl > 0px: CornerMask { x: 0px; y: 0px; corner: 0; size: root.tl; ground: root.ground; }
+    if root.count > 1 && root.tl > 0px: CornerMask { x: 0px; y: 0px; size: root.tl; ground: root.ground; }
     if root.count > 1 && root.tr > 0px: CornerMask { x: root.width - root.tr; y: 0px; corner: 1; size: root.tr; ground: root.ground; }
     if root.count > 1 && root.br > 0px: CornerMask { x: root.width - root.br; y: root.height - root.br; corner: 2; size: root.br; ground: root.ground; }
     if root.count > 1 && root.bl > 0px: CornerMask { x: 0px; y: root.height - root.bl; corner: 3; size: root.bl; ground: root.ground; }
@@ -136,7 +138,7 @@ export component FilamentSwatch inherits Rectangle {
         border-top-right-radius: root.tr;
         border-bottom-right-radius: root.br;
         border-width: root.warn ? 2px : 1px;
-        border-color: root.warn ? Theme.warning : root.all-dark() ? Theme.muted : Theme.flyout-border;
+        border-color: root.warn ? StateIcons.severity-color(Severity.attention) : root.all-dark() ? Theme.muted : Theme.flyout-border;
     }
     // A narrow field has no room for a gap beside the yellow frame; the colour must stay to be seen.
     if root.warn && !root.empty && root.gap > 0px: Rectangle {
@@ -197,7 +199,7 @@ export component FilamentSwatch inherits Rectangle {
 export component FilamentText inherits VerticalLayout {
     in property <string> material;
     in property <bool> material-warn;
-    in property <color> material-color: root.material-warn ? Theme.warning : Theme.foreground;
+    in property <color> material-color: root.material-warn ? StateIcons.severity-color(Severity.attention) : Theme.foreground;
     in property <string> lead;
     in property <string> name;
     in property <string> trail;
@@ -239,7 +241,7 @@ export component FilamentText inherits VerticalLayout {
             horizontal-stretch: 0;
             min-width: self.preferred-width;
             text: (root.name != "" ? parent.separator : "") + root.trail;
-            color: root.trail-warn ? Theme.warning : Theme.muted;
+            color: root.trail-warn ? StateIcons.severity-color(Severity.attention) : Theme.muted;
             font-size: Theme.font-small;
         }
         if root.extra != "": Text {

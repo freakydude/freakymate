@@ -15,7 +15,9 @@ export component PrintMmuPreview inherits AppWindow {
         Printer.mmu-buffer-state = "neutral";
         Printer.mmu-buffer-bias = 0.08;
         Printer.mmu-flowguard-state = "monitoring";
-        Printer.mmu-buffer-marker = Severity.fine;
+        Printer.mmu-buffer-marker = Severity.neutral;
+        Printer.mmu-has-extreme-threshold = true;
+        Printer.mmu-extreme-threshold = 0.6;
         Printer.mmu-has-flow-rate = true;
         Printer.mmu-flow-rate = 99;
     }

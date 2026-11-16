@@ -1,9 +1,22 @@
 // Sample data for previews (VS Code Slint preview, slint-viewer, scripts/ui-preview.sh).
 // Not part of the app: nothing in app.slint imports this folder. In the app, Rust fills these globals.
 
-import { MotionTab, Navigation, Network, Page, PathPartKind, Printer, Severity, UiSettings } from "../state.slint";
+import { FilamentPathItem, MotionTab, Navigation, Network, Page, PathPartKind, Printer, Severity, UiSettings } from "../state.slint";
 
 export global Sample {
+    // The way at a head without sensors of its own, as the core builds it (`LoadPath::parts`, `PathScope::HeadOnly`) and
+    // the fake's `toolchanger` profile shows it: tube, gears, tube, nozzle.
+    out property <FilamentPathItem> head-path: {
+        direction: 0, distance: "", gate-label: "",
+        parts: [
+            { kind: PathPartKind.link, fill: 0 },
+            { kind: PathPartKind.gears, active: false },
+            { kind: PathPartKind.link, fill: 0 },
+            { kind: PathPartKind.nozzle, active: false },
+        ],
+        colors: { first: #4dabf7, count: 1, longitudinal: false },
+    };
+
     // Connected Voron-like printer, homed, nozzle and bed at temperature, no job.
     public function ready-printer() {
         Printer.connection = "connected";
@@ -87,9 +100,9 @@ export global Sample {
         Printer.macros = ["PRINT_START", "PRINT_END", "LOAD_FILAMENT", "UNLOAD_FILAMENT", "PARK"];
         Printer.power-devices = [{ name: "printer", on: true, locked: true }, { name: "lights", on: false, locked: false }];
         Printer.updates = [
-            { name: "klipper", version: "v0.13.0-100", detail: "20 commits behind", has-update: true },
-            { name: "moonraker", version: "v0.9.3-50", detail: "v0.9.3-50", has-update: false, up-to-date: true },
-            { name: "mainsail", version: "v2.14.0", detail: "v2.14.0", has-update: false, up-to-date: true },
+            { name: "klipper", label: "Klipper", version: "v0.13.0-100", detail: "20 commits behind", has-update: true },
+            { name: "moonraker", label: "Moonraker", version: "v0.9.3-50", detail: "v0.9.3-50", has-update: false, up-to-date: true },
+            { name: "mainsail", label: "Mainsail", version: "v2.14.0", detail: "v2.14.0", has-update: false, up-to-date: true },
         ];
         UiSettings.presets = [{ name: "PLA", extruder: 215, bed: 60 }, { name: "PETG", extruder: 240, bed: 80 }];
     }
@@ -267,9 +280,9 @@ export global Sample {
         Printer.nozzle-head = "T1";
         Printer.mounted-head = 1;
         Printer.heads = [
-            { name: "T0", label: "T0", subtitle: "", has-nozzle: true, temperature: 24, target: 0, mounted: false, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T0", has-spool: true, spool-title: "Red PLA", spool-material: "PLA", spool-weight: "812 g", spool-colors: { first: #ff0000, count: 1 }, spool-id: 1, spool-tool: 0, can-pick-spool: true },
-            { name: "T1", label: "T1", subtitle: "", has-nozzle: true, temperature: 214.6, target: 215, mounted: true, detected: true, lanes: 1, pick-up: "macro", pick-up-macro: "T1", has-spool: true, spool-title: "Blue PLA", spool-material: "PLA", spool-weight: "905 g", spool-colors: { first: #0033ff, count: 1 }, spool-id: 3, spool-tool: 1, can-pick-spool: true },
-            { name: "T2", label: "T2", subtitle: "", has-nozzle: true, temperature: 24, target: 0, mounted: false, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T2", has-spool: false, spool-id: -1, spool-tool: 2, can-pick-spool: true },
+            { name: "T0", label: "T0", subtitle: "", has-nozzle: true, temperature: 24, target: 0, mounted: false, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T0", has-spool: true, spool-title: "Red PLA", spool-material: "PLA", spool-weight: "812 g", spool-colors: { first: #ff0000, count: 1 }, spool-id: 1, spool-tool: 0, can-pick-spool: true, path: Sample.head-path },
+            { name: "T1", label: "T1", subtitle: "", has-nozzle: true, temperature: 214.6, target: 215, mounted: true, detected: true, lanes: 1, pick-up: "macro", pick-up-macro: "T1", has-spool: true, spool-title: "Blue PLA", spool-material: "PLA", spool-weight: "905 g", spool-colors: { first: #0033ff, count: 1 }, spool-id: 3, spool-tool: 1, can-pick-spool: true, path: Sample.head-path },
+            { name: "T2", label: "T2", subtitle: "", has-nozzle: true, temperature: 24, target: 0, mounted: false, detected: false, lanes: 1, pick-up: "macro", pick-up-macro: "T2", has-spool: false, spool-id: -1, spool-tool: 2, can-pick-spool: true, path: Sample.head-path },
         ];
         // The fake has no `[fan]` with heads (the plugin refuses it); the fan of the mounted head leads the list.
         Printer.fans = [

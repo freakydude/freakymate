@@ -3,9 +3,10 @@
 // Gates tab shows them.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
 import { ToolLabel } from "../components/tool-label.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, Page, SpoolPicker, ToolMatchItem, Printer } from "../state.slint";
+import { Actions, Confirm, FilamentTab, MmuDialogs, MmuGateItem, Navigation, Page, SpoolPicker, ToolMatchItem, Printer, Severity } from "../state.slint";
 import { BarColors } from "../structs.slint";
 import { ButtonKind, IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
 import { FilamentCompare } from "../components/filament-compare.slint";
@@ -60,8 +61,9 @@ component ToolRow inherits Rectangle {
 
     property <bool> has-gate: root.mapping.gate >= 0;
     property <bool> differs: root.mapping.used && root.mapping.material-differs;
-    // Both sides equally wide: padding, tool number, arrow and four gaps take the rest.
-    property <length> half-width: (root.width - 10px - 40px - 18px - 4 * 5px) / 2;
+    property <length> tool-column-width: 40px;
+    // Both sides equally wide: padding, tool number, arrow and three gaps take the rest.
+    property <length> half-width: (root.width - 2 * Theme.spacing-medium - root.tool-column-width - Theme.icon-small - 3 * Theme.spacing-medium) / 2;
 
     border-radius: Theme.radius;
     background: Theme.surface;
@@ -71,7 +73,7 @@ component ToolRow inherits Rectangle {
         padding: Theme.spacing-medium;
         spacing: Theme.spacing-medium;
         VerticalLayout {
-            width: 40px;
+            width: root.tool-column-width;
             alignment: center;
             spacing: Theme.spacing-tight;
             ToolLabel {
@@ -163,7 +165,7 @@ component ToolsHeader inherits HorizontalLayout {
         }
         Text {
             text: Printer.mmu-match-summary;
-            color: Printer.mmu-match-verdict == "differs" ? Theme.warning : Theme.foreground;
+            color: Printer.mmu-match-verdict == "differs" ? StateIcons.severity-color(Severity.attention) : Theme.foreground;
             font-size: Theme.font-label;
             font-weight: 600;
             vertical-alignment: center;
@@ -287,10 +289,10 @@ export component EndlessSpoolDialog inherits Scrim {
     }
 
     DialogPanel {
-        width: min(parent.width - 16px, 520px);
-        height: parent.height - 16px;
+        width: min(parent.width - 2 * Theme.dialog-inset, 520px);
+        height: parent.height - 2 * Theme.dialog-inset;
         x: (parent.width - self.width) / 2;
-        y: 8px;
+        y: Theme.dialog-inset;
 
         VerticalLayout {
             padding: Theme.dialog-padding;
@@ -314,8 +316,8 @@ export component EndlessSpoolDialog inherits Scrim {
             group-list := ScrollList {
                 visible: Printer.mmu-endless-spool;
                 vertical-stretch: Printer.mmu-endless-spool ? 1 : 0;
-                property <length> row-step: Theme.touch + 4px;
-                content-height: Printer.mmu-gates.length * self.row-step - 4px;
+                property <length> row-step: Theme.touch + Theme.spacing-small;
+                content-height: Printer.mmu-gates.length * self.row-step - Theme.spacing-small;
                 for gate[index] in Printer.mmu-gates: GroupRow {
                     y: index * group-list.row-step;
                     width: group-list.row-width;
@@ -338,7 +340,7 @@ export component FilamentLine inherits Rectangle {
     in property <string> label;
     callback clicked;
 
-    height: 52px;
+    height: Theme.row-height-small;
     border-radius: Theme.radius-small;
     background: touch.pressed ? Theme.surface-active : Theme.surface-raised;
     border-width: root.selected ? 2px : 0px;
@@ -431,10 +433,10 @@ export component ToolDialog inherits Scrim {
     }
 
     DialogPanel {
-        width: min(parent.width - 16px, 680px);
+        width: min(parent.width - 2 * Theme.dialog-inset, 680px);
         height: content.preferred-height;
         x: (parent.width - self.width) / 2;
-        y: 8px;
+        y: Theme.dialog-inset;
 
         content := VerticalLayout {
             padding: Theme.dialog-padding;
@@ -447,9 +449,19 @@ export component ToolDialog inherits Scrim {
                     verdict: root.mapping.used ? root.mapping.verdict : "";
                 }
             }
-            FilamentCompare {
+            // Without a compared file there is nothing to put the gate against: no columns and no headers, only what the
+            // gate holds.
+            if Printer.mmu-match-file != "": FilamentCompare {
                 mapping: root.mapping;
                 source-title: root.mapping.gate >= 0 ? @tr("Gate {}", root.mapping.gate) : "";
+            }
+            if Printer.mmu-match-file == "" && root.mapping.gate >= 0: Text {
+                text: @tr("Gate {} holds", root.mapping.gate);
+                color: Theme.muted;
+                font-size: Theme.font-small;
+            }
+            if Printer.mmu-match-file == "" && root.mapping.gate >= 0: LoadedLine {
+                mapping: root.mapping;
             }
             // Equal buttons in the default kind: none of them is the recommended one.
             HorizontalLayout {
@@ -522,7 +534,7 @@ component GateChoice inherits FilamentLine {
             border-color: Theme.muted;
             tools-text := Text {
                 text: root.gate.tools == "" ? @tr("free") : root.gate.tools;
-                color: root.gate.tools == "" ? Theme.muted : Theme.accent;
+                color: root.gate.tools == "" ? Theme.muted : Theme.foreground;
                 font-size: Theme.font-small;
                 font-weight: root.gate.tools == "" ? 400 : 700;
             }
@@ -541,10 +553,10 @@ export component ToolGateDialog inherits Scrim {
     }
 
     DialogPanel {
-        width: min(parent.width - 16px, 780px);
-        height: parent.height - 16px;
+        width: min(parent.width - 2 * Theme.dialog-inset, 780px);
+        height: parent.height - 2 * Theme.dialog-inset;
         x: (parent.width - self.width) / 2;
-        y: 8px;
+        y: Theme.dialog-inset;
 
         HorizontalLayout {
             padding: Theme.dialog-padding;
@@ -603,8 +615,8 @@ export component ToolGateDialog inherits Scrim {
                 }
                 choice-list := ScrollList {
                     vertical-stretch: 1;
-                    property <length> row-step: 52px + 4px;
-                    content-height: Printer.mmu-gates.length * self.row-step - 4px;
+                    property <length> row-step: Theme.row-height-small + Theme.spacing-small;
+                    content-height: Printer.mmu-gates.length * self.row-step - Theme.spacing-small;
                     for gate[index] in Printer.mmu-gates: GateChoice {
                         y: index * choice-list.row-step;
                         width: choice-list.row-width;

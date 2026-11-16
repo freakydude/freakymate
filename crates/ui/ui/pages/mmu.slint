@@ -1,10 +1,10 @@
-// Gates tab of the Filament page: the gates and the bypass (five slots at a time), the filament path with sensors and
+// Gates tab of the Filament page: the gates and the bypass (four or five slots at a time), the filament path with sensors and
 // buffer, unload of the loaded filament; a tap on a gate or the bypass opens what can be done with it
 // (`mmu-dialogs.slint`).
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, MmuDialogs, MmuGateItem, MmuGatePage, MmuPageRange, Navigation, Printer } from "../state.slint";
+import { Actions, MmuDialogs, MmuGateItem, MmuGatePage, MmuPageRange, Navigation, Printer, Severity } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
 import { ButtonKind, Card, IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
 import { FilamentColors, FilamentSwatch } from "../components/filament-swatch.slint";
@@ -33,9 +33,11 @@ component MmuRecoverRow inherits HorizontalLayout {
 // moves anything. Loading belongs to a gate (its dialog); unloading takes out whatever is loaded, so it sits at the
 // filament path. The tools and the commands for the MMU as a whole are on the Changer page.
 export component MmuGatesTab inherits Rectangle {
+    // Height of the row of gate tiles and the page arrows.
+    property <length> tile-row-height: 150px;
     // The head whose gates the tab shows, a row of `Printer.heads`; -1 without a head level (all gates).
     in property <int> head-index: -1;
-    // The pages of this view: one unit at a time, five tiles at most (the split is made in the core, `gate_pages.rs`).
+    // The pages of this view: one unit at a time, four or five tiles at most (the split is made in the core, `gate_pages.rs`).
     property <MmuPageRange> range: Printer.mmu-page-ranges[max(0, root.head-index)];
     property <int> pages: root.range.count;
     // Until a chevron is used the tab opens on the unit of the loaded gate.
@@ -43,7 +45,9 @@ export component MmuGatesTab inherits Rectangle {
     property <MmuGatePage> current: Printer.mmu-pages[root.range.first + root.page];
     // With several units a caption names the unit, its head and the gates; one unit or none has no caption.
     property <bool> captioned: root.current.unit != "";
-    property <int> slots-per-page: 5;
+    // Tiles (the bypass included) across the tab: with arrows beside them four, so the longest state word ("Available",
+    // "Unknown") fits its tile beside the icon; without arrows (one page) five. The core pages by the same numbers.
+    property <int> slots-per-page: root.pages > 1 ? 4 : 5;
     property <bool> needs-recovery: Printer.mmu-paused || Printer.mmu-locked;
 
     VerticalLayout {
@@ -71,7 +75,7 @@ export component MmuGatesTab inherits Rectangle {
         HorizontalLayout {
             // The arrows stay in the row (no `if`), so the stretch of the tiles keeps its place; one page takes none.
             spacing: root.pages > 1 ? Theme.spacing : 0px;
-            height: 150px;
+            height: root.tile-row-height;
             IconButton {
                 visible: root.pages > 1;
                 min-width: root.pages > 1 ? Theme.touch : 0px;
@@ -165,7 +169,7 @@ export component MmuGatesTab inherits Rectangle {
                     IconButton {
                         icon: Icons.mmu-unload;
                         text: @tr("Unload");
-                        enabled: Printer.mmu-filament != "unloaded";
+                        enabled: !Printer.motion-locked && Printer.mmu-filament != "unloaded";
                         clicked => { Actions.mmu-unload(); }
                     }
                     // Accent only while the MMU is not homed (most commands need it); a homed one has no main action here.
@@ -173,7 +177,16 @@ export component MmuGatesTab inherits Rectangle {
                         icon: Icons.mmu-home;
                         text: @tr("Home");
                         kind: Printer.mmu-homed ? ButtonKind.normal : ButtonKind.accent;
+                        enabled: !Printer.motion-locked;
                         clicked => { Actions.mmu-home(); }
+                    }
+                    // Moving the filament waits for the end of the print.
+                    if Printer.motion-locked: Text {
+                        text: @tr("Not while printing");
+                        color: Theme.muted;
+                        font-size: Theme.font-small;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
                     }
                     Rectangle { vertical-stretch: 1; }
                 }
@@ -188,12 +201,14 @@ export component MmuGatesTab inherits Rectangle {
 export component MmuStrip inherits Rectangle {
     background: Theme.surface;
     border-radius: Theme.radius;
+    property <bool> recovering: Printer.print-state == "paused" && (Printer.mmu-paused || Printer.mmu-locked);
     // Room left over goes evenly between the lines, not to one of them.
     VerticalLayout {
         padding: Theme.padding;
         spacing: Theme.spacing-medium;
         alignment: space-between;
-        HorizontalLayout {
+        // While a paused print waits for Recover or Unlock the line is left out: the banner's hint names the gate.
+        if !root.recovering: HorizontalLayout {
             spacing: Theme.spacing;
             Image {
                 cross-axis-self-alignment: center;
@@ -215,14 +230,13 @@ export component MmuStrip inherits Rectangle {
                 cross-axis-self-alignment: center;
                 width: 34px;
                 height: 12px;
-                radius: 6px;
                 colors: FilamentColors.generic(Printer.spool-colors);
             }
             if Printer.has-spool: TextWithValue {
                 alignment: end;
                 text: Printer.spool-title;
                 value: Printer.spool-weight;
-                color: Printer.spool-low ? Theme.warning : Theme.muted;
+                color: Printer.spool-low ? StateIcons.severity-color(Severity.attention) : Theme.muted;
             }
         }
         // Where the filament is, while it is on its way: once loaded the line would only repeat itself.

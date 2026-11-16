@@ -18,7 +18,7 @@ component InterruptionBanner inherits Rectangle {
     in property <string> details;
     // Where the print stands, beside the title.
     in property <string> position;
-    property <color> tone: root.failed ? Theme.danger : Theme.warning;
+    property <color> tone: root.failed ? StateIcons.severity-color(Severity.error) : StateIcons.severity-color(Severity.attention);
     background: Theme.surface;
     border-radius: Theme.radius;
     border-width: 1px;
@@ -69,7 +69,8 @@ component InterruptionBanner inherits Rectangle {
 
 // A tall button of the action column beside the job.
 component ActionTile inherits IconButton {
-    height: 96px;
+    property <length> tile-height: 96px;
+    height: root.tile-height;
 }
 
 // A figure under the progress bar: what it is (a word or an icon), small, and its value. The value stays whole; the
@@ -130,6 +131,13 @@ component ProgressCard inherits Rectangle {
                 vertical-alignment: center;
             }
             Rectangle { horizontal-stretch: 1; }
+            // How the job ended, in a word beside its icon; the figures row below keeps its room.
+            if root.finished: Text {
+                text: root.state == "complete" ? @tr("Finished") : root.state == "cancelled" ? @tr("Cancelled") : @tr("Failed");
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                vertical-alignment: center;
+            }
             Image {
                 cross-axis-self-alignment: center;
                 width: Theme.icon-large;
@@ -157,12 +165,6 @@ component ProgressCard inherits Rectangle {
             ProgressDetail { icon: Icons.filament-spool; value: Printer.filament; }
             Rectangle { horizontal-stretch: 1; }
             if root.state == "printing": ProgressDetail { label: @tr("ETA"); value: Printer.eta; }
-            if root.finished: Text {
-                text: root.state == "complete" ? @tr("Finished") : root.state == "cancelled" ? @tr("Cancelled") : @tr("Failed");
-                color: Theme.muted;
-                font-size: Theme.font-small;
-                vertical-alignment: center;
-            }
         }
     }
 }
@@ -292,10 +294,12 @@ component RecentFileTile inherits Rectangle {
 // The newest files, offered while there is no job; as wide as four tiles, fewer files leave room on the right.
 // Placed by hand, not in a layout: the tile width follows the width the page gives, which a layout would ask back.
 component RecentFiles inherits Rectangle {
+    // Name (two lines) and time below the square preview of a tile.
+    property <length> caption-height: 64px;
     property <length> tile-width: (self.width - 3 * Theme.spacing) / 4;
 
     // The square preview plus name (two lines) and time, as the tile's layout stacks them.
-    height: root.tile-width + 64px;
+    height: root.tile-width + root.caption-height;
     for file[index] in Printer.recent-files: RecentFileTile {
         x: index * (root.tile-width + Theme.spacing);
         y: 0;

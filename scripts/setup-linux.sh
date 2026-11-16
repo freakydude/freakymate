@@ -40,10 +40,11 @@ if command -v rustup > /dev/null; then
 fi
 
 slint=$(awk -F'"' '/^name = "slint"$/ { getline; print $2; exit }' "$root/Cargo.lock")
-if command -v slint-viewer > /dev/null; then
-    echo "ok      slint-viewer $(slint-viewer --version 2>/dev/null | head -1)"
+viewer=$(command -v slint-viewer || echo "$HOME/.local/bin/slint-viewer")
+if [[ -x $viewer && $("$viewer" --version 2>/dev/null) == "slint-viewer $slint" ]]; then
+    echo "ok      slint-viewer $slint"
 else
-    echo "slint-viewer $slint missing, installing into ~/.local (several minutes)..."
+    echo "slint-viewer $slint missing or other version, installing into ~/.local (several minutes)..."
     if cargo install slint-viewer --version "$slint" --locked --root "$HOME/.local"; then
         echo "ok      slint-viewer $slint in ~/.local/bin"
     else

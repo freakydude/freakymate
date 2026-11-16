@@ -3,10 +3,10 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { StateIcons } from "../state-icons.slint";
-import { Actions, FanItem, HeaterItem, HeatTab, Navigation, Printer, SensorItem, UiSettings } from "../state.slint";
+import { Actions, FanItem, HeaterItem, HeatTab, Navigation, Printer, SensorItem, UiSettings, Severity } from "../state.slint";
 import { TemperatureScale } from "../components/temperature-scale.slint";
 import { NumberEntryDialog } from "../components/entry-dialogs.slint";
-import { ButtonKind, IconButton, IconLabel, ProgressBar, ScrollList, StepSelector, TabBar, TabButton, TouchSlider } from "../components/controls.slint";
+import { ButtonKind, IconButton, IconLabel, ProgressBar, ScrollList, StepSelector, TabBar, TabButton, TextWithValue, TouchSlider } from "../components/controls.slint";
 
 component HeaterRow inherits Rectangle {
     in property <HeaterItem> heater;
@@ -55,7 +55,7 @@ component HeaterRow inherits Rectangle {
                     icon: root.compact ? Icons.filament-spool : Icons.ui-warning;
                     icon-size: Theme.icon-compact;
                     text: root.compact ? root.heater.spool-hint : @tr("Spool {}", root.heater.spool-hint);
-                    color: Theme.warning;
+                    color: StateIcons.severity-color(Severity.attention);
                     font-size: Theme.font-small;
                 }
                 if root.heater.has-history: Image {
@@ -151,7 +151,7 @@ component FanRow inherits Rectangle {
             cross-axis-self-alignment: center;
             // A fan that does not turn although it should is an error: its icon and its speeds turn red.
             source: root.fan.stalled ? Icons.state-error : Icons.thermal-fan;
-            colorize: root.fan.stalled ? Theme.danger : root.fan.speed > 0 ? Theme.accent : Theme.muted;
+            colorize: root.fan.stalled ? StateIcons.severity-color(Severity.error) : root.fan.speed > 0 ? Theme.accent : Theme.muted;
             width: Theme.icon;
             height: Theme.icon;
         }
@@ -159,18 +159,18 @@ component FanRow inherits Rectangle {
             alignment: center;
             width: 170px;
             Text { text: root.fan.label; color: Theme.muted; font-size: Theme.font-small; overflow: elide; }
-            Text {
-                text: round(fan-slider.shown) + " %" + (root.fan.rpm == "" ? "" : "  ·  " + root.fan.rpm);
-                color: root.fan.stalled ? Theme.danger : Theme.foreground;
+            TextWithValue {
+                text: round(fan-slider.shown) + " %";
+                value: root.fan.rpm;
+                separator: "  ·  ";
+                color: root.fan.stalled ? StateIcons.severity-color(Severity.error) : Theme.foreground;
                 font-size: Theme.font-normal;
                 font-weight: 600;
-                overflow: elide;
             }
         }
         if root.fan.controllable: IconButton {
             width: Theme.button-narrow;
             text: @tr("Off");
-            checked: root.fan.speed < 1;
             clicked => { Actions.set-fan(root.fan.object, 0); }
         }
         fan-slider := TouchSlider {
@@ -183,7 +183,6 @@ component FanRow inherits Rectangle {
         if root.fan.controllable: IconButton {
             width: Theme.button-narrow;
             text: "100%";
-            checked: root.fan.speed > 99;
             clicked => { Actions.set-fan(root.fan.object, 100); }
         }
         // Klipper switches heater and controller fans itself: only how fast they run.

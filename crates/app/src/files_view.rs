@@ -58,7 +58,6 @@ impl FileState {
             chamber_temperature: facts.chamber_temperature.into(),
             thumbnail: thumbnail.cloned().unwrap_or_default(),
             has_thumbnail: thumbnail.is_some(),
-            show_thumbnail: thumbnail.is_some() || info.thumbnail_expected(),
             marked: self.marked.contains(&file.path),
         }
     }

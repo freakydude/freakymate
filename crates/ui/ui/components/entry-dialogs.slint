@@ -1,8 +1,9 @@
 // Dialogs for entering text and numbers.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Dialogs } from "../state.slint";
+import { Actions, Dialogs, Severity } from "../state.slint";
 import { IconButton, IconLabel } from "controls.slint";
 import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
 import { NumericKeypad, OnScreenKeyboard } from "keyboard.slint";
@@ -50,10 +51,10 @@ export component TextEntryDialog inherits Scrim {
         }
 
         DialogPanel {
-            x: 8px;
-            y: 8px;
-            width: parent.width - 16px;
-            height: parent.height - 16px;
+            x: Theme.dialog-inset;
+            y: Theme.dialog-inset;
+            width: parent.width - 2 * Theme.dialog-inset;
+            height: parent.height - 2 * Theme.dialog-inset;
 
             VerticalLayout {
                 padding: Theme.dialog-padding;
@@ -86,7 +87,6 @@ export component TextEntryDialog inherits Scrim {
                             x: 8px + min(0px, max(parent.width - 16px - self.width - self.text-cursor-width, self.computed-x));
                             width: max(parent.width - 16px - self.text-cursor-width, self.preferred-width);
                             height: 100%;
-                            single-line: true;
                             vertical-alignment: center;
                             text <=> root.text;
                             color: Theme.foreground;
@@ -174,9 +174,9 @@ export component NumberEntryDialog inherits Scrim {
 
         DialogPanel {
             width: 380px;
-            height: parent.height - 16px;
+            height: parent.height - 2 * Theme.dialog-inset;
             x: (parent.width - self.width) / 2;
-            y: 8px;
+            y: Theme.dialog-inset;
 
             VerticalLayout {
                 padding: Theme.dialog-padding;
@@ -199,7 +199,6 @@ export component NumberEntryDialog inherits Scrim {
                         spacing: Theme.spacing-medium;
                         field := TextInput {
                             horizontal-stretch: 1;
-                            single-line: true;
                             horizontal-alignment: right;
                             vertical-alignment: center;
                             text <=> root.text;
@@ -232,7 +231,7 @@ export component NumberEntryDialog inherits Scrim {
                     icon: Icons.ui-warning;
                     icon-size: Theme.icon-compact;
                     text: root.hint;
-                    color: Theme.warning;
+                    color: StateIcons.severity-color(Severity.attention);
                     font-size: Theme.font-small;
                 }
                 NumericKeypad {

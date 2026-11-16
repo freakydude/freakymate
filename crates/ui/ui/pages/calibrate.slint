@@ -18,13 +18,12 @@ component ActionButton inherits IconButton {
 // Icon above the text: two of them fit side by side in a card.
 component CardButton inherits IconButton {
     height: Theme.touch;
-    horizontal-stretch: 1;
 }
 
 component ScrewRow inherits HorizontalLayout {
     in property <ScrewItem> screw;
     spacing: Theme.spacing;
-    height: 30px;
+    height: 32px;
     Text {
         horizontal-stretch: 1;
         text: root.screw.name;

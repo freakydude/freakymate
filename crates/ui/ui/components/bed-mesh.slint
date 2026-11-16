@@ -132,9 +132,9 @@ export component BedMeshDialog inherits Scrim {
 
     DialogPanel {
         width: 2 * Theme.dialog-padding + 2 * Theme.spacing + max(root.map-height * root.aspect, 260px) + MeshLayout.legend-width;
-        height: parent.height - 16px;
+        height: parent.height - 2 * Theme.dialog-inset;
         x: (parent.width - self.width) / 2;
-        y: 8px;
+        y: Theme.dialog-inset;
         VerticalLayout {
             padding: Theme.dialog-padding;
             spacing: Theme.spacing;
@@ -181,9 +181,9 @@ export component BedMeshProfilesDialog inherits Scrim {
 
     DialogPanel {
         width: 440px;
-        height: parent.height - 16px;
+        height: parent.height - 2 * Theme.dialog-inset;
         x: (parent.width - self.width) / 2;
-        y: 8px;
+        y: Theme.dialog-inset;
         VerticalLayout {
             padding: Theme.dialog-padding;
             spacing: Theme.spacing;

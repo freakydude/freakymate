@@ -12,20 +12,24 @@ export component HistoryPreview inherits AppWindow {
         Navigation.history-open = true;
         Printer.history-title = "Nozzle";
         Printer.history-current = "214.6 °C";
-        Printer.history-temperature-path = "M 0 900 L 150 700 L 300 300 L 450 120 L 600 80 L 800 90 L 1000 85";
-        Printer.history-target-path = "M 0 80 L 1000 80";
-        Printer.history-power-path = "M 0 950 L 200 600 L 400 800 L 600 900 L 800 880 L 1000 890";
-        Printer.history-grid-path = "M 0 0 L 1000 0 M 0 333 L 1000 333 M 0 666 L 1000 666 M 0 1000 L 1000 1000";
+        // The paths are as wide as the plot area is (aspect about 2.3, 1000 high).
+        // Scale 0..220 °C: round steps of 50, as `chart.rs` makes them; the share is counted from the top.
+        Printer.history-temperature-path = "M 0 886 L 340 700 L 690 300 L 1030 100 L 1370 40 L 1830 30 L 2290 27";
+        Printer.history-target-path = "M 0 23 L 2290 23";
+        Printer.history-power-path = "M 0 950 L 460 600 L 920 800 L 1370 900 L 1830 880 L 2290 890";
+        Printer.history-grid-path = "M 0 90.9 L 2290 90.9 M 0 318.2 L 2290 318.2 M 0 545.5 L 2290 545.5 M 0 772.7 L 2290 772.7 M 0 1000 L 2290 1000";
         Printer.history-temperature-labels = [
-            { text: "220", position: 0 },
-            { text: "147", position: 0.333 },
-            { text: "73", position: 0.666 },
-            { text: "0", position: 1 },
+            { text: "200 °C", position: 0.091 },
+            { text: "150 °C", position: 0.318 },
+            { text: "100 °C", position: 0.545 },
+            { text: "50 °C", position: 0.773 },
+            { text: "0 °C", position: 1 },
         ];
+        // Marks every five minutes of the 20 minutes the history keeps.
         Printer.history-time-labels = [
-            { text: "-10 min", position: 0 },
-            { text: "-5 min", position: 0.5 },
-            { text: "now", position: 1 },
+            { text: "−15 min", position: 0.25 },
+            { text: "−10 min", position: 0.5 },
+            { text: "−5 min", position: 0.75 },
         ];
     }
 }

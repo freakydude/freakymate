@@ -1,0 +1,5 @@
+{
+    "$schema": "https://slint.dev/slint-project.schema.json",
+    "edition": "1.19",
+    "main": "app.slint"
+}

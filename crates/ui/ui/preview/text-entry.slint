@@ -7,14 +7,23 @@ import { Navigation, Page } from "../state.slint";
 import { Sample } from "sample.slint";
 
 export component TextEntryPreview inherits AppWindow {
-    TextEntryDialog {
-        open: true;
-        title: "Password";
-        secret: true;
-        text: "hunter2";
+    // The dialog covers the content area of the page that opens it (right of the navigation rail of 76 px, below the
+    // status bar of 44 px).
+    Rectangle {
+        x: 76px;
+        y: 44px;
+        width: parent.width - self.x;
+        height: parent.height - self.y;
+        TextEntryDialog {
+            open: true;
+            title: "Password";
+            secret: true;
+            text: "hunter2";
+        }
     }
 
     init => {
+        Sample.ready-printer();
         Sample.managed-network();
         Navigation.page = Page.network;
     }

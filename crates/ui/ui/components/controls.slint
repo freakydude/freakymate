@@ -1,6 +1,8 @@
 // Basic building blocks for touch input: buttons, step selection, cards, progress.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
+import { Severity } from "../structs.slint";
 
 // Small explanatory text in the muted colour.
 export component Note inherits Text {
@@ -37,10 +39,15 @@ export component IconButton inherits Rectangle {
 
     min-width: Theme.touch;
     min-height: Theme.touch;
+    // A button fills the room it gets: buttons of a row start from the size of their content and share the rest.
+    // Without this the content (icon, text: stretch 0) would keep the button at its content size.
+    horizontal-stretch: 1;
+    vertical-stretch: 1;
     border-radius: Theme.radius;
-    background: !root.enabled ? Theme.surface : touch.pressed ? root.pressed : root.base;
+    // A disabled button keeps its tile (on a card as well as on the page); only its content turns grey.
+    background: !root.enabled ? Theme.surface-raised : touch.pressed ? root.pressed : root.base;
     border-width: root.marked && root.kind == ButtonKind.normal ? 2px : 0px;
-    border-color: root.checked ? Theme.accent : Theme.success;
+    border-color: root.checked ? Theme.accent : StateIcons.severity-color(Severity.fine);
     accessible-role: button;
     accessible-label: root.text;
 
@@ -55,11 +62,13 @@ export component IconButton inherits Rectangle {
         padding: Theme.spacing-small;
         spacing: Theme.spacing-tight;
         alignment: center;
+        // Fixed only along the column: a fixed width would cap the width of the column and so of the button.
+        // `contain` draws the icon at its size, centred.
         if root.has-icon: Image {
-            cross-axis-self-alignment: center;
             source: root.icon;
             colorize: root.content;
-            width: root.icon-size;
+            image-fit: contain;
+            min-width: root.icon-size;
             height: root.icon-size;
         }
         if root.text != "": Text {
@@ -73,16 +82,17 @@ export component IconButton inherits Rectangle {
     }
 
     if root.horizontal: HorizontalLayout {
-        padding-left: root.align-start ? 12px : 10px;
+        padding-left: root.align-start ? Theme.spacing-large : Theme.spacing;
         padding-right: Theme.padding;
         spacing: Theme.spacing;
         alignment: root.align-start ? LayoutAlignment.start : LayoutAlignment.center;
+        // Fixed only along the row, so the icon does not cap the height of the button (see above).
         if root.has-icon: Image {
-            cross-axis-self-alignment: center;
             source: root.icon;
             colorize: root.content;
+            image-fit: contain;
             width: root.icon-size;
-            height: root.icon-size;
+            min-height: root.icon-size;
         }
         if root.text != "": Text {
             text: root.text;
@@ -156,10 +166,11 @@ export component ToggleRow inherits Rectangle {
     }
 }
 
-// Panel of a flyout over the page: slightly see-through, with an outline and a shadow so its edge stands out. The
-// software renderer draws no shadows, so the outline alone must carry it there. Taps inside stay inside.
+// Panel of a flyout over the page: slightly see-through and blurred behind (FemtoVG; the software renderer shows the
+// page sharp), with an outline and a shadow so its edge stands out. Taps inside stay inside.
 export component FlyoutPanel inherits Rectangle {
     background: Theme.surface.with-alpha(Theme.flyout-opacity);
+    backdrop-blur: Theme.glass-blur;
     border-radius: Theme.radius;
     border-width: 1px;
     border-color: Theme.flyout-border;
@@ -295,7 +306,7 @@ export component TabButton inherits Rectangle {
         width: 8px;
         height: 8px;
         border-radius: 4px;
-        background: Theme.warning;
+        background: StateIcons.severity-color(Severity.attention);
     }
 
     Rectangle {
@@ -310,6 +321,9 @@ export component TabButton inherits Rectangle {
 export component TabBar inherits Rectangle {
     // Pages whose layout has no padding of its own (Move, Tune, Thermal, Filament) keep the gap here.
     in property <length> inset: Theme.padding;
+    // Tabs keep their width at the start of the row; a row that also holds a hint or a chip sets `stretch` and lets
+    // one child fill the rest.
+    in property <LayoutAlignment> alignment: start;
     height: Theme.touch + root.inset;
 
     Rectangle {
@@ -323,7 +337,7 @@ export component TabBar inherits Rectangle {
         padding-right: root.inset;
         padding-top: root.inset;
         spacing: Theme.spacing;
-        alignment: start;
+        alignment: root.alignment;
         @children
     }
 }
@@ -429,7 +443,6 @@ export component ValueTile inherits Rectangle {
         if root.enabled-action && root.action-icon.width > 0: VerticalLayout {
             alignment: center;
             Image {
-                horizontal-alignment: center;
                 source: root.action-icon;
                 colorize: root.action-note != "" ? Theme.accent : Theme.muted;
                 width: Theme.icon-small;
@@ -663,8 +676,6 @@ export component SliderRow inherits Rectangle {
     in property <color> icon-color;
     in property <string> label;
     in property <string> value-text;
-    in property <bool> off-checked;
-    in property <bool> full-checked;
     in property <float> value;
     in property <float> minimum: 0;
     out property <float> shown: slider.shown;
@@ -700,7 +711,6 @@ export component SliderRow inherits Rectangle {
         IconButton {
             width: Theme.button-narrow;
             text: @tr("Off");
-            checked: root.off-checked;
             clicked => { root.off-clicked(); }
         }
         slider := TouchSlider {
@@ -713,7 +723,6 @@ export component SliderRow inherits Rectangle {
         IconButton {
             width: Theme.button-narrow;
             text: "100%";
-            checked: root.full-checked;
             clicked => { root.full-clicked(); }
         }
     }

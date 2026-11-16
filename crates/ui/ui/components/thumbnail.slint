@@ -1,7 +1,6 @@
-// Preview image of a G-code file, with a placeholder icon while there is none.
+// Preview image of a G-code file, with a quiet greyscale logo as placeholder while there is none.
 
 import { Theme } from "../theme.slint";
-import { Icons } from "../icons.slint";
 
 export component Thumbnail inherits Rectangle {
     in property <image> source;
@@ -16,10 +15,13 @@ export component Thumbnail inherits Rectangle {
         source: root.source;
         image-fit: contain;
     }
+    // About half of the tile, centred; the greys sit close to the tile so real previews stand out.
     if !root.available: Image {
-        source: Icons.file-gcode;
-        colorize: Theme.disabled-foreground;
-        width: parent.width / 3;
-        height: parent.width / 3;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        source: @image-url("../../../../assets/logo/freakymate-placeholder.svg");
+        width: min(parent.width, parent.height) / 2;
+        height: self.width;
+        image-fit: contain;
     }
 }

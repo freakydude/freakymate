@@ -1,13 +1,12 @@
 // Preview: console with sent commands (tappable, orange) and responses. Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
-import { ConsolePage } from "../pages/console.slint";
 import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
 
 export component ConsolePreview inherits AppWindow {
-    ConsolePage { }
-
     init => {
+        Sample.ready-printer();
         Navigation.page = Page.console;
         Printer.console = [
             { text: "G28", time: "11:30:12", is-command: true, is-error: false },

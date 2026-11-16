@@ -85,7 +85,7 @@ export component GateTile inherits SlotTile {
     property <bool> shows-spool: Printer.has-spoolman && root.has-filament;
     property <string> material: root.gate.material == "" ? "-" : root.gate.material;
     // Long materials (PEEK-CF, PA6-GF30) step down instead of being cut.
-    property <length> material-size: root.material.character-count <= 5 ? 19px : root.material.character-count <= 7 ? 16px : 14px;
+    property <length> material-size: root.material.character-count <= 5 ? Theme.font-tool : root.material.character-count <= 7 ? Theme.font-normal : Theme.font-label;
 
     selected: root.gate.selected;
     label: root.gate.title;
@@ -122,7 +122,7 @@ export component GateTile inherits SlotTile {
                 Text {
                     horizontal-stretch: 1;
                     text: root.gate.tools;
-                    color: Theme.accent;
+                    color: Theme.foreground;
                     font-size: Theme.font-small;
                     font-weight: 700;
                     horizontal-alignment: right;
@@ -151,7 +151,6 @@ export component GateTile inherits SlotTile {
                 font-size: Theme.font-small;
                 wrap: word-wrap;
                 overflow: elide;
-                vertical-alignment: top;
             }
             Text {
                 visible: root.shows-spool;
@@ -208,8 +207,10 @@ export component BypassTile inherits SlotTile {
     }
 }
 
-// The scale of the buffer: tension at the left, compression at the right. The marker is the bias, the lighter ends
-// the zones from where a proportional sensor counts as extreme, the stroke in the middle neutral, the stroke at the left the tension from which tangle prevention raises the gear current, and the
+// The scale of the buffer: tension at the left, compression at the right. The marker is the bias, the lighter part
+// between the two thresholds the zone around neutral, in which a proportional sensor does not count as extreme (the ends
+// beyond them keep the darker side colour), the stroke in the middle neutral, the stroke at the left the tension from
+// which tangle prevention raises the gear current, and the
 // strip growing from an end FlowGuard's level: how close it is to a tangle (left) or a clog (right) trigger. A side
 // that no sensor measures (a one-sided switch buffer) is an outline only; FlowGuard still infers it.
 component BufferScale inherits Rectangle {
@@ -246,16 +247,11 @@ component BufferScale inherits Rectangle {
         border-radius: Theme.radius-small;
         background: Theme.border;
     }
-    // The ends from where the sensor counts as extreme (FlowGuard's trigger zones), lighter than the sides.
-    if root.has-extreme-threshold && root.sides != "compression": Rectangle {
-        x: 0;
-        width: root.place(-root.extreme-threshold);
-        border-radius: Theme.radius-small;
-        background: Theme.flyout-border;
-    }
-    if root.has-extreme-threshold && root.sides != "tension": Rectangle {
-        x: root.place(root.extreme-threshold);
-        width: parent.width - self.x;
+    // The zone between the sensor's extreme thresholds (around neutral), lighter than the sides; the ends beyond them
+    // keep the side colour. A one-sided buffer shades only its measured half.
+    if root.has-extreme-threshold: Rectangle {
+        x: root.sides == "compression" ? parent.width / 2 : root.place(-root.extreme-threshold);
+        width: (root.sides == "tension" ? parent.width / 2 : root.place(root.extreme-threshold)) - self.x;
         border-radius: Theme.radius-small;
         background: Theme.flyout-border;
     }
@@ -337,7 +333,8 @@ export component FlowGuardInstrument inherits VerticalLayout {
             icon: root.guarded ? Icons.mmu-flowguard : Icons.mmu-sync;
             text: root.statement;
             color: root.tone;
-            font-size: Theme.font-small;
+            // A deviation is read from further away: one step larger than the calm line.
+            font-size: Printer.mmu-flowguard-line == Severity.attention || Printer.mmu-flowguard-line == Severity.error ? Theme.font-normal : Theme.font-small;
         }
         if Printer.mmu-encoder-headroom != "": IconLabel {
             horizontal-stretch: 0;

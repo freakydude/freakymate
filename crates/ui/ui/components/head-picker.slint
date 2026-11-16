@@ -88,7 +88,7 @@ component HeadRow inherits Rectangle {
                 x: 0px;
                 y: (state-cell.height - self.height) / 2;
                 source: Icons.ui-check;
-                colorize: StateIcons.severity-color(Severity.fine);
+                colorize: StateIcons.severity-color(Severity.neutral);
                 width: Theme.icon-compact;
                 height: Theme.icon-compact;
             }
@@ -147,11 +147,11 @@ export component HeadPicker inherits Scrim {
     }
 
     DialogPanel {
-        width: min(parent.width - 16px, 680px);
+        width: min(parent.width - 2 * Theme.dialog-inset, 680px);
         // The header, the list and the room around them; from about six rows the list scrolls.
-        height: min(parent.height - 16px, 2 * Theme.dialog-padding + Theme.touch + Theme.spacing + root.list-height);
+        height: min(parent.height - 2 * Theme.dialog-inset, 2 * Theme.dialog-padding + Theme.touch + Theme.spacing + root.list-height);
         x: (parent.width - self.width) / 2;
-        y: 8px;
+        y: Theme.dialog-inset;
 
         TouchArea { }
 

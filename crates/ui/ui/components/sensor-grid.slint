@@ -20,7 +20,7 @@ export component FilamentSensorGrid inherits Rectangle {
         height: root.row-height;
         icon: !sensor.enabled ? Icons.ui-minus : sensor.detected ? Icons.ui-check : Icons.filament-runout;
         text: sensor.label;
-        color: !sensor.enabled ? Theme.muted : StateIcons.ok-color(sensor.detected, StateIcons.severity-color(Severity.attention));
+        color: !sensor.enabled ? Theme.muted : sensor.detected ? Theme.foreground : StateIcons.severity-color(Severity.attention);
         font-size: Theme.font-small;
     }
 }

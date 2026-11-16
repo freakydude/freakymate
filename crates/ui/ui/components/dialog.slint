@@ -3,6 +3,8 @@
 // cross in their header; the buttons at the bottom are only for actions (Frank, 2026-10-27).
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
+import { Severity } from "../structs.slint";
 import { Icons } from "../icons.slint";
 import { IconButton } from "controls.slint";
 
@@ -17,10 +19,11 @@ export component Scrim inherits Rectangle {
 // Surface with an outline, red for dangerous actions.
 export component DialogPanel inherits Rectangle {
     in property <bool> danger;
-    background: Theme.surface;
+    background: Theme.surface.with-alpha(Theme.dialog-opacity);
+    backdrop-blur: Theme.glass-blur;
     border-radius: Theme.radius;
     border-width: 1px;
-    border-color: root.danger ? Theme.danger : Theme.border;
+    border-color: root.danger ? StateIcons.severity-color(Severity.error) : Theme.border;
 }
 
 export component DialogTitle inherits Text {

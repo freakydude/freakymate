@@ -19,4 +19,4 @@ doctest = false
 slint = { workspace = true, features = ["std", "compat-1-2"] }
 
 [build-dependencies]
-slint-build = "1.18.1"
+slint-build = "1.19.0"

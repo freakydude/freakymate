@@ -2,14 +2,24 @@
 // Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
+import { Theme } from "../theme.slint";
 import { ConsolePage } from "../pages/console.slint";
 import { Navigation, Page, Printer } from "../state.slint";
 import { Sample } from "sample.slint";
 
 export component ConsoleMacrosEditPreview inherits AppWindow {
-    ConsolePage {
-        macros-open: true;
-        macros-editing: true;
+    // The macro panel is state of the page itself, so this page covers the content area (right of the navigation
+    // rail of 76 px, below the status bar of 44 px) over the one the window shows for `Page.console`.
+    Rectangle {
+        x: 76px;
+        y: 44px;
+        width: parent.width - self.x;
+        height: parent.height - self.y;
+        background: Theme.background;
+        ConsolePage {
+            macros-open: true;
+            macros-editing: true;
+        }
     }
 
     init => {

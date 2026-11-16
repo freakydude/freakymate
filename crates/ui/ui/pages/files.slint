@@ -26,13 +26,11 @@ component FileRow inherits Rectangle {
     in property <string> chamber-temperature;
     in property <image> thumbnail;
     in property <bool> has-thumbnail;
-    in property <bool> show-thumbnail;
     // Marked for preparing (a single one) or deleting.
     in property <bool> selected;
     // The job of the print page.
     in property <bool> prepared;
     callback clicked;
-    height: 72px;
     border-radius: Theme.radius;
     background: root.selected ? Theme.surface-active : row-touch.pressed ? Theme.surface-raised : Theme.surface;
     border-width: root.selected ? 2px : 0px;
@@ -43,9 +41,10 @@ component FileRow inherits Rectangle {
     }
     HorizontalLayout {
         padding: Theme.spacing-small;
-        padding-left: root.show-thumbnail ? 4px : 14px;
+        padding-left: 4px;
         spacing: Theme.spacing;
-        if root.show-thumbnail: Thumbnail {
+        // The slot is always there: a file without a preview shows the placeholder.
+        Thumbnail {
             width: 64px;
             source: root.thumbnail;
             available: root.has-thumbnail;
@@ -116,7 +115,8 @@ component FileRow inherits Rectangle {
 
 // File list over the print page; scroll by swiping or with the bar at the right edge.
 export component FileBrowser inherits Rectangle {
-    property <length> row-step: 76px;
+    property <length> row-height: 72px;
+    property <length> row-step: root.row-height + Theme.spacing-small;
     property <bool> print-running: Printer.is-printing;
     background: Theme.background;
     visible: Navigation.files-open;
@@ -140,6 +140,7 @@ export component FileBrowser inherits Rectangle {
             content-height: Printer.files.length * root.row-step;
             for file[index] in Printer.files: FileRow {
                 y: index * root.row-step;
+                height: root.row-height;
                 width: list.row-width;
                 name: file.name;
                 modified: file.modified;
@@ -152,7 +153,6 @@ export component FileBrowser inherits Rectangle {
                 chamber-temperature: file.chamber-temperature;
                 thumbnail: file.thumbnail;
                 has-thumbnail: file.has-thumbnail;
-                show-thumbnail: file.show-thumbnail;
                 selected: file.marked;
                 prepared: file.path == Printer.prepared-path;
                 clicked => { Actions.toggle-file-mark(file.path); }
@@ -184,7 +184,6 @@ export component FileBrowser inherits Rectangle {
                 icon: Icons.print-prepare;
                 text: @tr("Prepare");
                 kind: ButtonKind.accent;
-                vertical-stretch: 1;
                 enabled: Printer.marked-file-path != "";
                 clicked => {
                     Actions.prepare-file(Printer.marked-file-path);
