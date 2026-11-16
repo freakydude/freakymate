@@ -9,7 +9,6 @@ import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
 component ChartLine inherits Path {
     viewbox-width: 1000 * Navigation.history-aspect;
     viewbox-height: 1000;
-    fill: transparent;
     stroke-width: 2px;
 }
 
@@ -25,10 +24,10 @@ export component HistoryDialog inherits Scrim {
     visible: Navigation.history-open;
 
     DialogPanel {
-        x: 8px;
-        y: 8px;
-        width: parent.width - 16px;
-        height: parent.height - 16px;
+        x: Theme.dialog-inset;
+        y: Theme.dialog-inset;
+        width: parent.width - 2 * Theme.dialog-inset;
+        height: parent.height - 2 * Theme.dialog-inset;
     VerticalLayout {
         padding: Theme.dialog-padding;
         spacing: Theme.spacing;
@@ -52,7 +51,7 @@ export component HistoryDialog inherits Scrim {
                 width: 56px;
                 for label in Printer.history-temperature-labels: Text {
                     x: 0;
-                    y: 8px + (parent.height - 16px) * label.position - 8px;
+                    y: Theme.dialog-inset + (parent.height - 2 * Theme.dialog-inset) * label.position - 8px;
                     width: parent.width;
                     height: 16px;
                     text: label.text;
@@ -64,44 +63,44 @@ export component HistoryDialog inherits Scrim {
             }
             chart := Rectangle {
                 horizontal-stretch: 1;
-                init => { Navigation.history-aspect = (self.width - 16px) / max(1px, self.height - 16px); }
-                changed width => { Navigation.history-aspect = (self.width - 16px) / max(1px, self.height - 16px); }
-                changed height => { Navigation.history-aspect = (self.width - 16px) / max(1px, self.height - 16px); }
+                init => { Navigation.history-aspect = (self.width - 2 * Theme.dialog-inset) / max(1px, self.height - 2 * Theme.dialog-inset); }
+                changed width => { Navigation.history-aspect = (self.width - 2 * Theme.dialog-inset) / max(1px, self.height - 2 * Theme.dialog-inset); }
+                changed height => { Navigation.history-aspect = (self.width - 2 * Theme.dialog-inset) / max(1px, self.height - 2 * Theme.dialog-inset); }
                 background: Theme.surface;
                 border-radius: Theme.radius;
                 border-width: 1px;
                 border-color: Theme.border;
                 clip: true;
                 ChartLine {
-                    x: 8px;
-                    y: 8px;
-                    width: parent.width - 16px;
-                    height: parent.height - 16px;
+                    x: Theme.dialog-inset;
+                    y: Theme.dialog-inset;
+                    width: parent.width - 2 * Theme.dialog-inset;
+                    height: parent.height - 2 * Theme.dialog-inset;
                     commands: Printer.history-grid-path;
                     stroke: Theme.border;
                     stroke-width: 1px;
                 }
                 ChartLine {
-                    x: 8px;
-                    y: 8px;
-                    width: parent.width - 16px;
-                    height: parent.height - 16px;
+                    x: Theme.dialog-inset;
+                    y: Theme.dialog-inset;
+                    width: parent.width - 2 * Theme.dialog-inset;
+                    height: parent.height - 2 * Theme.dialog-inset;
                     commands: Printer.history-power-path;
                     stroke: Theme.chart-secondary;
                 }
                 ChartLine {
-                    x: 8px;
-                    y: 8px;
-                    width: parent.width - 16px;
-                    height: parent.height - 16px;
+                    x: Theme.dialog-inset;
+                    y: Theme.dialog-inset;
+                    width: parent.width - 2 * Theme.dialog-inset;
+                    height: parent.height - 2 * Theme.dialog-inset;
                     commands: Printer.history-target-path;
                     stroke: Theme.muted;
                 }
                 ChartLine {
-                    x: 8px;
-                    y: 8px;
-                    width: parent.width - 16px;
-                    height: parent.height - 16px;
+                    x: Theme.dialog-inset;
+                    y: Theme.dialog-inset;
+                    width: parent.width - 2 * Theme.dialog-inset;
+                    height: parent.height - 2 * Theme.dialog-inset;
                     commands: Printer.history-temperature-path;
                     stroke: Theme.accent;
                     stroke-width: 3px;
@@ -121,7 +120,7 @@ export component HistoryDialog inherits Scrim {
             Rectangle {
                 horizontal-stretch: 1;
                 for label in Printer.history-time-labels: Text {
-                    x: 8px + (parent.width - 16px) * label.position - 30px;
+                    x: Theme.dialog-inset + (parent.width - 2 * Theme.dialog-inset) * label.position - self.width / 2;
                     width: 60px;
                     text: label.text;
                     color: Theme.muted;

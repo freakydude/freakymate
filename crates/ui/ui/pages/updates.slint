@@ -1,12 +1,15 @@
 // Updates of the printer host through Moonraker's update manager; a tab of the system pages.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Printer, UiSettings } from "../state.slint";
+import { Actions, Confirm, Printer, UiSettings, Severity } from "../state.slint";
 import { Card, IconButton, IconLabel, ScrollList } from "../components/controls.slint";
 import { SystemTabs } from "../components/system-tabs.slint";
 
 export component UpdatesPage inherits Rectangle {
+    property <length> row-height: 48px;
+
     init => { Actions.refresh-system(); }
 
     VerticalLayout {
@@ -21,25 +24,25 @@ export component UpdatesPage inherits Rectangle {
             if UiSettings.setup-command != "": IconLabel {
                 icon: Icons.ui-warning;
                 text: @tr("Finish the last update: run {} once on the printer host.", UiSettings.setup-command);
-                color: Theme.warning;
+                color: StateIcons.severity-color(Severity.attention);
                 font-size: Theme.font-small;
                 icon-size: Theme.icon-compact;
             }
             update-list := ScrollList {
-                property <length> row-pitch: 54px;
+                property <length> row-pitch: root.row-height + Theme.spacing-medium;
                 vertical-stretch: 1;
                 content-height: Printer.updates.length * self.row-pitch;
                 for update[index] in Printer.updates: HorizontalLayout {
                     y: index * update-list.row-pitch;
                     width: update-list.row-width;
-                    height: 48px;
+                    height: root.row-height;
                     spacing: Theme.spacing;
                     VerticalLayout {
                         horizontal-stretch: 1;
                         alignment: center;
                         Text { text: update.label; color: Theme.foreground; font-size: Theme.font-normal; overflow: elide; }
-                        if update.up-to-date: IconLabel { icon: Icons.ui-check; text: update.detail; color: Theme.success; font-size: Theme.font-small; icon-size: Theme.icon-compact; }
-                        if !update.up-to-date: Text { text: update.detail; color: update.has-update ? Theme.warning : Theme.muted; font-size: Theme.font-small; overflow: elide; }
+                        if update.up-to-date: IconLabel { icon: Icons.ui-check; text: update.detail; color: Theme.muted; font-size: Theme.font-small; icon-size: Theme.icon-compact; }
+                        if !update.up-to-date: Text { text: update.detail; color: update.has-update ? StateIcons.severity-color(Severity.attention) : Theme.muted; font-size: Theme.font-small; overflow: elide; }
                     }
                     IconButton {
                         width: 128px;
@@ -63,7 +66,7 @@ export component UpdatesPage inherits Rectangle {
                     horizontal-stretch: 1;
                     icon: Icons.ui-lock;
                     text: @tr("Locked while updating");
-                    color: Theme.warning;
+                    color: StateIcons.severity-color(Severity.attention);
                     font-size: Theme.font-small;
                 }
                 IconButton {

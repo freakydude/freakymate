@@ -1,0 +1,24 @@
+// Preview: print page with Happy Hare and a one-sided buffer (only tension is measured): the zone around neutral is
+// shaded on the measured half only. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer, Severity } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintMmuBufferOneSidedPreview inherits AppWindow {
+    init => {
+        Sample.mmu();
+        Sample.printing();
+        Navigation.page = Page.print;
+        Printer.mmu-gate = 2;
+        Printer.mmu-tool = 2;
+        Printer.mmu-filament = "loaded";
+        Printer.mmu-buffer-state = "neutral";
+        Printer.mmu-buffer-bias = -0.2;
+        Printer.mmu-buffer-sides = "tension";
+        Printer.mmu-flowguard-state = "monitoring";
+        Printer.mmu-buffer-marker = Severity.neutral;
+        Printer.mmu-has-extreme-threshold = true;
+        Printer.mmu-extreme-threshold = 0.6;
+    }
+}

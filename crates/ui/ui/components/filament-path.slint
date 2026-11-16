@@ -65,7 +65,11 @@ component PathPart inherits VerticalLayout {
             colorize: root.part.active ? Theme.foreground : root.large ? Theme.muted : Theme.disabled-foreground;
         }
     }
+    // A station keeps its whole name, so neighbours stay `Theme.spacing` apart (the spacing of the row). The name of
+    // the bowden, a section between stations, gives way when its piece is too short for it.
     if root.labelled: Text {
+        min-width: root.kind == PathPartKind.bowden ? 0px : self.preferred-width;
+        visible: root.kind != PathPartKind.bowden || root.width >= self.preferred-width + Theme.spacing;
         text: root.label;
         color: Theme.muted;
         font-size: Theme.font-small;
@@ -92,7 +96,8 @@ export component FilamentPath inherits HorizontalLayout {
         longitudinal: root.path.colors.longitudinal,
     };
 
-    spacing: Theme.spacing-small;
+    // Names need room between the pieces; the line of the print page has none.
+    spacing: root.compact ? Theme.spacing-small : Theme.spacing;
 
     // Direction of movement at the left: the gate pushes or pulls.
     VerticalLayout {

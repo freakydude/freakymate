@@ -1,0 +1,23 @@
+// Preview: print page after a cancelled job. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintCancelledPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Printer.print-state = "cancelled";
+        Printer.filename = "benchy.gcode";
+        Printer.job-name = "benchy";
+        Printer.progress = 0.37;
+        Printer.elapsed = "1:52:03";
+        Printer.remaining = "-";
+        Printer.eta = "-";
+        Printer.ended = "14:21";
+        Printer.layers = "74 / 200";
+        Printer.print-heights = "40.0 mm";
+        Printer.filament = "5.20 m";
+        Navigation.page = Page.print;
+    }
+}

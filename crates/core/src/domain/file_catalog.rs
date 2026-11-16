@@ -19,13 +19,6 @@ pub struct FileInfo<'a> {
     pub spool: Option<&'a Spool>,
 }
 
-impl FileInfo<'_> {
-    /// A file whose metadata is not loaded yet may still come with a thumbnail; one whose metadata lists none will not.
-    pub fn thumbnail_expected(&self) -> bool {
-        self.metadata.is_none_or(|metadata| metadata.thumbnail_path().is_some())
-    }
-}
-
 /// The file list together with what arrives later for its files: metadata, the last completed prints and their
 /// spools. The data comes from separate queries; this joins them and decides which files still need details.
 #[derive(Debug, Clone, Default)]
@@ -106,7 +99,6 @@ impl FileCatalog {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sources::moonraker_server::files::Thumbnail;
 
     fn entry(path: &str) -> FileEntry {
         FileEntry { path: path.to_owned(), modified: 1.0, size: 10 }
@@ -184,23 +176,5 @@ mod tests {
 
         assert!(catalog.metadata("running.gcode").is_some());
         assert!(catalog.needing_details().is_empty());
-    }
-
-    #[test]
-    fn a_thumbnail_is_expected_until_the_metadata_says_there_is_none() {
-        let mut catalog = FileCatalog::default();
-        let with = FileMetadata {
-            filename: "with.gcode".into(),
-            thumbnails: vec![Thumbnail { width: 32, height: 32, relative_path: "t.png".into() }],
-            ..FileMetadata::default()
-        };
-        catalog.set_entries(vec![entry("unknown.gcode"), entry("with.gcode"), entry("without.gcode")]);
-        catalog.store_metadata(with);
-        catalog.store_metadata(metadata("without.gcode"));
-
-        let expected: Vec<bool> =
-            catalog.entries().iter().map(|entry| catalog.info(entry).thumbnail_expected()).collect();
-
-        assert_eq!(expected, [true, true, false]);
     }
 }

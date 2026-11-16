@@ -2,8 +2,9 @@
 // On a tool changer the strip shows the spool of the head that is looked at (`head`).
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
 import { Icons } from "../icons.slint";
-import { HeadItem, Printer, SpoolPicker } from "../state.slint";
+import { HeadItem, Printer, SpoolPicker, Severity } from "../state.slint";
 import { TextWithValue } from "controls.slint";
 import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
 
@@ -31,6 +32,9 @@ export component SpoolStrip inherits Rectangle {
             height: 34px;
             radius: 4px;
             colors: FilamentColors.generic(root.for-head ? root.head.spool-colors : Printer.spool-colors);
+            // Without a spool the same empty swatch as an empty gate: a dashed outline, no colour.
+            empty: !root.has-spool;
+            gap-color: Theme.surface;
         }
         VerticalLayout {
             alignment: center;
@@ -47,7 +51,7 @@ export component SpoolStrip inherits Rectangle {
             if root.has-spool: TextWithValue {
                 text: root.for-head ? root.head.spool-material : Printer.spool-material;
                 value: root.for-head ? root.head.spool-weight : Printer.spool-weight;
-                color: (root.for-head ? root.head.spool-low : Printer.spool-low) ? Theme.warning : Theme.muted;
+                color: (root.for-head ? root.head.spool-low : Printer.spool-low) ? StateIcons.severity-color(Severity.attention) : Theme.muted;
             }
         }
         Image {

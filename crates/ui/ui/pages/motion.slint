@@ -77,9 +77,9 @@ component AxesTab inherits Rectangle {
                     VerticalLayout {
                         spacing: Theme.spacing;
                         vertical-stretch: 1;
-                        IconButton { icon: Icons.motion-z-plus; text: "Z+"; vertical-stretch: 1; enabled: Printer.homed-z; clicked => { Actions.jog("z", root.step); } }
-                        IconButton { icon: Icons.motion-home-z; text: @tr("Home Z"); vertical-stretch: 1; enabled: !Printer.position-locked; done: Printer.homed-z; clicked => { Actions.home(false, false, true); } }
-                        IconButton { icon: Icons.motion-z-minus; text: "Z-"; vertical-stretch: 1; enabled: Printer.homed-z; clicked => { Actions.jog("z", -root.step); } }
+                        IconButton { icon: Icons.motion-z-plus; text: "Z+"; enabled: Printer.homed-z; clicked => { Actions.jog("z", root.step); } }
+                        IconButton { icon: Icons.motion-home-z; text: @tr("Home Z"); enabled: !Printer.position-locked; done: Printer.homed-z; clicked => { Actions.home(false, false, true); } }
+                        IconButton { icon: Icons.motion-z-minus; text: "Z-"; enabled: Printer.homed-z; clicked => { Actions.jog("z", -root.step); } }
                     }
                 }
             }
@@ -108,7 +108,6 @@ component AxesTab inherits Rectangle {
                 text: @tr("Home all");
                 horizontal: true;
                 align-start: true;
-                vertical-stretch: 1;
                 enabled: !Printer.position-locked;
                 done: Printer.homed-xy && Printer.homed-z;
                 clicked => { Actions.home(true, true, true); }
@@ -118,7 +117,6 @@ component AxesTab inherits Rectangle {
                 text: Printer.can-quad-gantry-level ? @tr("QGL") : @tr("Z tilt");
                 horizontal: true;
                 align-start: true;
-                vertical-stretch: 1;
                 enabled: !Printer.position-locked;
                 done: Printer.leveling-state == "applied";
                 clicked => { Actions.level(); }
@@ -128,7 +126,6 @@ component AxesTab inherits Rectangle {
                 text: @tr("Motors off");
                 horizontal: true;
                 align-start: true;
-                vertical-stretch: 1;
                 enabled: !Printer.position-locked;
                 clicked => { Confirm.ask(@tr("Motors off"), @tr("The axes lose their reference and must be homed again."), "disable-motors", "", false); }
             }

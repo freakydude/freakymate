@@ -21,16 +21,17 @@ export component FilamentMmuEightPreview inherits AppWindow {
             { title: "Gate 7", index: 7, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T7", selected: false },
         ];
         Printer.mmu-pages = [
-            { first-row: 0, count: 5, bypass: false, unit: "", head: "", first-gate: 0, last-gate: 4 },
-            { first-row: 5, count: 3, bypass: true, unit: "", head: "", first-gate: 5, last-gate: 7 },
+            { first-row: 0, count: 4, bypass: false, unit: "", head: "", first-gate: 0, last-gate: 3 },
+            { first-row: 4, count: 4, bypass: false, unit: "", head: "", first-gate: 4, last-gate: 7 },
+            { first-row: 8, count: 0, bypass: true, unit: "", head: "", first-gate: -1, last-gate: -1 },
         ];
-        Printer.mmu-page-ranges = [{ first: 0, count: 2, start: 0 }];
+        Printer.mmu-page-ranges = [{ first: 0, count: 3, start: 1 }];
         Printer.mmu-filament = "loaded";
         Printer.mmu-action = "Loading";
         Printer.mmu-buffer-state = "neutral";
         Printer.mmu-buffer-bias = 0.05;
         Printer.mmu-flowguard-state = "monitoring";
-        Printer.mmu-buffer-marker = Severity.fine;
+        Printer.mmu-buffer-marker = Severity.neutral;
         Printer.mmu-has-flow-rate = true;
         Printer.mmu-flow-rate = 98;
     }

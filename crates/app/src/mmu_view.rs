@@ -230,7 +230,7 @@ impl MmuView {
         let mut ranges = Vec::new();
         for head in views {
             let bypass = status.happy_hare().map_or(BypassAt::Nowhere, |mmu| bypass_at(mmu, &tiles, head));
-            let view = gate_pages::gate_pages(&tiles, head, bypass, loaded, SLOTS_PER_PAGE);
+            let view = paged_gates(&tiles, head, bypass, loaded);
             ranges.push(MmuPageRange {
                 first: pages.len() as i32,
                 count: view.pages.len() as i32,
@@ -375,8 +375,19 @@ fn buffer_word(side: BufferSide) -> &'static str {
 /// Names the piece of the load path while no gate is selected.
 const NO_GATE_LABEL: &str = "No gate";
 
-/// Tiles on a page of the Gates tab, the bypass included.
-const SLOTS_PER_PAGE: usize = 5;
+/// Tiles on a page of the Gates tab, the bypass included: all on one page up to this many.
+const SLOTS_ON_ONE_PAGE: usize = 5;
+/// Tiles per page once there are several pages: the arrows take room, and a narrower tile would cut its state word.
+const SLOTS_PER_PAGE_WITH_ARROWS: usize = 4;
+
+/// The gates of a head (or all) on pages: one page while they fit, otherwise fewer per page beside the arrows.
+fn paged_gates(tiles: &[Lane], head: Option<&str>, bypass: BypassAt, loaded: Option<usize>) -> gate_pages::GatePages {
+    let single = gate_pages::gate_pages(tiles, head, bypass, loaded, SLOTS_ON_ONE_PAGE);
+    if single.pages.len() <= 1 {
+        return single;
+    }
+    gate_pages::gate_pages(tiles, head, bypass, loaded, SLOTS_PER_PAGE_WITH_ARROWS)
+}
 
 /// The caption names the head by its label (`T1`), not by its section.
 fn page_item(page: &GatePage, heads: &[HeadRow]) -> MmuGatePage {
@@ -539,6 +550,19 @@ mod tests {
             }),
             ..PrinterStatus::default()
         }
+    }
+
+    fn tiles_per_page(gates: usize) -> Vec<usize> {
+        let tiles: Vec<Lane> = (0..gates).map(|gate| tile(&format!("lane{gate}"), false)).collect();
+        let view = paged_gates(&tiles, None, BypassAt::LastUnit, None);
+        view.pages.iter().map(|page| page.count + usize::from(page.bypass)).collect()
+    }
+
+    #[test]
+    fn gates_stay_on_one_page_while_five_tiles_fit_and_go_four_per_page_beside_the_arrows() {
+        assert_eq!(tiles_per_page(4), [5]);
+        assert!(tiles_per_page(8).iter().all(|&tiles| tiles <= SLOTS_PER_PAGE_WITH_ARROWS));
+        assert_eq!(tiles_per_page(8).iter().sum::<usize>(), 9);
     }
 
     #[test]

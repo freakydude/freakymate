@@ -2,9 +2,10 @@
 // nothing here keeps the print from starting.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
 import { ToolLabel } from "../components/tool-label.slint";
 import { Icons } from "../icons.slint";
-import { ChangerTab, MmuDialogs, ToolMatchItem, Navigation, Page, Printer, SpoolPicker } from "../state.slint";
+import { ChangerTab, MmuDialogs, ToolMatchItem, Navigation, Page, Printer, SpoolPicker, Severity } from "../state.slint";
 import { Card, ScrollList, ValueTile } from "../components/controls.slint";
 import { VerdictIcon } from "../components/mmu-tiles.slint";
 import { FilamentColors, FilamentSwatch, FilamentText } from "../components/filament-swatch.slint";
@@ -44,7 +45,7 @@ component ToolChip inherits Rectangle {
         }
         Text {
             text: "T" + root.mapping.tool;
-            color: Theme.accent;
+            color: Theme.foreground;
             font-size: Theme.font-normal;
             font-weight: 700;
             vertical-alignment: center;
@@ -53,7 +54,7 @@ component ToolChip inherits Rectangle {
         Text {
             horizontal-stretch: 1;
             text: root.mapping.wanted-material;
-            color: root.mapping.material-differs ? Theme.warning : Theme.foreground;
+            color: root.mapping.material-differs ? StateIcons.severity-color(Severity.attention) : Theme.foreground;
             font-size: Theme.font-small;
             vertical-alignment: center;
             overflow: elide;
@@ -125,7 +126,7 @@ component ToolMatchCard inherits Card {
         Text {
             horizontal-stretch: 1;
             text: Printer.mmu-match-summary;
-            color: Printer.mmu-match-verdict == "differs" ? Theme.warning : Theme.foreground;
+            color: Printer.mmu-match-verdict == "differs" ? StateIcons.severity-color(Severity.attention) : Theme.foreground;
             font-size: Theme.font-normal;
             font-weight: 600;
             vertical-alignment: center;
@@ -181,7 +182,7 @@ component ExtruderMatchCard inherits Card {
 
     HorizontalLayout {
         spacing: Theme.spacing-medium;
-        height: 56px;
+        height: Theme.touch;
         ToolLabel {
             width: 40px;
             tool: root.first.tool;
@@ -228,7 +229,7 @@ component ExtruderMatchCard inherits Card {
                 horizontal-stretch: 1;
                 material: Printer.has-spool ? (Printer.spool-material != "" ? Printer.spool-material : "-") : @tr("No spool");
                 material-elide: !Printer.has-spool;
-                material-color: !Printer.has-spool ? Theme.muted : root.first.material-differs ? Theme.warning : Theme.foreground;
+                material-color: !Printer.has-spool ? Theme.muted : root.first.material-differs ? StateIcons.severity-color(Severity.attention) : Theme.foreground;
                 name: Printer.has-spool ? Printer.spool-title : "";
                 trail: Printer.has-spool ? Printer.spool-weight : "";
                 trail-warn: Printer.has-spool && root.first.weight-differs;
@@ -244,7 +245,7 @@ component ExtruderMatchCard inherits Card {
         Text {
             horizontal-stretch: 1;
             text: root.first.verdict == "fits" ? @tr("The spool fits the file") : @tr("The spool differs from the file");
-            color: root.first.verdict == "fits" ? Theme.foreground : Theme.warning;
+            color: root.first.verdict == "fits" ? Theme.foreground : StateIcons.severity-color(Severity.attention);
             font-size: Theme.font-small;
             wrap: word-wrap;
         }

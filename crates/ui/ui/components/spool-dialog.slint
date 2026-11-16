@@ -1,8 +1,9 @@
 // Spool picker.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Printer, SpoolPicker } from "../state.slint";
+import { Actions, Printer, SpoolPicker, Severity } from "../state.slint";
 import { ButtonKind, IconButton, IconLabel, ScrollList, TextWithValue } from "controls.slint";
 import { FilamentColors, FilamentSwatch } from "filament-swatch.slint";
 import { NumberEntryDialog } from "entry-dialogs.slint";
@@ -19,10 +20,10 @@ export component SpoolDialog inherits Scrim {
     }
 
     DialogPanel {
-        x: 8px;
-        y: 8px;
-        width: parent.width - 16px;
-        height: parent.height - 16px;
+        x: Theme.dialog-inset;
+        y: Theme.dialog-inset;
+        width: parent.width - 2 * Theme.dialog-inset;
+        height: parent.height - 2 * Theme.dialog-inset;
 
         VerticalLayout {
             padding: Theme.dialog-padding;
@@ -33,7 +34,7 @@ export component SpoolDialog inherits Scrim {
                 if Printer.spoolman-offline: IconLabel {
                     icon: Icons.ui-warning;
                     text: Printer.spoolman-pending > 0 ? @tr("Spoolman offline, {} reports waiting", Printer.spoolman-pending) : @tr("Spoolman offline");
-                    color: Theme.warning;
+                    color: StateIcons.severity-color(Severity.attention);
                     font-size: Theme.font-small;
                 }
             }
@@ -73,12 +74,12 @@ export component SpoolDialog inherits Scrim {
                             TextWithValue {
                                 text: spool.material;
                                 value: spool.remaining;
-                                color: spool.low ? Theme.warning : Theme.muted;
+                                color: spool.low ? StateIcons.severity-color(Severity.attention) : Theme.muted;
                             }
                         }
                         Text {
                             text: spool.place;
-                            color: Theme.accent;
+                            color: Theme.foreground;
                             font-size: Theme.font-small;
                             vertical-alignment: center;
                         }

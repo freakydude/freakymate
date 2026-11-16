@@ -21,7 +21,6 @@ export component BedMap inherits Rectangle {
         width: root.width;
         height: root.height;
         commands: Printer.bed-map.grid;
-        fill: transparent;
         stroke: Theme.surface-raised;
         stroke-width: 1px;
     }
@@ -38,7 +37,6 @@ export component BedMap inherits Rectangle {
         width: root.width;
         height: root.height;
         commands: Printer.print-objects[root.selected].outline;
-        fill: transparent;
         stroke: Theme.foreground;
         stroke-width: 3px;
     }
@@ -69,5 +67,5 @@ export component BedMapLegend inherits HorizontalLayout {
     spacing: Theme.spacing-large;
     LegendEntry { fill: Theme.active-fill; stroke: Theme.accent; text: @tr("Printing"); }
     LegendEntry { fill: Theme.surface; stroke: Theme.disabled-foreground; text: @tr("Excluded"); }
-    LegendEntry { fill: transparent; stroke: Theme.foreground; text: @tr("Selected"); }
+    LegendEntry { stroke: Theme.foreground; text: @tr("Selected"); }
 }

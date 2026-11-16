@@ -26,12 +26,12 @@ export component TemperatureScale inherits Rectangle {
         y: root.line-y;
         height: root.line-height;
         border-radius: self.height / 2;
-        background: Theme.surface-active;
+        background: Theme.scale-track;
         clip: true;
         if root.scale.has-window: Rectangle {
             x: root.x-of(root.scale.window-low);
             width: root.x-of(root.scale.window-high) - self.x;
-            background: Theme.muted;
+            background: Theme.foreground;
         }
         if root.scale.has-warning: Rectangle {
             x: root.x-of(root.scale.warning-from);

@@ -410,12 +410,13 @@ pub fn emphasis_severity(emphasis: Emphasis) -> Severity {
     }
 }
 
-/// The marker of the buffer scale: FlowGuard's emphasis while it has one; otherwise the buffer's state (leaning to a
-/// side is the controller at work, not a deviation).
+/// The marker of the buffer scale: FlowGuard's emphasis while it has one; otherwise neutral for a measuring buffer
+/// (neutral is the resting state, leaning to a side is the controller at work, not a deviation).
 pub fn buffer_marker_severity(line: Emphasis, buffer: SyncFeedbackState) -> Severity {
     match (line, buffer) {
-        (Emphasis::Calm, SyncFeedbackState::Neutral) => Severity::Fine,
-        (Emphasis::Calm, SyncFeedbackState::Tension | SyncFeedbackState::Compressed) => Severity::Neutral,
+        (Emphasis::Calm, SyncFeedbackState::Neutral | SyncFeedbackState::Tension | SyncFeedbackState::Compressed) => {
+            Severity::Neutral
+        }
         _ => emphasis_severity(line),
     }
 }
@@ -470,7 +471,7 @@ mod tests {
     #[test]
     fn the_buffer_marker_follows_flowguard_before_the_buffer() {
         assert_eq!(buffer_marker_severity(Emphasis::Error, SyncFeedbackState::Neutral), Severity::Error);
-        assert_eq!(buffer_marker_severity(Emphasis::Calm, SyncFeedbackState::Neutral), Severity::Fine);
+        assert_eq!(buffer_marker_severity(Emphasis::Calm, SyncFeedbackState::Neutral), Severity::Neutral);
         assert_eq!(buffer_marker_severity(Emphasis::Calm, SyncFeedbackState::Tension), Severity::Neutral);
         assert_eq!(buffer_marker_severity(Emphasis::Calm, SyncFeedbackState::Inactive), Severity::Calm);
     }

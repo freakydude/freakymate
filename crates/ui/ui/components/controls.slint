@@ -1,6 +1,8 @@
 // Basic building blocks for touch input: buttons, step selection, cards, progress.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
+import { Severity } from "../structs.slint";
 
 // Small explanatory text in the muted colour.
 export component Note inherits Text {
@@ -42,9 +44,10 @@ export component IconButton inherits Rectangle {
     horizontal-stretch: 1;
     vertical-stretch: 1;
     border-radius: Theme.radius;
-    background: !root.enabled ? Theme.surface : touch.pressed ? root.pressed : root.base;
+    // A disabled button keeps its tile (on a card as well as on the page); only its content turns grey.
+    background: !root.enabled ? Theme.surface-raised : touch.pressed ? root.pressed : root.base;
     border-width: root.marked && root.kind == ButtonKind.normal ? 2px : 0px;
-    border-color: root.checked ? Theme.accent : Theme.success;
+    border-color: root.checked ? Theme.accent : StateIcons.severity-color(Severity.fine);
     accessible-role: button;
     accessible-label: root.text;
 
@@ -79,7 +82,7 @@ export component IconButton inherits Rectangle {
     }
 
     if root.horizontal: HorizontalLayout {
-        padding-left: root.align-start ? 12px : 10px;
+        padding-left: root.align-start ? Theme.spacing-large : Theme.spacing;
         padding-right: Theme.padding;
         spacing: Theme.spacing;
         alignment: root.align-start ? LayoutAlignment.start : LayoutAlignment.center;
@@ -303,7 +306,7 @@ export component TabButton inherits Rectangle {
         width: 8px;
         height: 8px;
         border-radius: 4px;
-        background: Theme.warning;
+        background: StateIcons.severity-color(Severity.attention);
     }
 
     Rectangle {
@@ -440,7 +443,6 @@ export component ValueTile inherits Rectangle {
         if root.enabled-action && root.action-icon.width > 0: VerticalLayout {
             alignment: center;
             Image {
-                horizontal-alignment: center;
                 source: root.action-icon;
                 colorize: root.action-note != "" ? Theme.accent : Theme.muted;
                 width: Theme.icon-small;
@@ -674,8 +676,6 @@ export component SliderRow inherits Rectangle {
     in property <color> icon-color;
     in property <string> label;
     in property <string> value-text;
-    in property <bool> off-checked;
-    in property <bool> full-checked;
     in property <float> value;
     in property <float> minimum: 0;
     out property <float> shown: slider.shown;
@@ -711,7 +711,6 @@ export component SliderRow inherits Rectangle {
         IconButton {
             width: Theme.button-narrow;
             text: @tr("Off");
-            checked: root.off-checked;
             clicked => { root.off-clicked(); }
         }
         slider := TouchSlider {
@@ -724,7 +723,6 @@ export component SliderRow inherits Rectangle {
         IconButton {
             width: Theme.button-narrow;
             text: "100%";
-            checked: root.full-checked;
             clicked => { root.full-clicked(); }
         }
     }

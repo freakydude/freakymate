@@ -18,7 +18,7 @@ component WifiRow inherits Rectangle {
     border-radius: Theme.radius;
     background: row-touch.pressed ? Theme.surface-active : root.network.active ? Theme.surface-active : Theme.surface-raised;
     border-width: root.network.active ? 2px : 0px;
-    border-color: Theme.success;
+    border-color: Theme.foreground;
     accessible-role: button;
     accessible-label: root.network.ssid;
 
@@ -33,7 +33,7 @@ component WifiRow inherits Rectangle {
         Image {
             cross-axis-self-alignment: center;
             source: !root.network.in-range ? Icons.network-wifi-saved : root.network.bars >= 3 ? Icons.system-network : root.network.bars == 2 ? Icons.network-wifi-fair : Icons.network-wifi-weak;
-            colorize: StateIcons.ok-color(root.network.active, root.network.in-range ? Theme.foreground : Theme.muted);
+            colorize: root.network.in-range ? Theme.foreground : Theme.muted;
             width: Theme.icon-large;
             height: Theme.icon-large;
         }
@@ -52,7 +52,7 @@ component WifiRow inherits Rectangle {
                     : !root.network.in-range ? @tr("Saved, not in range")
                     : !root.network.supported ? @tr("Not supported")
                     : root.network.known ? @tr("Saved") : root.network.secured ? @tr("Password needed") : @tr("Open");
-                color: StateIcons.ok-color(root.network.active, Theme.muted);
+                color: Theme.muted;
                 font-size: Theme.font-small;
                 overflow: elide;
             }
@@ -136,7 +136,7 @@ component WifiCard inherits Card {
         separator: " ";
     }
     wifi-list := ScrollList {
-        property <length> row-pitch: Theme.touch + 14px;
+        property <length> row-pitch: Theme.touch + Theme.spacing-large;
         vertical-stretch: 1;
         content-height: Network.networks.length * self.row-pitch;
         for network[index] in Network.networks: WifiRow {
@@ -166,7 +166,7 @@ component WiredCard inherits Card {
             IconLabel {
                 icon: link.cable ? Icons.network-ethernet : Icons.network-ethernet-off;
                 text: link.interface;
-                color: StateIcons.ok-color(link.connected, Theme.foreground);
+                color: Theme.foreground;
             }
             Text {
                 text: !link.cable ? @tr("No cable") : link.connected ? link.address : @tr("Disconnected");

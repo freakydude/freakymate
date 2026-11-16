@@ -2,8 +2,9 @@
 // of the console live here too: which macros the list offers and whether temperature reports are shown.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Printer, UiSettings } from "../state.slint";
+import { Actions, Confirm, Printer, UiSettings, Severity } from "../state.slint";
 import { IconButton, ScrollList, ToggleRow } from "../components/controls.slint";
 import { MacroFormDialog } from "../components/macro-form.slint";
 import { TextEntryDialog } from "../components/entry-dialogs.slint";
@@ -112,7 +113,7 @@ export component ConsolePage inherits Rectangle {
                         }
                         Text {
                             text: (line.is-command ? "> " : "") + line.text;
-                            color: line.is-error ? Theme.danger : line.is-command ? Theme.accent : Theme.foreground;
+                            color: line.is-error ? StateIcons.severity-color(Severity.error) : line.is-command ? Theme.accent : Theme.foreground;
                             font-size: Theme.font-small;
                             font-family: "monospace";
                             vertical-alignment: center;
@@ -121,8 +122,6 @@ export component ConsolePage inherits Rectangle {
                     }
                     // A sent command can be put back into the field: tap it, then Enter runs it again.
                     if line.is-command: TouchArea {
-                        width: parent.width;
-                        height: parent.height;
                         clicked => {
                             root.draft = line.text;
                             entry.open = true;

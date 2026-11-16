@@ -1,8 +1,9 @@
 // Dialogs of the Gates tab: what can be done with one gate (a tap on its tile) and with the bypass.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, MmuDialogs, MmuGateItem, Printer, SpoolPicker } from "../state.slint";
+import { Actions, Confirm, MmuDialogs, MmuGateItem, Printer, SpoolPicker, Severity } from "../state.slint";
 import { IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
 import { FilamentColors, FilamentSwatch } from "../components/filament-swatch.slint";
 import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
@@ -70,10 +71,10 @@ export component GateDialog inherits Scrim {
     }
 
     DialogPanel {
-        width: min(parent.width - 16px, 680px);
+        width: min(parent.width - 2 * Theme.dialog-inset, 680px);
         height: content.preferred-height;
         x: (parent.width - self.width) / 2;
-        y: 8px;
+        y: Theme.dialog-inset;
 
         content := VerticalLayout {
             padding: Theme.dialog-padding;
@@ -110,7 +111,7 @@ export component GateDialog inherits Scrim {
                     TextWithValue {
                         text: root.item.name;
                         value: root.item.spool-text;
-                        color: root.item.spool-low ? Theme.warning : Theme.muted;
+                        color: root.item.spool-low ? StateIcons.severity-color(Severity.attention) : Theme.muted;
                     }
                 }
                 // With Spoolman the tile takes the filament of a spool.
@@ -130,7 +131,7 @@ export component GateDialog inherits Scrim {
                     icon: Icons.mmu-select-gate;
                     text: @tr("Select");
                     // Happy Hare changes the gate only with the filament unloaded.
-                    enabled: !root.item.selected && Printer.mmu-filament != "loaded";
+                    enabled: !Printer.motion-locked && !root.item.selected && Printer.mmu-filament != "loaded";
                     clicked => {
                         Actions.mmu-select-gate(root.item.index);
                         root.close();
@@ -140,7 +141,7 @@ export component GateDialog inherits Scrim {
                 if !root.item.loaded: IconButton {
                     icon: Icons.mmu-load;
                     text: @tr("Load");
-                    enabled: (!Printer.has-mmu || Printer.mmu-filament != "loaded") && root.item.availability != "empty";
+                    enabled: !Printer.motion-locked && (!Printer.has-mmu || Printer.mmu-filament != "loaded") && root.item.availability != "empty";
                     clicked => {
                         Actions.lane-load(MmuDialogs.gate-row);
                         root.close();
@@ -149,6 +150,7 @@ export component GateDialog inherits Scrim {
                 if root.item.loaded: IconButton {
                     icon: Icons.mmu-unload;
                     text: @tr("Unload");
+                    enabled: !Printer.motion-locked;
                     clicked => {
                         Actions.lane-unload(MmuDialogs.gate-row);
                         root.close();
@@ -158,7 +160,7 @@ export component GateDialog inherits Scrim {
                     icon: Icons.mmu-preload;
                     text: @tr("Preload");
                     // Happy Hare refuses to preload while printing.
-                    enabled: Printer.print-state != "printing";
+                    enabled: !Printer.motion-locked;
                     clicked => {
                         Actions.mmu-preload(root.item.index);
                         root.close();
@@ -167,6 +169,7 @@ export component GateDialog inherits Scrim {
                 if Printer.has-mmu: IconButton {
                     icon: Icons.mmu-check-gate;
                     text: @tr("Check");
+                    enabled: !Printer.motion-locked;
                     clicked => {
                         if (root.item.check-unloads-first) {
                             GateCheck.ask(@tr("Check gate {}", root.item.index), "mmu-check-gate", root.item.index);
@@ -179,7 +182,7 @@ export component GateDialog inherits Scrim {
                 IconButton {
                     icon: Icons.mmu-eject;
                     text: @tr("Eject");
-                    enabled: root.item.availability != "empty" && (Printer.has-mmu || Printer.print-state != "printing");
+                    enabled: !Printer.motion-locked && root.item.availability != "empty";
                     // Pulls the filament out of the unit, so it asks first.
                     clicked => {
                         Confirm.ask(@tr("Eject filament"), Printer.has-mmu
@@ -190,10 +193,16 @@ export component GateDialog inherits Scrim {
                 }
             }
 
+            // What moves filament waits for the end of the print; the settings below stay.
+            if Printer.motion-locked: Text {
+                text: @tr("Not while printing");
+                color: Theme.muted;
+                font-size: Theme.font-small;
+            }
+
             if root.sets-filament: HorizontalLayout {
                 spacing: Theme.spacing;
                 for material in GateFilaments.materials: IconButton {
-                    horizontal-stretch: 1;
                     text: material;
                     checked: root.item.material == material;
                     clicked => { Actions.set-lane-material(MmuDialogs.gate-row, material); }
@@ -222,10 +231,10 @@ export component BypassDialog inherits Scrim {
     }
 
     DialogPanel {
-        width: min(parent.width - 16px, 680px);
+        width: min(parent.width - 2 * Theme.dialog-inset, 680px);
         height: content.preferred-height;
         x: (parent.width - self.width) / 2;
-        y: 8px;
+        y: Theme.dialog-inset;
 
         content := VerticalLayout {
             padding: Theme.dialog-padding;
@@ -240,7 +249,12 @@ export component BypassDialog inherits Scrim {
                 font-size: Theme.font-small;
                 wrap: word-wrap;
             }
-            if Printer.mmu-filament == "loaded" && !Printer.mmu-bypass: IconLabel {
+            if Printer.motion-locked: Text {
+                text: @tr("Not while printing");
+                color: Theme.muted;
+                font-size: Theme.font-small;
+            }
+            if !Printer.motion-locked && Printer.mmu-filament == "loaded" && !Printer.mmu-bypass: IconLabel {
                 icon: Icons.ui-info;
                 text: @tr("Unload first: Happy Hare selects the bypass only without loaded filament.");
                 color: Theme.muted;
@@ -252,7 +266,7 @@ export component BypassDialog inherits Scrim {
                 IconButton {
                     icon: Icons.mmu-select-gate;
                     text: @tr("Select");
-                    enabled: !Printer.mmu-bypass && Printer.mmu-filament != "loaded";
+                    enabled: !Printer.motion-locked && !Printer.mmu-bypass && Printer.mmu-filament != "loaded";
                     clicked => {
                         Actions.mmu-select-bypass();
                         root.close();
@@ -261,7 +275,7 @@ export component BypassDialog inherits Scrim {
                 IconButton {
                     icon: Icons.mmu-load;
                     text: @tr("Load");
-                    enabled: Printer.mmu-filament != "loaded";
+                    enabled: !Printer.motion-locked && Printer.mmu-filament != "loaded";
                     clicked => {
                         Actions.mmu-load-bypass();
                         root.close();

@@ -49,15 +49,11 @@ export component AppWindow inherits Window {
     property <bool> motion-locked: Printer.motion-locked;
 
     changed network-visible => { Network.watch(self.network-visible); }
-    // A print that starts (here or elsewhere) while Filament is open must not get its moves, nor an open confirmation of
-    // it: the navigation locks the page, so leave it for the print page. The Motion page stays, showing Tune only, but
-    // a confirmation of the axes (motors off) closes.
+    // A print that starts (here or elsewhere) must not get the moves of an open dialog or confirmation: they close. The
+    // Filament page stays with its moves locked, the Motion page shows Tune only.
     changed motion-locked => {
         if (self.motion-locked && (Navigation.page == Page.filament || Navigation.page == Page.motion)) {
             Dialogs.dismiss();
-        }
-        if (self.motion-locked && Navigation.page == Page.filament) {
-            Navigation.page = Page.print;
         }
     }
     // Without Moonraker or Klipper the dialogs of the printer pages no longer apply; they close like a cancel. The
@@ -116,8 +112,6 @@ export component AppWindow inherits Window {
 
     // Standby: the backlight is off as well; Rust swallows the touches that wake the screen.
     if Backlight.off: Rectangle {
-        width: parent.width;
-        height: parent.height;
         background: black;
         TouchArea { }
     }

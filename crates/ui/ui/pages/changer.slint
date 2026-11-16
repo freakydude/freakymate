@@ -41,7 +41,7 @@ component ToolchangerCard inherits Card {
     icon: Icons.nav-changer;
 
     property <string> status: Printer.changer-status;
-    property <Severity> severity: root.status == "error" ? Severity.error : root.status == "uninitialized" ? Severity.attention : root.status == "ready" ? Severity.fine : Severity.info;
+    property <Severity> severity: root.status == "error" ? Severity.error : root.status == "uninitialized" ? Severity.attention : root.status == "ready" ? Severity.neutral : Severity.info;
     property <string> status-text: root.status == "ready" ? @tr("Ready")
         : root.status == "uninitialized" ? @tr("Not initialized")
         : root.status == "initializing" ? @tr("Initializing")
@@ -78,7 +78,7 @@ component ToolchangerCard inherits Card {
             }
             if Printer.changer-head-detected != "": Text {
                 text: @tr("Detected: {}", Printer.changer-head-detected);
-                color: Printer.changer-head-detected != Printer.changer-head && Printer.changer-head != "" ? Theme.warning : Theme.muted;
+                color: Printer.changer-head-detected != Printer.changer-head && Printer.changer-head != "" ? StateIcons.severity-color(Severity.attention) : Theme.muted;
                 font-size: Theme.font-small;
                 overflow: elide;
             }
@@ -113,7 +113,6 @@ component ToolchangerCard inherits Card {
 
 // The cards of every changer the printer has, in the order MMU, AFC, tool changer.
 component ServiceTab inherits VerticalLayout {
-    spacing: 0px;
     if Printer.has-afc: AfcServiceTab {
         vertical-stretch: 1;
     }

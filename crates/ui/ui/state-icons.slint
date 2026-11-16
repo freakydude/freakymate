@@ -116,7 +116,8 @@ export global StateIcons {
         return Theme.foreground;
     }
 
-    // A state that is in order in the colour of `fine`, anything else in `otherwise` (neutral, or another meaning).
+    // For a RESULT only (something done or measured is fine, e.g. homed), in the colour of `fine`, anything else in
+    // `otherwise`. A resting state that is merely in order stays neutral.
     public pure function ok-color(ok: bool, otherwise: color) -> color {
         return ok ? self.severity-color(Severity.fine) : otherwise;
     }

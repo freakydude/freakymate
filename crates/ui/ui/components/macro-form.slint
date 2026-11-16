@@ -20,10 +20,10 @@ export component MacroFormDialog inherits Scrim {
     }
 
     DialogPanel {
-        x: 8px;
-        y: 8px;
-        width: parent.width - 16px;
-        height: parent.height - 16px;
+        x: Theme.dialog-inset;
+        y: Theme.dialog-inset;
+        width: parent.width - 2 * Theme.dialog-inset;
+        height: parent.height - 2 * Theme.dialog-inset;
 
         VerticalLayout {
             padding: Theme.dialog-padding;
@@ -67,8 +67,8 @@ export component MacroFormDialog inherits Scrim {
                             border-width: 1px;
                             border-color: Theme.border;
                             Text {
-                                x: 10px;
-                                width: parent.width - 20px;
+                                x: Theme.padding;
+                                width: parent.width - 2 * Theme.padding;
                                 text: param.value != "" ? param.value : param.placeholder;
                                 color: param.value != "" ? Theme.foreground : Theme.disabled-foreground;
                                 font-size: Theme.font-normal;
@@ -78,8 +78,6 @@ export component MacroFormDialog inherits Scrim {
                         }
                     }
                     TouchArea {
-                        width: parent.width;
-                        height: parent.height;
                         clicked => {
                             root.edit-index = index;
                             if (param.numeric) {

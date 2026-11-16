@@ -133,7 +133,7 @@ component LaneChoice inherits FilamentLine {
             border-color: Theme.muted;
             tools-text := Text {
                 text: root.tile.tools == "" ? @tr("free") : root.tile.tools;
-                color: root.tile.tools == "" ? Theme.muted : Theme.accent;
+                color: root.tile.tools == "" ? Theme.muted : Theme.foreground;
                 font-size: Theme.font-small;
                 font-weight: root.tile.tools == "" ? 400 : 700;
             }
@@ -151,10 +151,10 @@ export component AfcToolLaneDialog inherits Scrim {
     }
 
     DialogPanel {
-        width: min(parent.width - 16px, 560px);
-        height: parent.height - 16px;
+        width: min(parent.width - 2 * Theme.dialog-inset, 560px);
+        height: parent.height - 2 * Theme.dialog-inset;
         x: (parent.width - self.width) / 2;
-        y: 8px;
+        y: Theme.dialog-inset;
 
         VerticalLayout {
             padding: Theme.dialog-padding;
@@ -165,8 +165,8 @@ export component AfcToolLaneDialog inherits Scrim {
             }
             choice-list := ScrollList {
                 vertical-stretch: 1;
-                property <length> row-step: 52px + 4px;
-                content-height: Printer.mmu-gates.length * self.row-step - 4px;
+                property <length> row-step: Theme.row-height-small + Theme.spacing-small;
+                content-height: Printer.mmu-gates.length * self.row-step - Theme.spacing-small;
                 for tile[index] in Printer.mmu-gates: LaneChoice {
                     y: index * choice-list.row-step;
                     width: choice-list.row-width;

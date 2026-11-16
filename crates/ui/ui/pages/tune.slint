@@ -2,8 +2,9 @@
 // expert tab pressure advance and the motion and extrusion values of the configuration, changed until the next restart.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Printer, TuningItem, UiSettings } from "../state.slint";
+import { Actions, Confirm, Printer, TuningItem, UiSettings, Severity } from "../state.slint";
 import { ButtonKind, Card, IconButton, ScrollList, StepSelector } from "../components/controls.slint";
 
 // Names of the expert values; the core identifies them by id.
@@ -37,12 +38,12 @@ component Adjuster inherits Card {
 
     HorizontalLayout {
         spacing: Theme.spacing;
-        height: 56px;
+        height: Theme.touch;
         IconButton { width: Theme.button-narrow; icon: Icons.ui-minus; clicked => { root.decrease(); } }
         Text {
             horizontal-stretch: 1;
             text: root.value;
-            color: root.highlight ? Theme.warning : Theme.foreground;
+            color: root.highlight ? StateIcons.severity-color(Severity.attention) : Theme.foreground;
             font-size: Theme.font-large;
             font-weight: 600;
             horizontal-alignment: center;
@@ -71,7 +72,7 @@ component TuningRow inherits Rectangle {
                 spacing: Theme.spacing;
                 Text {
                     text: root.item.value;
-                    color: root.item.changed ? Theme.warning : Theme.foreground;
+                    color: root.item.changed ? StateIcons.severity-color(Severity.attention) : Theme.foreground;
                     font-size: Theme.font-large;
                     font-weight: 600;
                 }
@@ -98,7 +99,7 @@ component TuningRow inherits Rectangle {
 
 // The values of the configuration that Klipper can change at runtime; they are back after a restart.
 export component TuneExpertTab inherits Rectangle {
-    property <length> row-step: 64px;
+    property <length> row-step: Theme.touch + Theme.spacing;
 
     list := ScrollList {
         x: Theme.padding;
@@ -117,6 +118,9 @@ export component TuneExpertTab inherits Rectangle {
 // What one corrects while watching a print: the Z offset of the first layer, and the speed and flow of the print.
 // Calibration values (pressure advance, smooth time) and the limits are in the expert tab.
 export component TuneBasicsTab inherits Rectangle {
+    // Height of the row with the zero/probe buttons.
+    property <length> action-row-height: 64px;
+
     VerticalLayout {
         padding: Theme.padding;
         spacing: Theme.spacing;
@@ -146,13 +150,12 @@ export component TuneBasicsTab inherits Rectangle {
                 }
                 StepSelector {
                     values: [0.005, 0.01, 0.025, 0.05, 0.1];
-                    unit: "";
                     selected <=> UiSettings.z-offset-step;
                     changed => { UiSettings.steps-changed(); }
                 }
                 HorizontalLayout {
                     spacing: Theme.spacing;
-                    height: 64px;
+                    height: root.action-row-height;
                     IconButton {
                         icon: Printer.has-probe ? Icons.calibration-probe : Icons.calibration-z-offset;
                         text: @tr("Apply offset");

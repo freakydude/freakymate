@@ -3,13 +3,23 @@
 import { AppWindow } from "../app.slint";
 import { MacroFormDialog } from "../components/macro-form.slint";
 import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
 
 export component MacroFormPreview inherits AppWindow {
-    MacroFormDialog {
-        open: true;
+    // The dialog opens from a tile of the console page and covers its content area (right of the navigation rail
+    // of 76 px, below the status bar of 44 px).
+    Rectangle {
+        x: 76px;
+        y: 44px;
+        width: parent.width - self.x;
+        height: parent.height - self.y;
+        MacroFormDialog {
+            open: true;
+        }
     }
 
     init => {
+        Sample.ready-printer();
         Navigation.page = Page.console;
         Printer.macro-form-name = "PARK";
         Printer.macro-form = [

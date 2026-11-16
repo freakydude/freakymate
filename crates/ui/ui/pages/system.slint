@@ -1,12 +1,16 @@
 // The machine tab of the system pages: Klipper, host and power devices.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Confirm, Navigation, Page, Printer } from "../state.slint";
+import { Actions, Confirm, Navigation, Page, Printer, Severity } from "../state.slint";
 import { Card, IconButton, IconLabel, ToggleRow } from "../components/controls.slint";
 import { SystemTabs } from "../components/system-tabs.slint";
 
 export component SystemPage inherits Rectangle {
+    // Height of a row of action buttons.
+    property <length> action-row-height: 64px;
+
     init => { Actions.refresh-system(); }
 
     VerticalLayout {
@@ -31,7 +35,7 @@ export component SystemPage inherits Rectangle {
                 }
                 HorizontalLayout {
                     spacing: Theme.spacing;
-                    height: 64px;
+                    height: root.action-row-height;
                     IconButton {
                         icon: Icons.system-restart;
                         text: @tr("Reload config");
@@ -51,7 +55,7 @@ export component SystemPage inherits Rectangle {
                 icon: Icons.system-host;
                 HorizontalLayout {
                     spacing: Theme.spacing;
-                    height: 64px;
+                    height: root.action-row-height;
                     IconButton {
                         icon: Icons.system-restart;
                         text: @tr("Reboot");
@@ -68,7 +72,7 @@ export component SystemPage inherits Rectangle {
                 Text { text: @tr("Restart service"); color: Theme.muted; font-size: Theme.font-small; }
                 HorizontalLayout {
                     spacing: Theme.spacing;
-                    height: 64px;
+                    height: root.action-row-height;
                     for service in [{ id: "klipper", name: @tr("Klipper") }, { id: "moonraker", name: @tr("Moonraker") }]: IconButton {
                         text: service.name;
                         icon: Icons.system-restart;
@@ -80,7 +84,7 @@ export component SystemPage inherits Rectangle {
                     icon: Icons.ui-lock;
                     text: Printer.updates-busy ? @tr("Locked while updating")
                         : Printer.is-printing ? @tr("Locked while printing") : @tr("Locked while Klipper is busy");
-                    color: Theme.warning;
+                    color: StateIcons.severity-color(Severity.attention);
                     font-size: Theme.font-small;
                 }
             }

@@ -9,13 +9,20 @@ import { Printer } from "../state.slint";
 import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
 
 export component ConfirmDialog inherits Scrim {
+    // Room left beside the panel (both sides together) and above/below it.
+    property <length> tools-side-margin: 40px;
+    property <length> message-side-margin: 80px;
+    property <length> vertical-margin: 2 * Theme.spacing-large;
+    // Width of the tool number column of FilamentCompareRow; the column titles start behind it.
+    property <length> tool-column-width: 40px;
+
     visible: Confirm.open;
 
     DialogPanel {
-        width: Confirm.tools.length > 0 ? min(parent.width - 40px, 640px) : min(parent.width - 80px, 480px);
+        width: Confirm.tools.length > 0 ? min(parent.width - root.tools-side-margin, 640px) : min(parent.width - root.message-side-margin, 480px);
         // Rows of items take more room than a message, about three rows of tools more still.
         // With tools it grows with their rows (three at most, more scroll), so one tool leaves no empty space.
-        height: min(parent.height - 24px, Confirm.tools.length > 0 ? 250px + min(3, Confirm.tools.length) * tools.row-step : Confirm.items.length > 0 ? 340px : 270px);
+        height: min(parent.height - root.vertical-margin, Confirm.tools.length > 0 ? 250px + min(3, Confirm.tools.length) * tools.row-step : Confirm.items.length > 0 ? 340px : 270px);
         danger: Confirm.danger;
 
         VerticalLayout {
@@ -38,10 +45,10 @@ export component ConfirmDialog inherits Scrim {
             // conditional list here caps the height of the whole window.
             items := ScrollList {
                 property <length> row-height: 44px;
-                property <length> row-step: self.row-height + 6px;
+                property <length> row-step: self.row-height + Theme.spacing-medium;
                 visible: Confirm.items.length > 0;
                 vertical-stretch: Confirm.items.length > 0 ? 1 : 0;
-                content-height: Confirm.items.length * self.row-step - 6px;
+                content-height: Confirm.items.length * self.row-step - Theme.spacing-medium;
                 for item[index] in Confirm.items: Rectangle {
                     y: index * items.row-step;
                     width: items.row-width;
@@ -75,7 +82,7 @@ export component ConfirmDialog inherits Scrim {
 
             // Column titles over the rows of the tools, aligned to FilamentCompareRow (padding, tool number, gaps).
             if Confirm.tools.length > 0: HorizontalLayout {
-                padding-left: 60px;
+                padding-left: Theme.dialog-padding + root.tool-column-width + Theme.spacing;
                 padding-right: Theme.dialog-padding;
                 spacing: Theme.spacing;
                 Text {
@@ -93,10 +100,10 @@ export component ConfirmDialog inherits Scrim {
             }
             // The tools of the file that do not fit, one row each. Always there like the items list above.
             tools := ScrollList {
-                property <length> row-step: 56px + 6px;
+                property <length> row-step: Theme.touch + Theme.spacing-medium;
                 visible: Confirm.tools.length > 0;
                 vertical-stretch: Confirm.tools.length > 0 ? 1 : 0;
-                content-height: Confirm.tools.length * self.row-step - 6px;
+                content-height: Confirm.tools.length * self.row-step - Theme.spacing-medium;
                 for tool[index] in Confirm.tools: FilamentCompareRow {
                     y: index * tools.row-step;
                     width: tools.row-width;

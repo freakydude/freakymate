@@ -14,6 +14,12 @@ export component MmuServiceTab inherits Rectangle {
         padding: Theme.padding;
         spacing: Theme.spacing;
 
+        // Recover and Unlock stay: they are what a paused print needs. The rest moves selector, servo or filament.
+        if Printer.motion-locked: Text {
+            text: @tr("Not while printing");
+            color: Theme.muted;
+            font-size: Theme.font-small;
+        }
         HorizontalLayout {
             spacing: Theme.spacing;
             vertical-stretch: 1;
@@ -22,6 +28,7 @@ export component MmuServiceTab inherits Rectangle {
                 icon: Icons.mmu-home;
                 text: @tr("Home");
                 kind: Printer.mmu-homed ? ButtonKind.normal : ButtonKind.accent;
+                enabled: !Printer.motion-locked;
                 done: Printer.mmu-homed;
                 clicked => { Actions.mmu-home(); }
             }
@@ -43,6 +50,7 @@ export component MmuServiceTab inherits Rectangle {
                 icon-size: root.tile-icon;
                 icon: Icons.motion-steppers-off;
                 text: @tr("Motors off");
+                enabled: !Printer.motion-locked;
                 clicked => {
                     Confirm.ask(@tr("MMU motors off"), @tr("The MMU can be moved by hand; the selector loses its position and must be homed again."), "mmu-motors-off", "", false);
                 }
@@ -57,6 +65,7 @@ export component MmuServiceTab inherits Rectangle {
                 horizontal-stretch: 2;
                 icon: Icons.mmu-check-gate;
                 text: @tr("Check all gates");
+                enabled: !Printer.motion-locked;
                 clicked => {
                     if (Printer.mmu-filament != "unloaded") {
                         GateCheck.ask(@tr("Check all gates"), "mmu-check-all-gates", "");
@@ -67,18 +76,18 @@ export component MmuServiceTab inherits Rectangle {
             }
             if Printer.mmu-servo != "": IconButton {
                 icon-size: root.tile-icon;
-                horizontal-stretch: 1;
                 icon: Icons.mmu-servo-up;
                 text: @tr("Servo up");
                 checked: Printer.mmu-servo == "up";
+                enabled: !Printer.motion-locked;
                 clicked => { Actions.mmu-servo-up(); }
             }
             if Printer.mmu-servo != "": IconButton {
                 icon-size: root.tile-icon;
-                horizontal-stretch: 1;
                 icon: Icons.mmu-servo-down;
                 text: @tr("Servo down");
                 checked: Printer.mmu-servo == "down";
+                enabled: !Printer.motion-locked;
                 clicked => { Actions.mmu-servo-down(); }
             }
         }

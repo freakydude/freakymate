@@ -14,8 +14,6 @@ component LedRow inherits SliderRow {
     label: root.led.label;
     // Moonraker does not know a WLED strip's brightness after a preset; then only "on" is certain.
     value-text: !root.led.on ? @tr("Off") : root.led.level-known ? round(root.shown) + " %" : @tr("On");
-    off-checked: !root.led.on;
-    full-checked: root.led.on && root.led.level > 99;
     value: root.led.level;
     off-clicked => { Actions.set-light(root.led.object, 0); }
     full-clicked => { Actions.set-light(root.led.object, 100); }
@@ -28,7 +26,6 @@ component DisplayRow inherits SliderRow {
     icon-color: Theme.accent;
     label: @tr("Display");
     value-text: round(root.shown) + " %";
-    full-checked: Backlight.brightness > 99;
     minimum: 10;
     value: Backlight.brightness;
     off-clicked => { Backlight.sleep(); }

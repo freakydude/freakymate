@@ -2,6 +2,8 @@
 // for the start dialog. Only facts are shown and what differs is yellow; no sentence and no advice, the person decides.
 
 import { Theme } from "../theme.slint";
+import { StateIcons } from "../state-icons.slint";
+import { Severity } from "../structs.slint";
 import { TextWithValue } from "controls.slint";
 import { ToolLabel } from "tool-label.slint";
 import { ToolMatchItem } from "../structs.slint";
@@ -25,7 +27,7 @@ component CompareCell inherits VerticalLayout {
     Text {
         min-width: 0px;
         text: root.text;
-        color: root.warn ? Theme.warning : root.heading ? Theme.muted : Theme.foreground;
+        color: root.warn ? StateIcons.severity-color(Severity.attention) : root.heading ? Theme.muted : Theme.foreground;
         font-size: root.heading ? Theme.font-small : Theme.font-normal;
         overflow: elide;
     }
@@ -210,7 +212,7 @@ export component FilamentCompareRow inherits Rectangle {
                 Text {
                     // Without MMU a missing tool is a missing command `T<n>` in Klipper, not a missing gate.
                     text: root.no-gate ? (root.with-gates ? @tr("No gate") : @tr("No T{}", root.mapping.tool)) : root.mapping.gate-empty ? @tr("Empty") : root.mapping.loaded-material;
-                    color: !root.has-supply || root.mapping.material-differs ? Theme.warning : Theme.foreground;
+                    color: !root.has-supply || root.mapping.material-differs ? StateIcons.severity-color(Severity.attention) : Theme.foreground;
                     font-size: Theme.font-normal;
                     overflow: elide;
                 }
@@ -218,7 +220,7 @@ export component FilamentCompareRow inherits Rectangle {
                     spacing: Theme.spacing-medium;
                     Text {
                         text: root.mapping.loaded-weight;
-                        color: root.mapping.weight-differs ? Theme.warning : Theme.muted;
+                        color: root.mapping.weight-differs ? StateIcons.severity-color(Severity.attention) : Theme.muted;
                         font-size: Theme.font-small;
                     }
                     Text {

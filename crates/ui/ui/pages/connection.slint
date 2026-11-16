@@ -29,7 +29,7 @@ export component ConnectionPage inherits Rectangle {
                 alignment: start;
                 Image {
                     source: StateIcons.klippy-state(Printer.connection, Printer.klippy-state);
-                    colorize: root.connected && Printer.klippy-state == "startup" ? StateIcons.severity-color(Severity.info) : StateIcons.severity-color(Severity.attention);
+                    colorize: StateIcons.severity-color(root.connected && Printer.klippy-state == "startup" ? Severity.info : root.connected && (Printer.klippy-state == "shutdown" || Printer.klippy-state == "error") ? Severity.error : Severity.attention);
                     width: 72px;
                     height: 72px;
                 }
@@ -55,7 +55,7 @@ export component ConnectionPage inherits Rectangle {
             }
             if root.login-required && Printer.login-error != "": Text {
                 text: Printer.login-error;
-                color: Theme.warning;
+                color: StateIcons.severity-color(Severity.attention);
                 font-size: Theme.font-normal;
                 wrap: word-wrap;
             }

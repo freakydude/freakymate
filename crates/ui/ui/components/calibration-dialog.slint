@@ -28,7 +28,7 @@ export component CalibrationDialog inherits Scrim {
     }
 
     DialogPanel {
-        width: min(parent.width - 16px, 640px);
+        width: min(parent.width - 2 * Theme.dialog-inset, 640px);
         height: content.preferred-height;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
@@ -72,7 +72,6 @@ export component CalibrationDialog inherits Scrim {
             if root.probing: HorizontalLayout {
                 spacing: Theme.spacing;
                 for distance in [-1, -0.1, -0.05, -0.01, 0.01, 0.05, 0.1, 1]: IconButton {
-                    horizontal-stretch: 1;
                     text: (distance > 0 ? "+" : "−") + abs(distance);
                     clicked => { Actions.test-z(distance); }
                 }
@@ -80,7 +79,6 @@ export component CalibrationDialog inherits Scrim {
             if root.probing: HorizontalLayout {
                 spacing: Theme.spacing;
                 IconButton {
-                    horizontal-stretch: 1;
                     horizontal: true;
                     icon: Icons.ui-chevron-down;
                     text: @tr("Halfway down");
@@ -88,7 +86,6 @@ export component CalibrationDialog inherits Scrim {
                     clicked => { Actions.bisect-z(-1); }
                 }
                 IconButton {
-                    horizontal-stretch: 1;
                     horizontal: true;
                     icon: Icons.ui-chevron-up;
                     text: @tr("Halfway up");
@@ -113,7 +110,6 @@ export component CalibrationDialog inherits Scrim {
                 spacing: Theme.spacing;
                 if !root.probing: IconButton {
                     height: Theme.touch;
-                    horizontal-stretch: 1;
                     horizontal: true;
                     icon: Icons.calibration-bed-screws;
                     text: @tr("Adjusted");
@@ -121,7 +117,6 @@ export component CalibrationDialog inherits Scrim {
                 }
                 IconButton {
                     height: Theme.touch;
-                    horizontal-stretch: 1;
                     horizontal: true;
                     icon: Icons.ui-check;
                     text: @tr("Accept");
