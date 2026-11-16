@@ -362,6 +362,17 @@ impl Afc {
                 self.lanes[lane].material = material;
                 Ok(())
             }
+            AfcCommand::SetSpoolTemp { lane, extruder_temp } => {
+                let lane = self.mux_lane(lane.as_deref())?;
+                // `gcmd.get_int('EXTRUDER_TEMP', cur_lane.extruder_temp, minval=0)`: missing keeps the value.
+                if let Some(text) = extruder_temp {
+                    let temp = text.parse::<i64>().ok().filter(|temp| *temp >= 0).ok_or_else(|| {
+                        CommandError::new("Error on 'AFC_SET_SPOOL_TEMP': EXTRUDER_TEMP must be at least 0")
+                    })?;
+                    self.lanes[lane].extruder_temp = Some(temp);
+                }
+                Ok(())
+            }
             AfcCommand::SetMap { lane, map } => self.set_map(lane.as_deref(), map.as_deref()),
             AfcCommand::ResetMapping => {
                 self.reset_mapping();
@@ -852,8 +863,16 @@ impl Afc {
     /// the only place that names the head's Klipper extruder.
     pub fn config_sections(&self) -> Vec<(String, Value)> {
         let mut sections = vec![
-            // `AFC.py` L228: without `auto_home` a tool load on an unhomed printer is refused.
-            ("afc".to_owned(), json!({ "auto_home": false, "enable_sensors_in_gui": true })),
+            // `AFC.py` L228: without `auto_home` a tool load on an unhomed printer is refused. Klipper lists the default
+            // of `default_material_temps` (`AFC.py` L161-162, main 2026-11) as the list `getlists` returns.
+            (
+                "afc".to_owned(),
+                json!({
+                    "auto_home": false,
+                    "enable_sensors_in_gui": true,
+                    "default_material_temps": ["default: 235", "PLA:210", "PETG:235", "ABS:235", "ASA:235"],
+                }),
+            ),
         ];
         match self.layout {
             AfcLayout::BoxTurtle => self.box_turtle_sections(&mut sections),
@@ -996,6 +1015,22 @@ mod tests {
         assert!(afc.change_tool_by_map(3, true).unwrap_err().message().starts_with("Current lane not loaded"));
         assert_eq!(afc.status()["AFC"]["current_load"], "lane2");
         assert_eq!(afc.change_tool_by_map(9, true).unwrap_err().message(), "Unknown command:\"T9\"");
+    }
+
+    #[test]
+    fn set_spool_temp_sets_the_nozzle_temperature_of_the_lane() {
+        let mut afc = box_turtle();
+        let set = |afc: &mut Afc, temp: &str| {
+            afc.apply(
+                AfcCommand::SetSpoolTemp { lane: Some("lane4".into()), extruder_temp: Some(temp.into()) },
+                true,
+                false,
+            )
+        };
+
+        set(&mut afc, "0").unwrap();
+        assert_eq!(lane(&afc, "lane4")["extruder_temp"], 0);
+        assert!(set(&mut afc, "-5").is_err());
     }
 
     #[test]

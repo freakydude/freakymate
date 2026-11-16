@@ -16,7 +16,7 @@ pub use sync_feedback::{
     ORIGIN_ENCODER, ORIGIN_SYNC_FEEDBACK, SyncFeedback, SyncFeedbackState,
 };
 
-use super::fields::{count, flag, integer, section, text};
+use super::fields::{count, flag, integer, number_or, section, text};
 use super::klipper::NOZZLE_HEATER;
 use super::objects::ObjectStore;
 use super::subscription::Subscription;
@@ -97,6 +97,8 @@ pub struct MmuStatus {
     pub endless_spool: bool,
     /// `off`, `readonly`, `push` or `pull`; empty if not reported.
     pub spoolman_support: String,
+    /// Nozzle temperature in °C for a gate without one of its own (`default_extruder_temp` in `[mmu_parameters]`).
+    pub default_extruder_temp: f64,
     pub sensors: Vec<MmuSensor>,
     pub sync_feedback: Option<SyncFeedback>,
     pub flowguard: Option<FlowGuard>,
@@ -288,6 +290,7 @@ pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
         tool_to_gate,
         endless_spool: flag(mmu, "endless_spool_enabled"),
         spoolman_support: text(mmu, "spoolman_support").to_owned(),
+        default_extruder_temp: read_default_extruder_temp(settings),
         flow_rate: read_flow_rate(mmu, &sensors),
         flowguard,
         encoder_headroom: read_encoder_headroom(mmu),
@@ -295,6 +298,15 @@ pub(super) fn read_mmu(store: &ObjectStore) -> Option<MmuStatus> {
         sync_feedback,
     })
 }
+/// Happy Hare's own default when `[mmu_parameters]` does not set it (`mmu_machine_parameters.py` L51).
+const DEFAULT_EXTRUDER_TEMP_C: f64 = 200.0;
+
+fn read_default_extruder_temp(settings: &Value) -> f64 {
+    settings
+        .get("mmu_parameters")
+        .map_or(DEFAULT_EXTRUDER_TEMP_C, |section| number_or(section, "default_extruder_temp", DEFAULT_EXTRUDER_TEMP_C))
+}
+
 /// `major.minor` of a version such as `4.1.0` or `v4.10`.
 fn parse_version(text: &str) -> Option<(u32, u32)> {
     let mut parts = text.trim().trim_start_matches('v').split('.');
@@ -638,6 +650,19 @@ mod tests {
         assert_eq!(threshold(proportional.clone(), 3), Some(0.95));
         assert_eq!(threshold(proportional, -1), Some(0.8));
         assert_eq!(threshold(json!({ "filament_tension": true }), 0), None);
+    }
+
+    #[test]
+    fn the_default_extruder_temperature_comes_from_the_mmu_parameters() {
+        let read = |settings: Value| {
+            read_mmu(&store(json!({ "mmu": {}, "configfile": { "settings": settings } })))
+                .unwrap()
+                .default_extruder_temp
+        };
+
+        assert_eq!(read(json!({ "mmu_parameters": { "default_extruder_temp": 215.0 } })), 215.0);
+        assert_eq!(read(json!({ "mmu_parameters": {} })), 200.0);
+        assert_eq!(read(Value::Null), 200.0);
     }
 
     #[test]

@@ -72,6 +72,8 @@ export global Actions {
     callback assign-lane-spool(int, int);
     // Material or colour in Happy Hare's gate map or in the lane of AFC, for a tile without a spool of Spoolman.
     callback set-lane-material(int, string);
+    // Nozzle temperature of a gate or lane in °C, typed in its dialog.
+    callback set-lane-temperature(int, float);
     callback set-lane-color(int, color);
     callback mmu-select-gate(int);
     callback mmu-load();

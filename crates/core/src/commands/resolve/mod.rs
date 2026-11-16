@@ -48,6 +48,7 @@ impl Command {
             Self::EjectLane { lane } => lanes::eject(status, lane)?,
             Self::AssignLaneSpool { lane, spool_id } => lanes::assign_spool(status, lane, spool_id)?,
             Self::SetLaneFilament { lane, material, color } => lanes::set_filament(status, lane, material, color)?,
+            Self::SetLaneTemperature { lane, temperature } => lanes::set_temperature(status, lane, temperature)?,
             Self::MapToolToLane { tool, lane } => lanes::map_tool(status, tool, lane)?,
             Self::ResetToolMap => lanes::reset_tool_map(status)?,
             Self::AfcResetFailure => vec![lanes::afc_reset_failure(status)?],

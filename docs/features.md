@@ -104,8 +104,11 @@ holds **Tools** and **Service**. The Gates tab and a strip on the print page sho
   (the print page shows the measured one only).
 
 A tap on a gate opens what can be done with it: select, load, preload, check or eject it, and pick its spool. Without
-Spoolman the dialog sets material and colour of the gate in Happy Hare's gate map instead, from a set of common
-materials and colours. A tap on a gate never moves the selector by itself. The bypass takes filament fed by hand past
+a spool the dialog sets material, colour and nozzle temperature of the gate in Happy Hare's gate map instead, from a
+set of common materials and colours. The temperature is the one Happy Hare heats to when it loads the gate outside a
+print (in a print the slicer sets it); a new material sets it back to Happy Hare's `default_extruder_temp`, and a tap
+on it types another one. With a spool, material, colour and temperature come from Spoolman and are only shown. Each
+tile shows the temperature beside the material. A tap on a gate never moves the selector by itself. The bypass takes filament fed by hand past
 the gates; its dialog selects and loads it. **Changer > Tools** is the one place to set which gate each tool takes its
 filament from (Happy Hare's tool-to-gate map): one row per tool with what its gate holds (material, colour, spool, grams
 left and, with EndlessSpool, what its group can still give), and a tap on a tool offers the gates with their colour and
@@ -161,7 +164,9 @@ appear where they have content:
 
 With [AFC](https://github.com/AFCProject/AFC-Klipper-Add-On) (Box Turtle, Night Owl and other units) the Filament page
 shows its lanes as tiles on the Gates tab, one page per unit, with the same dialog as a Happy Hare gate: load, unload,
-eject, pick the spool, or set material and colour. Below the tiles a card shows the way of the filament of the
+eject, pick the spool, or, without a spool, set material, colour and nozzle temperature. The temperature shown is the
+one AFC loads the lane at: the lane's own, else the one for its material from `default_material_temps`; a new
+material clears the lane's own, so AFC takes the one for the new material. Below the tiles a card shows the way of the filament of the
 selected lane through its unit and the hub to the head.
 
 - **Changer › Tools** maps tools to lanes (`SET_MAP`) and resets the map.

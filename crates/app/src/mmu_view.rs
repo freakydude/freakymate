@@ -430,6 +430,7 @@ fn gate_items(mmu: &MmuStatus, lanes: &[Lane], matches: &[ToolMatch]) -> Vec<Mmu
                 group: id_or_none(gate.endless_spool_group),
                 selected,
                 check_unloads_first: mmu.unloads_before_checking(gate.index),
+                temperature: whole_degrees(gate.temperature),
             }
         })
         .collect()
@@ -460,9 +461,15 @@ fn lane_items(status: &PrinterStatus, tiles: &[Lane]) -> Vec<MmuGateItem> {
                 selected: lane.active,
                 loaded: lane.active,
                 check_unloads_first: false,
+                temperature: whole_degrees(reported.map(|lane| lane.load_temperature)),
             }
         })
         .collect()
+}
+
+/// A nozzle temperature for a tile in whole °C; 0 for none.
+fn whole_degrees(celsius: Option<f64>) -> i32 {
+    celsius.filter(|celsius| *celsius > 0.0).map_or(0, |celsius| celsius.round() as i32)
 }
 
 /// The state of the MMU: what it holds, does and reports.

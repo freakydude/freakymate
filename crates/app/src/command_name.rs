@@ -86,6 +86,7 @@ pub fn command_name(command: &Command) -> String {
         Command::EjectLane { .. } => "Eject Lane".to_owned(),
         Command::AssignLaneSpool { .. } => "Assign Lane Spool".to_owned(),
         Command::SetLaneFilament { .. } => "Set Lane Filament".to_owned(),
+        Command::SetLaneTemperature { .. } => "Set Lane Temperature".to_owned(),
         Command::MapToolToLane { .. } => "Map Tool To Lane".to_owned(),
         Command::ResetToolMap => "Reset Tool Map".to_owned(),
         Command::AfcResetFailure => "AFC Reset Failure".to_owned(),

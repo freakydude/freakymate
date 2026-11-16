@@ -76,7 +76,8 @@ export component VerdictIcon inherits Image {
 }
 
 // A gate or a lane of AFC as a tile: the colour of the filament as the left edge over the full height (`FilamentSwatch`), beside it the
-// gate (or lane) and the tools that take its filament, the material (smaller in steps when long, never cut), the name or spool and
+// gate (or lane) and the tools that take its filament, the material (smaller in steps when long, never cut) with the nozzle
+// temperature it loads at, the name or spool and
 // what is left of it, and whether the gate has filament.
 export component GateTile inherits SlotTile {
     in property <MmuGateItem> gate;
@@ -134,12 +135,25 @@ export component GateTile inherits SlotTile {
                     verdict: root.gate.file-verdict;
                 }
             }
-            Text {
-                min-width: self.preferred-width;
-                text: root.material;
-                color: root.has-filament ? Theme.foreground : Theme.muted;
-                font-size: root.material-size;
-                font-weight: 700;
+            // The nozzle temperature the source loads it at stands beside the material, if there is one and room left.
+            HorizontalLayout {
+                spacing: Theme.spacing-small;
+                Text {
+                    min-width: self.preferred-width;
+                    text: root.material;
+                    color: root.has-filament ? Theme.foreground : Theme.muted;
+                    font-size: root.material-size;
+                    font-weight: 700;
+                }
+                Text {
+                    horizontal-stretch: 1;
+                    visible: root.gate.temperature > 0 && root.gate.material != "" && self.width >= self.preferred-width;
+                    text: root.gate.temperature + " °C";
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
             }
             // With Spoolman the lines say the spool's name and what is left of it; a gate without one invites to pick
             // one in the gate's dialog. A spool that Happy Hare knows but Spoolman does not tell about (not

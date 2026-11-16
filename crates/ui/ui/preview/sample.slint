@@ -138,10 +138,10 @@ export global Sample {
         Printer.has-lanes = true;
         Printer.afc-state = "Idle";
         Printer.mmu-gates = [
-            { title: "lane1", index: -1, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", group: -1, selected: true },
-            { title: "lane2", index: -1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", group: -1, selected: false },
-            { title: "lane3", index: -1, availability: "available", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", group: -1, selected: false },
-            { title: "lane4", index: -1, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", group: -1, selected: false },
+            { title: "lane1", index: -1, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", group: -1, selected: true, temperature: 210, spool-id: -1 },
+            { title: "lane2", index: -1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", group: -1, selected: false, temperature: 240, spool-id: -1 },
+            { title: "lane3", index: -1, availability: "available", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", group: -1, selected: false, temperature: 255, spool-id: -1 },
+            { title: "lane4", index: -1, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", group: -1, selected: false, spool-id: -1 },
         ];
         Printer.afc-tools = [
             { tool: 0, lane: "lane1", lane-row: 0 },
@@ -169,9 +169,9 @@ export global Sample {
         Printer.mmu-gate = 0;
         Printer.mmu-tool = 0;
         Printer.mmu-gates = [
-            { title: "Gate 0", index: 0, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", group: 0, selected: true },
-            { title: "Gate 1", index: 1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", group: 1, selected: false },
-            { title: "Gate 2", index: 2, availability: "buffered", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", group: 2, selected: false },
+            { title: "Gate 0", index: 0, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", group: 0, selected: true, temperature: 210 },
+            { title: "Gate 1", index: 1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", group: 1, selected: false, temperature: 240 },
+            { title: "Gate 2", index: 2, availability: "buffered", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", group: 2, selected: false, temperature: 255 },
             { title: "Gate 3", index: 3, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", group: 3, selected: false },
         ];
         Printer.mmu-pages = [{ first-row: 0, count: 4, bypass: true, unit: "", head: "", first-gate: 0, last-gate: 3 }];

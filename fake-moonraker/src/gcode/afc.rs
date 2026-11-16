@@ -1,6 +1,6 @@
 //! AFC (AFC-Klipper-Add-On at 5ea84ea) lane commands: `AFC.py` L461-462 (`TOOL_UNLOAD`, `CHANGE_TOOL`), L389-390
 //! (`LANE_UNLOAD`, `TOOL_LOAD`, registered per lane), `AFC_spool.py` L54-59 (`SET_COLOR`, `SET_MATERIAL`,
-//! `SET_SPOOL_ID`, `SET_MAP`, registered per lane); the map and service commands `RESET_AFC_MAPPING`
+//! `SET_SPOOL_ID`, `SET_MAP`, registered per lane), `AFC_SET_SPOOL_TEMP` (`AFC_spool.py` L60, main 2026-11); the map and service commands `RESET_AFC_MAPPING`
 //! (`AFC_spool.py` L44), `RESET_FAILURE` (`AFC_error.py` L58), `AFC_LANE_RESET` (`AFC_functions.py` L178) and
 //! `AFC_UNSELECT_TOOL` (`AFC_Toolchanger.py` L51); the test hook `FAKE_AFC_ERROR`.
 
@@ -18,6 +18,7 @@ pub(super) fn parse(name: &str, args: &[&str]) -> Result<Option<Command>, Comman
         "SET_SPOOL_ID" => AfcCommand::SetSpoolId { lane, spool_id: named_text(args, "SPOOL_ID") },
         "SET_COLOR" => AfcCommand::SetColor { lane, color: named_text(args, "COLOR") },
         "SET_MATERIAL" => AfcCommand::SetMaterial { lane, material: named_text(args, "MATERIAL") },
+        "AFC_SET_SPOOL_TEMP" => AfcCommand::SetSpoolTemp { lane, extruder_temp: named_text(args, "EXTRUDER_TEMP") },
         "SET_MAP" => AfcCommand::SetMap { lane, map: named_text(args, "MAP") },
         "RESET_AFC_MAPPING" => AfcCommand::ResetMapping,
         "RESET_FAILURE" => AfcCommand::ResetFailure,
