@@ -11,6 +11,8 @@ component Key inherits Rectangle {
     in property <length> font-size: Theme.font-normal;
     callback pressed;
     min-width: 40px;
+    // The row shares its width by the stretch of the keys, not by their labels (see `IconButton`).
+    preferred-width: 0px;
     horizontal-stretch: 1;
     border-radius: Theme.radius-small;
     background: root.accent ? (key-touch.pressed ? Theme.accent-pressed : Theme.accent)

@@ -169,46 +169,43 @@ export component FilamentPage inherits Rectangle {
     property <FilamentTab> tab: root.path-tabs ? Navigation.filament-tab : FilamentTab.extruder;
     // Beside the chip the two tabs keep to their width.
     property <length> tab-width: root.has-heads ? 124px : 130px;
+    // What AFC or the tool changer does differently, between the tabs and the chip.
+    property <bool> has-hint: Printer.afc-error || (root.has-heads && Printer.changer-note != "");
 
     VerticalLayout {
-        if root.has-heads || Printer.has-lanes || Printer.afc-error: Rectangle {
-            height: Theme.touch + Theme.padding;
-            TabBar {
-                if root.path-tabs: TabButton {
-                    min-width: root.tab-width;
-                    max-width: root.has-heads ? root.tab-width : 190px;
-                    icon: Icons.mmu-unit;
-                    text: @tr("Gates");
-                    checked: root.tab == FilamentTab.gates;
-                    clicked => { Navigation.filament-tab = FilamentTab.gates; }
-                }
-                if root.path-tabs: TabButton {
-                    min-width: root.tab-width;
-                    max-width: root.has-heads ? root.tab-width : 190px;
-                    icon: Icons.filament-extruder-gears;
-                    text: @tr("Extruder");
-                    checked: root.tab == FilamentTab.extruder;
-                    clicked => { Navigation.filament-tab = FilamentTab.extruder; }
-                }
+        // Tabs keep their width, the hint of AFC or the tool changer fills the rest, the chip of the head ends the row.
+        if root.has-heads || Printer.has-lanes || Printer.afc-error: TabBar {
+            alignment: stretch;
+            if root.path-tabs: TabButton {
+                horizontal-stretch: 0;
+                min-width: root.tab-width;
+                max-width: root.has-heads ? root.tab-width : 190px;
+                icon: Icons.mmu-unit;
+                text: @tr("Gates");
+                checked: root.tab == FilamentTab.gates;
+                clicked => { Navigation.filament-tab = FilamentTab.gates; }
             }
-            // What the tool changer does differently takes the room between the tabs and the chip.
-            if Printer.afc-error: AfcHint {
-                x: root.path-tabs ? 2 * root.tab-width + 3 * Theme.spacing + Theme.padding : Theme.padding;
-                y: Theme.padding;
-                width: parent.width - self.x - Theme.padding - (root.has-heads ? 160px + Theme.padding + Theme.spacing : 0px);
-                height: Theme.touch;
+            if root.path-tabs: TabButton {
+                horizontal-stretch: 0;
+                min-width: root.tab-width;
+                max-width: root.has-heads ? root.tab-width : 190px;
+                icon: Icons.filament-extruder-gears;
+                text: @tr("Extruder");
+                checked: root.tab == FilamentTab.extruder;
+                clicked => { Navigation.filament-tab = FilamentTab.extruder; }
             }
-            if root.has-heads && Printer.changer-note != "" && !Printer.afc-error: ChangerHint {
-                x: root.path-tabs ? 2 * root.tab-width + 3 * Theme.spacing + Theme.padding : Theme.padding;
-                y: Theme.padding;
-                width: parent.width - self.x - 160px - 2 * Theme.padding - Theme.spacing;
-                height: Theme.touch;
+            if root.has-hint && Printer.afc-error: AfcHint {
+                horizontal-stretch: 1;
+            }
+            if root.has-hint && !Printer.afc-error: ChangerHint {
+                horizontal-stretch: 1;
                 narrow: root.path-tabs;
             }
-            // At the right end of the row (a layout with `alignment: start` has no stretch for it).
+            // Without a hint the chip still ends the row.
+            if !root.has-hint: Rectangle {
+                horizontal-stretch: 1;
+            }
             if root.has-heads: HeadChip {
-                x: parent.width - self.width - Theme.padding;
-                y: Theme.padding;
                 head: Printer.heads[root.head-index];
                 open: Navigation.head-picker-open;
                 clicked => { Navigation.head-picker-open = true; }

@@ -75,17 +75,23 @@ export component AppWindow inherits Window {
             NavRail { }
             Rectangle {
                 horizontal-stretch: 1;
-                if Navigation.page == Page.print: PrintPage { }
-                if Navigation.page == Page.motion: MotionPage { }
-                if Navigation.page == Page.temperature: TemperaturePage { }
-                if Navigation.page == Page.filament: FilamentPage { }
-                if Navigation.page == Page.changer: ChangerPage { }
-                if Navigation.page == Page.console: ConsolePage { }
-                if Navigation.page == Page.system: SystemPage { }
-                if Navigation.page == Page.updates: UpdatesPage { }
-                if Navigation.page == Page.settings: SettingsPage { }
-                if Navigation.page == Page.network: NetworkPage { }
-                if !Printer.ready && !root.page-works-offline: ConnectionPage { }
+                // The window sizes the content area, not the page in it: an element with `x` and `y` does not pass
+                // its size constraints to its parent (since edition 1.19 an `if` page would).
+                Rectangle {
+                    x: 0;
+                    y: 0;
+                    if Navigation.page == Page.print: PrintPage { }
+                    if Navigation.page == Page.motion: MotionPage { }
+                    if Navigation.page == Page.temperature: TemperaturePage { }
+                    if Navigation.page == Page.filament: FilamentPage { }
+                    if Navigation.page == Page.changer: ChangerPage { }
+                    if Navigation.page == Page.console: ConsolePage { }
+                    if Navigation.page == Page.system: SystemPage { }
+                    if Navigation.page == Page.updates: UpdatesPage { }
+                    if Navigation.page == Page.settings: SettingsPage { }
+                    if Navigation.page == Page.network: NetworkPage { }
+                    if !Printer.ready && !root.page-works-offline: ConnectionPage { }
+                }
                 // Dialogs cover only the content area: the status bar and the navigation stay usable, and a tap
                 // there cancels the dialog (`Dialogs.dismiss`).
                 HistoryDialog { }

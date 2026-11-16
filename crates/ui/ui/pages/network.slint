@@ -268,8 +268,9 @@ export component NetworkSection inherits Rectangle {
 
     if Network.managed && Network.wifi-present: HorizontalLayout {
         spacing: Theme.spacing;
+        // Wi-Fi takes about 70 %, the wired card the rest but at least 200 px.
         WifiCard {
-            horizontal-stretch: 1;
+            horizontal-stretch: 7;
             choose(network) => {
                 if (network.known || !network.secured) {
                     root.start-connect(network.ssid, "", false);
@@ -287,7 +288,8 @@ export component NetworkSection inherits Rectangle {
             }
         }
         VerticalLayout {
-            width: max(200px, root.width * 0.3);
+            horizontal-stretch: 3;
+            min-width: 200px;
             spacing: Theme.spacing;
             WiredCard { }
             Rectangle { vertical-stretch: 1; }

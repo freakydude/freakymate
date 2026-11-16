@@ -42,7 +42,8 @@ selected() {
 }
 
 render() {
-    if "$viewer" --edition 1.18 --screenshot "$2" "$1"; then
+    # The project root carries slint-project.json, so the previews use the same edition as the app.
+    if "$viewer" --project-root "$root/crates/ui/ui" --screenshot "$2" "$1"; then
         echo "$2"
     else
         echo "WARN $(basename "$1") failed" >&2

@@ -37,6 +37,10 @@ export component IconButton inherits Rectangle {
 
     min-width: Theme.touch;
     min-height: Theme.touch;
+    // A button fills the room it gets: buttons of a row start from the size of their content and share the rest.
+    // Without this the content (icon, text: stretch 0) would keep the button at its content size.
+    horizontal-stretch: 1;
+    vertical-stretch: 1;
     border-radius: Theme.radius;
     background: !root.enabled ? Theme.surface : touch.pressed ? root.pressed : root.base;
     border-width: root.marked && root.kind == ButtonKind.normal ? 2px : 0px;
@@ -55,11 +59,13 @@ export component IconButton inherits Rectangle {
         padding: Theme.spacing-small;
         spacing: Theme.spacing-tight;
         alignment: center;
+        // Fixed only along the column: a fixed width would cap the width of the column and so of the button.
+        // `contain` draws the icon at its size, centred.
         if root.has-icon: Image {
-            cross-axis-self-alignment: center;
             source: root.icon;
             colorize: root.content;
-            width: root.icon-size;
+            image-fit: contain;
+            min-width: root.icon-size;
             height: root.icon-size;
         }
         if root.text != "": Text {
@@ -77,12 +83,13 @@ export component IconButton inherits Rectangle {
         padding-right: Theme.padding;
         spacing: Theme.spacing;
         alignment: root.align-start ? LayoutAlignment.start : LayoutAlignment.center;
+        // Fixed only along the row, so the icon does not cap the height of the button (see above).
         if root.has-icon: Image {
-            cross-axis-self-alignment: center;
             source: root.icon;
             colorize: root.content;
+            image-fit: contain;
             width: root.icon-size;
-            height: root.icon-size;
+            min-height: root.icon-size;
         }
         if root.text != "": Text {
             text: root.text;
@@ -311,6 +318,9 @@ export component TabButton inherits Rectangle {
 export component TabBar inherits Rectangle {
     // Pages whose layout has no padding of its own (Move, Tune, Thermal, Filament) keep the gap here.
     in property <length> inset: Theme.padding;
+    // Tabs keep their width at the start of the row; a row that also holds a hint or a chip sets `stretch` and lets
+    // one child fill the rest.
+    in property <LayoutAlignment> alignment: start;
     height: Theme.touch + root.inset;
 
     Rectangle {
@@ -324,7 +334,7 @@ export component TabBar inherits Rectangle {
         padding-right: root.inset;
         padding-top: root.inset;
         spacing: Theme.spacing;
-        alignment: start;
+        alignment: root.alignment;
         @children
     }
 }
