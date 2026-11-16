@@ -6,11 +6,11 @@ import { StateIcons } from "../state-icons.slint";
 import { Severity } from "../structs.slint";
 import { BarColors } from "../structs.slint";
 
-// A filament without a known colour shows in the accent colour as a generic filament, purely as a look; use where
-// there is filament (not for an empty gate).
+// A filament without a known colour shows in a neutral grey as a generic filament, purely as a look; use where there
+// is filament (not for an empty gate).
 export global FilamentColors {
     pure public function generic(colors: BarColors) -> BarColors {
-        return colors.count > 0 ? colors : { first: Theme.accent, count: 1 };
+        return colors.count > 0 ? colors : { first: Theme.filament-unknown, count: 1 };
     }
 }
 
