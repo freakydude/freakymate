@@ -4,7 +4,8 @@ name: Build
 # "android-apk". With a release id each package is attached to that (draft) release as soon as it is ready.
 # The jobs take the token permissions of the calling job: read for pull requests, contents write to attach files, and
 # actions write as well to stop a release at the first failure. The workflow "CI" finds failed tests by the job names
-# "Format, Clippy, Tests (Linux)" and "Windows tests"; keep them.
+# "Format, Clippy, Tests (Linux)" and "Windows tests"; keep them. The ruleset of main requires the jobs here by name
+# ("build / <job name>"): after renaming or adding a job, update its required status checks, or pull requests wait.
 on:
   workflow_call:
     inputs:
