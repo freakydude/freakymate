@@ -57,6 +57,10 @@ jobs:
         with:
           pattern: freakymate-*
           path: artifacts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: android-apk
+          path: apk
       - name: Pack
         working-directory: artifacts
         run: |
@@ -76,12 +80,13 @@ jobs:
           path: |
             artifacts/*.zip
             artifacts/*.deb
+            apk/*.apk
             artifacts/get-freakymate.sh
       - name: Publish prerelease
         # Versions ending in .0 are releases and are only published by the Release workflow.
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !endsWith(env.VERSION, '.0')
         run: |
-          gh release create "v$VERSION" artifacts/*.zip artifacts/*.deb artifacts/get-freakymate.sh \
+          gh release create "v$VERSION" artifacts/*.zip artifacts/*.deb apk/*.apk artifacts/get-freakymate.sh \
             --target "$GITHUB_SHA" \
             --prerelease \
             --title "FreakyMate v$VERSION (pre-release)" \
@@ -99,7 +104,7 @@ jobs:
         run: |
           marker='<!-- preview-packages -->'
           body="$marker
-          **Preview build \`$VERSION\`** of this pull request: [download packages]($ARTIFACT_URL) (zips and .deb, GitHub login required).
+          **Preview build \`$VERSION\`** of this pull request: [download packages]($ARTIFACT_URL) (zips, .deb and .apk, GitHub login required).
           Untested preview, use at your own risk."
           comment=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
             --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)

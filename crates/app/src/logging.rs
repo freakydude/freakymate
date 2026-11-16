@@ -11,9 +11,11 @@ use log::{Level, LevelFilter, Log, Metadata, Record};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+#[cfg(not(target_os = "android"))]
+use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, SyncSender};
-use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
@@ -69,6 +71,7 @@ struct Logger {
     verbose: AtomicBool,
     file: Option<SyncSender<Message>>,
     /// Several threads write to stderr; one line at a time.
+    #[cfg(not(target_os = "android"))]
     stderr: Mutex<()>,
 }
 
@@ -87,7 +90,13 @@ impl Logger {
     fn new(file: Option<SyncSender<Message>>, rust_log: Option<&str>) -> Self {
         let filter =
             rust_log.filter(|spec| !spec.trim().is_empty()).map(|spec| env_filter::Builder::new().parse(spec).build());
-        Self { filter, verbose: AtomicBool::new(false), file, stderr: Mutex::new(()) }
+        Self {
+            filter,
+            verbose: AtomicBool::new(false),
+            file,
+            #[cfg(not(target_os = "android"))]
+            stderr: Mutex::new(()),
+        }
     }
 
     fn max_level(&self) -> LevelFilter {
@@ -125,6 +134,10 @@ impl Log for Logger {
         let now = Local::now();
         let stamp = now.format(STAMP_FORMAT).to_string();
         let text = format_line(&stamp, record.level(), record.target(), &record.args().to_string());
+        // Android shows no stderr; its log is logcat.
+        #[cfg(target_os = "android")]
+        android_logger::log(record);
+        #[cfg(not(target_os = "android"))]
         {
             let _line = self.stderr.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             // Nowhere to report a failing stderr.

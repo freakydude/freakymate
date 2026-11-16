@@ -4,6 +4,7 @@ members = [
     "crates/core",
     "crates/ui",
     "crates/app",
+    "crates/android",
     "crates/ui-snapshot",
     "crates/icon-index",
     "fake-moonraker",

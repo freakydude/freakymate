@@ -21,6 +21,7 @@ mod format;
 mod framebuffer;
 mod history_view;
 mod items;
+#[cfg(not(target_os = "android"))]
 pub mod kiosk_pointer;
 pub mod logging;
 mod macro_view;
@@ -30,6 +31,7 @@ mod objects_view;
 pub mod presenter;
 pub mod settings_controller;
 mod spool_view;
+pub mod startup;
 mod status_log;
 mod status_view;
 mod thumbnail;

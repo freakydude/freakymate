@@ -5,3 +5,7 @@ target/
 /.cargo/config.toml
 # Local editor tooling, do not publish
 /.claude/
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/local.properties
