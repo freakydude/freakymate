@@ -62,6 +62,21 @@ if [ "$EUID" -eq 0 ]; then
   echo "Run as normal user; sudo is used where needed."
   exit 1
 fi
+# Sailhand was called FreakyMate; it does not take over from it (both want tty1), so stop before changing anything.
+old_install=""
+for old in /etc/systemd/system/freakymate.service /etc/systemd/system/multi-user.target.wants/freakymate@*.service \
+  "$HOME/freakymate"; do
+  for found in $old; do
+    [ -e "$found" ] && old_install="$found"
+  done
+done
+if [ -n "$old_install" ]; then
+  echo "FreakyMate is still installed ($old_install)."
+  echo "Remove it first: ~/freakymate/uninstall.sh (or: sudo apt remove freakymate), then run this script again."
+  echo "Keep your settings: cp $DATA_DIR/config/freakymate.conf $DATA_DIR/config/sailhand.conf"
+  echo "Details: docs/install.md, section 'Coming from FreakyMate'."
+  exit 1
+fi
 for file in "$NAME" release_info.json system-dependencies.json; do
   if [ ! -f "$SOURCE_DIR/$file" ]; then
     echo "'$file' missing; run this script inside the unpacked release zip for your architecture."

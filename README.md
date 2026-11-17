@@ -4,7 +4,8 @@
 
 **A touch screen for Klipper, with Happy Hare, AFC, tool changers and Spoolman built in.**
 
-Formerly FreakyMate.
+Formerly FreakyMate. An installed FreakyMate does not update itself to Sailhand: see
+[Coming from FreakyMate](docs/install.md#coming-from-freakymate).
 
 Sailhand is a small native app for the display on your 3D printer. It runs on the printer host (Raspberry Pi, BTT
 CB1/CB2 and similar), starts fullscreen at boot and talks to [Klipper](https://www.klipper3d.org/) through
@@ -66,6 +67,7 @@ Other ways to run it, all described in [Install and update](docs/install.md):
 - [Debian and Arch Linux packages](docs/install.md#packages)
 - [Pre-release and pull request builds](docs/install.md#which-build),
   [updates and channels](docs/install.md#updates-and-channels) and [uninstall](docs/install.md#uninstall)
+- [Coming from FreakyMate](docs/install.md#coming-from-freakymate): the update list does not switch over, move by hand
 
 ## Documentation
 

@@ -189,9 +189,28 @@ so: run `~/sailhand/install.sh` once. Without `-m` and `-d` it keeps the Moonrak
 folder of the existing installation; your settings stay. The Debian package brings everything along with each
 version.
 
+## Coming from FreakyMate
+
+Sailhand was called FreakyMate until v0.6.x. It is a new program with new names (service, folder, settings file,
+update entry), so an existing FreakyMate does **not** turn into Sailhand by itself. Do not rely on its update entry:
+the new packages are named `sailhand-…` and contain `sailhand` instead of `freakymate`, and the old service, rules and
+entries are not replaced. Switch once by hand:
+
+1. Uninstall FreakyMate: `~/freakymate/uninstall.sh` (installer) or `sudo apt remove freakymate` (package). Both want
+   `tty1`, so do not run them side by side. Check `moonraker.conf` afterwards: no `[update_manager freakymate]`
+   section should be left.
+2. Install Sailhand as in [Printer host](#printer-host) or [Packages](#packages).
+3. Keep your settings: the keys did not change, so copy the file before or after the uninstall:
+   `cp ~/printer_data/config/freakymate.conf ~/printer_data/config/sailhand.conf` (only the comment in its first lines
+   mentions the old name). Do this before the first start of Sailhand, which creates the file with defaults.
+
+From Sailhand on, updates come through `[update_manager sailhand]` as described under
+[Updates and channels](#updates-and-channels).
+
 ## Uninstall
 
-Coming from FreakyMate: uninstall it first with its own `~/freakymate/uninstall.sh` (or `sudo apt remove freakymate`), then install Sailhand.
+Removing an old FreakyMate (`~/freakymate/uninstall.sh` or `sudo apt remove freakymate`) is the first step of
+[Coming from FreakyMate](#coming-from-freakymate); this section is about Sailhand itself.
 
 Installed with the installer:
 
