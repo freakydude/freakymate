@@ -1,0 +1,26 @@
+// Preview: the setup dialog of an Eddy probe, the tap threshold pending after TAP=verify and the toolhead 20 mm
+// above the bed, so the hint of the tap row shows.
+
+import { AppWindow } from "../app.slint";
+import { EddyDialog, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component CalibrateEddyPreview inherits AppWindow {
+    init => {
+        Sample.calibration();
+        Printer.homed-x = true;
+        Printer.homed-y = true;
+        Printer.homed-z = true;
+        Printer.position-x = 175;
+        Printer.position-y = 175;
+        Printer.position-z = 20;
+        Printer.eddy-section = "probe_eddy_current eddy";
+        Printer.eddy-has-offset = true;
+        Printer.eddy-drive-current = { current: "15" };
+        Printer.eddy-calibration = { current: "48 points" };
+        Printer.eddy-tap-threshold = { pending: "0.582" };
+        Printer.eddy-tap-height-off = true;
+        Printer.pending-config = "probe_eddy_current eddy: tap_threshold = 0.582";
+        EddyDialog.open = true;
+    }
+}

@@ -4,9 +4,10 @@ use crate::presenter::Presenter;
 use crate::settings_controller::SettingsController;
 use crate::{Actions, AppWindow};
 use freakymate_core::domain::machine_tree::LaneId;
+use freakymate_core::domain::manual_probe::Direction;
 use freakymate_core::sources::happy_hare::commands::{Gates, ServoCommand};
 use freakymate_core::sources::klipper::tuning::TuningKey;
-use freakymate_core::sources::klipper::{Axis, TestZ};
+use freakymate_core::sources::klipper::{Axis, CentreOf, EddyTap, TestZ};
 use freakymate_core::{Command, PrinterService, Query};
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
@@ -108,6 +109,10 @@ fn bind_temperatures(
     actions
         .on_open_history(with_presenter(presenter, |presenter, object: SharedString| presenter.open_history(&object)));
     actions.on_close_history(run_presenter(presenter, Presenter::close_history));
+    let pid_service = service.clone();
+    actions.on_pid_tune(move |heater, target| {
+        pid_service.send(Command::PidCalibrate { heater: heater.into(), target: f64::from(target) });
+    });
     let target_presenter = Rc::clone(presenter);
     actions.on_heater_target_outside(move |heater, typed| target_presenter.heater_target_outside(&heater, &typed));
 }
@@ -125,13 +130,42 @@ fn bind_calibration(actions: &Actions, service: &PrinterService, presenter: &Rc<
     actions.on_calculate_screws_tilt(send(service, || Command::CalculateScrewsTilt));
     actions.on_adjust_bed_screws(send(service, || Command::AdjustBedScrews));
     actions.on_calibrate_z(send(service, || Command::CalibrateZ));
-    actions.on_test_z(with(service, |service, distance: f32| {
-        service.send(Command::TestZ { step: TestZ::By(round_offset(distance)) })
+    actions.on_eddy_drive_current(send(service, || Command::CalibrateEddyDriveCurrent));
+    actions.on_eddy_centre(with(service, |service, over: SharedString| {
+        let over = match over.as_str() {
+            "nozzle" => CentreOf::Nozzle,
+            "sensor" => CentreOf::Sensor,
+            _ => return,
+        };
+        service.send(Command::MoveToBedCentre { over })
     }));
-    actions.on_bisect_z(with(service, |service, direction: i32| {
+    actions.on_eddy_tap(with(service, |service, step: SharedString| {
+        let step = match step.as_str() {
+            "guess" => EddyTap::Guess,
+            "refine" => EddyTap::Refine,
+            "verify" => EddyTap::Verify,
+            _ => return,
+        };
+        service.send(Command::EddyTapCalibrate { step })
+    }));
+    let (probe_service, probe_presenter) = (service.clone(), Rc::clone(presenter));
+    actions.on_test_z(move |distance: f32| {
+        probe_presenter.probe_moved();
+        probe_service.send(Command::TestZ { step: TestZ::By(round_offset(distance)) })
+    });
+    let (probe_service, probe_presenter) = (service.clone(), Rc::clone(presenter));
+    actions.on_probe_fine(move |direction: i32| {
+        probe_presenter.probe_moved();
         let step = if direction > 0 { TestZ::BisectUp } else { TestZ::BisectDown };
-        service.send(Command::TestZ { step })
-    }));
+        probe_service.send(Command::TestZ { step })
+    });
+    let (probe_service, probe_presenter) = (service.clone(), Rc::clone(presenter));
+    actions.on_probe_coarse(move |direction: i32| {
+        let direction = if direction > 0 { Direction::Up } else { Direction::Down };
+        if let Some(distance) = probe_presenter.probe_coarse(direction) {
+            probe_service.send(Command::TestZ { step: TestZ::By(distance) })
+        }
+    });
     actions.on_accept_calibration(send(service, || Command::AcceptCalibration));
     actions.on_screw_adjusted(send(service, || Command::ScrewAdjusted));
     actions.on_abort_calibration(send(service, || Command::AbortCalibration));

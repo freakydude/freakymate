@@ -272,7 +272,8 @@ fn run_script(backend: &Backend, params: &Value) -> Result<(Value, Duration), Rp
         })
         .and_then(|commands| {
             let help = commands.contains(&gcode::Command::Help);
-            let dwell = commands
+            let pid_run = commands.iter().any(|command| matches!(command, gcode::Command::PidCalibrate { .. }));
+            let dwell: Duration = commands
                 .iter()
                 .map(|command| match command {
                     gcode::Command::Dwell(duration) => *duration,
@@ -283,7 +284,9 @@ fn run_script(backend: &Backend, params: &Value) -> Result<(Value, Duration), Rp
             if help {
                 backend.respond(HELP_TEXT);
             }
-            Ok(dwell)
+            // A tuning answers when it ends (Klipper blocks until then).
+            let tuning = if pid_run { backend.with_printer(|printer| printer.pid_run_wait()) } else { Duration::ZERO };
+            Ok(dwell + tuning)
         });
     if let Err(error) = &outcome {
         backend.respond(&format!("!! {}", error.message()));
@@ -622,6 +625,16 @@ mod tests {
         assert_eq!(session.take_reply_delay(), Some(Duration::from_millis(1200)));
         exchange(&mut session, &backend, call("printer.gcode.script", json!({ "script": "M104 S100" })));
         assert_eq!(session.take_reply_delay(), None);
+    }
+
+    #[test]
+    fn a_pid_tuning_answers_only_when_it_ends() {
+        let (mut session, backend) = setup();
+        let script = |script: &str| call("printer.gcode.script", json!({ "script": script }));
+
+        exchange(&mut session, &backend, script("PID_CALIBRATE HEATER=extruder TARGET=210"));
+
+        assert!(session.take_reply_delay().is_some_and(|delay| delay > Duration::ZERO));
     }
 
     #[test]

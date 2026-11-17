@@ -1,6 +1,6 @@
 use super::*;
 use crate::sources::klipper::tuning::TuningKey;
-use crate::sources::klipper::{Axis, CalibrationMode, Motion, PrintJob, WhiteChannel};
+use crate::sources::klipper::{Axis, CalibrationMode, CentreOf, EddyTap, Motion, PrintJob, WhiteChannel};
 use crate::sources::{PrinterStatus, Sources};
 use serde_json::json;
 
@@ -130,6 +130,51 @@ fn the_z_height_is_calibrated_at_the_probe_else_at_the_endstop() {
 }
 
 #[test]
+fn an_eddy_probe_has_no_probe_calibrate_but_its_own_command() {
+    let calibrate = resolved(Command::CalibrateZ, &["probe", "probe_eddy_current eddy"]);
+    assert_eq!(calibrate, Ok(vec![Command::EddyCalibrate { chip: "eddy".into() }]));
+    assert_eq!(script(Command::EddyCalibrate { chip: "eddy".into() }), "PROBE_EDDY_CURRENT_CALIBRATE CHIP=eddy");
+    let drive = resolved(Command::CalibrateEddyDriveCurrent, &["probe", "probe_eddy_current eddy"]);
+    assert_eq!(drive, Ok(vec![Command::EddyDriveCurrent { chip: "eddy".into() }]));
+    assert_eq!(script(Command::EddyDriveCurrent { chip: "eddy".into() }), "LDC_CALIBRATE_DRIVE_CURRENT CHIP=eddy");
+    assert_eq!(resolved(Command::CalibrateEddyDriveCurrent, &["probe"]), Err(CommandError::NoEddyProbe));
+    assert_eq!(
+        script(Command::EddyTapCalibrate { step: EddyTap::Guess }),
+        "PROBE_EDDY_CURRENT_TAP_CALIBRATE TAP=guess"
+    );
+    // The paper test of the other probes stays as it was.
+    assert_eq!(resolved(Command::CalibrateZ, &["probe", "bltouch"]), Ok(vec![Command::ProbeCalibrate]));
+}
+
+#[test]
+fn the_toolhead_moves_over_the_bed_centre_by_nozzle_or_sensor() {
+    let mut status = PrinterStatus { motion: motion_at([10.0, 10.0, 5.0, 0.0]), ..PrinterStatus::default() };
+    status.calibration.eddy =
+        Some(crate::sources::klipper::EddyProbe { name: "eddy".into(), offset: [-21.0, 4.5], ..Default::default() });
+    let sources = printer(&["probe_eddy_current eddy"]);
+    let go = |over| Command::MoveToBedCentre { over }.resolve(&sources, &status);
+    assert_eq!(go(CentreOf::Nozzle), Ok(vec![Command::MoveXy { x: 150.0, y: 150.0 }]));
+    assert_eq!(go(CentreOf::Sensor), Ok(vec![Command::MoveXy { x: 171.0, y: 145.5 }]));
+    assert_eq!(script(Command::MoveXy { x: 171.0, y: 145.5 }), "G90\nG1 X171 Y145.5 F6000");
+    let without = Command::MoveToBedCentre { over: CentreOf::Nozzle }.resolve(&sources, &PrinterStatus::default());
+    assert_eq!(without, Err(CommandError::NoEddyProbe));
+    assert!(Command::MoveToBedCentre { over: CentreOf::Sensor }.moves_machine());
+    assert!(Command::MoveXy { x: 1.0, y: 1.0 }.loses_print_position());
+}
+
+#[test]
+fn the_eddy_steps_are_refused_during_a_print_like_the_other_calibrations() {
+    for command in [
+        Command::EddyCalibrate { chip: "eddy".into() },
+        Command::EddyDriveCurrent { chip: "eddy".into() },
+        Command::EddyTapCalibrate { step: EddyTap::Verify },
+        Command::CalibrateEddyDriveCurrent,
+    ] {
+        assert!(command.loses_print_position() && command.moves_machine(), "{command:?}");
+    }
+}
+
+#[test]
 fn mode_commands_reach_klipper_only_while_it_waits() {
     let in_mode = |mode: Option<CalibrationMode>, command: Command| {
         let mut status = PrinterStatus::default();
@@ -172,6 +217,40 @@ fn cooling_down_switches_every_heater_off() {
     let commands = Command::CoolDown.resolve(&printer(&[]), &status);
 
     assert_eq!(commands, Ok(vec![set("extruder", 0.0), set("heater_bed", 0.0), set("heater_generic chamber", 0.0)]));
+}
+
+#[test]
+fn pid_tuning_names_the_heater_the_way_klipper_knows_it() {
+    let tune = |heater: &str, target| script(Command::PidCalibrate { heater: heater.into(), target });
+    assert_eq!(tune("extruder", 230.0), "PID_CALIBRATE HEATER=extruder TARGET=230");
+    assert_eq!(tune("heater_bed", 70.0), "PID_CALIBRATE HEATER=heater_bed TARGET=70");
+    assert_eq!(tune("heater_generic chamber", 45.5), "PID_CALIBRATE HEATER=chamber TARGET=45.5");
+}
+
+#[test]
+fn pid_tuning_needs_a_known_heater_and_a_target_it_takes() {
+    let mut status = status_with_targets(&[("extruder", 0.0), ("temperature_fan case", 0.0)]);
+    status.heaters[0].max_temp = Some(300.0);
+    status.heaters[1].cools_only = true;
+    let tune =
+        |heater: &str, target| Command::PidCalibrate { heater: heater.into(), target }.resolve(&printer(&[]), &status);
+
+    assert_eq!(tune("extruder", 230.0), Ok(vec![Command::PidCalibrate { heater: "extruder".into(), target: 230.0 }]));
+    assert!(matches!(tune("extruder", 310.0), Err(CommandError::TargetOutsideRange(..))));
+    assert!(matches!(tune("extruder", 0.0), Err(CommandError::TargetOutsideRange(..))), "off is no target");
+    assert_eq!(tune("heater_bed", 70.0), Err(CommandError::UnknownHeater("heater_bed".into())));
+    assert_eq!(
+        tune("temperature_fan case", 40.0),
+        Err(CommandError::UnknownHeater("temperature_fan case".into())),
+        "the heater manager does not know it"
+    );
+}
+
+#[test]
+fn pid_tuning_is_refused_during_a_print() {
+    let tune = Command::PidCalibrate { heater: "extruder".into(), target: 230.0 };
+    assert!(tune.interrupts_print());
+    assert!(!tune.moves_machine() && !tune.loses_print_position());
 }
 
 #[test]

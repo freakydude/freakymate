@@ -1,7 +1,7 @@
 //! What Klipper is told: its methods behind Moonraker's `printer.*` and its own G-code. G-code of the plugins and
 //! macros reaches Klipper through [`run_gcode`] as well.
 
-use super::{Axis, BED_HEATER, FanKind, Motion, NOZZLE_HEATER, TestZ, instance};
+use super::{Axis, BED_HEATER, EddyTap, FanKind, Motion, NOZZLE_HEATER, TestZ, instance};
 use crate::moonraker::Call;
 use serde_json::json;
 
@@ -74,6 +74,11 @@ pub fn home(x: bool, y: bool, z: bool) -> String {
         .filter_map(|(selected, letter)| selected.then_some(letter))
         .collect();
     format!("G28 {}", axes.join(" "))
+}
+
+/// An absolute move in X and Y at the speed of the manual moves; Z stays where it is.
+pub fn move_xy(x: f64, y: f64) -> String {
+    format!("G90\nG1 X{} Y{} F{}", number(x), number(y), number(JOG_SPEED_XY * SECONDS_PER_MINUTE))
 }
 
 /// A relative move as an absolute one, clamped to the axis range; `None` if the axis would not move.
@@ -187,6 +192,36 @@ pub fn remove_bed_mesh(profile: &str) -> Option<String> {
     usable_profile(profile).then(|| format!("BED_MESH_PROFILE REMOVE={profile}"))
 }
 
+/// The setup steps of an Eddy probe take its section name as `CHIP` (`ldc1612.py` and `probe_eddy_current.py`, mux
+/// commands by chip name); Klipper splits parameters at whitespace, so a name with a space cannot be used.
+fn eddy_command(command: &str, chip: &str, parameters: &str) -> Option<String> {
+    usable_profile(chip).then(|| format!("{command} CHIP={chip}{parameters}"))
+}
+
+/// `PID_CALIBRATE` (`pid_calibrate.py` l.20-27: `HEATER` and `TARGET` are required). `HEATER` is the name the heater
+/// manager knows, the section name without its kind (`heater_generic chamber` is `chamber`); the bed's and the
+/// nozzle's are `heater_bed` and `extruder`.
+pub fn pid_calibrate(heater: &str, target: f64) -> String {
+    let name = heater.rsplit(' ').next().unwrap_or(heater);
+    format!("PID_CALIBRATE HEATER={name} TARGET={}", number(target))
+}
+
+/// Measures the drive current of the sensor; Klipper then asks for `SAVE_CONFIG` (`reg_drive_current`).
+pub fn eddy_drive_current(chip: &str) -> Option<String> {
+    eddy_command("LDC_CALIBRATE_DRIVE_CURRENT", chip, "")
+}
+
+/// Measures the Z heights; Klipper waits in `manual_probe` for the paper test, then drives for minutes (`calibrate`).
+pub fn eddy_calibrate(chip: &str) -> Option<String> {
+    eddy_command("PROBE_EDDY_CURRENT_CALIBRATE", chip, "")
+}
+
+/// One step of the tap calibration (`tap_threshold` is set by `verify`); Klipper checks the order. It takes no `CHIP`
+/// (`probe_eddy_current.py` l.340, `TAP=` only).
+pub fn eddy_tap(step: EddyTap) -> String {
+    format!("PROBE_EDDY_CURRENT_TAP_CALIBRATE TAP={}", step.parameter())
+}
+
 pub fn test_z(step: TestZ) -> String {
     match step {
         TestZ::By(distance) => format!("TESTZ Z={}", number(distance)),
@@ -221,6 +256,19 @@ mod tests {
         assert_eq!(home(true, true, true), "G28");
         assert_eq!(home(false, false, true), "G28 Z");
         assert_eq!(home(false, false, false), "G28");
+    }
+
+    #[test]
+    fn a_move_in_xy_leaves_z_alone() {
+        assert_eq!(move_xy(175.0, 145.5), "G90\nG1 X175 Y145.5 F6000");
+    }
+
+    #[test]
+    fn the_eddy_steps_name_the_chip() {
+        assert_eq!(eddy_drive_current("eddy").as_deref(), Some("LDC_CALIBRATE_DRIVE_CURRENT CHIP=eddy"));
+        assert_eq!(eddy_calibrate("eddy").as_deref(), Some("PROBE_EDDY_CURRENT_CALIBRATE CHIP=eddy"));
+        assert_eq!(eddy_calibrate("my eddy"), None);
+        assert_eq!(eddy_tap(EddyTap::Refine), "PROBE_EDDY_CURRENT_TAP_CALIBRATE TAP=refine");
     }
 
     #[test]

@@ -26,7 +26,7 @@ export component SystemPage inherits Rectangle {
             spacing: Theme.spacing;
             Card {
                 title: @tr("Klipper");
-                icon: Icons.system-firmware-restart;
+                icon: Icons.nav-printer;
                 IconLabel {
                     icon: Printer.is-connected ? Icons.system-connected : Icons.system-disconnected;
                     text: Printer.endpoint;
@@ -37,16 +37,16 @@ export component SystemPage inherits Rectangle {
                     spacing: Theme.spacing;
                     height: root.action-row-height;
                     IconButton {
-                        icon: Icons.system-restart;
-                        text: @tr("Reload config");
+                        icon: Icons.system-klipper-restart;
+                        text: @tr("Restart");
                         enabled: Printer.is-connected && !Printer.host-actions-locked;
-                        clicked => { Confirm.ask(@tr("Restart Klipper"), @tr("Reloads the configuration."), "restart-klipper", "", false); }
+                        clicked => { Confirm.ask(@tr("Restart Klipper"), @tr("Restarts Klipper and reloads the configuration; the MCUs keep running."), "restart-klipper", "", false); }
                     }
                     IconButton {
                         icon: Icons.system-firmware-restart;
-                        text: @tr("Firmware");
+                        text: @tr("Firmware restart");
                         enabled: Printer.is-connected && !Printer.host-actions-locked;
-                        clicked => { Confirm.ask(@tr("Firmware restart"), @tr("Restarts Klipper and all MCUs."), "firmware-restart", "", false); }
+                        clicked => { Confirm.ask(@tr("Firmware restart"), @tr("Restarts Klipper and resets all MCUs, e.g. after a firmware update or an MCU error."), "firmware-restart", "", false); }
                     }
                 }
             }

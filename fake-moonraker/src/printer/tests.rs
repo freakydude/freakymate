@@ -759,3 +759,42 @@ fn fake_overshoot_rejects_unknown_heaters() {
     assert!(run(&mut printer(), "FAKE_OVERSHOOT HEATER=nozzle DELTA=5").is_err());
     assert!(run(&mut printer(), "FAKE_OVERSHOOT DELTA=5").is_err());
 }
+
+#[test]
+fn pid_calibrate_swings_the_target_then_switches_off_and_leaves_pending_values() {
+    let mut printer = printer();
+    run(&mut printer, "PID_CALIBRATE HEATER=extruder TARGET=60").unwrap();
+    assert_eq!(printer.status()["extruder"]["target"], 60.0, "set at once");
+    assert!(printer.pid_run_wait() > Duration::ZERO, "the answer comes when the run ends");
+
+    let mut targets = Vec::new();
+    for _ in 0..200 {
+        printer.advance(Duration::from_secs(1));
+        let target = printer.status()["extruder"]["target"].as_f64().unwrap();
+        if targets.last() != Some(&target) {
+            targets.push(target);
+        }
+        if printer.pid_run.is_none() {
+            break;
+        }
+    }
+
+    assert!(targets.contains(&57.5), "TARGET - 2.5 (pc l.89): {targets:?}");
+    assert_eq!(targets.last(), Some(&0.0), "the heater is off at the end (h l.127-132)");
+    let pending = &printer.configfile_json()["save_config_pending_items"]["extruder"];
+    assert_eq!((pending["control"].as_str(), pending["pid_Kp"].as_str()), (Some("pid"), Some("23.104")));
+    assert_eq!(printer.configfile_json()["settings"]["extruder"]["pid_kp"], 21.527, "printer.cfg is unchanged");
+
+    run(&mut printer, "SAVE_CONFIG").unwrap();
+    let settings = &printer.configfile_json()["settings"]["extruder"];
+    assert_eq!(settings["pid_kp"], 23.104);
+    assert_eq!(printer.configfile_json()["save_config_pending_items"], json!({}));
+}
+
+#[test]
+fn pid_calibrate_needs_both_parameters_and_a_known_target_in_range() {
+    assert!(run(&mut printer(), "PID_CALIBRATE HEATER=extruder").is_err());
+    assert!(run(&mut printer(), "PID_CALIBRATE TARGET=200").is_err());
+    assert!(run(&mut printer(), "PID_CALIBRATE HEATER=extruder TARGET=500").is_err());
+    assert!(run(&mut printer(), "PID_CALIBRATE HEATER=nozzle TARGET=200").is_err());
+}

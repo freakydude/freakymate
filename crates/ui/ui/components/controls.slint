@@ -188,6 +188,8 @@ export component StepSelector inherits HorizontalLayout {
     in property <[float]> values;
     in property <string> unit;
     in property <string> label;
+    // Values above it are shown disabled and cannot be chosen.
+    in property <float> max-enabled: 1000000;
     in-out property <float> selected;
     callback changed(float);
 
@@ -205,12 +207,13 @@ export component StepSelector inherits HorizontalLayout {
         height: Theme.row-height-small;
         border-radius: Theme.radius;
         // The chosen one is framed like a chosen button (IconButton.checked), not filled like the main action.
-        background: value == root.selected || step-touch.pressed ? Theme.surface-active : Theme.surface-raised;
+        background: value == root.selected || (step-touch.pressed && value <= root.max-enabled) ? Theme.surface-active : Theme.surface-raised;
         border-width: value == root.selected ? 2px : 0px;
         border-color: Theme.accent;
         accessible-role: button;
         accessible-label: value + root.unit;
         step-touch := TouchArea {
+            enabled: value <= root.max-enabled;
             clicked => {
                 root.selected = value;
                 root.changed(value);
@@ -223,7 +226,7 @@ export component StepSelector inherits HorizontalLayout {
             padding-right: Theme.padding;
             Text {
                 text: value + root.unit;
-                color: Theme.foreground;
+                color: value <= root.max-enabled ? Theme.foreground : Theme.disabled-foreground;
                 font-size: Theme.font-small;
                 font-weight: 600;
                 horizontal-alignment: center;

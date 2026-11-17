@@ -51,6 +51,25 @@ bed = 80.0
 
 The Thermal page shows the first four. Restart FreakyMate after editing (`sudo systemctl restart freakymate`).
 
+The **step sizes** the screen offers (Motion, Z offset, Thermal, Filament, the paper test) can be changed in the table
+`[step_choices]`. Every key is optional; without it the default applies:
+
+```toml
+[step_choices]
+move_mm = [0.1, 1, 10, 50, 100]
+z_offset_mm = [0.005, 0.01, 0.025, 0.05, 0.1]
+temperature = [1, 5, 10, 25]
+extrude_mm = [5, 10, 25, 50, 100]
+extrude_speed = [1, 2, 5, 10]
+manual_probe_mm = [0.01, 0.05, 0.1, 1]
+```
+
+The order does not matter: FreakyMate sorts each list and removes duplicates. Values that are not above zero are left out,
+and a list with nothing usable, or with more than six values (`manual_probe_mm`: four, the paper test offers each of them
+as minus and plus), is replaced by the default; the log says which key. If the step chosen last is not in a list any
+more, the nearest one is selected. Lengths in `extrude_mm` above Klipper's `max_extrude_only_distance` stay in the row but
+are disabled; if none fits, the limit itself is offered as well. Restart FreakyMate after editing.
+
 Up to 0.3.8 the settings were a JSON file (`freakymate.json`, `settings.json`). It stays where it is and is no longer
 read; FreakyMate starts with the defaults in the new file. Take over what you had changed by hand (presets) and delete
 the JSON file when you like.

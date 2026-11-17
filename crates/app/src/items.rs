@@ -23,6 +23,7 @@ use freakymate_core::sources::moonraker_server::power::PowerDevice;
 use freakymate_core::sources::moonraker_server::update_manager::UpdateInfo;
 use freakymate_core::sources::spoolman::Spool;
 use slint::{Model, ModelRc, SharedString, VecModel};
+use std::rc::Rc;
 
 pub(crate) fn connection_name(state: ConnectionState) -> &'static str {
     match state {
@@ -212,13 +213,18 @@ pub(crate) fn heater_item(heater: &Heater, lanes: &[Lane], limits: Option<Limits
         target: heater.target as f32,
         power: heater.power as f32,
         can_raise: heater.can_raise(),
-        target_range: heater.max_temp.map_or_else(SharedString::new, |maximum| {
-            format!("Klipper: {:.0}–{maximum:.0} °C", heater.min_temp).into()
-        }),
+        target_range: target_range(heater),
         has_history: heater.has_history,
         nozzle: heater.is_nozzle(),
         scale: scale_item(limits),
     }
+}
+
+/// The targets Klipper takes as a note for typing one; empty without `max_temp`.
+pub(crate) fn target_range(heater: &Heater) -> SharedString {
+    heater
+        .max_temp
+        .map_or_else(SharedString::new, |maximum| format!("Klipper: {:.0}–{maximum:.0} °C", heater.min_temp).into())
 }
 
 /// The scale under a temperature; hidden without limits.
@@ -560,6 +566,11 @@ pub(crate) fn reuse_flags(old: Option<ModelRc<bool>>, flags: Option<Vec<bool>>) 
         Some(old) if old.iter().eq(flags.iter().copied()) => old,
         _ => ModelRc::new(VecModel::from(flags)),
     }
+}
+
+/// A list of step sizes for a `StepSelector`.
+pub fn float_model(values: &[f64]) -> ModelRc<f32> {
+    ModelRc::from(Rc::new(VecModel::from(values.iter().map(|value| *value as f32).collect::<Vec<f32>>())))
 }
 
 #[cfg(test)]

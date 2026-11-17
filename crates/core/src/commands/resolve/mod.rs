@@ -22,6 +22,8 @@ impl Command {
             Self::Level => calibration::level(setup)?,
             Self::ApplyZOffset => calibration::apply_z_offset(setup),
             Self::CalibrateZ => calibration::calibrate_z(setup)?,
+            Self::CalibrateEddyDriveCurrent => calibration::eddy_drive_current(setup)?,
+            Self::MoveToBedCentre { over } => calibration::move_to_bed_centre(status, over)?,
             Self::TestZ { .. } | Self::ScrewAdjusted | Self::AcceptCalibration | Self::AbortCalibration => {
                 calibration::within_mode(self, mode)
             }
@@ -29,6 +31,7 @@ impl Command {
             Self::ApplyPreset { extruder, bed } => heating::preset(status, extruder, bed),
             Self::CoolDown => heating::cool_down(status),
             Self::StepHeater { heater, step } => heating::step(status, &heater, step)?,
+            Self::PidCalibrate { heater, target } => heating::pid_calibrate(status, heater, target)?,
             Self::StepTuning { key, direction } => heating::step_tuning(status, key, direction)?,
             Self::ResetTuning { key } => heating::reset_tuning(setup, key)?,
             Self::SetLight { led, level } => vec![lighting::light(setup, status, &led, level)],

@@ -7,9 +7,10 @@ use crate::console_view::ConsoleView;
 use crate::files_view::{FileState, FilesView};
 use crate::history_view::HistoryView;
 use crate::items::{
-    compared_tool_items, connection_name, fan_item, fans_part_fan_first, head_item, head_nozzles, heater_item,
-    heaters_by_head, host_interface_item, keeping_parts, led_effect_item, led_item, no_head_selected, power_item,
-    replace_rows, selected_head, sensor_item, split_tuning, spool_in_use_target, spool_tool, tuning_item, update_item,
+    compared_tool_items, connection_name, fan_item, fans_part_fan_first, float_model, head_item, head_nozzles,
+    heater_item, heaters_by_head, host_interface_item, keeping_parts, led_effect_item, led_item, no_head_selected,
+    power_item, replace_rows, selected_head, sensor_item, split_tuning, spool_in_use_target, spool_tool, tuning_item,
+    update_item,
 };
 use crate::macro_view::MacroView;
 use crate::mmu_view::{JobFile, MmuView};
@@ -26,11 +27,13 @@ use freakymate_core::domain::filament::{self, FilamentHandling};
 use freakymate_core::domain::filament_match::{self, ToolMatch};
 use freakymate_core::domain::heads::{self, ChangerNote};
 use freakymate_core::domain::machine_tree::LaneId;
+use freakymate_core::domain::manual_probe::Direction;
 use freakymate_core::domain::prepared_job::PreparedJob;
 use freakymate_core::domain::spools::{self, Lane};
 use freakymate_core::domain::temperature_limits::HeaterWatch;
 use freakymate_core::domain::{estimates, light, pause};
 use freakymate_core::sources::PrinterStatus;
+use freakymate_core::sources::klipper::ExtruderState;
 use freakymate_core::sources::klipper::commands::{MeshNameProblem, mesh_name_problem};
 use freakymate_core::sources::klipper::{BED_HEATER, KlippyState, Leveling, NOZZLE_HEATER, tuning};
 use freakymate_core::sources::moonraker_server::files::{FileEntry, FileMetadata, ThumbnailImage};
@@ -38,6 +41,7 @@ use freakymate_core::sources::moonraker_server::gcode_store::{ConsoleKind, Conso
 use freakymate_core::sources::moonraker_server::history::{FinishedJob, PrintHistory};
 use freakymate_core::sources::spoolman::{Spool, SpoolmanState};
 use freakymate_core::sources::toolchanger::ToolchangerStatus;
+use freakymate_core::step_choices::{DEFAULT_EXTRUDE_MM, nearest_step};
 use freakymate_core::{Access, Command, ConnectionState, Event, PrinterService, Query, Snapshot};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
@@ -79,7 +83,9 @@ pub struct Presenter {
     tuning: Rc<VecModel<TuningItem>>,
     history: HistoryView,
     /// The lengths the Filament page offers, set again only when the configuration changes them.
-    extrude_lengths: RefCell<Vec<f64>>,
+    /// The lengths for extruding as configured, and the lengths and limit last shown.
+    extrude_choices: RefCell<Vec<f64>>,
+    extrude_lengths: RefCell<(Vec<f64>, f64)>,
     filament_sensors: Rc<VecModel<FilamentSensorItem>>,
     print_objects: ObjectsView,
     calibration: CalibrationView,
@@ -94,7 +100,7 @@ pub struct Presenter {
     updates: Rc<VecModel<UpdateItem>>,
     host_interfaces: Rc<VecModel<HostInterfaceItem>>,
     /// Commands from here that wait long for their answer, oldest first (`Event::CommandRunning`).
-    running_commands: RefCell<Vec<(u64, String)>>,
+    running_commands: RefCell<Vec<(u64, Command, String)>>,
     status: Rc<StatusView>,
 }
 
@@ -114,6 +120,7 @@ impl Presenter {
             led_effects: Rc::default(),
             tuning: Rc::default(),
             history: HistoryView::new(window),
+            extrude_choices: RefCell::new(DEFAULT_EXTRUDE_MM.to_vec()),
             extrude_lengths: RefCell::default(),
             filament_sensors: Rc::default(),
             print_objects: ObjectsView::default(),
@@ -187,19 +194,30 @@ impl Presenter {
         bed_map::object_at_tap(&status.print_objects, bed, x_share, y_share, reach_share)
     }
 
-    /// Offers only lengths Klipper accepts; a selected length beyond them falls back to the longest one.
-    fn set_extrude_lengths(&self, window: &AppWindow, lengths: Vec<f64>) {
-        if *self.extrude_lengths.borrow() == lengths {
+    /// The lengths from the settings file; shown with the next snapshot.
+    pub fn set_extrude_choices(&self, lengths: Vec<f64>) {
+        *self.extrude_choices.borrow_mut() = lengths;
+        *self.extrude_lengths.borrow_mut() = Default::default();
+    }
+
+    /// Offers all configured lengths, those above Klipper's limit disabled; a selected length that is disabled falls
+    /// back to the nearest one that is not.
+    fn set_extrude_lengths(&self, window: &AppWindow, extruder: &ExtruderState) {
+        let lengths = extruder.extrude_lengths(&self.extrude_choices.borrow());
+        let limit = extruder.extrude_limit();
+        if *self.extrude_lengths.borrow() == (lengths.clone(), limit) {
             return;
         }
-        let values: Vec<f32> = lengths.iter().map(|length| *length as f32).collect();
-        let longest = values.last().copied().unwrap_or_default();
-        window.global::<Printer>().set_extrude_lengths(ModelRc::from(Rc::new(VecModel::from(values))));
+        let printer = window.global::<Printer>();
+        printer.set_extrude_lengths(float_model(&lengths));
+        printer.set_extrude_limit(limit as f32);
+        let enabled: Vec<f64> = lengths.iter().copied().filter(|length| *length <= limit).collect();
         let settings = window.global::<UiSettings>();
-        if settings.get_extrude_length() > longest {
-            settings.set_extrude_length(longest);
+        let selected = f64::from(settings.get_extrude_length());
+        if !enabled.contains(&selected) {
+            settings.set_extrude_length(nearest_step(&enabled, selected) as f32);
         }
-        *self.extrude_lengths.borrow_mut() = lengths;
+        *self.extrude_lengths.borrow_mut() = (lengths, limit);
     }
 
     /// Brings the whole UI up to date with a snapshot of the printer.
@@ -219,6 +237,7 @@ impl Presenter {
         let lanes = self.lanes(snapshot);
         let active_spool = spools::active_spool(&lanes).cloned();
         self.show_temperatures(&printer, snapshot, &lanes);
+        self.history.show_pid(status);
         self.print_objects.show(&printer, &status.print_objects, status.motion.bed());
         self.show_capabilities(&printer, snapshot);
         self.show_filament(&printer, snapshot, &lanes, active_spool.as_ref());
@@ -290,6 +309,7 @@ impl Presenter {
         printer.set_position_x(motion.live_position[0] as f32);
         printer.set_position_y(motion.live_position[1] as f32);
         printer.set_position_z(motion.live_position[2] as f32);
+        self.calibration.show_toolhead_height(&printer, &status.calibration, motion.live_position[2]);
         printer.set_homed_x(motion.homed.x);
         printer.set_homed_y(motion.homed.y);
         printer.set_homed_z(motion.homed.z);
@@ -302,7 +322,7 @@ impl Presenter {
         self.note_origin("volumetric flow", Some(flow.origin));
         printer.set_live_flow(flow.value as f32);
         printer.set_can_extrude(status.extruder.can_extrude);
-        self.set_extrude_lengths(window, status.extruder.extrude_lengths());
+        self.set_extrude_lengths(window, &status.extruder);
     }
 
     /// Light, fans, LEDs, the tuning values and the pending configuration.
@@ -358,6 +378,16 @@ impl Presenter {
                 .collect(),
         );
         replace_rows(&self.sensors, status.sensors.iter().map(sensor_item).collect());
+    }
+
+    /// A coarse press of the paper test: the distance to send, if the button is on.
+    pub fn probe_coarse(&self, direction: Direction) -> Option<f64> {
+        self.calibration.press_coarse(direction)
+    }
+
+    /// A fine or fixed-step move of the paper test.
+    pub fn probe_moved(&self) {
+        self.calibration.probe_moved();
     }
 
     /// What the printer offers: leveling, probe, calibration, the filament macros, power devices, updates and macros.
@@ -462,6 +492,7 @@ impl Presenter {
     /// Opens the temperature history of a heater or sensor and asks Moonraker for the stored minutes.
     pub fn open_history(&self, object: &str) {
         self.history.open(object, &self.cache.borrow().snapshot.status);
+        self.show_pid_runs();
         self.service.query(Query::TemperatureHistory);
     }
 
@@ -545,11 +576,12 @@ impl Presenter {
                 }
             }
             Event::CommandRunning { id, command, script_line } => {
-                self.running_commands.borrow_mut().push((id, running_label(&command, script_line.as_deref())));
+                let label = running_label(&command, script_line.as_deref());
+                self.running_commands.borrow_mut().push((id, command, label));
                 self.show_running_command();
             }
             Event::CommandFinished { id } => {
-                self.running_commands.borrow_mut().retain(|(running, _)| *running != id);
+                self.running_commands.borrow_mut().retain(|(running, ..)| *running != id);
                 self.show_running_command();
             }
         }
@@ -558,8 +590,19 @@ impl Presenter {
     /// The status bar shows the newest command that is still waiting for its answer.
     fn show_running_command(&self) {
         let Some(window) = self.window.upgrade() else { return };
-        let newest = self.running_commands.borrow().last().map(|(_, command)| command.clone()).unwrap_or_default();
+        let newest = self.running_commands.borrow().last().map(|(_, _, label)| label.clone()).unwrap_or_default();
         window.global::<Printer>().set_running_command(newest.into());
+        self.show_pid_runs();
+    }
+
+    /// The dialog of a heater knows that this display's `PID_CALIBRATE` for it has not been answered yet.
+    fn show_pid_runs(&self) {
+        let runs = self.running_commands.borrow();
+        let tunings = runs.iter().filter_map(|(_, command, _)| match command {
+            Command::PidCalibrate { heater, target } => Some((heater.as_str(), *target)),
+            _ => None,
+        });
+        self.history.set_pid_runs(tunings, &self.cache.borrow().snapshot.status);
     }
 
     /// Hides or shows the temperature reports in the console; the history is read again so that it follows.

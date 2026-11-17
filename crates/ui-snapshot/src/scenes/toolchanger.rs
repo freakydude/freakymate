@@ -224,6 +224,21 @@ fn no_head_mounted(session: &mut Session) -> Result<(), String> {
         snapshot.status.toolchanger.as_ref().is_some_and(|changer| changer.selected.is_none())
     })?;
     session.show_page(Page::Filament, "toolchanger-no-head")?;
+    session.window.global::<Navigation>().set_head_picker_open(true);
+    session.capture("toolchanger-no-head-picker")?;
+    session.window.global::<Navigation>().set_head_picker_open(false);
+    // Not initialized and no head: the Service tab of the Changer page with the warning dot on Sensors.
+    session.service.send(Command::RunMacro { name: "FAKE_TOOLCHANGER_STATE STATE=uninitialized".into() });
+    session.wait_until("uninitialized without head", |snapshot| {
+        snapshot.status.toolchanger.as_ref().is_some_and(|changer| changer.status == "uninitialized")
+    })?;
+    session.window.global::<Navigation>().set_changer_tab(ChangerTab::Service);
+    session.show_page(Page::Changer, "toolchanger-no-head-service")?;
+    session.window.global::<Navigation>().set_changer_tab(ChangerTab::Tools);
+    session.service.send(Command::InitializeToolchanger { recover: false });
+    session.wait_until("ready without head", |snapshot| {
+        snapshot.status.toolchanger.as_ref().is_some_and(|changer| changer.is_ready())
+    })?;
     session.service.send(Command::RunMacro { name: "T2".into() });
     session.wait_until("T2 selected again", |snapshot| {
         snapshot.status.toolchanger.as_ref().is_some_and(|changer| changer.selected == Some(2))

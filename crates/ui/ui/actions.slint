@@ -24,6 +24,8 @@ export global Actions {
     // Temperature history of a heater or sensor (Klipper object name) in an overlay.
     callback open-history(string);
     callback close-history();
+    // `PID_CALIBRATE` of a heater (Klipper object name) at a target in °C.
+    callback pid-tune(string, float);
     callback adjust-z-offset(float);
     callback reset-z-offset();
     callback apply-z-offset();
@@ -37,12 +39,18 @@ export global Actions {
     pure callback bed-mesh-name-hint(string) -> string;
     callback calculate-screws-tilt();
     callback adjust-bed-screws();
-    // PROBE_CALIBRATE or Z_ENDSTOP_CALIBRATE, whichever the printer has.
+    // PROBE_CALIBRATE, PROBE_EDDY_CURRENT_CALIBRATE or Z_ENDSTOP_CALIBRATE, whichever the printer has.
     callback calibrate-z();
-    // Within the manual probe: a relative move in mm; bisect-z goes halfway up (1) or down (-1) to the nearest
-    // height tried.
+    // Eddy probe steps (drive current, tap with "guess", "refine" or "verify"); the Z heights are calibrate-z.
+    callback eddy-drive-current();
+    callback eddy-tap(string);
+    // Moves X and Y so that the "nozzle" or the "sensor" is over the middle of the bed.
+    callback eddy-centre(string);
+    // Within the manual probe: a relative move in mm; probe-fine and probe-coarse (up 1, down -1) take the step
+    // whose target the button shows.
     callback test-z(float);
-    callback bisect-z(int);
+    callback probe-fine(int);
+    callback probe-coarse(int);
     callback accept-calibration();
     callback screw-adjusted();
     callback abort-calibration();

@@ -11,6 +11,7 @@ use crate::happy_hare::HappyHare;
 use crate::history::{Sample, TemperatureStore};
 use crate::layer_pause::LayerPause;
 use crate::machine::{FILAMENT_SENSORS, MachineProfile};
+use crate::pid_tuning::{self, PidConfig, PidRun};
 use crate::print_objects::{self, Definitions};
 use serde_json::{Map, Value, json};
 use std::time::Duration;
@@ -258,6 +259,9 @@ pub struct Printer {
     temperatures: TemperatureStore,
     z_offset: f64,
     calibration: Calibration,
+    /// The PID values of printer.cfg and the tuning that runs, if one does.
+    pid_config: PidConfig,
+    pid_run: Option<PidRun>,
     gantry_leveled: bool,
     print_state: PrintState,
     filename: String,
@@ -327,7 +331,9 @@ impl Printer {
             devices: profile.devices.then(Devices::default),
             temperatures: TemperatureStore::default(),
             z_offset: 0.0,
-            calibration: Calibration::new(profile.probe, profile.bed_mesh, profile.bed_screws),
+            calibration: Calibration::new(profile.probe, profile.eddy, profile.bed_mesh, profile.bed_screws),
+            pid_config: PidConfig::new(),
+            pid_run: None,
             gantry_leveled: false,
             print_state: PrintState::Standby,
             filename: String::new(),
@@ -377,6 +383,7 @@ impl Printer {
     pub fn advance(&mut self, elapsed: Duration) {
         let seconds = elapsed.as_secs_f64() * self.time_scale;
         self.uptime += seconds;
+        self.advance_pid_run(seconds);
         self.extruder.advance(seconds);
         if let Some(toolchanger) = self.toolchanger.as_mut() {
             toolchanger.advance(seconds);
@@ -490,7 +497,11 @@ impl Printer {
             Command::SetHeaterTemperature { heater, target } => self.set_named_heater(&heater, target)?,
             Command::FakeOvershoot { heater, delta } => self.named_heater_mut(&heater)?.0.overshoot = delta,
             Command::ExcludeObject { name } => self.exclude_object(&name),
-            Command::SaveConfig => self.calibration.save(),
+            Command::PidCalibrate { heater, target } => self.start_pid_run(&heater, target)?,
+            Command::SaveConfig => {
+                self.pid_config.save(&self.calibration.pending_json());
+                self.calibration.save();
+            }
             Command::Calibration(command) => {
                 let homed = self.homed.iter().all(|homed| *homed);
                 self.calibration.apply(command, homed)?;
@@ -596,6 +607,38 @@ impl Printer {
             ("chamber", Some(chamber)) => Ok((chamber, MAX_CHAMBER_TARGET)),
             _ => Err(CommandError::new(format!("Unknown heater '{heater}'"))),
         }
+    }
+
+    /// Starts a tuning: Klipper sets the target at once (`pheaters.set_temperature`, h l.110-113 refuses one outside
+    /// the range) and then waits for the run to end.
+    fn start_pid_run(&mut self, heater: &str, target: f64) -> Result<(), CommandError> {
+        self.set_named_heater(heater, target)?;
+        self.pid_run = Some(PidRun::new(heater, target));
+        Ok(())
+    }
+
+    /// How long the answer of a `PID_CALIBRATE` takes in real time.
+    pub fn pid_run_wait(&mut self) -> Duration {
+        let Some(run) = self.pid_run.clone() else { return Duration::ZERO };
+        let temperature =
+            self.named_heater_mut(&run.heater).map_or(AMBIENT_TEMPERATURE, |(heater, _)| heater.temperature);
+        Duration::from_secs_f64(run.duration_seconds(temperature, HEAT_RATE_PER_SECOND) / self.time_scale)
+    }
+
+    fn advance_pid_run(&mut self, seconds: f64) {
+        let Some(mut run) = self.pid_run.take() else { return };
+        let Ok((heater, _)) = self.named_heater_mut(&run.heater) else { return };
+        match run.advance(heater.reading(), seconds) {
+            pid_tuning::Step::Hold => {}
+            pid_tuning::Step::Target(target) => heater.target = target,
+            pid_tuning::Step::Done => {
+                // `set_control` hands the heater back with target 0 (h l.127-132).
+                heater.target = 0.0;
+                self.calibration.set_pending(&pid_tuning::section_of(&run.heater), pid_tuning::found_options());
+                return;
+            }
+        }
+        self.pid_run = Some(run);
     }
 
     fn set_named_heater(&mut self, heater: &str, target: f64) -> Result<(), CommandError> {

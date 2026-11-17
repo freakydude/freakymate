@@ -1,8 +1,11 @@
 // Temperature history of one heater or sensor: the last minutes from Moonraker, growing while it is open.
 
 import { Theme } from "../theme.slint";
-import { Actions, Navigation, Printer } from "../state.slint";
+import { Icons } from "../icons.slint";
+import { Actions, Confirm, Navigation, Printer } from "../state.slint";
+import { ButtonKind, IconButton, Note } from "controls.slint";
 import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
+import { NumberEntryDialog } from "entry-dialogs.slint";
 
 // A line of the chart. The view box is 1000 high and as wide as the drawing area's shape, because a path is scaled
 // evenly; the lines are computed for that shape (`Navigation.history-aspect`).
@@ -20,8 +23,25 @@ component Legend inherits HorizontalLayout {
     Text { text: root.text; color: Theme.muted; font-size: Theme.font-small; vertical-alignment: center; }
 }
 
+// A value that is read: the name above, the value below.
+component Labelled inherits VerticalLayout {
+    in property <string> label;
+    in property <string> value;
+    alignment: center;
+    Text { text: root.label; color: Theme.muted; font-size: Theme.font-small; }
+    Text { text: root.value; color: Theme.foreground; font-size: Theme.font-normal; font-weight: 600; }
+}
+
 export component HistoryDialog inherits Scrim {
     visible: Navigation.history-open;
+
+    // The target of a PID tuning: what the person typed, else what the core offers (230 °C for a nozzle, 70 °C for
+    // the bed, nothing for another heater).
+    property <bool> open: Navigation.history-open;
+    property <bool> typed;
+    property <float> typed-target;
+    property <float> pid-target: root.typed ? root.typed-target : Printer.history-pid-target;
+    changed open => { root.typed = false; }
 
     DialogPanel {
         x: Theme.dialog-inset;
@@ -143,6 +163,114 @@ export component HistoryDialog inherits Scrim {
             if Printer.history-target-path != "": Legend { color: Theme.muted; text: @tr("Target"); }
             if Printer.history-power-path != "": Legend { color: Theme.chart-secondary; text: @tr("Power"); }
         }
+
+        // Klipper has found values for this heater, whoever started the tuning: show them with the old ones.
+        if Printer.history-pid-available && Printer.history-pid-running-target <= 0 && Printer.history-pid-has-result: VerticalLayout {
+            spacing: Theme.spacing;
+            Note { text: @tr("Result of PID_CALIBRATE, pending for printer.cfg. Takes effect after Save config, which restarts Klipper."); }
+            HorizontalLayout {
+                height: Theme.touch;
+                spacing: Theme.spacing-large;
+                for value in Printer.history-pid-result: Labelled {
+                    label: value.current != "" ? @tr("{} (was {})", value.name, value.current) : value.name;
+                    value: value.pending;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                IconButton {
+                    width: 200px;
+                    horizontal: true;
+                    icon: Icons.ui-save;
+                    text: @tr("Save config");
+                    kind: ButtonKind.accent;
+                    clicked => { Confirm.ask(@tr("Save config"), @tr("Klipper writes the configuration and restarts."), "save-config", "", false); }
+                }
+            }
+        }
+        // Our own PID_CALIBRATE has not been answered: Klipper is busy.
+        if Printer.history-pid-available && Printer.history-pid-running-target > 0: HorizontalLayout {
+            height: Theme.touch;
+            spacing: Theme.spacing-large;
+            Image {
+                source: Icons.calibration-pid;
+                colorize: Theme.foreground;
+                width: Theme.icon-large;
+                height: Theme.icon-large;
+                cross-axis-self-alignment: center;
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                Text {
+                    text: @tr("PID_CALIBRATE at {} °C", round(Printer.history-pid-running-target));
+                    color: Theme.foreground;
+                    font-size: Theme.font-normal;
+                    font-weight: 600;
+                }
+                Note { text: @tr("Klipper accepts no other command until it ends. Only the emergency stop ends it early."); }
+            }
+        }
+        // Without a result the heater can be tuned: the target is a field like on the heater row.
+        if Printer.history-pid-available && Printer.history-pid-running-target <= 0 && !Printer.history-pid-has-result: HorizontalLayout {
+            height: Theme.touch;
+            spacing: Theme.spacing;
+            Rectangle {
+                width: 110px;
+                border-radius: Theme.radius;
+                background: target-touch.pressed ? Theme.surface-active : Theme.surface-raised;
+                accessible-role: button;
+                accessible-label: @tr("Target");
+                target-touch := TouchArea {
+                    clicked => {
+                        pid-entry.text = root.pid-target > 0 ? round(root.pid-target) : "";
+                        pid-entry.open = true;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: @tr("Target"); color: Theme.muted; font-size: Theme.font-small; horizontal-alignment: center; }
+                    Text {
+                        text: root.pid-target > 0 ? round(root.pid-target) + " °C" : "—";
+                        color: root.pid-target > 0 ? Theme.accent : Theme.muted;
+                        font-size: Theme.font-large;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+            if Printer.history-pid-current != "": Labelled {
+                horizontal-stretch: 1;
+                label: @tr("In printer.cfg now");
+                value: Printer.history-pid-current;
+            }
+            if Printer.history-pid-current == "": Rectangle { horizontal-stretch: 1; }
+            IconButton {
+                width: 200px;
+                horizontal: true;
+                icon: Icons.calibration-pid;
+                text: @tr("PID tune");
+                kind: ButtonKind.accent;
+                enabled: root.pid-target > 0 && !Printer.is-printing;
+                clicked => {
+                    Confirm.ask(@tr("PID tune {}", Printer.history-title),
+                        @tr("Heats to {} °C and takes several minutes. Klipper accepts no other command meanwhile; only the emergency stop ends it early.", round(root.pid-target)),
+                        "pid-tune", round(root.pid-target), false);
+                    Confirm.confirm-text = @tr("Start");
+                }
+            }
+        }
     }
+    }
+
+    pid-entry := NumberEntryDialog {
+        unit: "°C";
+        title: @tr("PID tune target");
+        hint: Printer.history-pid-range;
+        hint-warning: Actions.heater-target-outside(Printer.history-object, self.text);
+        accepted(text) => {
+            if (text.is-float()) {
+                root.typed-target = text.to-float();
+                root.typed = true;
+            }
+        }
     }
 }

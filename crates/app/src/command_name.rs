@@ -21,6 +21,7 @@ pub fn command_name(command: &Command) -> String {
         Command::ZTiltAdjust => "Z Tilt Adjust".to_owned(),
         Command::SetHeaterTarget { .. } => "Set Heater Target".to_owned(),
         Command::StepHeater { .. } => "Step Heater".to_owned(),
+        Command::PidCalibrate { .. } => "PID Tune".to_owned(),
         Command::ApplyPreset { .. } => "Apply Preset".to_owned(),
         Command::CoolDown => "Cool Down".to_owned(),
         Command::PickUpHead { .. } => "Pick Up Head".to_owned(),
@@ -51,6 +52,10 @@ pub fn command_name(command: &Command) -> String {
         Command::CalibrateZ => "Calibrate Z".to_owned(),
         Command::ProbeCalibrate => "Probe Calibrate".to_owned(),
         Command::ZEndstopCalibrate => "Z Endstop Calibrate".to_owned(),
+        Command::CalibrateEddyDriveCurrent | Command::EddyDriveCurrent { .. } => "Eddy Drive Current".to_owned(),
+        Command::MoveToBedCentre { .. } | Command::MoveXy { .. } => "Move To Bed Centre".to_owned(),
+        Command::EddyCalibrate { .. } => "Eddy Z Heights".to_owned(),
+        Command::EddyTapCalibrate { .. } => "Eddy Tap Threshold".to_owned(),
         Command::TestZ { .. } => "Test Z".to_owned(),
         Command::AcceptCalibration => "Accept Calibration".to_owned(),
         Command::ScrewAdjusted => "Screw Adjusted".to_owned(),
@@ -107,9 +112,12 @@ pub fn command_name(command: &Command) -> String {
     }
 }
 
-/// What a running command is called in the status bar: the first line of its G-code script, as in the console,
-/// otherwise the command's name.
+/// What a running command is called in the status bar (which adds the dots): the first line of its G-code script, as
+/// in the console, otherwise the command's name; a PID tuning has its own name, not its script.
 pub fn running_label(command: &Command, script_line: Option<&str>) -> String {
+    if matches!(command, Command::PidCalibrate { .. }) {
+        return "PID tune".to_owned();
+    }
     script_line.map_or_else(|| command_name(command), str::to_owned)
 }
 
@@ -131,5 +139,7 @@ mod tests {
     fn a_running_script_is_named_by_its_first_line() {
         assert_eq!(running_label(&Command::Home { x: true, y: true, z: true }, Some("G28")), "G28");
         assert_eq!(running_label(&Command::RebootHost, None), "Reboot Host");
+        let tune = Command::PidCalibrate { heater: "extruder".into(), target: 230.0 };
+        assert_eq!(running_label(&tune, Some("PID_CALIBRATE HEATER=extruder TARGET=230")), "PID tune");
     }
 }

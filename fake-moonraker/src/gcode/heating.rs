@@ -36,6 +36,10 @@ pub(super) fn parse(name: &str, args: &[&str]) -> Result<Option<Command>, Comman
             heater: named_text(args, "HEATER").ok_or_else(|| CommandError::new("Missing parameter HEATER"))?,
             target: named_value(args, "TARGET")?.unwrap_or(0.0),
         }),
+        "PID_CALIBRATE" => Ok(Command::PidCalibrate {
+            heater: required_text(args, "HEATER")?,
+            target: named_value(args, "TARGET")?.ok_or_else(|| CommandError::new("Missing parameter TARGET"))?,
+        }),
         "FAKE_OVERSHOOT" => Ok(Command::FakeOvershoot {
             heater: named_text(args, "HEATER").ok_or_else(|| CommandError::new("Missing parameter HEATER"))?,
             delta: named_value(args, "DELTA")?.unwrap_or(0.0),

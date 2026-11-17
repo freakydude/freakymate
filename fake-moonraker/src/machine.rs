@@ -120,6 +120,9 @@ pub struct MachineProfile {
     pub error_gcode_pause: bool,
     /// The buffer of the Happy Hare machine (a proportional one as on the real device, unless a profile says otherwise).
     pub buffer: BufferKind,
+    /// The probe is an Eddy current probe (`[probe_eddy_current eddy]`, as on Frank's Voron): no `PROBE_CALIBRATE`, but
+    /// the setup steps of `docs/Eddy_Probe.md`.
+    pub eddy: bool,
     /// An encoder on the Happy Hare machine (`mmu.encoder`, `mmu.sensors.encoder`).
     pub encoder: bool,
 }
@@ -188,6 +191,7 @@ impl MachineProfile {
             initialize_on: InitializeOn::FirstUse,
             error_gcode_pause: false,
             buffer: BufferKind::Proportional,
+            eddy: false,
             encoder: false,
         }
     }
@@ -212,6 +216,7 @@ impl MachineProfile {
             initialize_on: InitializeOn::FirstUse,
             error_gcode_pause: false,
             buffer: BufferKind::Proportional,
+            eddy: true,
             encoder: false,
         }
     }
@@ -236,6 +241,7 @@ impl MachineProfile {
             initialize_on: InitializeOn::FirstUse,
             error_gcode_pause: false,
             buffer: BufferKind::Proportional,
+            eddy: false,
             encoder: false,
         }
     }

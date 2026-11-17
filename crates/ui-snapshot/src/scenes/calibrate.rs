@@ -1,8 +1,8 @@
 //! The Calibrate tab of the Motion page and the bed mesh dialogs.
 
 use crate::session::Session;
-use freakymate::{Actions, MeshDialogs, MotionTab, Navigation, Page};
-use freakymate_core::sources::klipper::{CalibrationMode, TestZ};
+use freakymate::{Actions, EddyDialog, MeshDialogs, MotionTab, Navigation, Page};
+use freakymate_core::sources::klipper::{CalibrationMode, EddyTap, TestZ};
 use freakymate_core::{Command, Snapshot};
 use slint::ComponentHandle;
 use std::time::Duration;
@@ -46,6 +46,10 @@ pub(super) fn calibrate(session: &mut Session) -> Result<(), String> {
     session.pump(Duration::from_millis(300));
     session.capture("calibrate-pending")?;
 
+    if session.presenter.snapshot().sources.klipper.eddy_probe.is_some() {
+        eddy_dialog(session)?;
+    }
+
     if offered.bed_screws {
         session.service.send(Command::AdjustBedScrews);
         session.wait_until("bed screws", |snapshot| snapshot.status.calibration.mode.is_some())?;
@@ -67,6 +71,34 @@ pub(super) fn calibrate(session: &mut Session) -> Result<(), String> {
     session.service.send(Command::SaveConfig);
     session.wait_until("saved", |snapshot| !snapshot.status.save_config_pending)?;
     session.window.global::<Navigation>().set_motion_tab(MotionTab::Axes);
+    Ok(())
+}
+
+/// The Eddy probe button of the level card (800x480, no fitting).
+const EDDY_BUTTON: (f32, f32) = (178.0, 302.0);
+
+/// The setup dialog of an Eddy probe after the steps that need no paper: drive current and the tap steps, so the
+/// pending list shows two values. The paper test of the Z heights was run above (`CalibrateZ` is its command).
+fn eddy_dialog(session: &mut Session) -> Result<(), String> {
+    session.service.send(Command::CalibrateEddyDriveCurrent);
+    for step in [EddyTap::Guess, EddyTap::Refine, EddyTap::Verify] {
+        session.service.send(Command::EddyTapCalibrate { step });
+    }
+    session.wait_until("tap threshold pending", |snapshot| {
+        snapshot.status.calibration.eddy.as_ref().is_some_and(|eddy| eddy.tap_threshold.pending.is_some())
+    })?;
+    if session.has_reference_layout() {
+        let (x, y) = EDDY_BUTTON;
+        session.tap(x, y);
+    } else {
+        session.window.global::<EddyDialog>().set_open(true);
+    }
+    session.pump(Duration::from_millis(300));
+    if !session.window.global::<EddyDialog>().get_open() {
+        return Err("a tap on the Eddy probe button did not open the dialog".into());
+    }
+    session.capture("calibrate-eddy")?;
+    session.window.global::<EddyDialog>().set_open(false);
     Ok(())
 }
 

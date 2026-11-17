@@ -233,7 +233,7 @@ component HeatersTab inherits Rectangle {
                 // Under the heaters, so the presets can take the full height beside them.
                 StepSelector {
                     label: @tr("Step");
-                    values: [1, 5, 10, 25];
+                    values: UiSettings.temperature-steps;
                     unit: " °C";
                     selected <=> UiSettings.temperature-step;
                     changed => { UiSettings.steps-changed(); }

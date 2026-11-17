@@ -2,7 +2,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Actions, Dialogs, Printer } from "../state.slint";
+import { Actions, Dialogs, Printer, UiSettings } from "../state.slint";
 import { ButtonKind, IconButton, TextWithValue } from "controls.slint";
 import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
 
@@ -71,7 +71,7 @@ export component CalibrationDialog inherits Scrim {
             }
             if root.probing: HorizontalLayout {
                 spacing: Theme.spacing;
-                for distance in [-1, -0.1, -0.05, -0.01, 0.01, 0.05, 0.1, 1]: IconButton {
+                for distance in UiSettings.manual-probe-steps: IconButton {
                     text: (distance > 0 ? "+" : "−") + abs(distance);
                     clicked => { Actions.test-z(distance); }
                 }
@@ -79,18 +79,34 @@ export component CalibrationDialog inherits Scrim {
             if root.probing: HorizontalLayout {
                 spacing: Theme.spacing;
                 IconButton {
+                    icon: Icons.ui-chevrons-down;
                     horizontal: true;
-                    icon: Icons.ui-chevron-down;
-                    text: @tr("Halfway down");
-                    enabled: Printer.probe-z-lower != "";
-                    clicked => { Actions.bisect-z(-1); }
+                    text: Printer.probe-coarse-down;
+                    enabled: Printer.probe-coarse-down != "";
+                    accessible-label: @tr("Coarse step down to {}", Printer.probe-coarse-down);
+                    clicked => { Actions.probe-coarse(-1); }
                 }
                 IconButton {
+                    icon: Icons.ui-chevron-down;
                     horizontal: true;
+                    text: Printer.probe-fine-down;
+                    accessible-label: @tr("Fine step down to {}", Printer.probe-fine-down);
+                    clicked => { Actions.probe-fine(-1); }
+                }
+                IconButton {
                     icon: Icons.ui-chevron-up;
-                    text: @tr("Halfway up");
-                    enabled: Printer.probe-z-upper != "";
-                    clicked => { Actions.bisect-z(1); }
+                    horizontal: true;
+                    text: Printer.probe-fine-up;
+                    accessible-label: @tr("Fine step up to {}", Printer.probe-fine-up);
+                    clicked => { Actions.probe-fine(1); }
+                }
+                IconButton {
+                    icon: Icons.ui-chevrons-up;
+                    horizontal: true;
+                    text: Printer.probe-coarse-up;
+                    enabled: Printer.probe-coarse-up != "";
+                    accessible-label: @tr("Coarse step up to {}", Printer.probe-coarse-up);
+                    clicked => { Actions.probe-coarse(1); }
                 }
             }
 

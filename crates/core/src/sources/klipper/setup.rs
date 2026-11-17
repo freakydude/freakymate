@@ -3,6 +3,7 @@
 
 use super::calibration::{self, CalibrationSetup};
 use super::devices::{self, FanKind, WhiteChannel};
+use super::eddy;
 use super::filament_sensors::is_filament_sensor;
 use super::leveling::Leveling;
 use super::macros::{self, MacroDetails};
@@ -52,6 +53,9 @@ pub struct Setup {
     /// Klipper has the command `AFC_UNSELECT_TOOL` (AFC with its own tool changer, `[AFC_Toolchanger]`); from the same
     /// answer.
     pub has_afc_unselect_tool: bool,
+    /// The name of the Eddy current probe (`[probe_eddy_current <name>]`), the `CHIP` of its commands. Klipper registers
+    /// no `PROBE_CALIBRATE` for it.
+    pub eddy_probe: Option<String>,
     /// `[save_variables]` is configured, so `SAVE_VARIABLE` keeps values across restarts.
     pub save_variables: bool,
 }
@@ -65,7 +69,11 @@ impl Setup {
             let (kind, instance) = name.split_once(' ').map_or((name, None), |(kind, instance)| (kind, Some(instance)));
             match (kind, instance) {
                 (_, None) if Leveling::objects().contains(&kind) => leveling_objects.push(kind),
-                ("probe" | "bltouch" | "smart_effector" | "probe_eddy_current", _) => setup.probe = true,
+                ("probe_eddy_current", _) => {
+                    setup.probe = true;
+                    setup.eddy_probe = setup.eddy_probe.take().or_else(|| eddy::instance(name).map(str::to_owned));
+                }
+                ("probe" | "bltouch" | "smart_effector", _) => setup.probe = true,
                 ("save_variables", None) => setup.save_variables = true,
                 // What is only shown leaves out helpers; what changes behaviour (probe, leveling) counts above.
                 _ if devices::is_hidden(name) => {}
@@ -95,6 +103,10 @@ impl Setup {
         self.led_white = self.leds.iter().map(|led| (led.clone(), devices::white_channel(section(led)))).collect();
         self.tuning = TuningConfig::from_settings(settings);
         self.calibration.apply_settings(settings);
+        if self.eddy_probe.is_none() {
+            self.eddy_probe = eddy::configured_name(settings).map(str::to_owned);
+            self.probe |= self.eddy_probe.is_some();
+        }
     }
 
     pub fn white_channel(&self, led: &str) -> WhiteChannel {
@@ -155,7 +167,9 @@ impl Setup {
             "extruder",
             Some(&["temperature", "target", "power", "pressure_advance", "smooth_time", "can_extrude"]),
         );
-        subscription.add("configfile", Some(&["save_config_pending", "save_config_pending_items", "settings"]));
+        // `config` is the raw file text: `settings` also lists defaults, so only it tells what the file holds.
+        subscription
+            .add("configfile", Some(&["config", "save_config_pending", "save_config_pending_items", "settings"]));
         subscription.add("heater_bed", Some(HEATER_FIELDS));
         subscription.add("heaters", Some(&["available_sensors"]));
         for leveling in Leveling::objects() {
@@ -224,6 +238,17 @@ mod tests {
         let mut setup = Setup::from_objects(["neopixel Case"]);
         setup.apply_settings(Some(&serde_json::json!({ "neopixel case": { "color_order": ["GRBW"] } })));
         assert_eq!(setup.white_channel("neopixel Case"), WhiteChannel::All);
+    }
+
+    #[test]
+    fn an_eddy_probe_is_found_by_its_object_or_by_its_section() {
+        let by_object = Setup::from_objects(["probe", "probe_eddy_current eddy", "probe_eddy_current _helper"]);
+        assert!(by_object.probe);
+        assert_eq!(by_object.eddy_probe.as_deref(), Some("eddy"));
+        let mut by_section = Setup::from_objects(["probe"]);
+        by_section.apply_settings(Some(&serde_json::json!({ "probe_eddy_current eddy": {} })));
+        assert_eq!(by_section.eddy_probe.as_deref(), Some("eddy"));
+        assert_eq!(Setup::from_objects(["probe"]).eddy_probe, None);
     }
 
     #[test]

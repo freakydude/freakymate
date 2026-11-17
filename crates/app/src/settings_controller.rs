@@ -1,10 +1,12 @@
 //! Connects `UiSettings` with the settings file and applies changes immediately.
 
+use crate::items::float_model;
 use crate::network_controller::NetworkController;
 use crate::presenter::Presenter;
 use crate::{AppWindow, Backlight, PresetItem, UiSettings};
 use freakymate_core::backlight::{BacklightService, BacklightSettings, usable_brightness};
 use freakymate_core::settings::{MAX_SHOWN_PRESETS, Settings, SettingsStore, TemperaturePreset};
+use freakymate_core::step_choices::{StepLists, mirrored_row, nearest_step};
 use freakymate_core::{Endpoint, PrinterService};
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::cell::RefCell;
@@ -89,6 +91,9 @@ impl SettingsController {
         ui.set_temperature_step(settings.steps.temperature as f32);
         ui.set_extrude_length(settings.steps.extrude_mm as f32);
         ui.set_extrude_speed(settings.steps.extrude_speed as f32);
+        let lists = settings.step_choices.lists();
+        show_step_lists(&ui, &lists);
+        self.presenter.set_extrude_choices(lists.extrude_mm);
         if cfg!(not(target_os = "android")) {
             ui.set_settings_file(self.store.path().display().to_string().into());
         }
@@ -276,4 +281,17 @@ fn export_log(window: &slint::Weak<AppWindow>) {
             ui.set_log_export_result(text);
         });
     });
+}
+
+/// Offers the configured step sizes; a remembered selection that is not among them becomes the nearest one.
+fn show_step_lists(ui: &UiSettings<'_>, lists: &StepLists) {
+    ui.set_move_steps(float_model(&lists.move_mm));
+    ui.set_z_offset_steps(float_model(&lists.z_offset_mm));
+    ui.set_temperature_steps(float_model(&lists.temperature));
+    ui.set_extrude_speeds(float_model(&lists.extrude_speed));
+    ui.set_manual_probe_steps(float_model(&mirrored_row(&lists.manual_probe_mm)));
+    ui.set_move_step(nearest_step(&lists.move_mm, f64::from(ui.get_move_step())) as f32);
+    ui.set_z_offset_step(nearest_step(&lists.z_offset_mm, f64::from(ui.get_z_offset_step())) as f32);
+    ui.set_temperature_step(nearest_step(&lists.temperature, f64::from(ui.get_temperature_step())) as f32);
+    ui.set_extrude_speed(nearest_step(&lists.extrude_speed, f64::from(ui.get_extrude_speed())) as f32);
 }

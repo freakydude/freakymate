@@ -1,11 +1,11 @@
-//! Heat tabs, nozzle history, stalled fan and taps while temperatures change.
+//! Heat tabs, nozzle history, PID tuning, stalled fan and taps while temperatures change.
 
 use crate::session::Session;
-use freakymate::{Backlight, HeatTab, Navigation, Page};
+use freakymate::{Backlight, HeatTab, Navigation, Page, Printer};
 use freakymate_core::sources::moonraker_server::wled::{self, StripAction};
 use freakymate_core::{Command, Snapshot};
 use slint::ComponentHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// The exhaust fan measures at 50 %, then its tachometer goes silent: red after a while; afterwards off again. The
 /// core only learns a reading some seconds after a change of speed (kick start), so this scene waits that long.
@@ -66,8 +66,38 @@ pub(super) fn heat_tabs(session: &mut Session) -> Result<(), String> {
     }
     if status.heater("extruder").is_some() {
         heater_deviation(session)?;
+        pid_tuning(session)?;
     }
     Ok(())
+}
+
+/// The nozzle's dialog with the PID footer: the start, `PID_CALIBRATE` running (the status bar names it, the dialog
+/// shows nothing of its own), and the result Klipper keeps for `SAVE_CONFIG`. The tuning is short at 60 °C in the fake.
+fn pid_tuning(session: &mut Session) -> Result<(), String> {
+    const TARGET: f64 = 60.0;
+    const RUNNING_LABEL: &str = "PID tune";
+    // A command shows as running after one second (`LONG_COMMAND`); the tuning in the fake lasts a few seconds.
+    const NAMED_WITHIN: Duration = Duration::from_secs(5);
+    session.presenter.open_history("extruder");
+    session.pump(Duration::from_secs(1));
+    session.capture("temperature-pid-start")?;
+    session.service.send(Command::PidCalibrate { heater: "extruder".into(), target: TARGET });
+    let deadline = Instant::now() + NAMED_WITHIN;
+    while session.window.global::<Printer>().get_running_command() != RUNNING_LABEL {
+        if Instant::now() > deadline {
+            return Err("timed out waiting for the status bar to name the tuning".into());
+        }
+        session.pump(Duration::from_millis(50));
+    }
+    session.capture("temperature-pid-running")?;
+    session.wait_until("Klipper to keep the found values", |snapshot| {
+        snapshot.status.calibration.pending.iter().any(|section| section.section == "extruder")
+    })?;
+    session.pump(Duration::from_secs(1));
+    session.capture("temperature-pid-done")?;
+    session.presenter.close_history();
+    session.service.send(Command::SaveConfig);
+    session.wait_until("the saved values", |snapshot| snapshot.status.calibration.pending.is_empty())
 }
 
 /// The nozzle holds its target, then reads 20 °C more (`FAKE_OVERSHOOT`): the number turns yellow, the stroke leaves

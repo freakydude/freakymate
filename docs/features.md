@@ -38,6 +38,11 @@ probe still counts as the probe).
     the Z endstop, bed mesh (measure, a coloured map of the active mesh, load, save and remove profiles, clear) and
     what `SAVE_CONFIG` would write. While Klipper waits for the paper test or the Z height, a dialog shows its steps;
     closing it aborts. FreakyMate only starts these commands, Klipper does the work.
+    With an Eddy current probe (`[probe_eddy_current]`) the button "Eddy probe" opens its setup dialog: the steps of
+    Klipper's Eddy probe guide (drive current, Z heights by paper test, tap threshold with guess, refine and verify),
+    each with what the configuration file holds and what waits for Save config, buttons to put the nozzle or the sensor
+    over the bed centre, and a hint when the toolhead is outside the 3–10 mm the tap steps need. The values come from
+    Klipper's status, so steps started elsewhere show up as well.
 - **Thermal**: every heater with a target (nozzle, bed, `heater_generic`, `temperature_fan`), presets; − and +
   respect `min_temp`/`max_temp` from the Klipper configuration. Under each temperature with a `max_temp` a scale
   shows the distance to the limit where Klipper shuts down: the current value as a stroke, "max N °C", and for a
@@ -45,7 +50,11 @@ probe still counts as the probe).
   The number turns yellow or red when a sensor or a switched-off heater nears its limit, or when a heater that has
   reached its target leaves the tolerance; heating up or cooling down after a new target stays grey. Tapping a heater or sensor shows its temperature
   history with a grid: the last 20 minutes of Moonraker's temperature store, asked again every five seconds while it
-  is open. Moonraker keeps heaters and `temperature_sensor` objects there; the others have no history. Further tabs when the printer has them:
+  is open. Moonraker keeps heaters and `temperature_sensor` objects there; the others have no history. The dialog of
+  a heater also starts a PID tuning (`PID_CALIBRATE`): target field (230 °C for a nozzle, 70 °C for the bed, typed for
+  other heaters), the PID values printer.cfg has now, and "PID tune" after a confirmation; it is off during a print.
+  Whenever Klipper holds new PID values for the heater, started here, in the console or in Mainsail, the dialog shows
+  them beside the old ones with "Save config". Further tabs when the printer has them:
   - **Fans**: part fan (the one of the nozzle in use first) and `fan_generic` fans (filter, exhaust) with a slider, `heater_fan` and `controller_fan` as a
     bar, speed in rpm where there is a tachometer. A fan turns red when its tachometer has reported 0 rpm for a few
     seconds at a speed where it measured before (many tachometers report nothing at a low speed although the fan
@@ -80,8 +89,18 @@ probe still counts as the probe).
 | A prepared file with the filament check per tool                     | Pause at a layer, with the pause planned for layer 44       |
 | ![Exclude objects on the bed map](screenshots/objects-map.png)       | ![Calibrate tab](screenshots/calibrate.png)                 |
 | Exclude objects: the bed map with the outlines from the slicer       | The Calibrate tab: bed screws, Z height and the bed mesh    |
-| ![Bed mesh map](screenshots/bed-mesh.png)                   |                                                                       |
-| The map of the active bed mesh, with a faulty region framed |                                                                       |
+| ![Bed mesh map](screenshots/bed-mesh.png)                   | ![Eddy probe setup](screenshots/eddy-probe.png)                       |
+| The map of the active bed mesh, with a faulty region framed | Eddy probe setup: drive current, Z heights and tap threshold          |
+| ![PID tuning result](screenshots/pid-tune.png)              |                                                                       |
+| PID tuning of a heater: the new values beside the old ones  |                                                                       |
+
+| ![Tune tab of Motion](screenshots/tune.png)               | ![Filament page](screenshots/filament.png)                |
+| --------------------------------------------------------- | --------------------------------------------------------- |
+| The Tune tab: Z offset, speed factor and flow factor      | The Filament page: extrude, retract, load and unload      |
+| ![System › Machine](screenshots/system.png)               | ![System › Console](screenshots/console.png)              |
+| System › Machine: restarts, host and power devices        | System › Console: history, command field and macros       |
+| ![Klipper in shutdown](screenshots/klippy-shutdown.png)   |                                                           |
+| When Klipper is shut down: restart it or restart the firmware|                                                           |
 
 ## Happy Hare (MMU)
 

@@ -31,6 +31,23 @@ pub struct Heater {
     pub cools_only: bool,
     /// Moonraker keeps a temperature history of it; see [`history_objects`].
     pub has_history: bool,
+    /// The PID values in printer.cfg (`configfile.settings`, lower case `pid_kp`, ...); only with `control: pid`.
+    pub pid: Option<PidValues>,
+}
+
+/// `pid_Kp`, `pid_Ki` and `pid_Kd` of a heater.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PidValues {
+    pub kp: f64,
+    pub ki: f64,
+    pub kd: f64,
+}
+
+impl PidValues {
+    /// `value_of` gives a value by its short name (`"kp"`); `None` unless all three exist.
+    pub fn read(value_of: impl Fn(&str) -> Option<f64>) -> Option<Self> {
+        Some(Self { kp: value_of("kp")?, ki: value_of("ki")?, kd: value_of("kd")? })
+    }
 }
 
 /// From here a `max_temp` is Klipper's placeholder for "none" (`temperature_sensor` defaults to 99999999.9).
@@ -146,7 +163,14 @@ fn heater(
             .then(|| settings.get("min_extrude_temp").and_then(Value::as_f64).unwrap_or(DEFAULT_MIN_EXTRUDE_TEMP)),
         cools_only: object.starts_with("temperature_fan "),
         has_history,
+        pid: read_pid(settings),
     }
+}
+
+/// The values of a heater with `control: pid`; `settings` holds them as numbers under lower-case keys.
+fn read_pid(settings: &Value) -> Option<PidValues> {
+    let controlled = settings.get("control").and_then(Value::as_str) == Some("pid");
+    controlled.then(|| PidValues::read(|name| settings.get(format!("pid_{name}")).and_then(Value::as_f64))).flatten()
 }
 
 /// Object kinds that are only a temperature; `tmc2240` and `tmc5262` report the temperature of the driver (the other
@@ -223,6 +247,23 @@ mod tests {
         assert_eq!(read_sensors(&store)[0].max_temp, Some(80.0));
         let dryer = &read_heaters(&store)[0];
         assert_eq!((dryer.max_temp, dryer.hysteresis), (Some(70.0), 3.0));
+    }
+
+    #[test]
+    fn the_pid_values_of_printer_cfg_are_read_only_for_a_pid_heater() {
+        let mut store = ObjectStore::default();
+        store.replace(&json!({
+            "extruder": { "temperature": 30.0, "target": 0.0, "power": 0.0 },
+            "heater_bed": { "temperature": 30.0, "target": 0.0, "power": 0.0 },
+            "configfile": { "settings": {
+                // Klipper lists the settings under lower-case keys.
+                "extruder": { "control": "pid", "pid_kp": 21.527, "pid_ki": 1.063, "pid_kd": 108.982 },
+                "heater_bed": { "control": "watermark" },
+            } }
+        }));
+        let heaters = read_heaters(&store);
+        assert_eq!(heaters[0].pid, Some(PidValues { kp: 21.527, ki: 1.063, kd: 108.982 }));
+        assert_eq!(heaters[1].pid, None);
     }
 
     #[test]
