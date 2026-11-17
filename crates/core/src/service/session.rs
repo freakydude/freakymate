@@ -401,7 +401,7 @@ impl<'a> Session<'a> {
             sources.apply_help(&help);
         }
         self.sources = sources;
-        self.store.replace(result.get("status").unwrap_or(&Value::Null));
+        self.store.replace_subscribed(&result);
         log_fact("Changers", &PrinterStatus::from_store(&self.store).changer_systems());
         // After a restart the configuration or the hardware may have changed: what was learned about the fans is gone.
         self.fan_watch = FanWatch::default();
@@ -503,7 +503,11 @@ impl<'a> Session<'a> {
             "notify_status_update" => {
                 if let Some(changes) = notification.params.get(0) {
                     trail::status_changes(changes);
-                    self.store.merge(changes);
+                    let eventtime = notification.params.get(1).and_then(Value::as_f64);
+                    if !self.store.merge_update(changes, eventtime) {
+                        log::debug!("status update older than the subscription ignored");
+                        return;
+                    }
                     self.requery_stale_gate_map(changes).await;
                     self.publish();
                 }

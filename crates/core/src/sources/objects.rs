@@ -5,12 +5,36 @@ use serde_json::{Map, Value};
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ObjectStore {
     objects: Map<String, Value>,
+    /// Klipper's `eventtime` of the subscription's snapshot; updates sent before it are part of the snapshot.
+    snapshot_eventtime: Option<f64>,
 }
 
 impl ObjectStore {
-    /// Replaces the entire state, e.g. with the response to `printer.objects.subscribe`.
+    /// Replaces the entire state.
     pub fn replace(&mut self, status: &Value) {
         self.objects = status.as_object().cloned().unwrap_or_default();
+        self.snapshot_eventtime = None;
+    }
+
+    /// Replaces the entire state with the response to `printer.objects.subscribe`, which Klipper took at its
+    /// `eventtime`.
+    pub fn replace_subscribed(&mut self, response: &Value) {
+        self.replace(response.get("status").unwrap_or(&Value::Null));
+        self.snapshot_eventtime = response.get("eventtime").and_then(Value::as_f64);
+    }
+
+    /// Applies the changes of a `notify_status_update` Klipper sent at `eventtime`; false, and nothing changes, when
+    /// they are older than the subscription's snapshot. Such an update may still be queued when the snapshot arrives,
+    /// and it would undo a change the snapshot already holds: while a client subscribes again, Moonraker stops its
+    /// updates until Klipper has answered (`klippy_connection.py`, `_request_subscripton`) and Klipper leaves the
+    /// client out of that query's round (`webhooks.py`, `_handle_query`), so the change never comes as an update.
+    /// Seen with Happy Hare's `action`, which kept "Selecting" from the bootup until the next gate change.
+    pub fn merge_update(&mut self, changes: &Value, eventtime: Option<f64>) -> bool {
+        let older = matches!((eventtime, self.snapshot_eventtime), (Some(sent), Some(snapshot)) if sent < snapshot);
+        if !older {
+            self.merge(changes);
+        }
+        !older
     }
 
     /// Applies changed fields; fields not mentioned are kept. Klipper sends a changed field whole (`webhooks.py`,
@@ -29,6 +53,7 @@ impl ObjectStore {
 
     pub fn clear(&mut self) {
         self.objects.clear();
+        self.snapshot_eventtime = None;
     }
 
     pub fn object(&self, name: &str) -> Option<&Value> {
@@ -93,5 +118,47 @@ mod tests {
         store.merge(&json!({ "toolhead": { "position": [5.0, 6.0, 7.0, 8.0] } }));
 
         assert_eq!(store.object("toolhead"), Some(&json!({ "position": [5.0, 6.0, 7.0, 8.0] })));
+    }
+
+    /// The Voron's bootup: "Selecting" was queued while Sailhand subscribed again, the snapshot already says "Idle".
+    #[test]
+    fn an_update_older_than_the_snapshot_is_ignored() {
+        let mut store = ObjectStore::default();
+        store.replace_subscribed(&json!({ "eventtime": 30.5, "status": { "mmu": { "action": "Idle" } } }));
+
+        let applied = store.merge_update(&json!({ "mmu": { "action": "Selecting" } }), Some(30.25));
+
+        assert!(!applied);
+        assert_eq!(store.object("mmu"), Some(&json!({ "action": "Idle" })));
+    }
+
+    #[test]
+    fn updates_from_the_snapshot_on_are_applied() {
+        let mut store = ObjectStore::default();
+        store.replace_subscribed(&json!({ "eventtime": 30.5, "status": { "mmu": { "action": "Selecting" } } }));
+
+        assert!(store.merge_update(&json!({ "mmu": { "action": "Selecting" } }), Some(30.5)));
+        assert!(store.merge_update(&json!({ "mmu": { "action": "Idle" } }), Some(30.75)));
+
+        assert_eq!(store.object("mmu"), Some(&json!({ "action": "Idle" })));
+    }
+
+    #[test]
+    fn without_eventtimes_every_update_is_applied() {
+        let mut store = ObjectStore::default();
+        store.replace_subscribed(&json!({ "status": { "mmu": { "action": "Idle" } } }));
+        assert!(store.merge_update(&json!({ "mmu": { "action": "Selecting" } }), Some(1.0)));
+
+        store.replace_subscribed(&json!({ "eventtime": 30.5, "status": { "mmu": { "action": "Idle" } } }));
+        assert!(store.merge_update(&json!({ "mmu": { "action": "Selecting" } }), None));
+    }
+
+    #[test]
+    fn a_cleared_store_forgets_the_snapshot_time() {
+        let mut store = ObjectStore::default();
+        store.replace_subscribed(&json!({ "eventtime": 30.5, "status": {} }));
+        store.clear();
+
+        assert!(store.merge_update(&json!({ "mmu": { "action": "Idle" } }), Some(1.0)));
     }
 }

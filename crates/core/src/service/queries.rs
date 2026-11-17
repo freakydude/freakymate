@@ -9,6 +9,7 @@ use crate::sources::moonraker_server::gcode_store;
 use crate::sources::moonraker_server::history;
 use crate::sources::moonraker_server::machine;
 use crate::sources::moonraker_server::power;
+use crate::sources::moonraker_server::server_info::ServerComponents;
 use crate::sources::moonraker_server::temperature_store;
 use crate::sources::moonraker_server::update_manager;
 use crate::sources::spoolman;
@@ -16,12 +17,8 @@ use serde_json::Value;
 
 impl Session<'_> {
     pub(super) fn answer(&self, query: Query) {
-        if query == Query::PrintHistory && !self.components.history {
-            log::debug!("no job history: Moonraker has no history component");
-            return;
-        }
-        if matches!(query, Query::Spoolman | Query::SpoolList) && !self.components.spoolman {
-            log::debug!("no Spoolman: Moonraker has no spoolman component");
+        if let Some(component) = missing_component(&query, &self.components) {
+            log::debug!("{query:?} not asked: Moonraker has no {component} component");
             return;
         }
         let connection = self.connection.clone();
@@ -52,6 +49,16 @@ impl Session<'_> {
                 Err(_) => log::log!(failure_level, "query {query:?} timed out"),
             }
         });
+    }
+}
+
+/// The Moonraker component a query needs, when this Moonraker has not loaded it; without it the method is unknown.
+fn missing_component(query: &Query, components: &ServerComponents) -> Option<&'static str> {
+    match query {
+        Query::PrintHistory if !components.history => Some("history"),
+        Query::Spoolman | Query::SpoolList if !components.spoolman => Some("spoolman"),
+        Query::PowerDevices if !components.power => Some("power"),
+        _ => None,
     }
 }
 
@@ -129,4 +136,23 @@ pub(super) fn update_status_events(status: &Value) -> Vec<Event> {
         Event::Updates(update_manager::parse_update_status(status)),
         Event::UpdateManagerBusy(update_manager::is_busy(status)),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The Voron's Moonraker has no `[power]` section and answered `machine.device_power.devices` with
+    /// "Method not found".
+    #[test]
+    fn a_query_waits_for_its_component() {
+        let none = ServerComponents::default();
+        assert_eq!(missing_component(&Query::PowerDevices, &none), Some("power"));
+        assert_eq!(missing_component(&Query::PrintHistory, &none), Some("history"));
+        assert_eq!(missing_component(&Query::SpoolList, &none), Some("spoolman"));
+        assert_eq!(missing_component(&Query::Files, &none), None);
+
+        let power = ServerComponents { power: true, ..ServerComponents::default() };
+        assert_eq!(missing_component(&Query::PowerDevices, &power), None);
+    }
 }
