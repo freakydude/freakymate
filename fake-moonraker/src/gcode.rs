@@ -1,6 +1,7 @@
 //! Parser for the G-code lines the UI sends via `printer.gcode.script`.
 
 use crate::calibration::{CalibrationCommand, TestZ};
+use crate::eddy_probe::TapStep;
 use crate::layer_pause::LayerPauseCommand;
 use std::fmt;
 
@@ -88,6 +89,12 @@ pub enum Command {
     FakeOvershoot {
         heater: String,
         delta: f64,
+    },
+    /// `PID_CALIBRATE HEATER=<short name> TARGET=<°C>` (pc l.20-27: both required): heats, swings the target and keeps
+    /// the found values for `SAVE_CONFIG`; the reply comes when the run ends.
+    PidCalibrate {
+        heater: String,
+        target: f64,
     },
     /// Empty name: Klipper only lists the excluded objects.
     ExcludeObject {
@@ -502,6 +509,24 @@ mod tests {
             ]
         );
         assert!(parse_script("TESTZ Z=up").is_err());
+    }
+
+    #[test]
+    fn parses_the_eddy_setup_commands() {
+        let commands = parse_script(
+            "LDC_CALIBRATE_DRIVE_CURRENT CHIP=eddy\nPROBE_EDDY_CURRENT_CALIBRATE CHIP=eddy\nPROBE_EDDY_CURRENT_TAP_CALIBRATE TAP=verify",
+        )
+        .unwrap();
+        assert_eq!(
+            commands,
+            vec![
+                Command::Calibration(CalibrationCommand::EddyDriveCurrent { chip: "eddy".into() }),
+                Command::Calibration(CalibrationCommand::EddyCalibrate { chip: "eddy".into() }),
+                Command::Calibration(CalibrationCommand::EddyTap(TapStep::Verify)),
+            ]
+        );
+        assert!(parse_script("LDC_CALIBRATE_DRIVE_CURRENT").is_err());
+        assert!(parse_script("PROBE_EDDY_CURRENT_TAP_CALIBRATE TAP=fast").is_err());
     }
 
     #[test]

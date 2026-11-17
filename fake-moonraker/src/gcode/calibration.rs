@@ -6,6 +6,17 @@ use super::*;
 pub(super) fn parse(name: &str, args: &[&str]) -> Result<Option<Command>, CommandError> {
     let command: Result<Command, CommandError> = match name {
         "PROBE_CALIBRATE" => Ok(Command::Calibration(CalibrationCommand::ProbeCalibrate)),
+        // The mux commands take the probe by `CHIP` (pe l.112; ldc l.43-74); the tap step takes `TAP` (pe l.340).
+        "LDC_CALIBRATE_DRIVE_CURRENT" => {
+            Ok(Command::Calibration(CalibrationCommand::EddyDriveCurrent { chip: required_text(args, "CHIP")? }))
+        }
+        "PROBE_EDDY_CURRENT_CALIBRATE" => {
+            Ok(Command::Calibration(CalibrationCommand::EddyCalibrate { chip: required_text(args, "CHIP")? }))
+        }
+        "PROBE_EDDY_CURRENT_TAP_CALIBRATE" => {
+            let step = named_text(args, "TAP").map_or(Ok(TapStep::Guess), |step| TapStep::parse(&step));
+            step.map(|step| Command::Calibration(CalibrationCommand::EddyTap(step)))
+        }
         "MANUAL_PROBE" => Ok(Command::Calibration(CalibrationCommand::ManualProbe)),
         "TESTZ" => Ok(Command::Calibration(CalibrationCommand::TestZ(TestZ::parse(&required_text(args, "Z")?)?))),
         "ACCEPT" => Ok(Command::Calibration(CalibrationCommand::Accept)),

@@ -4,6 +4,7 @@
 //! `klippy/extras/manual_probe.py`, `bed_screws.py`, `bed_mesh.py` and `configfile.py` (read 2026-10-28 and
 //! 2026-10-29); measured values are made up.
 
+use crate::eddy_probe::{EddyProbe, TapStep};
 use crate::gcode::CommandError;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -37,6 +38,9 @@ type MeshPoints = Vec<Vec<f64>>;
 #[derive(Debug, Clone, PartialEq)]
 pub enum CalibrationCommand {
     ProbeCalibrate,
+    EddyDriveCurrent { chip: String },
+    EddyCalibrate { chip: String },
+    EddyTap(TapStep),
     ManualProbe,
     TestZ(TestZ),
     Accept,
@@ -78,6 +82,9 @@ impl TestZ {
 enum ProbePurpose {
     /// `PROBE_CALIBRATE`: on `ACCEPT` the probe's `z_offset` becomes pending.
     ProbeOffset,
+    /// `PROBE_EDDY_CURRENT_CALIBRATE`: on `ACCEPT` the measurement of the Z heights follows and the `calibrate` table
+    /// becomes pending (pe l.118-132; Klipper takes minutes, here it is instant).
+    EddyHeights,
     /// `MANUAL_PROBE`: the height is only reported.
     Height,
 }
@@ -133,6 +140,9 @@ struct BedScrews {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Calibration {
     probe: bool,
+    /// The probe is an Eddy current probe: Klipper registers no `PROBE_CALIBRATE` for it (pe l.1055,
+    /// `can_set_z_offset=False`; probe.py l.56-60).
+    eddy: Option<EddyProbe>,
     bed_mesh: bool,
     screws: bool,
     manual_probe: Option<ManualProbe>,
@@ -147,19 +157,35 @@ pub struct Calibration {
 
 impl Calibration {
     /// `screws` adds both `[bed_screws]` and `[screws_tilt_adjust]`; a bed mesh starts with saved profiles.
-    pub fn new(probe: bool, bed_mesh: bool, screws: bool) -> Self {
+    pub fn new(probe: bool, eddy: bool, bed_mesh: bool, screws: bool) -> Self {
         let meshes = if bed_mesh {
             SAVED_MESHES.iter().map(|(name, tilt)| ((*name).to_owned(), mesh_points(*tilt))).collect()
         } else {
             BTreeMap::new()
         };
-        Self { probe, bed_mesh, screws, meshes, ..Self::default() }
+        Self { probe, eddy: eddy.then(EddyProbe::default), bed_mesh, screws, meshes, ..Self::default() }
     }
 
     /// `homed`: whether all axes are homed; Klipper refuses to probe or move to a screw otherwise.
     pub fn apply(&mut self, command: CalibrationCommand, homed: bool) -> Result<(), CommandError> {
         match command {
-            CalibrationCommand::ProbeCalibrate if self.probe => self.start_probe(ProbePurpose::ProbeOffset, homed)?,
+            CalibrationCommand::ProbeCalibrate if self.probe && self.eddy.is_none() => {
+                self.start_probe(ProbePurpose::ProbeOffset, homed)?
+            }
+            CalibrationCommand::EddyDriveCurrent { chip } if self.eddy.is_some() => {
+                EddyProbe::check_chip(&chip)?;
+                self.set_eddy_pending(EddyProbe::measure_drive_current());
+            }
+            CalibrationCommand::EddyCalibrate { chip } if self.eddy.is_some() => {
+                EddyProbe::check_chip(&chip)?;
+                self.start_probe(ProbePurpose::EddyHeights, homed)?
+            }
+            CalibrationCommand::EddyTap(step) if self.eddy.is_some() => {
+                let measured = self.eddy.as_mut().map(|eddy| eddy.tap(step)).transpose()?.flatten();
+                if let Some(option) = measured {
+                    self.set_eddy_pending(option);
+                }
+            }
             CalibrationCommand::ManualProbe => self.start_probe(ProbePurpose::Height, homed)?,
             CalibrationCommand::TestZ(step) => self.probing()?.test(step),
             CalibrationCommand::Accept if self.manual_probe.is_some() => self.accept_probe(),
@@ -211,6 +237,19 @@ impl Calibration {
         Ok(())
     }
 
+    /// Puts options of a section on the list of `SAVE_CONFIG` (`configfile.set`), keeping what is there.
+    pub fn set_pending(&mut self, section: &str, options: Map<String, Value>) {
+        self.pending.entry(section.to_owned()).or_default().get_or_insert_with(Map::new).extend(options);
+    }
+
+    fn set_eddy_pending(&mut self, (option, value): (&str, String)) {
+        self.pending
+            .entry(EddyProbe::section_name().to_owned())
+            .or_default()
+            .get_or_insert_with(Map::new)
+            .insert(option.to_owned(), json!(value));
+    }
+
     fn store_mesh(&mut self, profile: &str, points: MeshPoints) {
         self.pending.insert(format!("bed_mesh {profile}"), Some(mesh_section(&points)));
         self.meshes.insert(profile.to_owned(), points);
@@ -231,6 +270,9 @@ impl Calibration {
 
     fn accept_probe(&mut self) {
         let Some(probe) = self.manual_probe.take() else { return };
+        if probe.purpose == ProbePurpose::EddyHeights {
+            self.set_eddy_pending(EddyProbe::measured_table());
+        }
         if probe.purpose == ProbePurpose::ProbeOffset {
             // The probe triggered at the start height; the nozzle touched the paper at `z`.
             let z_offset = PROBE_Z_OFFSET + START_HEIGHT - probe.z;
@@ -258,6 +300,10 @@ impl Calibration {
 
     /// `SAVE_CONFIG` writes everything pending.
     pub fn save(&mut self) {
+        let written = self.pending.remove(EddyProbe::section_name()).flatten();
+        if let (Some(eddy), Some(options)) = (self.eddy.as_mut(), written) {
+            eddy.write(&options);
+        }
         self.pending.clear();
     }
 
@@ -327,6 +373,12 @@ impl Calibration {
         objects
     }
 
+    /// The raw text of the file for the sections where it differs from `settings` (Eddy: no defaults).
+    pub fn raw_config_sections(&self) -> Map<String, Value> {
+        let eddy = self.eddy.as_ref().map(|eddy| (EddyProbe::section_name().to_owned(), eddy.raw()));
+        eddy.into_iter().collect()
+    }
+
     fn screw_tilt_json(&self) -> Value {
         let results: Map<String, Value> = if self.screw_results {
             SCREW_TILT
@@ -348,7 +400,9 @@ impl Calibration {
 
     pub fn config_sections(&self) -> Map<String, Value> {
         let mut sections = Map::new();
-        if self.probe {
+        if let Some(eddy) = &self.eddy {
+            sections.insert(EddyProbe::section_name().to_owned(), eddy.settings());
+        } else if self.probe {
             sections.insert(
                 "probe".to_owned(),
                 json!({ "x_offset": 23.0, "y_offset": -22.5, "z_offset": PROBE_Z_OFFSET, "speed": 5.0 }),
@@ -387,6 +441,9 @@ fn must_be_homed(homed: bool) -> Result<(), CommandError> {
 fn command_name(command: &CalibrationCommand) -> &'static str {
     match command {
         CalibrationCommand::ProbeCalibrate => "PROBE_CALIBRATE",
+        CalibrationCommand::EddyDriveCurrent { .. } => "LDC_CALIBRATE_DRIVE_CURRENT",
+        CalibrationCommand::EddyCalibrate { .. } => "PROBE_EDDY_CURRENT_CALIBRATE",
+        CalibrationCommand::EddyTap(_) => "PROBE_EDDY_CURRENT_TAP_CALIBRATE",
         CalibrationCommand::ManualProbe => "MANUAL_PROBE",
         CalibrationCommand::TestZ(_) => "TESTZ",
         CalibrationCommand::Accept => "ACCEPT",
@@ -454,7 +511,7 @@ mod tests {
     use super::*;
 
     fn printer() -> Calibration {
-        Calibration::new(true, true, true)
+        Calibration::new(true, false, true, true)
     }
 
     #[test]
@@ -523,5 +580,52 @@ mod tests {
         assert_eq!(status["bed_mesh"]["profile_name"], "pei-textured");
         assert_eq!(calibration.pending_json()["bed_mesh pei-textured"], Value::Null);
         assert_eq!(calibration.pending_json()["bed_mesh copy"]["x_count"], "5");
+    }
+
+    fn eddy_printer() -> Calibration {
+        Calibration::new(true, true, true, false)
+    }
+
+    fn eddy_chip() -> String {
+        "eddy".to_owned()
+    }
+
+    #[test]
+    fn an_eddy_probe_has_no_probe_calibrate_but_the_setup_steps() {
+        let mut calibration = eddy_printer();
+        assert!(calibration.apply(CalibrationCommand::ProbeCalibrate, true).is_err());
+        calibration.apply(CalibrationCommand::EddyDriveCurrent { chip: eddy_chip() }, true).unwrap();
+        assert_eq!(calibration.pending_json()["probe_eddy_current eddy"]["reg_drive_current"], "16");
+        assert!(calibration.apply(CalibrationCommand::EddyDriveCurrent { chip: "other".into() }, true).is_err());
+        assert!(calibration.config_sections().get("probe").is_none());
+    }
+
+    #[test]
+    fn the_z_heights_go_through_the_paper_test_and_leave_the_table_pending() {
+        let mut calibration = eddy_printer();
+        calibration.apply(CalibrationCommand::EddyCalibrate { chip: eddy_chip() }, true).unwrap();
+        assert_eq!(calibration.status()["manual_probe"]["is_active"], true);
+        assert!(!calibration.has_pending());
+        calibration.apply(CalibrationCommand::Accept, true).unwrap();
+        let table = calibration.pending_json()["probe_eddy_current eddy"]["calibrate"].clone();
+        assert!(table.as_str().unwrap().contains(':'));
+        calibration.save();
+        assert!(!calibration.has_pending());
+        assert_eq!(calibration.raw_config_sections()["probe_eddy_current eddy"]["calibrate"], table);
+    }
+
+    #[test]
+    fn verify_leaves_the_tap_threshold_pending_and_saving_writes_it_to_the_file() {
+        let mut calibration = eddy_printer();
+        let raw = |calibration: &Calibration| calibration.raw_config_sections()["probe_eddy_current eddy"].clone();
+        assert!(raw(&calibration).get("tap_threshold").is_none());
+        for step in [TapStep::Guess, TapStep::Refine] {
+            calibration.apply(CalibrationCommand::EddyTap(step), true).unwrap();
+            assert!(!calibration.has_pending());
+        }
+        calibration.apply(CalibrationCommand::EddyTap(TapStep::Verify), true).unwrap();
+        assert_eq!(calibration.pending_json()["probe_eddy_current eddy"]["tap_threshold"], "0.582");
+        calibration.save();
+        assert_eq!(raw(&calibration)["tap_threshold"], "0.582");
     }
 }

@@ -11,12 +11,12 @@ machine that one of these plugins drives is therefore covered, whatever its name
 | Printer           | [Klipper](https://www.klipper3d.org/) with [Moonraker](https://moonraker.readthedocs.io/), as set up by KIAUH, MainsailOS and similar |
 | Host system       | Debian 12 Bookworm or newer, Raspberry Pi OS Bookworm or newer (32 or 64 bit), Ubuntu 22.04 or newer, Armbian on these; glibc 2.35 or newer and the packages `cage` and `seatd` (the installer checks all of this). Debian 11 Bullseye is too old |
 | Host hardware     | Raspberry Pi, BTT CB1/CB2 and similar boards: `aarch64`, `armv7` or `x86_64`                                                         |
-| Display           | Any display the host drives (HDMI, DSI). Best at 5" or more with 800x480; other sizes are scaled. Small displays with only a framebuffer driver (SPI, `fbtft`) run through a fallback. Tested displays: see [below](#tested-setups) |
+| Display           | Any display the host drives (HDMI, DSI). Best at 5" or more with 800x480; other sizes are scaled. Small displays with only a framebuffer driver (SPI) run through a [fallback](install.md#framebuffer-fallback). Tested displays: see [below](#tested-setups) |
 | Touch             | A touch screen; a mouse and keyboard work as well                                                                                     |
 | Optional          | NetworkManager for the Wi-Fi settings, a controllable backlight for brightness and standby, the plugins below                         |
 
 FreakyMate can also run as a window on a Linux or Windows desktop and talk to a Moonraker over the network (see
-[Install and update](install.md#packages-and-desktop-use)).
+[Install and update](install.md#desktop-linux-windows)).
 
 ## Plugins and typical hardware
 
@@ -66,7 +66,7 @@ Displays: BTT HDMI5 (5", 800x480, HDMI), Raspberry Pi Touch Display v1 (7", 800x
 - **IDEX modes** (copy, mirror) and which head sits on which carriage.
 - **KTC** by TypQxQ (`ktc` objects): not read; tool macros `T<n>` still work.
 - **Kalico** (the Klipper fork) has not been tried.
-- **Touch rotation** in the framebuffer fallback; rotate the display in its driver.
+- **Touch rotation** in the [framebuffer fallback](install.md#framebuffer-fallback).
 - **HTTPS** to Moonraker: FreakyMate talks plain HTTP and WebSocket, like most home installations.
 - **Windows installer:** on Windows FreakyMate runs from the unpacked zip.
 - Own layouts for 7" and 4.3" displays are planned; until then the 800x480 layout is scaled.

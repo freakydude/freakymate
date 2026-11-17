@@ -1,7 +1,7 @@
 // Main window: status bar, navigation, current page and overlays.
 
 import { Theme } from "theme.slint";
-import { Actions, Backlight, Confirm, Dialogs, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, UiSettings } from "state.slint";
+import { Actions, Backlight, Confirm, Dialogs, EddyDialog, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, UiSettings } from "state.slint";
 import { NavRail, StatusBar } from "components/chrome.slint";
 import { CalibrationDialog } from "components/calibration-dialog.slint";
 import { ConfirmDialog } from "components/confirm-dialog.slint";
@@ -9,6 +9,7 @@ import { MessagesFlyout } from "components/messages-flyout.slint";
 import { SpoolDialog } from "components/spool-dialog.slint";
 import { HistoryDialog } from "components/history.slint";
 import { BedMeshDialog, BedMeshProfilesDialog } from "components/bed-mesh.slint";
+import { EddyProbeDialog } from "components/eddy-probe-dialog.slint";
 import { LightPanel } from "components/light.slint";
 import { PrintPage } from "pages/print.slint";
 import { MotionPage } from "pages/motion.slint";
@@ -22,8 +23,8 @@ import { SettingsPage } from "pages/settings.slint";
 import { NetworkPage } from "pages/network-page.slint";
 import { ConnectionPage } from "pages/connection.slint";
 
-export { Actions, Backlight, Confirm, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, UiSettings }
-export { ChartLabel, FilamentPathItem, PathPartItem, PathPartKind, FileItem, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem, AfcHubReturnItem, AfcToolItem, SpoolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, ScrewItem, WifiItem, WiredItem, HostInterfaceItem } from "state.slint";
+export { Actions, Backlight, Confirm, EddyDialog, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, UiSettings }
+export { ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, FileItem, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem, AfcHubReturnItem, AfcToolItem, SpoolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, ScrewItem, EddyValue, WifiItem, WiredItem, HostInterfaceItem } from "state.slint";
 
 export component AppWindow inherits Window {
     title: "FreakyMate";
@@ -103,6 +104,7 @@ export component AppWindow inherits Window {
                 CalibrationDialog { }
                 BedMeshDialog { }
                 BedMeshProfilesDialog { }
+                EddyProbeDialog { }
                 ConfirmDialog { }
             }
         }

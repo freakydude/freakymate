@@ -1,7 +1,8 @@
 //! Levelling, Z height and the commands within a calibration mode.
 
 use crate::commands::{Command, CommandError};
-use crate::sources::klipper::{CalibrationMode, Leveling, Setup};
+use crate::sources::PrinterStatus;
+use crate::sources::klipper::{CalibrationMode, CentreOf, Leveling, Setup, centre_target};
 
 pub(super) fn level(setup: &Setup) -> Result<Vec<Command>, CommandError> {
     match setup.leveling {
@@ -16,7 +17,11 @@ pub(super) fn apply_z_offset(setup: &Setup) -> Vec<Command> {
 }
 
 pub(super) fn calibrate_z(setup: &Setup) -> Result<Vec<Command>, CommandError> {
-    if setup.probe {
+    // An Eddy probe has no `PROBE_CALIBRATE` (`probe_eddy_current.py` l.1055, `can_set_z_offset=False`; `probe.py`
+    // l.56-60): its own command measures the Z heights.
+    if let Some(chip) = &setup.eddy_probe {
+        Ok(vec![Command::EddyCalibrate { chip: chip.clone() }])
+    } else if setup.probe {
         Ok(vec![Command::ProbeCalibrate])
     } else if setup.calibration.z_endstop {
         Ok(vec![Command::ZEndstopCalibrate])
@@ -33,4 +38,15 @@ pub(super) fn within_mode(command: Command, mode: Option<&CalibrationMode>) -> V
         _ => mode.is_some(),
     };
     if waiting { vec![command] } else { Vec::new() }
+}
+
+pub(super) fn eddy_drive_current(setup: &Setup) -> Result<Vec<Command>, CommandError> {
+    let chip = setup.eddy_probe.clone().ok_or(CommandError::NoEddyProbe)?;
+    Ok(vec![Command::EddyDriveCurrent { chip }])
+}
+
+pub(super) fn move_to_bed_centre(status: &PrinterStatus, over: CentreOf) -> Result<Vec<Command>, CommandError> {
+    let probe = status.calibration.eddy.as_ref().ok_or(CommandError::NoEddyProbe)?;
+    let [x, y] = centre_target(&status.motion, probe, over).ok_or(CommandError::NoAxisRange)?;
+    Ok(vec![Command::MoveXy { x, y }])
 }

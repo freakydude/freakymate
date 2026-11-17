@@ -57,38 +57,13 @@ The script picks the build for your system, installs the few packages it needs a
 starts on the display at every boot, and new versions show up in the update list of Mainsail, Fluidd and its own
 System page.
 
-Pre-release channel, install by hand, Debian and Arch Linux packages, desktop window and uninstall:
-[Install and update](docs/install.md).
+Other ways to run it, all described in [Install and update](docs/install.md):
 
-### Android
-
-An old Android phone or tablet near the printer can serve as touch screen: the same UI, in landscape. It needs Android 7.0
-or newer on a 64-bit ARM device, and Moonraker must be reachable over the home network (plain `http`/`ws`). So far it has
-been tried in the Android emulator only, not yet on many real devices.
-
-1. Download `freakymate-<version>-arm64-v8a-prod-release.apk` from the latest
-   [pre-release](https://github.com/freakydude/freakymate/releases) and open it on the device; allow installing from
-   unknown sources when Android asks.
-2. Updates: add the repository `freakydude/freakymate` to [Obtainium](https://github.com/ImranR98/Obtainium) and enable
-   pre-releases.
-
-For a bug report, Settings has "Export log": it copies the log of the last days into one text file you can attach to the
-issue. On Android 10 and newer it lands in `Download/FreakyMate`; on Android 7 to 9 in the app's own folder
-(`Android/data/de.freakydu.freakymate/files/Download`), which the screen names after the export.
-
-The APK is signed with a release key; `apksigner verify --print-certs <apk>` shows the SHA-256 fingerprint of its
-certificate, which must be <!-- TODO Frank: SHA-256 fingerprint of the release certificate -->.
-
-The APK in the artifacts of a pull request (`…-dev-release.apk`) is a test build: it installs as a separate app,
-FreakyMate Dev, with its own settings, and leaves an installed FreakyMate alone.
-
-## Builds
-
-| Build            | What it is                                                                                    | Where                                                                       |
-| ---------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| **Release**      | A tagged state of `main` (`vX.Y.0`), when a set of changes feels finished                     | [Releases](https://github.com/freakydude/freakymate/releases/latest), update channel `stable` |
-| **Pre-release**  | Always the latest `main`, replaced by every merged change                                     | [Releases](https://github.com/freakydude/freakymate/releases), update channel `beta` |
-| **Pull request** | The state of an open pull request, to try a change before it is merged                        | Artifacts of the pull request's CI run (needs a GitHub login), see [Install](docs/install.md#release-and-pre-release) |
+- [Android phone or tablet](docs/install.md#android) as touch screen near the printer
+- [Desktop window](docs/install.md#desktop-linux-windows) on Linux or Windows
+- [Debian and Arch Linux packages](docs/install.md#packages)
+- [Pre-release and pull request builds](docs/install.md#which-build),
+  [updates and channels](docs/install.md#updates-and-channels) and [uninstall](docs/install.md#uninstall)
 
 ## Documentation
 
@@ -96,7 +71,7 @@ FreakyMate Dev, with its own settings, and leaves an installed FreakyMate alone.
 | --------------------------------------------- | ------------------------------------------------------------------------------------- |
 | [Requirements and hardware](docs/hardware.md) | Host, display, plugins and typical hardware, what is not supported yet, privacy       |
 | [Features](docs/features.md)                  | Every page in detail: print, motion, thermal, filament, changer, system, Spoolman     |
-| [Install and update](docs/install.md)         | Release and pre-release, installer, update channels, uninstall, Debian package, desktop |
+| [Install and update](docs/install.md)         | Which build, printer host, Android, packages, desktop, update channels, uninstall      |
 | [Slicer and macros](docs/printer-setup.md)    | Thumbnails, layers, excluding objects; macros for filament, layer pause and tool spools |
 | [Configuration](docs/configuration.md)        | Command line, settings file, log, bug reports, Moonraker login, displays, network     |
 | [Troubleshooting](docs/troubleshooting.md)    | Black screen, no connection, touch, where the log is                                  |

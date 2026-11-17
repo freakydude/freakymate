@@ -5,6 +5,7 @@ mod bed_mesh;
 mod calibration;
 pub mod commands;
 mod devices;
+mod eddy;
 mod exclude_object;
 mod extruder;
 mod fan_watch;
@@ -26,12 +27,13 @@ pub use calibration::{
     BedMeshState, CalibrationMode, CalibrationSetup, CalibrationState, PendingSection, ScrewAdjustment, TestZ,
 };
 pub use devices::{Fan, FanKind, Led, WhiteChannel, instance, is_hidden, is_led, white_channel};
+pub use eddy::{CentreOf, EddyOption, EddyProbe, EddyTap, TAP_HEIGHT_MM, centre_target, tap_height_fits};
 pub use exclude_object::{PrintObject, object_at};
 pub use extruder::ExtruderState;
 pub use fan_watch::FanWatch;
 pub use filament_sensors::FilamentSensor;
 pub use firmware_retraction::Retraction;
-pub use heaters::{BED_HEATER, DEFAULT_MIN_EXTRUDE_TEMP, Heater, NOZZLE_HEATER, TemperatureSensor};
+pub use heaters::{BED_HEATER, DEFAULT_MIN_EXTRUDE_TEMP, Heater, NOZZLE_HEATER, PidValues, TemperatureSensor};
 pub use height_watch::HeightWatch;
 pub use job::{PrintJob, PrintState};
 pub use leveling::Leveling;

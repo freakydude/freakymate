@@ -31,6 +31,20 @@ pub(super) fn step(status: &PrinterStatus, heater: &str, step: f64) -> Result<Ve
     Ok(vec![target(heater, current.stepped_target(step))])
 }
 
+/// The target of a tuning must be one Klipper takes and not off (`heaters.py` l.110-113 refuses the rest).
+pub(super) fn pid_calibrate(status: &PrinterStatus, heater: String, target: f64) -> Result<Vec<Command>, CommandError> {
+    let known = status.heater(&heater).filter(|known| !known.cools_only);
+    let known = known.ok_or_else(|| CommandError::UnknownHeater(heater.clone()))?;
+    if target <= 0.0 || !known.accepts_target(target) {
+        let maximum = known.max_temp.map_or(String::from("no maximum"), |maximum| format!("up to {maximum} °C"));
+        return Err(CommandError::TargetOutsideRange(
+            target.to_string(),
+            format!("from {} °C, {maximum}", known.min_temp),
+        ));
+    }
+    Ok(vec![Command::PidCalibrate { heater, target }])
+}
+
 pub(super) fn step_tuning(
     status: &PrinterStatus,
     key: TuningKey,

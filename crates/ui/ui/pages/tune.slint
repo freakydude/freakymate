@@ -149,7 +149,7 @@ export component TuneBasicsTab inherits Rectangle {
                     horizontal-alignment: center;
                 }
                 StepSelector {
-                    values: [0.005, 0.01, 0.025, 0.05, 0.1];
+                    values: UiSettings.z-offset-steps;
                     selected <=> UiSettings.z-offset-step;
                     changed => { UiSettings.steps-changed(); }
                 }

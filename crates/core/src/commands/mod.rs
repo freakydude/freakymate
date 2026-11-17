@@ -13,7 +13,7 @@ use crate::moonraker::Call;
 use crate::sources::happy_hare::commands as mmu;
 use crate::sources::klipper::commands::{self as klipper, run_gcode};
 use crate::sources::klipper::tuning::TuningKey;
-use crate::sources::klipper::{Axis, Motion, TestZ};
+use crate::sources::klipper::{Axis, CentreOf, EddyTap, Motion, TestZ};
 use crate::sources::moonraker_server::wled::{self, StripAction};
 use crate::sources::moonraker_server::{files, machine, power, update_manager};
 use crate::sources::{led_effect, spoolman, toolchanger};
@@ -76,6 +76,12 @@ pub enum Command {
     },
     /// Switches every heater off.
     CoolDown,
+    /// `PID_CALIBRATE` of a heater at `target` °C: Klipper heats and takes no other command for minutes; the
+    /// result waits for `SaveConfig` ([`crate::domain::pid_tuning`]). Refused during a print.
+    PidCalibrate {
+        heater: String,
+        target: f64,
+    },
     /// `speed` from 0 to 1; only part and generic fans can be set, Klipper drives the others.
     SetFanSpeed {
         fan: String,
@@ -150,6 +156,29 @@ pub enum Command {
     CalibrateZ,
     ProbeCalibrate,
     ZEndstopCalibrate,
+    /// Measures the drive current of the Eddy probe's sensor (`reg_drive_current`); followed by `SaveConfig`.
+    CalibrateEddyDriveCurrent,
+    /// `PROBE_EDDY_CURRENT_CALIBRATE`: Klipper waits in `manual_probe` for the paper test, then measures (`calibrate`).
+    /// Eddy has no `PROBE_CALIBRATE`, so [`Command::CalibrateZ`] resolves to this.
+    EddyCalibrate {
+        chip: String,
+    },
+    EddyDriveCurrent {
+        chip: String,
+    },
+    /// Moves X and Y so that the nozzle, or the sensor of the Eddy probe, is over the middle of the bed.
+    MoveToBedCentre {
+        over: CentreOf,
+    },
+    /// Absolute move in X and Y.
+    MoveXy {
+        x: f64,
+        y: f64,
+    },
+    /// One step of the tap calibration; `Verify` sets `tap_threshold`.
+    EddyTapCalibrate {
+        step: EddyTap,
+    },
     /// Within `manual_probe`; dropped if Klipper is not waiting there, since it knows the command only then.
     TestZ {
         step: TestZ,
@@ -349,6 +378,7 @@ impl Command {
             Self::QuadGantryLevel => run_gcode(klipper::QUAD_GANTRY_LEVEL),
             Self::ZTiltAdjust => run_gcode(klipper::Z_TILT_ADJUST),
             Self::SetHeaterTarget { heater, target } => run_gcode(klipper::heater_target(heater, *target)),
+            Self::PidCalibrate { heater, target } => run_gcode(klipper::pid_calibrate(heater, *target)),
             Self::SetFanSpeed { fan, speed } => run_gcode(klipper::fan_speed(fan, *speed)?),
             Self::SetLed { led, red, green, blue, white } => {
                 run_gcode(klipper::set_led(led, [*red, *green, *blue, *white]))
@@ -369,6 +399,10 @@ impl Command {
             Self::AdjustBedScrews => run_gcode(klipper::BED_SCREWS_ADJUST),
             Self::ProbeCalibrate => run_gcode(klipper::PROBE_CALIBRATE),
             Self::ZEndstopCalibrate => run_gcode(klipper::Z_ENDSTOP_CALIBRATE),
+            Self::EddyCalibrate { chip } => run_gcode(klipper::eddy_calibrate(chip)?),
+            Self::EddyDriveCurrent { chip } => run_gcode(klipper::eddy_drive_current(chip)?),
+            Self::EddyTapCalibrate { step } => run_gcode(klipper::eddy_tap(*step)),
+            Self::MoveXy { x, y } => run_gcode(klipper::move_xy(*x, *y)),
             Self::TestZ { step } => run_gcode(klipper::test_z(*step)),
             Self::AcceptCalibration => run_gcode(klipper::ACCEPT),
             Self::ScrewAdjusted => run_gcode(klipper::ADJUSTED),
@@ -412,6 +446,8 @@ impl Command {
             // Intents are resolved before; none of them is a call of its own.
             Self::Level
             | Self::CalibrateZ
+            | Self::CalibrateEddyDriveCurrent
+            | Self::MoveToBedCentre { .. }
             | Self::StepHeater { .. }
             | Self::ApplyPreset { .. }
             | Self::CoolDown
@@ -447,7 +483,8 @@ impl Command {
         matches!(self, Self::SetActiveSpool { .. } | Self::MeasureSpool { .. } | Self::AssignGateSpool { .. })
     }
 
-    /// Restarts, reboots and updates end a running print; they are refused while one runs
+    /// Restarts, reboots and updates end a running print, and `PID_CALIBRATE` switches the heater off and blocks
+    /// Klipper; they are refused while one runs
     /// ([`PrinterStatus::print_running`](crate::sources::PrinterStatus::print_running)).
     pub fn interrupts_print(&self) -> bool {
         matches!(
@@ -455,6 +492,7 @@ impl Command {
             Self::RestartKlipper
                 | Self::FirmwareRestart
                 | Self::RestartService { .. }
+                | Self::PidCalibrate { .. }
                 | Self::RebootHost
                 | Self::ShutdownHost
                 | Self::Upgrade { .. }
@@ -475,6 +513,12 @@ impl Command {
                 | Self::CalibrateZ
                 | Self::ProbeCalibrate
                 | Self::ZEndstopCalibrate
+                | Self::CalibrateEddyDriveCurrent
+                | Self::EddyCalibrate { .. }
+                | Self::EddyDriveCurrent { .. }
+                | Self::EddyTapCalibrate { .. }
+                | Self::MoveToBedCentre { .. }
+                | Self::MoveXy { .. }
                 | Self::CalibrateBedMesh
                 | Self::CalculateScrewsTilt
                 | Self::AdjustBedScrews
@@ -496,6 +540,12 @@ impl Command {
                 | Self::CalibrateZ
                 | Self::ProbeCalibrate
                 | Self::ZEndstopCalibrate
+                | Self::CalibrateEddyDriveCurrent
+                | Self::EddyCalibrate { .. }
+                | Self::EddyDriveCurrent { .. }
+                | Self::EddyTapCalibrate { .. }
+                | Self::MoveToBedCentre { .. }
+                | Self::MoveXy { .. }
                 | Self::PickUpHead { .. }
                 | Self::DropHead
                 | Self::InitializeToolchanger { .. }

@@ -1,0 +1,230 @@
+// Setup of an Eddy current probe, opened from the Calibrate tab. Klipper has no PROBE_CALIBRATE for it: one row per
+// step of its Eddy_Probe guide, in the order of the guide, each with what printer.cfg holds now and what is pending.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Actions, Confirm, EddyDialog, EddyValue, Printer } from "../state.slint";
+import { ButtonKind, IconButton, Note } from "controls.slint";
+import { DialogHeader, DialogPanel, Scrim } from "dialog.slint";
+
+// A step: what it needs (from the guide), the option it sets with its value now and pending, its buttons.
+component StepRow inherits Rectangle {
+    in property <string> title;
+    in property <string> needs;
+    // The position is outside a range the guide names (only the tap steps: 3 to 10 mm); a hint, nothing is locked.
+    in property <bool> needs-warning;
+    in property <string> option;
+    in property <EddyValue> value;
+    property <string> shown: root.value.current != "" ? root.value.current : @tr("not set");
+    height: Theme.touch + 2 * Theme.spacing-tight;
+    // A well darker than the dialog, so the buttons in it stand out as buttons.
+    background: Theme.background;
+    border-radius: Theme.radius;
+
+    HorizontalLayout {
+        padding-left: Theme.dialog-padding;
+        padding-right: Theme.spacing-medium;
+        padding-top: Theme.spacing-tight;
+        padding-bottom: Theme.spacing-tight;
+        spacing: Theme.spacing-large;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: Theme.spacing-tight;
+            Text {
+                text: root.title;
+                color: Theme.foreground;
+                font-size: Theme.font-normal;
+                font-weight: 600;
+                overflow: elide;
+            }
+            HorizontalLayout {
+                spacing: Theme.spacing-medium;
+                if root.needs-warning: Image {
+                    source: Icons.ui-warning;
+                    colorize: Theme.warning;
+                    width: Theme.icon-compact;
+                    height: Theme.icon-compact;
+                    accessible-role: image;
+                    accessible-label: @tr("Warning");
+                }
+                Text {
+                    horizontal-stretch: 1;
+                    text: root.needs;
+                    color: root.needs-warning ? Theme.warning : Theme.muted;
+                    font-size: Theme.font-small;
+                    wrap: word-wrap;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Text {
+                text: root.option;
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                overflow: elide;
+            }
+            Text {
+                text: root.value.pending != "" ? root.shown + " → " + root.value.pending : root.shown;
+                color: root.value.current != "" || root.value.pending != "" ? Theme.foreground : Theme.muted;
+                font-size: Theme.font-normal;
+                font-weight: 600;
+                // A value is a hard fact: it never shrinks, the description at the left wraps instead.
+                min-width: self.preferred-width;
+            }
+        }
+        @children
+    }
+}
+
+export component EddyProbeDialog inherits Scrim {
+    property <bool> ready: Printer.ready;
+    // The paper test of the Z heights is the dialog of the calibration mode; it lies behind this one in the tree, so
+    // this one steps aside while Klipper waits in the mode and returns when the mode ends.
+    visible: EddyDialog.open && Printer.calibration-mode == "";
+
+    changed ready => {
+        if (!root.ready) { EddyDialog.open = false; }
+    }
+
+    DialogPanel {
+        x: Theme.dialog-inset;
+        y: Theme.dialog-inset;
+        width: parent.width - 2 * Theme.dialog-inset;
+        height: parent.height - 2 * Theme.dialog-inset;
+        VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: Theme.spacing;
+            DialogHeader {
+                title: @tr("Eddy probe");
+                close => { EddyDialog.open = false; }
+                Note {
+                    text: "[" + Printer.eddy-section + "]";
+                    vertical-alignment: center;
+                    wrap: no-wrap;
+                }
+            }
+            // The toolhead now, and the buttons that put the nozzle or the sensor over the middle of the bed (X and Y
+            // only); the steps move nothing by themselves, the person decides where to start.
+            Rectangle {
+                height: Theme.touch;
+                HorizontalLayout {
+                    padding-left: Theme.dialog-padding;
+                    spacing: Theme.spacing-large;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        alignment: center;
+                        HorizontalLayout {
+                            spacing: Theme.spacing-large;
+                            Note { text: @tr("Toolhead"); vertical-alignment: center; wrap: no-wrap; }
+                            Text {
+                                text: "X " + Printer.position-x.to-fixed(1) + "   Y " + Printer.position-y.to-fixed(1) + "   Z " + Printer.position-z.to-fixed(1);
+                                color: Theme.foreground;
+                                font-size: Theme.font-normal;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+                    }
+                    Note { text: @tr("Over the bed centre"); vertical-alignment: center; wrap: no-wrap; }
+                    IconButton {
+                        width: 88px;
+                        text: @tr("Nozzle");
+                        enabled: Printer.homed-x && Printer.homed-y && !Printer.position-locked;
+                        clicked => { Actions.eddy-centre("nozzle"); }
+                    }
+                    if Printer.eddy-has-offset: IconButton {
+                        width: 88px;
+                        text: @tr("Sensor");
+                        enabled: Printer.homed-x && Printer.homed-y && !Printer.position-locked;
+                        clicked => { Actions.eddy-centre("sensor"); }
+                    }
+                }
+            }
+            StepRow {
+                title: @tr("1  Drive current");
+                needs: @tr("Sensor near the bed centre, about 20 mm above the bed");
+                option: "reg_drive_current";
+                value: Printer.eddy-drive-current;
+                IconButton {
+                    width: 140px;
+                    horizontal: true;
+                    icon: Icons.calibration-probe;
+                    text: @tr("Measure");
+                    enabled: !Printer.position-locked;
+                    clicked => { Actions.eddy-drive-current(); }
+                }
+            }
+            StepRow {
+                title: @tr("2  Z heights");
+                needs: @tr("Nozzle near the bed centre; after the paper test Klipper moves the sensor there itself");
+                option: "calibrate";
+                value: Printer.eddy-calibration;
+                IconButton {
+                    width: 140px;
+                    horizontal: true;
+                    icon: Icons.calibration-z-offset;
+                    text: @tr("Paper test");
+                    enabled: !Printer.position-locked;
+                    clicked => { Actions.calibrate-z(); }
+                }
+            }
+            StepRow {
+                title: @tr("3  Tap threshold");
+                needs: @tr("Nozzle near the centre, 3–10 mm up; emergency stop at hand");
+                needs-warning: Printer.eddy-tap-height-off;
+                option: "tap_threshold";
+                value: Printer.eddy-tap-threshold;
+                IconButton {
+                    width: 88px;
+                    text: @tr("Guess");
+                    enabled: !Printer.position-locked;
+                    clicked => { Actions.eddy-tap("guess"); }
+                }
+                IconButton {
+                    width: 88px;
+                    text: @tr("Refine");
+                    enabled: !Printer.position-locked;
+                    clicked => { Actions.eddy-tap("refine"); }
+                }
+                IconButton {
+                    width: 88px;
+                    text: @tr("Verify");
+                    enabled: !Printer.position-locked;
+                    clicked => { Actions.eddy-tap("verify"); }
+                }
+            }
+            Rectangle { vertical-stretch: 1; }
+            // Like the Calibrate tab: what SAVE_CONFIG would write, and the confirmation at the right.
+            HorizontalLayout {
+                spacing: Theme.spacing;
+                height: Theme.touch;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    Note {
+                        text: Printer.save-config-pending ? Printer.pending-config : @tr("Nothing to save.");
+                        wrap: no-wrap;
+                        overflow: elide;
+                    }
+                    Note {
+                        text: @tr("Each step takes effect after Save config, which restarts Klipper.");
+                        wrap: no-wrap;
+                        overflow: elide;
+                    }
+                }
+                IconButton {
+                    width: 220px;
+                    icon: Icons.ui-save;
+                    text: @tr("Save config");
+                    horizontal: true;
+                    kind: ButtonKind.accent;
+                    enabled: Printer.save-config-pending;
+                    clicked => { Confirm.ask(@tr("Save config"), @tr("Klipper writes the configuration and restarts."), "save-config", "", false); }
+                }
+            }
+        }
+    }
+}

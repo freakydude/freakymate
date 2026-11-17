@@ -1,7 +1,7 @@
 # Development
 
 Rust stable (see `rust-toolchain.toml`). On Linux install `libfontconfig1-dev libxkbcommon-dev libinput-dev libudev-dev`
-(the last two for the framebuffer fallback, see [install.md](install.md)).
+(the last two for the framebuffer fallback, see [install.md](install.md#framebuffer-fallback)).
 Structure, data flow and conventions:
 [architecture.md](architecture.md). How pull requests are handled: [CONTRIBUTING.md](../CONTRIBUTING.md).
 

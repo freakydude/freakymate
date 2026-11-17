@@ -3,9 +3,11 @@
 
 use crate::bed_mesh_view;
 use crate::items::replace_rows;
-use crate::{BedMeshMap, MeshCellItem, MeshFrameItem, Printer, ScrewItem};
+use crate::{BedMeshMap, EddyValue, MeshCellItem, MeshFrameItem, Printer, ScrewItem};
+use freakymate_core::domain::manual_probe::{Direction, Heights, ProbeSteps};
 use freakymate_core::sources::klipper::{
-    BedMesh, CalibrationMode, CalibrationState, PendingSection, ScrewAdjustment, Setup,
+    BedMesh, CalibrationMode, CalibrationState, EddyOption, EddyProbe, PendingSection, ScrewAdjustment, Setup,
+    tap_height_fits,
 };
 use slint::{ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
@@ -23,6 +25,14 @@ pub struct CalibrationView {
     mesh_frames: Rc<VecModel<MeshFrameItem>>,
     /// The mesh last drawn: the picture is built again only when the mesh changes.
     drawn_mesh: RefCell<Option<BedMesh>>,
+    probe: RefCell<ProbeState>,
+}
+
+/// The paper test: the heights last reported and the coarse ladder the buttons go by.
+#[derive(Default)]
+struct ProbeState {
+    heights: Option<Heights>,
+    steps: ProbeSteps,
 }
 
 impl CalibrationView {
@@ -52,7 +62,48 @@ impl CalibrationView {
         replace_rows(&self.screws, calibration.screws.iter().map(screw_item).collect());
         let pending: Vec<String> = calibration.pending.iter().map(pending_line).collect();
         printer.set_pending_config(pending.join(" · ").into());
+        show_eddy(printer, calibration.eddy.as_ref());
         show_mode(printer, calibration.mode.as_ref());
+        self.show_probe_steps(printer, calibration.mode.as_ref());
+    }
+
+    /// Whether the toolhead height suits the tap steps of the Eddy probe; only a hint.
+    pub fn show_toolhead_height(&self, printer: &Printer, calibration: &CalibrationState, z: f64) {
+        printer.set_eddy_tap_height_off(calibration.eddy.is_some() && !tap_height_fits(z));
+    }
+
+    /// A coarse press in `direction`: the distance to send, if the button is on.
+    pub fn press_coarse(&self, direction: Direction) -> Option<f64> {
+        let mut probe = self.probe.borrow_mut();
+        let heights = probe.heights?;
+        probe.steps.press_coarse(heights, direction)
+    }
+
+    /// A move other than a coarse press (fine, fixed step): the ladder starts over.
+    pub fn probe_moved(&self) {
+        self.probe.borrow_mut().steps.reset();
+    }
+
+    /// The target on each of the four buttons; the ladder starts over when no paper test runs.
+    fn show_probe_steps(&self, printer: &Printer, mode: Option<&CalibrationMode>) {
+        let mut probe = self.probe.borrow_mut();
+        probe.heights = match mode {
+            Some(CalibrationMode::ManualProbe { z, lower, upper }) => {
+                Some(Heights { z: *z, lower: *lower, upper: *upper })
+            }
+            _ => None,
+        };
+        let Some(heights) = probe.heights else {
+            probe.steps.reset();
+            return;
+        };
+        probe.steps.observe(heights.z);
+        let text = |target: f64| SharedString::from(format!("{target:.3}"));
+        let coarse = |direction| probe.steps.coarse_target(heights, direction);
+        printer.set_probe_fine_down(text(ProbeSteps::fine_target(heights, Direction::Down)));
+        printer.set_probe_fine_up(text(ProbeSteps::fine_target(heights, Direction::Up)));
+        printer.set_probe_coarse_down(coarse(Direction::Down).map(text).unwrap_or_default());
+        printer.set_probe_coarse_up(coarse(Direction::Up).map(text).unwrap_or_default());
     }
 }
 
@@ -71,6 +122,29 @@ impl CalibrationView {
         self.mesh_cells.set_vec(cells);
         self.mesh_frames.set_vec(frames);
     }
+}
+
+fn show_eddy(printer: &Printer, eddy: Option<&EddyProbe>) {
+    let Some(eddy) = eddy else {
+        printer.set_eddy_section(SharedString::new());
+        printer.set_eddy_has_offset(false);
+        return;
+    };
+    printer.set_eddy_section(eddy.section().into());
+    printer.set_eddy_has_offset(eddy.has_offset());
+    printer.set_eddy_drive_current(eddy_value(&eddy.drive_current, String::clone));
+    printer.set_eddy_calibration(eddy_value(&eddy.calibration_points, |points| points_text(*points)));
+    printer.set_eddy_tap_threshold(eddy_value(&eddy.tap_threshold, String::clone));
+}
+
+fn eddy_value<T>(option: &EddyOption<T>, text: impl Fn(&T) -> String) -> EddyValue {
+    let show = |value: &Option<T>| value.as_ref().map(&text).unwrap_or_default().into();
+    EddyValue { current: show(&option.current), pending: show(&option.pending) }
+}
+
+/// The table of the `calibrate` option is shown by its size.
+fn points_text(points: usize) -> String {
+    format!("{points} {}", if points == 1 { "point" } else { "points" })
 }
 
 fn show_mode(printer: &Printer, mode: Option<&CalibrationMode>) {
@@ -119,6 +193,12 @@ fn pending_line(section: &PendingSection) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_table_is_shown_by_its_points() {
+        assert_eq!(points_text(48), "48 points");
+        assert_eq!(points_text(1), "1 point");
+    }
 
     #[test]
     fn pending_lines_show_short_values_only() {

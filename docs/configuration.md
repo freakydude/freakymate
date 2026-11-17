@@ -13,7 +13,7 @@ freakymate [--moonraker <url>] [--fullscreen] [--framebuffer] [--settings <file>
 | -------------------- | ------------------------------------------------------------------------------------------------ |
 | `-m, --moonraker`    | Moonraker address for this start, e.g. `http://printer.local:7125` (otherwise the saved setting) |
 | `-f, --fullscreen`   | Kiosk mode for a touch screen, as the services start it: fullscreen, no window frame, no mouse pointer |
-| `--framebuffer`      | Fallback for displays without DRM/KMS (Linux): draws straight to `/dev/fbN` without cage, implies `--fullscreen`. The installer uses it only when there is no `/dev/dri/card*` (see [Installation](install.md)) |
+| `--framebuffer`      | Fallback for displays without DRM/KMS (Linux): draws straight to `/dev/fbN` without cage, implies `--fullscreen`. See [Framebuffer fallback](install.md#framebuffer-fallback) |
 | `--settings`         | Settings file (TOML), default `~/.config/freakymate/settings.conf` (Windows: `%APPDATA%`). The installer passes `printer_data/config/freakymate.conf` |
 | `-l, --logfile`      | Log file, rotated daily like those of Klipper and Moonraker (default: stderr only). The installer passes `printer_data/logs/freakymate.log` |
 | `--report [FILE]`    | Writes a diagnostic report `freakymate-report.json` and exits, see [Bug reports](#bug-reports). Without FILE it goes to `printer_data/logs` (when the settings are in `printer_data/config`), otherwise to the current folder; FILE may also be a folder |
@@ -50,6 +50,25 @@ bed = 80.0
 ```
 
 The Thermal page shows the first four. Restart FreakyMate after editing (`sudo systemctl restart freakymate`).
+
+The **step sizes** the screen offers (Motion, Z offset, Thermal, Filament, the paper test) can be changed in the table
+`[step_choices]`. Every key is optional; without it the default applies:
+
+```toml
+[step_choices]
+move_mm = [0.1, 1, 10, 50, 100]
+z_offset_mm = [0.005, 0.01, 0.025, 0.05, 0.1]
+temperature = [1, 5, 10, 25]
+extrude_mm = [5, 10, 25, 50, 100]
+extrude_speed = [1, 2, 5, 10]
+manual_probe_mm = [0.01, 0.05, 0.1, 1]
+```
+
+The order does not matter: FreakyMate sorts each list and removes duplicates. Values that are not above zero are left out,
+and a list with nothing usable, or with more than six values (`manual_probe_mm`: four, the paper test offers each of them
+as minus and plus), is replaced by the default; the log says which key. If the step chosen last is not in a list any
+more, the nearest one is selected. Lengths in `extrude_mm` above Klipper's `max_extrude_only_distance` stay in the row but
+are disabled; if none fits, the limit itself is offered as well. Restart FreakyMate after editing.
 
 Up to 0.3.8 the settings were a JSON file (`freakymate.json`, `settings.json`). It stays where it is and is no longer
 read; FreakyMate starts with the defaults in the new file. Take over what you had changed by hand (presets) and delete
@@ -142,7 +161,7 @@ the password of a login goes over the network unencrypted.
 
 FreakyMate works best on a display of 5" or more at 800x480: the layout is made for that size. It has been tested on
 the BTT HDMI5 (5") and the Raspberry Pi Touch Display v1 (7", DSI), both 800x480, and on a TFT35 SPI display through
-the framebuffer fallback. In fullscreen, other resolutions show the same layout scaled up or down to fit, so
+the [framebuffer fallback](install.md#framebuffer-fallback). In fullscreen, other resolutions show the same layout scaled up or down to fit, so
 a 7" 1024x600 display fills its screen and a smaller one, say a 4.3" 480x272, shows everything, only smaller. A window on
 a desktop is never smaller than 800x480; a larger one shows more room instead of scaling (where a compositor forces a
 smaller window, the layout is fitted as in fullscreen). Apart from the TFT35, other sizes are not tested yet. Whether a small display is

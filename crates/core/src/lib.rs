@@ -19,6 +19,7 @@ pub mod settings;
 pub mod setup;
 pub mod sourced;
 pub mod sources;
+pub mod step_choices;
 mod toml_merge;
 
 pub use commands::Command;

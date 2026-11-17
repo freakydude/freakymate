@@ -3,6 +3,7 @@
 
 use crate::atomic_file::write_atomically;
 use crate::backlight::BacklightSettings;
+use crate::step_choices::StepChoices;
 use crate::toml_merge;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -28,6 +29,9 @@ pub struct Settings {
     /// Android: the screen stays on while FreakyMate is in front, like a touch screen at the printer.
     pub keep_screen_on: bool,
     pub steps: Steps,
+    /// The step sizes the UI offers; edited in the settings file only. Missing keys mean the defaults.
+    #[serde(skip_serializing_if = "StepChoices::is_empty")]
+    pub step_choices: StepChoices,
     /// Edited in the settings file only; the Thermal page shows the first [`MAX_SHOWN_PRESETS`].
     pub temperature_presets: Vec<TemperaturePreset>,
     /// Macros the printer had when the touch screen last saw it; a macro missing here counts as new.
@@ -84,6 +88,7 @@ impl Default for Settings {
             fullscreen: false,
             keep_screen_on: true,
             steps: Steps::default(),
+            step_choices: StepChoices::default(),
             temperature_presets: vec![
                 TemperaturePreset::new("PLA", 210.0, 60.0),
                 TemperaturePreset::new("PETG", 240.0, 80.0),

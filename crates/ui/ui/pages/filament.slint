@@ -16,6 +16,7 @@ import { BypassDialog, GateDialog } from "mmu-dialogs.slint";
 component LengthSelector inherits StepSelector {
     label: @tr("Length");
     values: Printer.extrude-lengths;
+    max-enabled: Printer.extrude-limit;
     unit: " mm";
     selected <=> UiSettings.extrude-length;
     changed => { UiSettings.steps-changed(); }
@@ -23,7 +24,7 @@ component LengthSelector inherits StepSelector {
 
 component SpeedSelector inherits StepSelector {
     label: @tr("Speed");
-    values: [1, 2, 5, 10];
+    values: UiSettings.extrude-speeds;
     unit: " mm/s";
     selected <=> UiSettings.extrude-speed;
     changed => { UiSettings.steps-changed(); }

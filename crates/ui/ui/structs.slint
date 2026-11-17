@@ -321,6 +321,14 @@ export struct ChartLabel {
     position: float,
 }
 
+// A PID value of a heater: what printer.cfg has now and what `PID_CALIBRATE` found, as text; `pending` is empty
+// without a result.
+export struct PidValueItem {
+    name: string,
+    current: string,
+    pending: string,
+}
+
 // A spool of Spoolman in the picker. `place`: where it sits ("Gate 2", "In use") or empty.
 export struct SpoolItem {
     id: int,
@@ -390,6 +398,12 @@ export struct MeshFrameItem {
 }
 
 // Texts of a file row; an empty text is a fact the file does not have.
+// What an option of the Eddy probe holds in the configuration file and what SAVE_CONFIG would write; empty if none.
+export struct EddyValue {
+    current: string,
+    pending: string,
+}
+
 // One screw from the last SCREWS_TILT_CALCULATE.
 export struct ScrewItem {
     name: string,

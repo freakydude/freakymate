@@ -86,7 +86,7 @@ component AxesTab inherits Rectangle {
 
             StepSelector {
                 label: @tr("Step");
-                values: [0.1, 1, 10, 50, 100];
+                values: UiSettings.move-steps;
                 unit: " mm";
                 selected <=> UiSettings.move-step;
                 changed => { UiSettings.steps-changed(); }

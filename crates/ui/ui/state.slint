@@ -2,10 +2,10 @@
 
 import { Icons } from "icons.slint";
 import { Theme } from "theme.slint";
-import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 import { Actions } from "actions.slint";
 
-export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 export { Actions } from "actions.slint";
 
 
@@ -123,6 +123,7 @@ export global Printer {
     in property <TuningItem> flow-factor;
     in property <[TuningItem]> tuning;
     // Temperature history of one heater or sensor, drawn as SVG path commands in a 1000 x 1000 view box.
+    in property <string> history-object;
     in property <string> history-title;
     in property <string> history-current;
     in property <string> history-temperature-path;
@@ -133,9 +134,21 @@ export global Printer {
     in property <string> history-grid-path;
     in property <[ChartLabel]> history-temperature-labels;
     in property <[ChartLabel]> history-time-labels;
+    // PID tuning in the dialog of a heater: it can be tuned (not a sensor, not a fan), the target to start with (0:
+    // the person types it), the target range as a note for the keypad, the values in printer.cfg ("Kp 21.527 · …",
+    // empty if it has none) and the values Klipper keeps for SAVE_CONFIG, whoever ran `PID_CALIBRATE`.
+    in property <bool> history-pid-available;
+    in property <float> history-pid-target;
+    in property <string> history-pid-range;
+    in property <string> history-pid-current;
+    // The target of this display's own PID_CALIBRATE that Klipper has not answered yet; 0 when none.
+    in property <float> history-pid-running-target;
+    in property <bool> history-pid-has-result;
+    in property <[PidValueItem]> history-pid-result;
     in property <bool> can-extrude;
-    // Lengths for extruding by hand that Klipper accepts (`max_extrude_only_distance`).
-    in property <[float]> extrude-lengths: [5, 10, 25, 50];
+    // Lengths for extruding by hand; those above the limit (`max_extrude_only_distance`) are shown disabled.
+    in property <[float]> extrude-lengths: [5, 10, 25, 50, 100];
+    in property <float> extrude-limit: 50;
     in property <[FilamentSensorItem]> filament-sensors;
     // A switched-on filament sensor reports no filament; the Sensors tab of a tool changer shows a dot.
     in property <bool> filament-sensor-runout;
@@ -260,6 +273,22 @@ export global Printer {
     in property <string> probe-z;
     in property <string> probe-z-lower;
     in property <string> probe-z-upper;
+    // Target heights of the four step buttons; an empty coarse target means the button is off.
+    in property <string> probe-fine-down;
+    in property <string> probe-fine-up;
+    in property <string> probe-coarse-down;
+    in property <string> probe-coarse-up;
+    // The Eddy current probe (Klipper has no PROBE_CALIBRATE for it): the section, e.g. "probe_eddy_current eddy",
+    // empty without one, and the options its setup steps write.
+    in property <string> eddy-section;
+    in property <EddyValue> eddy-drive-current;
+    // "48 points" instead of the table.
+    in property <EddyValue> eddy-calibration;
+    in property <EddyValue> eddy-tap-threshold;
+    // The toolhead is outside the heights the tap steps need (3 to 10 mm): a hint only.
+    in property <bool> eddy-tap-height-off;
+    // The sensor sits away from the nozzle (x_offset, y_offset): "sensor over the centre" is a move of its own.
+    in property <bool> eddy-has-offset;
     // bed-screws: the screw to adjust, whether this is the fine round, accepted screws in a row and their number.
     in property <string> bed-screw;
     in property <bool> bed-screw-fine;
@@ -370,6 +399,13 @@ export global UiSettings {
     in property <string> log-export-result;
     // The console leaves out Klipper's temperature reports while it waits for a heater.
     in-out property <bool> hide-temperature-reports: true;
+    // The step sizes on offer (`[step_choices]` of the settings file); Rust sets them, the defaults are for previews.
+    in property <[float]> move-steps: [0.1, 1, 10, 50, 100];
+    in property <[float]> z-offset-steps: [0.005, 0.01, 0.025, 0.05, 0.1];
+    in property <[float]> temperature-steps: [1, 5, 10, 25];
+    in property <[float]> extrude-speeds: [1, 2, 5, 10];
+    // Both sides of the manual probe: the minus side descending, then the plus side ascending.
+    in property <[float]> manual-probe-steps: [-1, -0.1, -0.05, -0.01, 0.01, 0.05, 0.1, 1];
     in-out property <float> move-step: 10;
     in-out property <float> z-offset-step: 0.025;
     in-out property <float> temperature-step: 5;
@@ -629,6 +665,7 @@ export global Confirm {
         if (self.action == "mmu-reset-tool-map") { Actions.mmu-reset-tool-map(); }
         if (self.action == "afc-reset-lane") { Actions.afc-reset-lane(self.argument); }
         if (self.action == "save-config") { Actions.save-config(); }
+        if (self.action == "pid-tune") { Actions.pid-tune(Printer.history-object, self.argument.to-float()); }
         if (self.action == "remove-bed-mesh") { Actions.remove-bed-mesh(self.argument); }
         if (self.action == "reboot-host") { Actions.reboot-host(); }
         if (self.action == "shutdown-host") { Actions.shutdown-host(); }
@@ -645,6 +682,11 @@ export global Confirm {
         if (self.action == "wifi-off") { Network.set-wifi-enabled(false); }
         if (self.action == "wired-off") { Network.set-wired(self.argument, false); }
     }
+}
+
+// The setup of the Eddy probe, opened from the Calibrate tab.
+export global EddyDialog {
+    in-out property <bool> open;
 }
 
 // The map of the active bed mesh and the saved profiles, opened from the Calibrate tab.
@@ -671,6 +713,7 @@ export global Dialogs {
         Navigation.head-picker-open = false;
         MeshDialogs.map-open = false;
         MeshDialogs.profiles-open = false;
+        EddyDialog.open = false;
         if (Navigation.history-open) { Actions.close-history(); }
         // Closing the dialog of a calibration mode leaves the mode (Frank, 2026-10-28).
         if (Printer.ready && Printer.calibration-mode != "") { Actions.abort-calibration(); }

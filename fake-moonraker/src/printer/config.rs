@@ -5,8 +5,10 @@ use super::*;
 impl Printer {
     pub(super) fn configfile_json(&self) -> Value {
         let settings = self.config_sections();
+        let mut raw = raw_config(&settings);
+        raw.extend(self.calibration.raw_config_sections());
         json!({
-            "config": raw_config(&settings),
+            "config": raw,
             "settings": settings,
             "save_config_pending": self.calibration.has_pending(),
             "save_config_pending_items": self.calibration.pending_json(),
@@ -41,6 +43,14 @@ impl Printer {
         );
         sections
             .insert("heater_bed".to_owned(), json!({ "min_temp": MIN_HEATER_TEMPERATURE, "max_temp": MAX_BED_TARGET }));
+        // `control` and the PID values of printer.cfg, lower-case keys like Klipper's `settings`.
+        for section in ["extruder", "heater_bed"] {
+            if let (Some(Value::Object(options)), Some(Value::Object(pid))) =
+                (sections.get_mut(section), self.pid_config.settings(section))
+            {
+                options.extend(pid);
+            }
+        }
         // Like Klipper: `settings` lists min_temp and max_temp of every temperature sensor with its defaults.
         for (name, maximum) in
             [("temperature_sensor raspberry_pi", MAX_HOST_TEMPERATURE), ("temperature_sensor mcu", MAX_MCU_TEMPERATURE)]
@@ -53,7 +63,7 @@ impl Printer {
         if self.chamber.is_some() {
             sections.insert(
                 "heater_generic chamber".to_owned(),
-                json!({ "min_temp": MIN_HEATER_TEMPERATURE, "max_temp": MAX_CHAMBER_TARGET }),
+                json!({ "min_temp": MIN_HEATER_TEMPERATURE, "max_temp": MAX_CHAMBER_TARGET, "control": "watermark" }),
             );
         }
         if self.profile.quad_gantry_level {

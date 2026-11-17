@@ -3,8 +3,6 @@
 use crate::sources::fields::{flag, number};
 use serde_json::Value;
 
-/// Lengths in mm the Filament page offers for extruding by hand.
-pub const EXTRUDE_LENGTHS_MM: [f64; 5] = [5.0, 10.0, 25.0, 50.0, 100.0];
 /// Klipper's default of `max_extrude_only_distance` in mm.
 const DEFAULT_MAX_EXTRUDE_ONLY_MM: f64 = 50.0;
 
@@ -20,12 +18,19 @@ pub struct ExtruderState {
 }
 
 impl ExtruderState {
-    /// The lengths of [`EXTRUDE_LENGTHS_MM`] Klipper accepts (Klipper's default limit while the configuration is
-    /// unknown); the limit itself when it is shorter than all of them.
-    pub fn extrude_lengths(&self) -> Vec<f64> {
-        let limit = self.max_extrude_only_mm.unwrap_or(DEFAULT_MAX_EXTRUDE_ONLY_MM);
-        let lengths: Vec<f64> = EXTRUDE_LENGTHS_MM.into_iter().filter(|length| *length <= limit).collect();
-        if lengths.is_empty() { vec![limit] } else { lengths }
+    /// Klipper's limit for extruding alone in mm (its default while the configuration is unknown).
+    pub fn extrude_limit(&self) -> f64 {
+        self.max_extrude_only_mm.unwrap_or(DEFAULT_MAX_EXTRUDE_ONLY_MM)
+    }
+
+    /// The configured lengths, all of them: those above [`Self::extrude_limit`] are for the UI to show as disabled.
+    /// When none fits the limit, the limit itself comes first as an extra length.
+    pub fn extrude_lengths(&self, configured: &[f64]) -> Vec<f64> {
+        let limit = self.extrude_limit();
+        if configured.iter().any(|length| *length <= limit) {
+            return configured.to_vec();
+        }
+        std::iter::once(limit).chain(configured.iter().copied()).collect()
     }
 }
 
@@ -54,13 +59,15 @@ mod tests {
     }
 
     #[test]
-    fn only_lengths_klipper_accepts_are_offered_for_extruding() {
+    fn all_configured_lengths_are_offered_and_the_limit_joins_when_none_fits() {
         let configured = |limit: f64| ExtruderState { max_extrude_only_mm: Some(limit), ..ExtruderState::default() };
+        let lengths = [5.0, 10.0, 25.0, 50.0, 100.0];
 
-        assert_eq!(ExtruderState::default().extrude_lengths(), [5.0, 10.0, 25.0, 50.0]);
-        assert_eq!(configured(100.0).extrude_lengths(), EXTRUDE_LENGTHS_MM);
-        assert_eq!(configured(30.0).extrude_lengths(), [5.0, 10.0, 25.0]);
-        assert_eq!(configured(2.0).extrude_lengths(), [2.0]);
+        assert_eq!(ExtruderState::default().extrude_limit(), 50.0);
+        assert_eq!(ExtruderState::default().extrude_lengths(&lengths), lengths);
+        assert_eq!(configured(30.0).extrude_lengths(&lengths), lengths);
+        assert_eq!(configured(5.0).extrude_lengths(&lengths), lengths);
+        assert_eq!(configured(2.0).extrude_lengths(&lengths), [2.0, 5.0, 10.0, 25.0, 50.0, 100.0]);
         let status = status(json!({
             "extruder": { "temperature": 20.0 },
             "configfile": { "settings": { "extruder": { "max_extrude_only_distance": 100.0 } } }

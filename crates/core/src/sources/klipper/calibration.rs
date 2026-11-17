@@ -3,6 +3,7 @@
 //! what `SAVE_CONFIG` would write. Commands and fields follow Klipper's G-Codes.md and Status_Reference.md.
 
 use super::bed_mesh::{self, BedMesh};
+use super::eddy::EddyProbe;
 use crate::sources::fields::{count, number, text};
 use crate::sources::objects::ObjectStore;
 use serde_json::Value;
@@ -101,6 +102,8 @@ pub struct CalibrationState {
     pub bed_mesh: Option<BedMeshState>,
     pub screws: Vec<ScrewAdjustment>,
     pub pending: Vec<PendingSection>,
+    /// The setup of an Eddy current probe, if the printer has one.
+    pub eddy: Option<EddyProbe>,
 }
 
 impl CalibrationState {
@@ -113,6 +116,7 @@ impl CalibrationState {
             bed_mesh: store.object("bed_mesh").map(|object| read_bed_mesh(object, section("bed_mesh"))),
             screws: read_screws(store.object("screws_tilt_adjust"), section("screws_tilt_adjust")),
             pending: read_pending(store.object("configfile")),
+            eddy: EddyProbe::read(store.names(), store.object("configfile")),
         }
     }
 }
@@ -176,7 +180,7 @@ fn read_screws(object: Option<&Value>, settings: Option<&Value>) -> Vec<ScrewAdj
         .collect()
 }
 
-fn read_pending(configfile: Option<&Value>) -> Vec<PendingSection> {
+pub(super) fn read_pending(configfile: Option<&Value>) -> Vec<PendingSection> {
     let Some(items) = configfile.and_then(|configfile| configfile.get("save_config_pending_items")) else {
         return Vec::new();
     };

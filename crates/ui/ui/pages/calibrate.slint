@@ -5,7 +5,7 @@
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { StateIcons } from "../state-icons.slint";
-import { Actions, Confirm, MeshDialogs, Printer, ScrewItem } from "../state.slint";
+import { Actions, Confirm, EddyDialog, MeshDialogs, Printer, ScrewItem } from "../state.slint";
 import { ButtonKind, Card, IconButton, Note, ScrollList } from "../components/controls.slint";
 import { MeshMap } from "../components/bed-mesh.slint";
 
@@ -102,7 +102,13 @@ component LevelCard inherits Card {
         enabled: !Printer.position-locked;
         clicked => { Actions.level(); }
     }
-    if Printer.z-calibration != "": ActionButton {
+    // An Eddy probe has no paper test of its own: its setup is a dialog with the steps of Klipper's guide.
+    if Printer.eddy-section != "": ActionButton {
+        icon: Icons.calibration-probe;
+        text: @tr("Eddy probe");
+        clicked => { EddyDialog.open = true; }
+    }
+    if Printer.z-calibration != "" && Printer.eddy-section == "": ActionButton {
         icon: Printer.z-calibration == "probe" ? Icons.calibration-probe : Icons.calibration-z-offset;
         text: Printer.z-calibration == "probe" ? @tr("Probe Z offset") : @tr("Z endstop");
         enabled: !Printer.position-locked;

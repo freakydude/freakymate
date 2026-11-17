@@ -15,6 +15,10 @@ pub enum CommandError {
     NoLight,
     #[error("this printer has neither a probe nor a Z endstop with position_endstop")]
     NoZCalibration,
+    #[error("this printer has no Eddy current probe")]
+    NoEddyProbe,
+    #[error("Klipper reports no range for the X and Y axes")]
+    NoAxisRange,
     #[error("this printer has no macro to pause at a layer")]
     NoLayerPause,
     #[error("the print file reports no layers")]
@@ -31,6 +35,9 @@ pub enum CommandError {
     TuningNotConfigured(String),
     #[error("unknown heater {0}")]
     UnknownHeater(String),
+    /// `{0}` is the target as typed, `{1}` the range the heater takes.
+    #[error("{0} °C is outside what the heater takes ({1})")]
+    TargetOutsideRange(String, String),
     #[error("gate {0} does not exist")]
     UnknownGate(usize),
     #[error("this printer has no AFC")]
