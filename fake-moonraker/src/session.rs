@@ -215,6 +215,10 @@ impl Session {
             }
             "printer.restart" | "printer.firmware_restart" => {
                 backend.with_printer(Printer::restart);
+                // Moonraker clears the client subscriptions when the Klippy connection closes and announces it
+                // (klippy_connection.py `_on_connection_closed`, server.py:129); clients must subscribe again.
+                self.subscription.clear();
+                backend.notify("notify_klippy_disconnected", Value::Null);
                 backend.respond("// Klipper state: Ready");
                 backend.notify("notify_klippy_ready", Value::Null);
                 Ok(ok())

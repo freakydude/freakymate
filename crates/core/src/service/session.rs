@@ -513,6 +513,11 @@ impl<'a> Session<'a> {
                 }
             }
             "notify_klippy_ready" => {
+                // The poll in `refresh_klippy` already subscribed; Moonraker only drops subscriptions on disconnect.
+                if self.klippy_ready {
+                    log::debug!("klippy ready while already subscribed");
+                    return;
+                }
                 if let Err(error) = self.subscribe().await {
                     log::warn!("subscription after klippy ready failed: {error}");
                 }
