@@ -83,6 +83,10 @@ jobs:
     with:
       version: ${{ needs.version.outputs.version }}
       release-id: ${{ needs.draft.outputs.id }}
+    # Resolved in the environment "android-signing" of the APK job (see build.yml).
+    secrets:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
 
   publish:
     name: Publish prerelease
