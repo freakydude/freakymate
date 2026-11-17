@@ -21,6 +21,14 @@ on:
         description: "The first failing job cancels the whole run (releases are all or nothing)"
         type: boolean
         default: false
+    # The caller must pass them by name although they live in the environment "android-signing": a secret it does not
+    # pass is empty here, without an error, even in a job that sets the environment (GitHub docs "Reuse workflows",
+    # environment secrets). Pull requests pass none and build FreakyMate Dev.
+    secrets:
+      ANDROID_KEYSTORE_BASE64:
+        required: false
+      ANDROID_KEYSTORE_PASSWORD:
+        required: false
 
 env:
   CARGO_TERM_COLOR: always
