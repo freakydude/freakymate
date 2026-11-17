@@ -36,8 +36,13 @@ pub struct Config {
 }
 
 /// Installs the logger. `RUST_LOG` decides what is logged when set; otherwise the program logs at info, and
-/// [`set_verbose`] raises its own modules to debug.
+/// [`set_verbose`] raises its own modules to debug. A second call in the same process keeps the first log: Android
+/// starts the program again in its process when it destroyed the activity in the background.
 pub fn init(config: Config) -> io::Result<()> {
+    if LOGGER.get().is_some() {
+        log::info!("started again in the same process; the log goes on");
+        return Ok(());
+    }
     if let Some(path) = &config.file {
         let _ = LOG_FILE.set(path.clone());
     }
@@ -341,6 +346,13 @@ mod tests {
             fs::read_dir(directory).unwrap().flatten().map(|entry| entry.file_name().into_string().unwrap()).collect();
         names.sort();
         names
+    }
+
+    /// Android starts the program again in the same process when it destroyed the activity in the background.
+    #[test]
+    fn a_second_start_in_the_same_process_keeps_the_log() {
+        init(Config::default()).unwrap();
+        init(Config::default()).unwrap();
     }
 
     #[test]

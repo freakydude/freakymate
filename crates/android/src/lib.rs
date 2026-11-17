@@ -1,5 +1,10 @@
 //! Android entry point: the native activity calls [`android_main`], which starts the same program as `main.rs`.
 //! Everything below is empty on other platforms, so the workspace still builds on the desktop.
+//!
+//! It runs once per activity, on a thread of its own: when Android destroyed the activity in the background, the
+//! next start calls it again in the same process. Slint keeps its platform per thread, so it can start again; the
+//! program's own process-wide state must allow that too (`logging::init`, `android::init`). Text on stderr appears in
+//! logcat under the tag `RustStdoutStderr`.
 
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]

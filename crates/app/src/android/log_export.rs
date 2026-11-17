@@ -4,7 +4,7 @@
 //! the app's own folder on the shared storage (`Context.getExternalFilesDir`), also without permission (the public
 //! Download folder would need `WRITE_EXTERNAL_STORAGE`). The Java calls run on a thread of their own.
 
-use super::ACTIVITY;
+use super::current_activity;
 use crate::log_export::{self, LogExport};
 use jni::errors::Error as JniError;
 use jni::objects::{JObject, JString};
@@ -38,9 +38,10 @@ pub(crate) fn start(done: impl FnOnce(Result<String, String>) + Send + 'static) 
 }
 
 fn export() -> Result<String, String> {
-    let app = ACTIVITY.get().ok_or("no activity")?;
+    let app = current_activity().ok_or("no activity")?;
     let export = log_export::read_current(chrono::Local::now().naive_local()).map_err(|error| error.to_string())?;
-    // SAFETY: both pointers belong to the activity held by `ACTIVITY` for the life of the process.
+    // SAFETY: both pointers belong to the current activity, whose button started the export; `app` keeps the glue
+    // alive, and Android destroys the activity only after it left the screen.
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr().cast()) };
     let activity_ptr = app.activity_as_ptr();
     vm.attach_current_thread(|env| {

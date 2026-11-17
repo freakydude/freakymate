@@ -6,7 +6,7 @@ use crate::display;
 use slint::android::android_activity::{AndroidApp, MainEvent, PollEvent, WindowManagerFlags};
 use slint::{ComponentHandle, PhysicalSize, Timer, TimerMode};
 use std::cell::Cell;
-use std::sync::OnceLock;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 /// Slint reports no size change on Android, so the size is looked at twice a second (rotation, split screen, system
@@ -20,13 +20,22 @@ pub(crate) mod log_export;
 
 type ReturnAction = Box<dyn Fn() + Send + Sync>;
 
-static ACTIVITY: OnceLock<AndroidApp> = OnceLock::new();
-static ON_RETURN: OnceLock<ReturnAction> = OnceLock::new();
+// Both belong to the current activity. Android may destroy the activity in the background and start a new one in the
+// same process; `android_main` then runs again and replaces them.
+static ACTIVITY: Mutex<Option<AndroidApp>> = Mutex::new(None);
+static ON_RETURN: Mutex<Option<ReturnAction>> = Mutex::new(None);
+
+fn lock<T>(slot: &Mutex<T>) -> MutexGuard<'_, T> {
+    slot.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 /// Keeps the activity for its window flags; called by `android_main` before Slint takes it.
 pub fn init(app: AndroidApp) {
-    // Set only once per process; a second call would mean a second activity, which the manifest does not allow.
-    let _ = ACTIVITY.set(app);
+    *lock(&ACTIVITY) = Some(app);
+}
+
+fn current_activity() -> Option<AndroidApp> {
+    lock(&ACTIVITY).clone()
 }
 
 /// Listens to the activity's life cycle (for `slint::android::init_with_event_listener`).
@@ -37,18 +46,23 @@ pub fn event_listener() -> impl Fn(&PollEvent<'_>) + 'static {
         PollEvent::Main(MainEvent::Resume { .. }) => {
             let away = paused_at.take().map(|paused| paused.elapsed());
             if away.is_some_and(|away| away >= RECONNECT_AFTER_BACKGROUND)
-                && let Some(on_return) = ON_RETURN.get()
+                && let Some(on_return) = lock(&ON_RETURN).as_ref()
             {
                 on_return();
             }
+        }
+        // Slint ends its event loop here, and with it the program; a new activity starts it again.
+        PollEvent::Main(MainEvent::Destroy) => {
+            log::info!("Android destroyed the activity");
+            lock(&ON_RETURN).take();
         }
         _ => {}
     }
 }
 
-/// What to do when the app comes back after a long background (connect again); set once.
+/// What to do when the app comes back after a long background (connect again), for the current activity.
 pub(crate) fn on_return_from_background(action: impl Fn() + Send + Sync + 'static) {
-    let _ = ON_RETURN.set(Box::new(action));
+    *lock(&ON_RETURN) = Some(Box::new(action));
 }
 
 /// Hides Android's status bar (clock, battery); the navigation bar and a camera cutout stay and are left free (safe
@@ -69,7 +83,7 @@ pub(crate) fn keep_screen_on(on: bool) {
 }
 
 fn set_window_flag(flag: WindowManagerFlags, on: bool) {
-    let Some(activity) = ACTIVITY.get() else {
+    let Some(activity) = current_activity() else {
         log::warn!("no activity for the window flag {flag:?}");
         return;
     };
