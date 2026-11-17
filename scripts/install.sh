@@ -62,19 +62,60 @@ if [ "$EUID" -eq 0 ]; then
   echo "Run as normal user; sudo is used where needed."
   exit 1
 fi
-# Sailhand was called FreakyMate; it does not take over from it (both want tty1), so stop before changing anything.
-old_install=""
-for old in /etc/systemd/system/freakymate.service /etc/systemd/system/multi-user.target.wants/freakymate@*.service \
-  "$HOME/freakymate"; do
-  for found in $old; do
-    [ -e "$found" ] && old_install="$found"
+# Sailhand was called FreakyMate and does not take over from it (both want tty1, both have an update entry), so stop
+# before changing anything. Pressing Update on FreakyMate after the rename empties ~/freakymate, uninstall.sh included
+# (Moonraker removes the folder and then fails on the wrong asset), so the manual steps in the docs are the fallback.
+OLD_NAME="freakymate"
+MIGRATION_DOCS="https://github.com/freakydude/sailhand/blob/main/docs/install.md#coming-from-freakymate"
+# Prints what is left of FreakyMate, one item per line; nothing when it is gone. An empty ~/freakymate is harmless.
+freakymate_leftovers() {
+  local item
+  if freakymate_package > /dev/null; then
+    echo "package $OLD_NAME"
+  fi
+  for item in "/etc/systemd/system/$OLD_NAME.service" /etc/systemd/system/multi-user.target.wants/"$OLD_NAME"@*.service \
+    "/etc/polkit-1/rules.d/50-$OLD_NAME.rules" "/etc/udev/rules.d/70-$OLD_NAME-backlight.rules" "/etc/$OLD_NAME"; do
+    [ -e "$item" ] && echo "$item"
   done
-done
-if [ -n "$old_install" ]; then
-  echo "FreakyMate is still installed ($old_install)."
-  echo "Remove it first: ~/freakymate/uninstall.sh (or: sudo apt remove freakymate), then run this script again."
-  echo "Keep your settings: cp $DATA_DIR/config/freakymate.conf $DATA_DIR/config/sailhand.conf"
-  echo "Details: docs/install.md, section 'Coming from FreakyMate'."
+  if [ -n "$(find "$HOME/$OLD_NAME" -mindepth 1 -print -quit 2> /dev/null)" ]; then
+    echo "$HOME/$OLD_NAME"
+  fi
+  if grep -qs "^\[update_manager $OLD_NAME\]" "$DATA_DIR/config/moonraker.conf"; then
+    echo "[update_manager $OLD_NAME] in $DATA_DIR/config/moonraker.conf"
+  fi
+  if grep -qsx "$OLD_NAME" "$DATA_DIR/moonraker.asvc"; then
+    echo "'$OLD_NAME' in $DATA_DIR/moonraker.asvc"
+  fi
+  return 0
+}
+# Prints the command that removes the FreakyMate package; fails when no package is installed.
+freakymate_package() {
+  if dpkg-query -W -f '${Status}' "$OLD_NAME" 2> /dev/null | grep -q "ok installed"; then
+    echo "sudo apt remove $OLD_NAME"
+  elif pacman -Q "$OLD_NAME" > /dev/null 2>&1; then
+    echo "sudo pacman -R $OLD_NAME"
+  else
+    return 1
+  fi
+}
+# Prints how to remove FreakyMate here: its package, its own uninstaller, or the manual steps.
+freakymate_removal() {
+  local package
+  if package=$(freakymate_package); then
+    echo "  $package"
+  elif [ -x "$HOME/$OLD_NAME/uninstall.sh" ]; then
+    echo "  ~/$OLD_NAME/uninstall.sh"
+  else
+    echo "  by hand (its uninstall.sh is gone), with the steps from the page below"
+  fi
+}
+leftovers=$(freakymate_leftovers)
+if [ -n "$leftovers" ]; then
+  echo "FreakyMate (the former name of Sailhand) is still installed here:"
+  sed 's/^/  /' <<< "$leftovers"
+  echo "Remove it first, then run this script again:"
+  freakymate_removal
+  echo "Its settings stay in $DATA_DIR/config/. Steps and how to keep the settings: $MIGRATION_DOCS"
   exit 1
 fi
 for file in "$NAME" release_info.json system-dependencies.json; do

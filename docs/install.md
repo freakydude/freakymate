@@ -196,13 +196,34 @@ update entry), so an existing FreakyMate does **not** turn into Sailhand by itse
 the new packages are named `sailhand-…` and contain `sailhand` instead of `freakymate`, and the old service, rules and
 entries are not replaced. Switch once by hand:
 
-1. Uninstall FreakyMate: `~/freakymate/uninstall.sh` (installer) or `sudo apt remove freakymate` (package). Both want
-   `tty1`, so do not run them side by side. Check `moonraker.conf` afterwards: no `[update_manager freakymate]`
-   section should be left.
+1. Uninstall FreakyMate: `~/freakymate/uninstall.sh` (installer) or `sudo apt remove freakymate` (package). Both
+   want `tty1`, so do not run them side by side. The Sailhand installer stops with a hint as long as something of
+   FreakyMate is left.
+
+   If Update was pressed for FreakyMate after the rename, Moonraker has emptied `~/freakymate` (it removes the folder,
+   then fails on the new release) and `uninstall.sh` is gone with it; the screen stays dark. Then remove it by hand,
+   with your `printer_data` folder if it is not `~/printer_data`:
+
+   ```sh
+   sudo systemctl disable --now freakymate.service
+   sudo rm -f /etc/systemd/system/freakymate.service /etc/polkit-1/rules.d/50-freakymate.rules \
+     /etc/udev/rules.d/70-freakymate-backlight.rules
+   sudo rm -rf /etc/freakymate
+   sudo systemctl daemon-reload
+   sudo systemctl enable getty@tty1.service
+   sed -i '/^freakymate$/d' ~/printer_data/moonraker.asvc
+   rm -rf ~/freakymate
+   ```
+
+   Then delete the `[update_manager freakymate]` section with its lines from `moonraker.conf` (Mainsail: Machine →
+   config) and restart Moonraker.
 2. Install Sailhand as in [Printer host](#printer-host) or [Packages](#packages).
-3. Keep your settings: the keys did not change, so copy the file before or after the uninstall:
+3. Keep your settings: the uninstall leaves them in `~/printer_data/config/`. If the file is `freakymate.conf`, the
+   keys did not change, so copy it:
    `cp ~/printer_data/config/freakymate.conf ~/printer_data/config/sailhand.conf` (only the comment in its first lines
-   mentions the old name). Do this before the first start of Sailhand, which creates the file with defaults.
+   mentions the old name). Do this before the first start of Sailhand, which creates the file with defaults. A
+   `freakymate.json` (up to 0.3.8) is not read any more; take over by hand what you changed, see
+   [Configuration](configuration.md).
 
 From Sailhand on, updates come through `[update_manager sailhand]` as described under
 [Updates and channels](#updates-and-channels).
