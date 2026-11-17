@@ -358,5 +358,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_ID: ${{ inputs.release-id }}
-        run: bash .github/scripts/attach-to-release.sh "$RELEASE_ID" apk/*.apk
+        # upload-artifact keeps the path below the first wildcard: the APK arrives as apk/<flavor>/release/*.apk.
+        # failglob stops with "no match" instead of passing the pattern on.
+        run: |
+          shopt -s globstar failglob
+          bash .github/scripts/attach-to-release.sh "$RELEASE_ID" apk/**/*.apk
       - *cancel-on-failure
