@@ -2,6 +2,7 @@
 
 use crate::actions;
 use crate::backlight_controller::BacklightController;
+#[cfg(not(target_os = "android"))]
 use crate::display;
 use crate::network_controller::NetworkController;
 use crate::presenter::Presenter;
@@ -11,7 +12,9 @@ use freakymate_core::backlight::{BacklightBackend, BacklightService};
 use freakymate_core::network::{NetworkBackend, NetworkService};
 use freakymate_core::settings::{SettingsError, SettingsStore};
 use freakymate_core::{CredentialStore, Endpoint, PrinterService};
+#[cfg(not(target_os = "android"))]
 use slint::winit_030::winit::event::{ElementState, KeyEvent, WindowEvent};
+#[cfg(not(target_os = "android"))]
 use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, Timer, TimerMode};
 use std::path::PathBuf;
@@ -27,6 +30,8 @@ pub struct Options {
     /// Fallback for displays without DRM/KMS: draws straight to the framebuffer (see [`crate::framebuffer`], Linux).
     pub framebuffer: bool,
     pub settings_file: Option<PathBuf>,
+    /// Where the Moonraker logins are kept (default: the user's configuration directory).
+    pub credentials_file: Option<PathBuf>,
     /// NetworkManager, or simulated networks in development builds.
     pub network: NetworkBackend,
     /// The kernel's backlight, or a simulated one in development builds. Default: none, the UI offers no control.
@@ -91,14 +96,15 @@ impl Application {
         }
         let window = AppWindow::new()?;
         // Wayland and X11 desktops find the icon through the app id and `freakymate.desktop`, not the window icon.
+        #[cfg(not(target_os = "android"))]
         if !options.framebuffer
             && let Err(error) = slint::set_xdg_app_id("freakymate")
         {
             log::warn!("cannot set the app id: {error}");
         }
         // Always in the user's configuration directory, also when the settings lie in printer_data/config.
-        let (service, channels) =
-            PrinterService::start(runtime.handle(), endpoint.clone(), CredentialStore::default_location());
+        let credentials = options.credentials_file.map_or_else(CredentialStore::default_location, CredentialStore::new);
+        let (service, channels) = PrinterService::start(runtime.handle(), endpoint.clone(), credentials);
         let presenter = Presenter::new(&window, service.clone());
         let (network_service, network_channels) = NetworkService::start(runtime.handle(), options.network);
         let network = NetworkController::bind(
@@ -139,6 +145,8 @@ impl Application {
         // (800x445 instead of 800x480). This covers compositors without xdg-decoration as well.
         window.set_kiosk(options.fullscreen);
         window.global::<UiSettings>().set_setup_command(options.setup_command.unwrap_or_default().into());
+        // Slint's fullscreen on Android hides no system bar and only drops the safe area (see `android.rs`).
+        #[cfg(not(target_os = "android"))]
         if options.fullscreen || settings.fullscreen() {
             window.window().set_fullscreen(true);
         }
@@ -148,8 +156,18 @@ impl Application {
             let _ = input_target.set(backlight.clone());
             crate::framebuffer::fit_when_shown(&window);
         }
+        #[cfg(not(target_os = "android"))]
         if !options.framebuffer {
             watch_window_events(&window, Some(backlight.clone()));
+        }
+        #[cfg(target_os = "android")]
+        {
+            crate::android::hide_status_bar();
+            crate::android::hide_system_keyboard();
+            crate::android::keep_screen_on(settings.keep_screen_on());
+            crate::android::watch_window_size(&window);
+            let service = service.clone();
+            crate::android::on_return_from_background(move || service.reconnect());
         }
         Ok(Self {
             window,
@@ -176,6 +194,7 @@ impl Application {
 /// by hand, and nothing is fitted then. (The pointer of the kiosk is hidden by its cursor theme, see
 /// [`crate::kiosk_pointer`].) While the screen is dark or just lit, touches, clicks and keys are swallowed here, so the
 /// UI needs no wake-up surface of its own; they restart the idle time (see [`BacklightController::input`]).
+#[cfg(not(target_os = "android"))]
 pub fn watch_window_events(window: &AppWindow, backlight: Option<std::rc::Rc<BacklightController>>) {
     let fit = std::env::var_os("SLINT_SCALE_FACTOR").is_none();
     let weak = window.as_weak();
@@ -204,6 +223,7 @@ pub fn watch_window_events(window: &AppWindow, backlight: Option<std::rc::Rc<Bac
 
 /// Whether an input event is a press, a touch or a key, which counts as activity for the standby; `None` for events
 /// that are no input. A release or a mouse wheel is input, but no activity of its own.
+#[cfg(not(target_os = "android"))]
 fn input_activity(event: &WindowEvent) -> Option<bool> {
     match event {
         WindowEvent::MouseInput { state, .. } | WindowEvent::KeyboardInput { event: KeyEvent { state, .. }, .. } => {
@@ -216,9 +236,10 @@ fn input_activity(event: &WindowEvent) -> Option<bool> {
 }
 
 /// Fullscreen fits the layout to the display; a window shows it at the scale of the system (see
-/// [`display::fits_to_display`]).
+/// [`display::fits_to_display`]). Android fits on its own (`android.rs`).
+#[cfg(not(target_os = "android"))]
 pub(crate) fn scale_to_mode(window: &slint::Window) {
-    let system_scale = window.with_winit_window(|winit_window| winit_window.scale_factor() as f32).unwrap_or(1.0);
+    let system_scale = system_scale(window);
     let size = window.size();
     if display::fits_to_display(window.is_fullscreen(), size.width, size.height, system_scale) {
         display::apply_fit(window);
@@ -230,4 +251,9 @@ pub(crate) fn scale_to_mode(window: &slint::Window) {
         "Display",
         &format!("{mode} {}x{}, scale factor {:.3}", size.width, size.height, window.scale_factor()),
     );
+}
+
+#[cfg(not(target_os = "android"))]
+fn system_scale(window: &slint::Window) -> f32 {
+    window.with_winit_window(|winit_window| winit_window.scale_factor() as f32).unwrap_or(1.0)
 }

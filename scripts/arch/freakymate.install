@@ -1,0 +1,26 @@
+post_install() {
+  # The program compares it with the setup it needs; the package always brings both together.
+  mkdir -p /etc/freakymate
+  /usr/bin/freakymate --setup-version > /etc/freakymate/setup-version || true
+  if [ -d /run/systemd/system ]; then
+    # The backlight rule applies to the device that is already there, without a reboot.
+    udevadm control --reload-rules || true
+    udevadm trigger --subsystem-match=backlight --action=add || true
+  fi
+  echo "freakymate installed. Start it in kiosk mode on tty1 for user <name>:"
+  echo "  sudo systemctl enable --now freakymate@<name>"
+  echo "If FreakyMate was also installed from the release zip (service /etc/systemd/system/freakymate.service),"
+  echo "enable only one of the two: they share tty1."
+  echo "Wi-Fi settings need NetworkManager and membership in the group netdev:"
+  echo "  sudo usermod -aG netdev <name>"
+  echo "Brightness and screen standby (displays with a controllable backlight) need the group video:"
+  echo "  sudo usermod -aG video <name>"
+}
+
+post_upgrade() {
+  mkdir -p /etc/freakymate
+  /usr/bin/freakymate --setup-version > /etc/freakymate/setup-version || true
+  if [ -d /run/systemd/system ]; then
+    udevadm control --reload-rules || true
+  fi
+}

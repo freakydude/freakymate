@@ -6,6 +6,8 @@
 pub use freakymate_ui::*;
 
 pub mod actions;
+#[cfg(target_os = "android")]
+pub mod android;
 pub mod app;
 pub mod backlight_controller;
 mod bed_map;
@@ -21,7 +23,9 @@ mod format;
 mod framebuffer;
 mod history_view;
 mod items;
+#[cfg(not(target_os = "android"))]
 pub mod kiosk_pointer;
+mod log_export;
 pub mod logging;
 mod macro_view;
 mod mmu_view;
@@ -30,6 +34,7 @@ mod objects_view;
 pub mod presenter;
 pub mod settings_controller;
 mod spool_view;
+pub mod startup;
 mod status_log;
 mod status_view;
 mod thumbnail;

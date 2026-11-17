@@ -1,9 +1,11 @@
 name: CI
 
-# Every push to main and every pull request: tests, builds and packages for all platforms (artifact "packages-<version>").
-# Pull requests get a comment with the download link; every push to main is published as prerelease
-# vX.Y.<commits since the last release>, replacing the previous prerelease. Releases: workflow "Release".
-# Branches without a pull request: start the workflow manually ("Run workflow").
+# Every push to main and every pull request: tests, builds and packages for all platforms (see build.yml). Each build
+# stands on its own: a failed one does not stop the others.
+# Pull requests get a comment listing the packages that were built (with download links) and the jobs that failed.
+# Every push to main becomes the prerelease vX.Y.<commits since the last release>: the builds attach their packages to
+# a draft, and the last job publishes it with a note on what is missing, replacing the previous prerelease. Releases:
+# workflow "Release". Branches without a pull request: start the workflow manually ("Run workflow").
 on:
   push:
     # Only main: a branch push with an open pull request would otherwise run twice (push and pull_request).
@@ -34,73 +36,105 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: echo "version=$(bash .github/scripts/version.sh)" | tee -a "$GITHUB_OUTPUT"
 
-  build:
+  draft:
+    name: Draft prerelease
     needs: version
+    # Versions ending in .0 are releases and are only published by the Release workflow.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !endsWith(needs.version.outputs.version, '.0')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      id: ${{ steps.draft.outputs.id }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - id: draft
+        run: |
+          # Drafts of earlier runs that were replaced or broke off; drafts of releases (not prerelease) stay.
+          for old in $(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[] | select(.draft and .prerelease) | .id'); do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$old" || true
+          done
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" -f tag_name="v$VERSION" -f target_commitish="$GITHUB_SHA" \
+            -f name="FreakyMate v$VERSION (pre-release)" -F draft=true -F prerelease=true --jq .id)
+          echo "id=$id" | tee -a "$GITHUB_OUTPUT"
+
+  # Two callers of build.yml, because its jobs take the permissions of the caller: pull requests build with a read-only
+  # token, main may attach files to the draft.
+  build-pr:
+    name: build
+    needs: version
+    if: github.event_name != 'push'
+    permissions:
+      contents: read
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ needs.version.outputs.version }}
 
-  release:
-    name: Package and release
-    needs: [version, build]
+  build-main:
+    name: build
+    needs: [version, draft]
+    # Also without a draft (a .0 version): then the packages are artifacts only.
+    if: ${{ !cancelled() && github.event_name == 'push' && needs.version.result == 'success' && needs.draft.result != 'failure' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      release-id: ${{ needs.draft.outputs.id }}
+
+  publish:
+    name: Publish prerelease
+    needs: [version, draft, build-main]
+    # Also after failed builds (the prerelease names them) and after a cancel (the draft goes).
+    if: always() && needs.draft.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_ID: ${{ needs.draft.outputs.id }}
+      TAG: v${{ needs.version.outputs.version }}
+      BUILD_RESULT: ${{ needs.build-main.result }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - run: bash .github/scripts/publish-prerelease.sh "$RELEASE_ID" "$TAG" "$BUILD_RESULT"
+
+  comment:
+    name: Comment on pull request
+    needs: [version, build-pr]
+    # Pull requests from forks get a read-only token; the artifacts are still listed in the run.
+    if: >-
+      !cancelled() && github.event_name == 'pull_request' && needs.version.result == 'success'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
       issues: write
       pull-requests: write
     env:
       VERSION: ${{ needs.version.outputs.version }}
       GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        with:
-          pattern: freakymate-*
-          path: artifacts
-      - name: Pack
-        working-directory: artifacts
-        run: |
-          bash ../.github/scripts/pack-artifacts.sh "v$VERSION"
-          for archive in *linux*.zip; do
-            unzip -Z -l "$archive"
-            unzip -p "$archive" release_info.json | python3 -m json.tool
-          done
-          for package in *.deb; do
-            dpkg-deb --info "$package"
-            dpkg-deb --contents "$package"
-          done
-      - id: upload
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: packages-${{ env.VERSION }}
-          path: |
-            artifacts/*.zip
-            artifacts/*.deb
-            artifacts/get-freakymate.sh
-      - name: Publish prerelease
-        # Versions ending in .0 are releases and are only published by the Release workflow.
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !endsWith(env.VERSION, '.0')
-        run: |
-          gh release create "v$VERSION" artifacts/*.zip artifacts/*.deb artifacts/get-freakymate.sh \
-            --target "$GITHUB_SHA" \
-            --prerelease \
-            --title "FreakyMate v$VERSION (pre-release)" \
-            --notes "Automatic build of main at $GITHUB_SHA, replaced by the next commit on main. Newest functions first, less time in use than a release; use it with care and at your own risk (see the README)."
-          for old in $(gh release list --limit 100 --json tagName,isPrerelease --jq '.[] | select(.isPrerelease) | .tagName'); do
-            if [ "$old" != "v$VERSION" ]; then gh release delete "$old" --yes --cleanup-tag; fi
-          done
-      - name: Link preview in pull request
-        # Pull requests from forks get a read-only token; the artifact is still listed in the run.
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+      - name: Link packages in the pull request
         continue-on-error: true
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
         run: |
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          packages=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --paginate |
+            jq -r --arg run "$run_url" '.artifacts[] | select((.name | startswith("packages-")) or .name == "android-apk")
+              | "- [\(.name)](\($run)/artifacts/\(.id))"' | sort)
+          failed=$(bash .github/scripts/failed-jobs.sh | sed 's/^/- /')
           marker='<!-- preview-packages -->'
           body="$marker
-          **Preview build \`$VERSION\`** of this pull request: [download packages]($ARTIFACT_URL) (zips and .deb, GitHub login required).
-          Untested preview, use at your own risk."
+          **Preview build \`$VERSION\`** of this pull request (GitHub login required; untested preview, use at your own risk):
+          ${packages:-No package was built.}"
+          if [ -n "$failed" ]; then
+            body+=$'\n\n'"**Failed** ([run]($run_url)):"$'\n'"$failed"
+          fi
           comment=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
             --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
           if [ -n "$comment" ]; then

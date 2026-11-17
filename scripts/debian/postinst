@@ -14,6 +14,10 @@ if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
   udevadm trigger --subsystem-match=backlight --action=add || true
   echo "freakymate installed. Start it in kiosk mode on tty1 for user <name>:"
   echo "  sudo systemctl enable --now freakymate@<name>"
+  # install.sh from the release zip sets up its own kiosk service; both want tty1.
+  if [ -f /etc/systemd/system/freakymate.service ]; then
+    echo "FreakyMate is also installed from the release zip (freakymate.service); enable only one of the two kiosks."
+  fi
   echo "Wi-Fi settings need NetworkManager and membership in the group netdev:"
   echo "  sudo usermod -aG netdev <name>"
   echo "Brightness and screen standby (displays with a controllable backlight) need the group video:"

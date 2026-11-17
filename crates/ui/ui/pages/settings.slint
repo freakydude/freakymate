@@ -27,6 +27,25 @@ component MinutesRow inherits VerticalLayout {
     }
 }
 
+// Android only: copies the log into the Download folder, where it can be attached to a bug report.
+component LogExportRow inherits VerticalLayout {
+    spacing: Theme.spacing-tight;
+    IconButton {
+        height: Theme.row-height-small;
+        icon: Icons.ui-save;
+        text: @tr("Export log");
+        horizontal: true;
+        enabled: !UiSettings.log-export-running;
+        clicked => { UiSettings.log-export-clicked(); }
+    }
+    if UiSettings.log-export-result != "": Text {
+        text: UiSettings.log-export-result;
+        color: Theme.disabled-foreground;
+        font-size: Theme.font-small;
+        wrap: word-wrap;
+    }
+}
+
 component ConnectionCard inherits Card {
     title: @tr("Moonraker address");
     icon: Icons.system-host;
@@ -72,12 +91,20 @@ component DisplayCard inherits Card {
 
     VerticalLayout {
         spacing: Theme.spacing;
-        ToggleRow {
+        if UiSettings.fullscreen-available: ToggleRow {
             text: @tr("Fullscreen");
             checked: UiSettings.fullscreen;
             toggled => {
                 UiSettings.fullscreen = !UiSettings.fullscreen;
                 UiSettings.fullscreen-toggled(UiSettings.fullscreen);
+            }
+        }
+        if UiSettings.keep-screen-on-available: ToggleRow {
+            text: @tr("Keep the screen on");
+            checked: UiSettings.keep-screen-on;
+            toggled => {
+                UiSettings.keep-screen-on = !UiSettings.keep-screen-on;
+                UiSettings.keep-screen-on-toggled(UiSettings.keep-screen-on);
             }
         }
         // Only where the backlight can be controlled.
@@ -124,8 +151,11 @@ export component SettingsPage inherits Rectangle {
                     }
                 }
                 Rectangle { vertical-stretch: 1; }
+                if UiSettings.log-export-available: LogExportRow { vertical-stretch: 0; }
                 Text {
-                    text: @tr("FreakyMate {}\nSaved in {}", UiSettings.version, UiSettings.settings-file);
+                    // Without a file the user can reach (Android keeps it in the app's private folder) only the version.
+                    text: UiSettings.settings-file == "" ? @tr("FreakyMate {}", UiSettings.version)
+                        : @tr("FreakyMate {}\nSaved in {}", UiSettings.version, UiSettings.settings-file);
                     color: Theme.disabled-foreground;
                     font-size: Theme.font-small;
                     wrap: word-wrap;

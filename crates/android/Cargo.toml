@@ -1,0 +1,20 @@
+[package]
+name = "freakymate-android"
+description = "Android entry point of FreakyMate: a native activity that starts the same application"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+# The APK loads `libfreakymate.so` (see the manifest in `android/`).
+[lib]
+name = "freakymate"
+crate-type = ["cdylib"]
+
+# Only for Android, so `cargo check --workspace` on the desktop does not try to build them.
+[target.'cfg(target_os = "android")'.dependencies]
+freakymate = { workspace = true, default-features = false }
+android-activity = { version = "0.6.1", features = ["native-activity"] }
+slint = { workspace = true, features = ["backend-android-activity-06"] }

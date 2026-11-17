@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A native activity without any Java code: libfreakymate.so (crates/android) does everything. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Moonraker is reached over plain http/ws inside the home network; Android blocks that by default. -->
+    <application
+        android:label="${appLabel}"
+        android:icon="@mipmap/ic_launcher"
+        android:hasCode="false"
+        android:usesCleartextTraffic="true"
+        android:allowBackup="false">
+        <activity
+            android:name="android.app.NativeActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|uiMode|density">
+            <meta-data android:name="android.app.lib_name" android:value="freakymate" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

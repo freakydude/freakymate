@@ -39,6 +39,10 @@ export component AppWindow inherits Window {
     no-frame: root.kiosk;
     background: Theme.background;
     default-font-size: Theme.font-normal;
+    // Edges the system draws over (Android: navigation bar, camera cutout); the layout stays clear of them, and Rust
+    // fits the design size into the rest (`display.rs`). Zero on the desktop.
+    out property <length> covered-width: self.safe-area-insets.left + self.safe-area-insets.right;
+    out property <length> covered-height: self.safe-area-insets.top + self.safe-area-insets.bottom;
 
     // Pages that are useful even without a ready printer.
     property <bool> page-works-offline: Navigation.page == Page.system || Navigation.page == Page.settings
@@ -65,6 +69,10 @@ export component AppWindow inherits Window {
     VerticalLayout {
         // Standby draws nothing but the black cover below.
         visible: !Backlight.off;
+        padding-left: root.safe-area-insets.left;
+        padding-top: root.safe-area-insets.top;
+        padding-right: root.safe-area-insets.right;
+        padding-bottom: root.safe-area-insets.bottom;
         StatusBar { }
         HorizontalLayout {
             vertical-stretch: 1;
@@ -101,13 +109,17 @@ export component AppWindow inherits Window {
     }
 
     if Navigation.light-open: LightPanel {
-        width: parent.width;
-        height: parent.height;
+        x: root.safe-area-insets.left;
+        y: root.safe-area-insets.top;
+        width: parent.width - root.covered-width;
+        height: parent.height - root.covered-height;
     }
 
     if Navigation.messages-open: MessagesFlyout {
-        width: parent.width;
-        height: parent.height;
+        x: root.safe-area-insets.left;
+        y: root.safe-area-insets.top;
+        width: parent.width - root.covered-width;
+        height: parent.height - root.covered-height;
     }
 
     // Standby: the backlight is off as well; Rust swallows the touches that wake the screen.

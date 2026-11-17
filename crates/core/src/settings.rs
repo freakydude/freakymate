@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 use toml_edit::DocumentMut;
 
-pub(crate) const APP_FOLDER: &str = "freakymate";
 const FILE_NAME: &str = "settings.conf";
 const EXTENSION: &str = "conf";
 /// Up to 0.3.8 the settings were JSON; such a file stays where it is and is no longer read.
@@ -26,6 +25,8 @@ pub struct Settings {
     /// Address of the Moonraker server, e.g. `http://127.0.0.1:7125`.
     pub moonraker: String,
     pub fullscreen: bool,
+    /// Android: the screen stays on while FreakyMate is in front, like a touch screen at the printer.
+    pub keep_screen_on: bool,
     pub steps: Steps,
     /// Edited in the settings file only; the Thermal page shows the first [`MAX_SHOWN_PRESETS`].
     pub temperature_presets: Vec<TemperaturePreset>,
@@ -81,6 +82,7 @@ impl Default for Settings {
         Self {
             moonraker: "http://127.0.0.1:7125".to_owned(),
             fullscreen: false,
+            keep_screen_on: true,
             steps: Steps::default(),
             temperature_presets: vec![
                 TemperaturePreset::new("PLA", 210.0, 60.0),
@@ -141,7 +143,7 @@ impl SettingsStore {
     /// Default location: `<config dir>/freakymate/settings.conf`.
     pub fn default_location() -> Result<Self, SettingsError> {
         let directory = dirs::config_dir().ok_or(SettingsError::NoConfigDirectory)?;
-        Ok(Self::new(directory.join(APP_FOLDER).join(FILE_NAME)))
+        Ok(Self::new(directory.join(crate::config_folder()).join(FILE_NAME)))
     }
 
     pub fn path(&self) -> &Path {

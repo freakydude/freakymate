@@ -28,7 +28,9 @@ driver causes trouble), `SLINT_SCALE_FACTOR=1.5` (sets the scale by hand and tur
 FreakyMate keeps its settings in a [TOML](https://toml.io) file with the ending `.conf`, like `moonraker.conf`:
 `printer_data/config/freakymate.conf` when installed with the installer or the `.deb` (so it can be edited in Mainsail or
 Fluidd next to the Klipper configs), otherwise `~/.config/freakymate/settings.conf` (Windows:
-`%APPDATA%\freakymate\settings.conf`). The file is created with the defaults at the first start. Comments (`# …`) are
+`%APPDATA%\freakymate\settings.conf`). Test builds (built locally or for a pull request; their version has a suffix such
+as `-dev` or `-pr.…`) use the folder `freakymate-dev` instead, so trying one leaves the installed FreakyMate alone; the
+same holds for the credentials below. The file is created with the defaults at the first start. Comments (`# …`) are
 yours: when a setting changes on the screen, FreakyMate changes only that value and leaves comments, blank lines and
 order as they are. If the file cannot be read, FreakyMate starts with the defaults and does not overwrite it; the log
 says what is wrong.

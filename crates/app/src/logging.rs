@@ -11,9 +11,11 @@ use log::{Level, LevelFilter, Log, Metadata, Record};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+#[cfg(not(target_os = "android"))]
+use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, SyncSender};
-use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
@@ -34,8 +36,16 @@ pub struct Config {
 }
 
 /// Installs the logger. `RUST_LOG` decides what is logged when set; otherwise the program logs at info, and
-/// [`set_verbose`] raises its own modules to debug.
+/// [`set_verbose`] raises its own modules to debug. A second call in the same process keeps the first log: Android
+/// starts the program again in its process when it destroyed the activity in the background.
 pub fn init(config: Config) -> io::Result<()> {
+    if LOGGER.get().is_some() {
+        log::info!("started again in the same process; the log goes on");
+        return Ok(());
+    }
+    if let Some(path) = &config.file {
+        let _ = LOG_FILE.set(path.clone());
+    }
     let writer = config.file.map(|path| spawn_writer(path, config.header)).transpose()?;
     let logger = Logger::new(writer, std::env::var("RUST_LOG").ok().as_deref());
     log::set_max_level(logger.max_level());
@@ -62,6 +72,12 @@ pub fn header(name: &str, value: &str) {
 }
 
 static LOGGER: OnceLock<Logger> = OnceLock::new();
+static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
+
+/// The current log file, when the log is written to one.
+pub fn file_path() -> Option<&'static Path> {
+    LOG_FILE.get().map(PathBuf::as_path)
+}
 
 struct Logger {
     /// From `RUST_LOG`.
@@ -69,6 +85,7 @@ struct Logger {
     verbose: AtomicBool,
     file: Option<SyncSender<Message>>,
     /// Several threads write to stderr; one line at a time.
+    #[cfg(not(target_os = "android"))]
     stderr: Mutex<()>,
 }
 
@@ -87,7 +104,13 @@ impl Logger {
     fn new(file: Option<SyncSender<Message>>, rust_log: Option<&str>) -> Self {
         let filter =
             rust_log.filter(|spec| !spec.trim().is_empty()).map(|spec| env_filter::Builder::new().parse(spec).build());
-        Self { filter, verbose: AtomicBool::new(false), file, stderr: Mutex::new(()) }
+        Self {
+            filter,
+            verbose: AtomicBool::new(false),
+            file,
+            #[cfg(not(target_os = "android"))]
+            stderr: Mutex::new(()),
+        }
     }
 
     fn max_level(&self) -> LevelFilter {
@@ -125,6 +148,10 @@ impl Log for Logger {
         let now = Local::now();
         let stamp = now.format(STAMP_FORMAT).to_string();
         let text = format_line(&stamp, record.level(), record.target(), &record.args().to_string());
+        // Android shows no stderr; its log is logcat.
+        #[cfg(target_os = "android")]
+        android_logger::log(record);
+        #[cfg(not(target_os = "android"))]
         {
             let _line = self.stderr.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             // Nowhere to report a failing stderr.
@@ -290,7 +317,7 @@ fn dated_name(path: &Path, day: NaiveDate) -> PathBuf {
 }
 
 /// The rotated files of this log with the day in their name.
-fn old_files(path: &Path) -> Vec<(NaiveDate, PathBuf)> {
+pub(crate) fn old_files(path: &Path) -> Vec<(NaiveDate, PathBuf)> {
     let (Some(directory), Some(name)) = (path.parent(), path.file_name().and_then(|name| name.to_str())) else {
         return Vec::new();
     };
@@ -319,6 +346,13 @@ mod tests {
             fs::read_dir(directory).unwrap().flatten().map(|entry| entry.file_name().into_string().unwrap()).collect();
         names.sort();
         names
+    }
+
+    /// Android starts the program again in the same process when it destroyed the activity in the background.
+    #[test]
+    fn a_second_start_in_the_same_process_keeps_the_log() {
+        init(Config::default()).unwrap();
+        init(Config::default()).unwrap();
     }
 
     #[test]

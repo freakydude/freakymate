@@ -145,7 +145,12 @@ enum Request {
     Command(Command),
     Query(Query),
     Connect(Endpoint),
-    LogIn { username: String, password: String },
+    /// A fresh connection to the same address, also while the current one seems alive.
+    Reconnect,
+    LogIn {
+        username: String,
+        password: String,
+    },
     LogOut,
 }
 
@@ -187,6 +192,12 @@ impl PrinterService {
     /// Reconnects, e.g. after the address was changed in the settings.
     pub fn connect_to(&self, endpoint: Endpoint) {
         let _ = self.requests.send(Request::Connect(endpoint));
+    }
+
+    /// Connects again to the same address at once, e.g. when an app returns from the background: the system may have
+    /// frozen it, and the old connection would show stale values until the keepalive notices that it is gone.
+    pub fn reconnect(&self) {
+        let _ = self.requests.send(Request::Reconnect);
     }
 
     /// Logs in while the connection is [`ConnectionState::LoginRequired`]; only the refresh token is kept, the

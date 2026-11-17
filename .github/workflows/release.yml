@@ -2,6 +2,8 @@ name: Release
 
 # Deliberate release of main: increases the minor or major number, tags vX.Y.0 and publishes the release.
 # Later commits on main count up the patch number again (see .github/scripts/version.sh).
+# All or nothing: the builds attach their packages to a draft; the first failing job cancels the run, and the draft is
+# only published when every build succeeded, otherwise deleted.
 on:
   workflow_dispatch:
     inputs:
@@ -35,37 +37,71 @@ jobs:
           echo "version=$(bash .github/scripts/version.sh ${{ inputs.bump }})" | tee -a "$GITHUB_OUTPUT"
           echo "previous=$(bash .github/scripts/version.sh last)" | tee -a "$GITHUB_OUTPUT"
 
-  build:
+  draft:
+    name: Draft release
     needs: version
-    uses: ./.github/workflows/build.yml
-    with:
-      version: ${{ needs.version.outputs.version }}
-
-  publish:
-    name: Publish release
-    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      id: ${{ steps.draft.outputs.id }}
     env:
       TAG: v${{ needs.version.outputs.version }}
       PREVIOUS: ${{ needs.version.outputs.previous }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        with:
-          pattern: freakymate-*
-          path: artifacts
-      - name: Pack
-        working-directory: artifacts
-        run: bash ../.github/scripts/pack-artifacts.sh "$TAG"
-      - name: Create release
+      - id: draft
         run: |
-          notes_start=()
-          if [ -n "$PREVIOUS" ]; then notes_start=(--notes-start-tag "$PREVIOUS"); fi
-          gh release create "$TAG" artifacts/*.zip artifacts/*.deb artifacts/get-freakymate.sh \
-            --target "$GITHUB_SHA" \
-            --title "FreakyMate $TAG" \
-            --generate-notes "${notes_start[@]}" \
-            --latest
+          # A draft of an earlier attempt at this version.
+          for old in $(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.draft and .tag_name == \"$TAG\") | .id"); do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$old"
+          done
+          previous=()
+          if [ -n "$PREVIOUS" ]; then previous=(-f previous_tag_name="$PREVIOUS"); fi
+          notes=$(gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$TAG" \
+            -f target_commitish="$GITHUB_SHA" "${previous[@]}" --jq .body)
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" \
+            -f name="FreakyMate $TAG" -f body="$notes" -F draft=true --jq .id)
+          echo "id=$id" | tee -a "$GITHUB_OUTPUT"
+
+  build:
+    needs: [version, draft]
+    # contents: attach to the draft; actions: cancel the run at the first failure.
+    permissions:
+      contents: write
+      actions: write
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      release-id: ${{ needs.draft.outputs.id }}
+      cancel-on-failure: true
+
+  publish:
+    name: Publish release
+    needs: [version, draft, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_ID: ${{ needs.draft.outputs.id }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Publish the draft
+        run: |
+          bash .github/scripts/attach-to-release.sh "$RELEASE_ID" scripts/get-freakymate.sh
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" -F draft=false -f make_latest=true > /dev/null
+
+  discard:
+    name: Discard the draft
+    needs: [draft, publish]
+    if: always() && needs.draft.result == 'success' && needs.publish.result != 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_ID: ${{ needs.draft.outputs.id }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID"

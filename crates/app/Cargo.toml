@@ -24,16 +24,25 @@ chrono = { version = "0.4", default-features = false, features = [
 clap = { version = "4.6.7", features = ["derive"] }
 env_filter = { version = "2.0.0", default-features = false, features = ["std"] }
 log.workspace = true
+slint = { workspace = true, features = ["std", "compat-1-2"] }
+tokio.workspace = true
+thiserror.workspace = true
+
+# Desktop and kiosk: winit with FemtoVG on the GPU, the software renderer as the fallback.
+[target.'cfg(not(target_os = "android"))'.dependencies]
 slint = { workspace = true, features = [
-    "std",
-    "compat-1-2",
     "backend-winit",
     "unstable-winit-030",
     "renderer-femtovg",
     "renderer-software",
 ] }
-tokio.workspace = true
-thiserror.workspace = true
+
+# Android: Slint's android-activity backend, which draws with Skia (winit and FemtoVG are not built there).
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.15.1"
+# The version Slint's Android backend already uses, so only one copy is built.
+jni = "0.22.4"
+slint = { workspace = true, features = ["backend-android-activity-06", "renderer-skia"] }
 
 # Fallback for displays without DRM/KMS (`--framebuffer`): a platform of its own draws with Slint's software renderer
 # to /dev/fbN (mapped with memmap2, read with ioctls from libc), input comes from libinput.

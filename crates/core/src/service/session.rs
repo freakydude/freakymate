@@ -94,6 +94,7 @@ async fn wait_for_retry(
             request = requests.recv() => match request {
                 None => return Retry::Shutdown,
                 Some(Request::Connect(endpoint)) => return Retry::SwitchTo(endpoint),
+                Some(Request::Reconnect) => return Retry::Same,
                 Some(Request::Command(command)) => outputs.event(Event::CommandFailed {
                     command,
                     error: CommandError::NotConnected,
@@ -263,6 +264,7 @@ impl<'a> Session<'a> {
                     None => return SessionEnd::Shutdown,
                     Some(Request::Connect(endpoint)) if endpoint != self.endpoint => return SessionEnd::SwitchTo(endpoint),
                     Some(Request::Connect(_)) => {}
+                    Some(Request::Reconnect) => return SessionEnd::SwitchTo(self.endpoint.clone()),
                     Some(Request::Command(command)) => self.execute(command),
                     Some(Request::Query(query)) => self.answer(query),
                     Some(Request::LogIn { .. }) => log::debug!("login ignored: Moonraker already answers"),
@@ -315,6 +317,7 @@ impl<'a> Session<'a> {
                     Some(Request::Connect(endpoint)) if endpoint != self.endpoint => {
                         return Some(SessionEnd::SwitchTo(endpoint));
                     }
+                    Some(Request::Reconnect) => return Some(SessionEnd::SwitchTo(self.endpoint.clone())),
                     Some(Request::LogIn { username, password }) => match self.log_in(&username, &password).await {
                         Ok(()) => return None,
                         Err(AccessError::Call(error)) => {
