@@ -595,6 +595,29 @@ async fn reports_errors_and_recovers_from_emergency_stop() {
     wait_for(&mut channels, ready).await;
 }
 
+/// RESTART from "ready" sends no shutdown; the subscription is dropped by the disconnect and must be renewed.
+#[tokio::test(flavor = "multi_thread")]
+async fn restart_from_ready_subscribes_again() {
+    let endpoint = start_fake().await;
+    let (service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+    wait_for(&mut channels, ready).await;
+    let extruder_target = |target: f64| {
+        move |snapshot: &Snapshot| {
+            ready(snapshot) && snapshot.status.heater("extruder").is_some_and(|heater| heater.target == target)
+        }
+    };
+    service.send(Command::SetHeaterTarget { heater: "extruder".into(), target: 200.0 });
+    wait_for(&mut channels, extruder_target(200.0)).await;
+
+    // The fake's restart resets the printer: a target of 0 can only come from the subscription after the restart.
+    service.send(Command::FirmwareRestart);
+    wait_for(&mut channels, extruder_target(0.0)).await;
+
+    service.send(Command::Home { x: true, y: true, z: true });
+    wait_for(&mut channels, |snapshot| snapshot.status.motion.homed.all()).await;
+}
+
 /// After a shutdown mid-print `print_stats` still reports the print, but it is lost; the restart must not be refused.
 #[tokio::test(flavor = "multi_thread")]
 async fn firmware_restart_after_shutdown_during_a_print() {

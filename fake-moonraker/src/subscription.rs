@@ -10,6 +10,12 @@ pub struct Subscription {
 }
 
 impl Subscription {
+    /// Drops all subscribed objects, as Moonraker does when the Klipper connection closes.
+    pub fn clear(&mut self) {
+        self.wanted.clear();
+        self.last_sent.clear();
+    }
+
     pub fn replace_with(&mut self, objects: &Value) -> Result<(), String> {
         let requested = objects.as_object().ok_or("'objects' must be an object")?;
         let mut wanted = BTreeMap::new();
