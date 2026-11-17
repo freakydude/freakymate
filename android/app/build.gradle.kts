@@ -21,7 +21,7 @@ val abis = providers.gradleProperty("abis").orElse("arm64-v8a").get().split(",")
 val releaseKeystore: String? = System.getenv("ANDROID_KEYSTORE")
 val androidHome: String = System.getenv("ANDROID_HOME") ?: error("set ANDROID_HOME")
 val jniLibs = layout.buildDirectory.dir("jniLibs")
-val cargoNdk by tasks.registering(Exec::class) {
+val cargoNdk = tasks.register<Exec>("cargoNdk") {
     workingDir = rootDir.parentFile
     // slint's build script does not find the platform on its own.
     environment("ANDROID_JAR", "$androidHome/platforms/android-$compileSdkLevel/android.jar")

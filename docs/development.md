@@ -119,8 +119,9 @@ The development tools are separate programs and never shipped: `fake-moonraker` 
 - Every push to `main` becomes prerelease `vX.Y.Z`: the builds attach their packages to a draft release as they
   finish, and the last job publishes it, replacing the previous prerelease (`.github/scripts/publish-prerelease.sh`).
   A failed build leaves its packages out, and the release notes name it; failed tests or a cancelled run publish
-  nothing, the previous prerelease stays. Moonraker and Obtainium only ever see the finished release. Moonraker offers
-  it on the `beta` channel.
+  nothing, the previous prerelease stays. Their draft stays too, so **Re-run failed jobs** can still complete and
+  publish it; the next push to `main` deletes it. Moonraker and Obtainium only ever see the finished release.
+  Moonraker offers it on the `beta` channel.
 - Release: run the workflow **Release** (Actions tab) on `main` and choose `minor` or `major`. It tags `vX.Y.0`,
   builds and publishes the release with generated notes; Moonraker offers it on the `stable` channel. The patch number
   then starts again at 0. All or nothing: the first failing job cancels the run, and the draft is deleted.

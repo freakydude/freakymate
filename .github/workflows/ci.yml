@@ -91,7 +91,7 @@ jobs:
   publish:
     name: Publish prerelease
     needs: [version, draft, build-main]
-    # Also after failed builds (the prerelease names them) and after a cancel (the draft goes).
+    # Also after failed builds (the prerelease names them) and after a cancel (the draft stays for a re-run).
     if: always() && needs.draft.result == 'success'
     runs-on: ubuntu-latest
     permissions:

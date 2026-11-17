@@ -1,6 +1,6 @@
 #!/bin/bash
 # Installs the Android SDK parts android/app/build.gradle.kts needs (platform, build-tools, NDK) with the sdkmanager of the
-# GitHub runner and exports ANDROID_HOME, ANDROID_NDK_HOME and ANDROID_JAR to the following steps.
+# GitHub runner and exports ANDROID_HOME, ANDROID_NDK_HOME/ANDROID_NDK_ROOT and ANDROID_JAR to the following steps.
 # Versions are the ones android/ and crates/android are built and tested with.
 set -euo pipefail
 
@@ -17,5 +17,7 @@ yes | "$sdkmanager" --sdk_root="$sdk" --licenses > /dev/null || true
 {
   echo "ANDROID_HOME=$sdk"
   echo "ANDROID_NDK_HOME=$sdk/ndk/$ndk"
+  # The runner sets ANDROID_NDK_ROOT to an older NDK; cargo-ndk warns when the two differ.
+  echo "ANDROID_NDK_ROOT=$sdk/ndk/$ndk"
   echo "ANDROID_JAR=$sdk/platforms/android-$platform/android.jar"
 } >> "${GITHUB_ENV:?runs inside GitHub Actions}"

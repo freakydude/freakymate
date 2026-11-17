@@ -2,7 +2,7 @@
 # Publishes the draft prerelease of this run once all builds have ended, with what is in it: the packages of the builds
 # that succeeded, and the list of those that failed. Moonraker's update manager and Obtainium see only the finished
 # release. Without a release: a cancelled run (a newer commit replaces it), failed tests, or no package at all; then
-# the draft goes and the previous prerelease stays. After publishing, older prereleases are deleted.
+# the previous prerelease stays. After publishing, older prereleases are deleted.
 # Usage: publish-prerelease.sh <release-id> <tag> <result of the build job>
 # Needs GH_TOKEN (contents: write, actions: read), GITHUB_REPOSITORY, GITHUB_RUN_ID, GITHUB_SHA, GITHUB_SERVER_URL.
 set -euo pipefail
@@ -14,25 +14,26 @@ scripts="$(dirname "${BASH_SOURCE[0]}")"
 release="repos/$GITHUB_REPOSITORY/releases/$id"
 run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
-drop_draft() {
-  echo "$1; no prerelease, the draft is deleted"
-  gh api -X DELETE "$release" > /dev/null || true
+# The draft stays: "Re-run failed jobs" does not run the job "Draft prerelease" again and attaches to this draft. The
+# next run on main deletes it (that job in ci.yml).
+keep_draft() {
+  echo "$1; no prerelease, the draft stays for a re-run"
 }
 
 if [ "$build_result" = cancelled ]; then
-  drop_draft "Run cancelled"
+  keep_draft "Run cancelled"
   exit 0
 fi
 
 failed=$(bash "$scripts/failed-jobs.sh")
 # Job names of the test jobs in build.yml.
 if grep -q -E '^(Format, Clippy, Tests \(Linux\)|Windows tests)$' <<< "$failed"; then
-  drop_draft "Tests failed"
+  keep_draft "Tests failed"
   echo "::error title=No prerelease::Tests failed"
   exit 1
 fi
 if [ "$(gh api "$release" --jq '.assets | length')" -eq 0 ]; then
-  drop_draft "No package was built"
+  keep_draft "No package was built"
   echo "::error title=No prerelease::No package was built"
   exit 1
 fi
