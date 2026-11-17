@@ -20,7 +20,7 @@ For more detail switch on `verbose_log` (see [Log](configuration.md#log)).
 - Check that the service runs: `systemctl status freakymate`, and read the end of the log.
 - Changed the display after installing? Run `~/freakymate/install.sh` again; it chooses between the normal kiosk
   (`cage`, needs `/dev/dri/card*`) and the framebuffer fallback for displays without DRM/KMS (see
-  [Install](install.md#install-on-the-printer-host)).
+  [Install](install.md#framebuffer-fallback)).
 - Something else on `tty1`? The installer disables the login console there; a second kiosk (for example a Debian
   package and the installer at the same time) competes for it. Use one of the two.
 - Graphics driver trouble: the environment variable `SLINT_BACKEND=winit-software` forces software rendering (see
@@ -41,8 +41,8 @@ The layout is made for 800x480 and scaled to other sizes in fullscreen. `SLINT_S
 
 ## Touch is rotated or off
 
-FreakyMate has no setting for touch rotation yet. In the framebuffer fallback, rotate the display in its driver
-(for example `armbianEnv.txt`); touch rotation is not handled there. Please tell me your display on Discord or in a
+FreakyMate has no setting for touch rotation yet; the [framebuffer fallback](install.md#framebuffer-fallback) says what
+applies there. Please tell me your display on Discord or in a
 [hardware support issue](https://github.com/freakydude/freakymate/issues/new/choose).
 
 ## A function is missing
