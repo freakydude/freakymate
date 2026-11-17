@@ -148,7 +148,10 @@ jobs:
           path: android/app/build/outputs/apk/*/release/*.apk
       - *cancel-on-failure
 
-  linux:
+  # One job per target, not one matrix: a job can only wait for all legs of a matrix, so each package waits for its
+  # own build and reaches the release draft as soon as that build is done. A matrix of one keeps the steps the same
+  # (`*linux-steps`); GitHub's YAML has anchors but no merge keys.
+  linux-x86_64:
     name: Linux ${{ matrix.target }}
     runs-on: ubuntu-22.04
     # Ubuntu 22.04: the oldest maintained system that has everything the kiosk needs (cage, seatd), with glibc 2.35;
@@ -156,22 +159,13 @@ jobs:
     # or seatd. Keep MIN_GLIBC in scripts/install.sh and libc6 in build-deb.sh in step; move on when jammy ends (04/2027).
     container: ubuntu:22.04
     strategy:
-      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
             arch: amd64
             triple: x86_64-linux-gnu
             compiler: gcc
-          - target: aarch64-unknown-linux-gnu
-            arch: arm64
-            triple: aarch64-linux-gnu
-            compiler: gcc-aarch64-linux-gnu
-          - target: armv7-unknown-linux-gnueabihf
-            arch: armhf
-            triple: arm-linux-gnueabihf
-            compiler: gcc-arm-linux-gnueabihf
-    steps:
+    steps: &linux-steps
       - name: Toolchain and target libraries
         shell: bash
         env:
@@ -231,23 +225,45 @@ jobs:
           path: dist/
       - *cancel-on-failure
 
-  package:
+  linux-aarch64:
+    name: Linux ${{ matrix.target }}
+    runs-on: ubuntu-22.04
+    container: ubuntu:22.04
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-unknown-linux-gnu
+            arch: arm64
+            triple: aarch64-linux-gnu
+            compiler: gcc-aarch64-linux-gnu
+    steps: *linux-steps
+
+  linux-armv7:
+    name: Linux ${{ matrix.target }}
+    runs-on: ubuntu-22.04
+    container: ubuntu:22.04
+    strategy:
+      matrix:
+        include:
+          - target: armv7-unknown-linux-gnueabihf
+            arch: armhf
+            triple: arm-linux-gnueabihf
+            compiler: gcc-arm-linux-gnueabihf
+    steps: *linux-steps
+
+  # One job per target as above. `!cancelled()`: after a failed build the job still runs and fails at the download, so
+  # its required check is red instead of skipped (a skipped check counts as passed).
+  package-linux-x86_64:
     name: Package ${{ matrix.target }}
-    needs: [linux, windows]
-    # Each target on its own: a failed build leaves the packages of the others.
+    needs: linux-x86_64
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - aarch64-unknown-linux-gnu
-          - armv7-unknown-linux-gnueabihf
-          - x86_64-pc-windows-msvc
+        target: [x86_64-unknown-linux-gnu]
     env:
       ARTIFACT: freakymate-${{ matrix.target }}
-    steps:
+    steps: &package-steps
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
@@ -282,6 +298,42 @@ jobs:
           shopt -s nullglob
           bash .github/scripts/attach-to-release.sh "$RELEASE_ID" artifacts/*.zip artifacts/*.deb artifacts/*.pkg.tar.zst
       - *cancel-on-failure
+
+  package-linux-aarch64:
+    name: Package ${{ matrix.target }}
+    needs: linux-aarch64
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [aarch64-unknown-linux-gnu]
+    env:
+      ARTIFACT: freakymate-${{ matrix.target }}
+    steps: *package-steps
+
+  package-linux-armv7:
+    name: Package ${{ matrix.target }}
+    needs: linux-armv7
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [armv7-unknown-linux-gnueabihf]
+    env:
+      ARTIFACT: freakymate-${{ matrix.target }}
+    steps: *package-steps
+
+  package-windows:
+    name: Package ${{ matrix.target }}
+    needs: windows
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-pc-windows-msvc]
+    env:
+      ARTIFACT: freakymate-${{ matrix.target }}
+    steps: *package-steps
 
   attach-apk:
     name: Attach APK
