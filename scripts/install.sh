@@ -1,22 +1,22 @@
 #!/bin/bash
-# Installs FreakyMate from an unpacked release zip as a kiosk service (cage on tty1; on systems without a DRM/KMS
+# Installs Sailhand from an unpacked release zip as a kiosk service (cage on tty1; on systems without a DRM/KMS
 # device the framebuffer fallback without cage) and
-# registers it with the Moonraker update manager (type: zip), so Mainsail, Fluidd and FreakyMate
+# registers it with the Moonraker update manager (type: zip), so Mainsail, Fluidd and Sailhand
 # itself can install later releases.
 #
 # Run inside the unpacked folder: ./install.sh [-m <moonraker-url>] [-d <printer_data>] [-c stable|beta]
-# Running it again (also as ~/freakymate/install.sh) brings the setup outside the program folder up to date, which
+# Running it again (also as ~/sailhand/install.sh) brings the setup outside the program folder up to date, which
 # Moonraker's updates do not touch; without -m and -d it keeps the values of the existing installation.
 # Young software: use it with care and at your own risk (see the README).
 
 set -euo pipefail
 
-NAME="freakymate"
+NAME="sailhand"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="$HOME/$NAME"
 SERVICE_FILE="/etc/systemd/system/$NAME.service"
-POLKIT_RULE="50-freakymate.rules"
-UDEV_RULE="70-freakymate-backlight.rules"
+POLKIT_RULE="50-sailhand.rules"
+UDEV_RULE="70-sailhand-backlight.rules"
 SETUP_MARKER="/etc/$NAME/setup-version"
 MOONRAKER=""
 DATA_DIR=""
@@ -73,17 +73,17 @@ report "Checking the system"
 echo "Moonraker: $MOONRAKER, printer_data: $DATA_DIR"
 glibc=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')
 if [ -n "$glibc" ] && ! printf '%s\n%s\n' "$MIN_GLIBC" "$glibc" | sort -V -C; then
-  echo "This system has glibc $glibc; FreakyMate needs $MIN_GLIBC or newer: $SUPPORTED_SYSTEMS."
+  echo "This system has glibc $glibc; Sailhand needs $MIN_GLIBC or newer: $SUPPORTED_SYSTEMS."
   exit 1
 fi
 if ! "$SOURCE_DIR/$NAME" --version > /dev/null 2>&1; then
   echo "The program in this folder does not run on this system ($(uname -m)); download the zip for its architecture."
   exit 1
 fi
-# A package (.deb, Arch) brings its own kiosk service freakymate@<user>; it and this one both want tty1.
-for packaged in /etc/systemd/system/multi-user.target.wants/freakymate@*.service; do
+# A package (.deb, Arch) brings its own kiosk service sailhand@<user>; it and this one both want tty1.
+for packaged in /etc/systemd/system/multi-user.target.wants/sailhand@*.service; do
   [ -e "$packaged" ] || continue
-  echo "Note: the kiosk of the FreakyMate package is enabled too ($(basename "$packaged")); both want tty1."
+  echo "Note: the kiosk of the Sailhand package is enabled too ($(basename "$packaged")); both want tty1."
   echo "Keep one of them, e.g.: sudo systemctl disable --now $(basename "$packaged")"
 done
 
@@ -97,7 +97,7 @@ for package in "${packages[@]}"; do
 done
 if [ ${#missing[@]} -gt 0 ]; then
   echo "Not available from the package sources: ${missing[*]}."
-  echo "On Ubuntu and Ubuntu-based Armbian enable 'universe' (sudo add-apt-repository universe); otherwise FreakyMate"
+  echo "On Ubuntu and Ubuntu-based Armbian enable 'universe' (sudo add-apt-repository universe); otherwise Sailhand"
   echo "needs $SUPPORTED_SYSTEMS."
   exit 1
 fi
@@ -114,7 +114,7 @@ if [ -f "$SOURCE_DIR/$POLKIT_RULE" ] && [ -d /etc/polkit-1/rules.d ]; then
   sudo groupadd -f netdev
   sudo usermod -aG netdev "$USER" || true
 else
-  echo "polkit rules directory not found; Wi-Fi settings in FreakyMate will be read-only."
+  echo "polkit rules directory not found; Wi-Fi settings in Sailhand will be read-only."
 fi
 
 report "Allowing brightness and screen standby (backlight via udev, group video)"
@@ -124,13 +124,13 @@ if [ -f "$SOURCE_DIR/$UDEV_RULE" ] && [ -d /etc/udev/rules.d ]; then
   # Applies the rule to the backlight that is already there, without a reboot.
   sudo udevadm trigger --subsystem-match=backlight --action=add || true
 else
-  echo "udev rules directory not found; FreakyMate will not offer brightness and standby."
+  echo "udev rules directory not found; Sailhand will not offer brightness and standby."
 fi
 
 report "Installing to $INSTALL_DIR"
 if [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
   mkdir -p "$INSTALL_DIR"
-  # A running FreakyMate cannot be overwritten ("Text file busy"); replacing the file leaves the old one to the running
+  # A running Sailhand cannot be overwritten ("Text file busy"); replacing the file leaves the old one to the running
   # process until the restart below.
   cp -a --remove-destination "$SOURCE_DIR"/. "$INSTALL_DIR"/
 fi
@@ -138,11 +138,11 @@ chmod 0755 "$INSTALL_DIR/$NAME" "$INSTALL_DIR/install.sh" "$INSTALL_DIR/uninstal
 
 report "Creating $SERVICE_FILE"
 # Settings live next to the Klipper configs, so they can be edited in Mainsail or Fluidd and backups of printer_data
-# include them. The program creates the file with the defaults at its first start; an old freakymate.json stays as it
+# include them. The program creates the file with the defaults at its first start; an old sailhand.json stays as it
 # is and is no longer read.
-SETTINGS_FILE="$DATA_DIR/config/freakymate.conf"
+SETTINGS_FILE="$DATA_DIR/config/sailhand.conf"
 USER_ID=$(id -u)
-ARGUMENTS="--moonraker $MOONRAKER --settings $SETTINGS_FILE --logfile $DATA_DIR/logs/freakymate.log"
+ARGUMENTS="--moonraker $MOONRAKER --settings $SETTINGS_FILE --logfile $DATA_DIR/logs/sailhand.log"
 # -d: no client-side frame, otherwise winit keeps room for its title bar after leaving fullscreen (black bar).
 START="/usr/bin/cage -d -s -- $INSTALL_DIR/$NAME --fullscreen $ARGUMENTS"
 CONSOLE_LINES=""
@@ -158,7 +158,7 @@ ExecStopPost=+/bin/sh -c '${console_loop/BIND/1}'"
 fi
 sudo tee "$SERVICE_FILE" > /dev/null << EOF
 [Unit]
-Description=FreakyMate touch UI for Klipper
+Description=Sailhand touch UI for Klipper
 After=systemd-user-sessions.service network-online.target moonraker.service
 Wants=network-online.target
 Conflicts=getty@tty1.service
@@ -212,7 +212,7 @@ else
 [update_manager $NAME]
 type: zip
 channel: $CHANNEL
-repo: freakydude/freakymate
+repo: freakydude/sailhand
 path: $INSTALL_DIR
 managed_services: $NAME
 system_dependencies: system-dependencies.json
@@ -221,4 +221,4 @@ EOF
   sudo systemctl restart moonraker || echo "Restart Moonraker yourself to activate the update entry."
 fi
 
-echo "Done. Log: $DATA_DIR/logs/freakymate.log (Mainsail: Machine, logs) or journalctl -u $NAME -f"
+echo "Done. Log: $DATA_DIR/logs/sailhand.log (Mainsail: Machine, logs) or journalctl -u $NAME -f"

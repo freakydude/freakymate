@@ -4,11 +4,11 @@
 //! `toolchanger-mmu` and `toolchanger`; what a profile does not have is skipped.
 
 use crate::session::Session;
-use freakymate::{Actions, ChangerTab, FilamentTab, MmuDialogs, Navigation, Page, Printer};
-use freakymate_core::Command;
-use freakymate_core::domain::changer;
-use freakymate_core::domain::machine_tree::LaneId;
-use freakymate_core::sources::happy_hare::LoadedFilament;
+use sailhand::{Actions, ChangerTab, FilamentTab, MmuDialogs, Navigation, Page, Printer};
+use sailhand_core::Command;
+use sailhand_core::domain::changer;
+use sailhand_core::domain::machine_tree::LaneId;
+use sailhand_core::sources::happy_hare::LoadedFilament;
 use slint::{ComponentHandle, Model};
 use std::time::Duration;
 
@@ -120,7 +120,7 @@ fn afc_changer(session: &mut Session) -> Result<(), String> {
     session.capture("afc-changer-tool-lane")?;
     session.window.global::<MmuDialogs>().set_afc_tool(-1);
 
-    let mapped = |snapshot: &freakymate_core::Snapshot, tool: usize, lane: &str| {
+    let mapped = |snapshot: &sailhand_core::Snapshot, tool: usize, lane: &str| {
         changer::afc_tool_map(&snapshot.status).iter().any(|entry| entry.tool == tool && entry.lane == lane)
     };
     // Without tiles (AFC's own changer has none) there is no lane to choose from by tile.

@@ -1,9 +1,9 @@
 //! The run, split into scenes that can be chosen on the command line.
 
 use crate::session::Session;
-use freakymate::Confirm;
-use freakymate_core::sources::klipper::KlippyState;
-use freakymate_core::{Command, ConnectionState, Query};
+use sailhand::Confirm;
+use sailhand_core::sources::klipper::KlippyState;
+use sailhand_core::{Command, ConnectionState, Query};
 use slint::ComponentHandle;
 
 mod calibrate;

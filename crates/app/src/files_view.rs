@@ -2,8 +2,8 @@
 
 use crate::items::replace_rows;
 use crate::{FileItem, Printer, format, view};
-use freakymate_core::domain::file_catalog::FileCatalog;
-use freakymate_core::sources::moonraker_server::files::FileEntry;
+use sailhand_core::domain::file_catalog::FileCatalog;
+use sailhand_core::sources::moonraker_server::files::FileEntry;
 use slint::{Image, Model, ModelRc, SharedString, VecModel};
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;

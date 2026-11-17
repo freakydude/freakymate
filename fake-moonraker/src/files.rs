@@ -8,7 +8,7 @@ const PLACEHOLDER_SIZE: u32 = 300;
 /// Layer height of every fake file; the first layer is as high.
 pub const LAYER_HEIGHT: f64 = 0.2;
 
-/// The benchy's thumbnails as preFlight 1.4.1 rendered them in FreakyMate's accent colour, so screenshots show a real
+/// The benchy's thumbnails as preFlight 1.4.1 rendered them in Sailhand's accent colour, so screenshots show a real
 /// print preview. #3DBenchy (3DBenchy.com) is licensed CC0 1.0.
 const BENCHY_THUMBNAILS: [(u32, u32, &[u8]); 3] = [
     (32, 32, include_bytes!("../assets/benchy-32x32.png")),

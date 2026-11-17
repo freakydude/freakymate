@@ -1,7 +1,7 @@
 //! Turn file previews into Slint images. The core has already decoded PNG and JPEG in a worker thread, so this only
 //! copies pixels; SVG (from the fake Moonraker) is parsed by Slint.
 
-use freakymate_core::sources::moonraker_server::files::ThumbnailImage;
+use sailhand_core::sources::moonraker_server::files::ThumbnailImage;
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 
 pub fn to_image(thumbnail: &ThumbnailImage) -> Option<Image> {

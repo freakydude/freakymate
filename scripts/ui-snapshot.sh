@@ -9,7 +9,7 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-out_dir="${TMPDIR:-/tmp}/freakymate-ui-snapshots"
+out_dir="${TMPDIR:-/tmp}/sailhand-ui-snapshots"
 profile=voron
 size=800x480
 scenes=

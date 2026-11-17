@@ -23,26 +23,26 @@ use crate::{
 };
 use crate::{bed_map, format, thumbnail, view};
 use chrono::Local;
-use freakymate_core::domain::filament::{self, FilamentHandling};
-use freakymate_core::domain::filament_match::{self, ToolMatch};
-use freakymate_core::domain::heads::{self, ChangerNote};
-use freakymate_core::domain::machine_tree::LaneId;
-use freakymate_core::domain::manual_probe::Direction;
-use freakymate_core::domain::prepared_job::PreparedJob;
-use freakymate_core::domain::spools::{self, Lane};
-use freakymate_core::domain::temperature_limits::HeaterWatch;
-use freakymate_core::domain::{estimates, light, pause};
-use freakymate_core::sources::PrinterStatus;
-use freakymate_core::sources::klipper::ExtruderState;
-use freakymate_core::sources::klipper::commands::{MeshNameProblem, mesh_name_problem};
-use freakymate_core::sources::klipper::{BED_HEATER, KlippyState, Leveling, NOZZLE_HEATER, tuning};
-use freakymate_core::sources::moonraker_server::files::{FileEntry, FileMetadata, ThumbnailImage};
-use freakymate_core::sources::moonraker_server::gcode_store::{ConsoleKind, ConsoleLine};
-use freakymate_core::sources::moonraker_server::history::{FinishedJob, PrintHistory};
-use freakymate_core::sources::spoolman::{Spool, SpoolmanState};
-use freakymate_core::sources::toolchanger::ToolchangerStatus;
-use freakymate_core::step_choices::{DEFAULT_EXTRUDE_MM, nearest_step};
-use freakymate_core::{Access, Command, ConnectionState, Event, PrinterService, Query, Snapshot};
+use sailhand_core::domain::filament::{self, FilamentHandling};
+use sailhand_core::domain::filament_match::{self, ToolMatch};
+use sailhand_core::domain::heads::{self, ChangerNote};
+use sailhand_core::domain::machine_tree::LaneId;
+use sailhand_core::domain::manual_probe::Direction;
+use sailhand_core::domain::prepared_job::PreparedJob;
+use sailhand_core::domain::spools::{self, Lane};
+use sailhand_core::domain::temperature_limits::HeaterWatch;
+use sailhand_core::domain::{estimates, light, pause};
+use sailhand_core::sources::PrinterStatus;
+use sailhand_core::sources::klipper::ExtruderState;
+use sailhand_core::sources::klipper::commands::{MeshNameProblem, mesh_name_problem};
+use sailhand_core::sources::klipper::{BED_HEATER, KlippyState, Leveling, NOZZLE_HEATER, tuning};
+use sailhand_core::sources::moonraker_server::files::{FileEntry, FileMetadata, ThumbnailImage};
+use sailhand_core::sources::moonraker_server::gcode_store::{ConsoleKind, ConsoleLine};
+use sailhand_core::sources::moonraker_server::history::{FinishedJob, PrintHistory};
+use sailhand_core::sources::spoolman::{Spool, SpoolmanState};
+use sailhand_core::sources::toolchanger::ToolchangerStatus;
+use sailhand_core::step_choices::{DEFAULT_EXTRUDE_MM, nearest_step};
+use sailhand_core::{Access, Command, ConnectionState, Event, PrinterService, Query, Snapshot};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -161,8 +161,8 @@ impl Presenter {
     }
 
     /// Connects the service's snapshots and events to the UI (asynchronously in the Slint event loop).
-    pub fn follow(self: &Rc<Self>, channels: freakymate_core::ServiceChannels) -> Result<(), slint::EventLoopError> {
-        let freakymate_core::ServiceChannels { mut snapshots, mut events } = channels;
+    pub fn follow(self: &Rc<Self>, channels: sailhand_core::ServiceChannels) -> Result<(), slint::EventLoopError> {
+        let sailhand_core::ServiceChannels { mut snapshots, mut events } = channels;
         let presenter = Rc::clone(self);
         slint::spawn_local(async move {
             loop {

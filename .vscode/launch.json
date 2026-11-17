@@ -4,14 +4,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker)",
+      "name": "debug: sailhand (fake Moonraker)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -19,7 +19,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker",
       "postDebugTask": "stop: fake-moonraker"
@@ -27,14 +27,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, Happy Hare)",
+      "name": "debug: sailhand (fake Moonraker, Happy Hare)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -42,7 +42,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (Happy Hare)",
       "postDebugTask": "stop: fake-moonraker"
@@ -50,14 +50,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, Basic)",
+      "name": "debug: sailhand (fake Moonraker, Basic)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -65,7 +65,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (Basic)",
       "postDebugTask": "stop: fake-moonraker"
@@ -73,14 +73,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, ERCF)",
+      "name": "debug: sailhand (fake Moonraker, ERCF)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -88,7 +88,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (ERCF)",
       "postDebugTask": "stop: fake-moonraker"
@@ -96,14 +96,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, Encoder)",
+      "name": "debug: sailhand (fake Moonraker, Encoder)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -111,7 +111,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (Encoder)",
       "postDebugTask": "stop: fake-moonraker"
@@ -119,14 +119,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, CO buffer)",
+      "name": "debug: sailhand (fake Moonraker, CO buffer)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -134,7 +134,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (CO buffer)",
       "postDebugTask": "stop: fake-moonraker"
@@ -142,14 +142,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, TO buffer)",
+      "name": "debug: sailhand (fake Moonraker, TO buffer)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -157,7 +157,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (TO buffer)",
       "postDebugTask": "stop: fake-moonraker"
@@ -165,14 +165,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, Tool changer)",
+      "name": "debug: sailhand (fake Moonraker, Tool changer)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -180,7 +180,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (Tool changer)",
       "postDebugTask": "stop: fake-moonraker"
@@ -188,14 +188,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, Happy Hare units)",
+      "name": "debug: sailhand (fake Moonraker, Happy Hare units)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -203,7 +203,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (Happy Hare units)",
       "postDebugTask": "stop: fake-moonraker"
@@ -211,14 +211,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, Tool changer + Happy Hare)",
+      "name": "debug: sailhand (fake Moonraker, Tool changer + Happy Hare)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -226,7 +226,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (Tool changer + Happy Hare)",
       "postDebugTask": "stop: fake-moonraker"
@@ -234,14 +234,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, AFC)",
+      "name": "debug: sailhand (fake Moonraker, AFC)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -249,7 +249,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (AFC)",
       "postDebugTask": "stop: fake-moonraker"
@@ -257,14 +257,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, AFC tool changer)",
+      "name": "debug: sailhand (fake Moonraker, AFC tool changer)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -272,7 +272,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (AFC tool changer)",
       "postDebugTask": "stop: fake-moonraker"
@@ -280,14 +280,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (fake Moonraker, Tool changer, UNSELECT_TOOL absent)",
+      "name": "debug: sailhand (fake Moonraker, Tool changer, UNSELECT_TOOL absent)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       },
       "args": [
@@ -295,7 +295,7 @@
         "http://127.0.0.1:7125"
       ],
       "env": {
-        "RUST_LOG": "info,freakymate_core=debug"
+        "RUST_LOG": "info,sailhand_core=debug"
       },
       "preLaunchTask": "run: fake-moonraker (Tool changer, UNSELECT_TOOL absent)",
       "postDebugTask": "stop: fake-moonraker"
@@ -303,21 +303,21 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "debug: freakymate (saved settings)",
+      "name": "debug: sailhand (saved settings)",
       "cargo": {
         "args": [
           "build",
           "-p",
-          "freakymate",
+          "sailhand",
           "--bin",
-          "freakymate"
+          "sailhand"
         ]
       }
     },
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker)",
+      "name": "android: sailhand (fake Moonraker)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker",
       "postDebugTask": "stop: fake-moonraker"
@@ -325,7 +325,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, Happy Hare)",
+      "name": "android: sailhand (fake Moonraker, Happy Hare)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (Happy Hare)",
       "postDebugTask": "stop: fake-moonraker"
@@ -333,7 +333,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, Basic)",
+      "name": "android: sailhand (fake Moonraker, Basic)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (Basic)",
       "postDebugTask": "stop: fake-moonraker"
@@ -341,7 +341,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, ERCF)",
+      "name": "android: sailhand (fake Moonraker, ERCF)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (ERCF)",
       "postDebugTask": "stop: fake-moonraker"
@@ -349,7 +349,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, Encoder)",
+      "name": "android: sailhand (fake Moonraker, Encoder)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (Encoder)",
       "postDebugTask": "stop: fake-moonraker"
@@ -357,7 +357,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, CO buffer)",
+      "name": "android: sailhand (fake Moonraker, CO buffer)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (CO buffer)",
       "postDebugTask": "stop: fake-moonraker"
@@ -365,7 +365,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, TO buffer)",
+      "name": "android: sailhand (fake Moonraker, TO buffer)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (TO buffer)",
       "postDebugTask": "stop: fake-moonraker"
@@ -373,7 +373,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, Tool changer)",
+      "name": "android: sailhand (fake Moonraker, Tool changer)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (Tool changer)",
       "postDebugTask": "stop: fake-moonraker"
@@ -381,7 +381,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, Happy Hare units)",
+      "name": "android: sailhand (fake Moonraker, Happy Hare units)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (Happy Hare units)",
       "postDebugTask": "stop: fake-moonraker"
@@ -389,7 +389,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, Tool changer + Happy Hare)",
+      "name": "android: sailhand (fake Moonraker, Tool changer + Happy Hare)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (Tool changer + Happy Hare)",
       "postDebugTask": "stop: fake-moonraker"
@@ -397,7 +397,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, AFC)",
+      "name": "android: sailhand (fake Moonraker, AFC)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (AFC)",
       "postDebugTask": "stop: fake-moonraker"
@@ -405,7 +405,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, AFC tool changer)",
+      "name": "android: sailhand (fake Moonraker, AFC tool changer)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (AFC tool changer)",
       "postDebugTask": "stop: fake-moonraker"
@@ -413,7 +413,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (fake Moonraker, Tool changer, UNSELECT_TOOL absent)",
+      "name": "android: sailhand (fake Moonraker, Tool changer, UNSELECT_TOOL absent)",
       "command": "scripts/android-run.sh --fresh",
       "preLaunchTask": "run: fake-moonraker (Tool changer, UNSELECT_TOOL absent)",
       "postDebugTask": "stop: fake-moonraker"
@@ -421,7 +421,7 @@
     {
       "type": "node-terminal",
       "request": "launch",
-      "name": "android: freakymate (saved settings)",
+      "name": "android: sailhand (saved settings)",
       "command": "scripts/android-run.sh"
     },
     {

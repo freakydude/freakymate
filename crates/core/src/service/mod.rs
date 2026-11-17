@@ -38,7 +38,7 @@ const PARALLEL_FILE_DETAILS: usize = 4;
 const SPOOLMAN_POLL_INTERVAL: Duration = Duration::from_secs(60);
 /// Moonraker does not report WLED changes, and Mainsail or a macro may switch a strip too.
 const WLED_POLL_INTERVAL: Duration = Duration::from_secs(5);
-const CLIENT_NAME: &str = "freakymate";
+const CLIENT_NAME: &str = "sailhand";
 /// A command whose answer takes longer is shown as running (busy indicator).
 const LONG_COMMAND: Duration = Duration::from_secs(1);
 /// Moonraker sends nothing more to a connection that lost its authorization (the same user logged out elsewhere),

@@ -2,7 +2,7 @@
 
 use super::STATUS_BAR_LIGHT;
 use crate::session::Session;
-use freakymate::{Navigation, Page, Printer};
+use sailhand::{Navigation, Page, Printer};
 use slint::{ComponentHandle, Model};
 use std::time::Duration;
 

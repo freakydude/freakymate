@@ -62,7 +62,7 @@ jobs:
           notes=$(gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$TAG" \
             -f target_commitish="$GITHUB_SHA" "${previous[@]}" --jq .body)
           id=$(gh api "repos/$GITHUB_REPOSITORY/releases" -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" \
-            -f name="FreakyMate $TAG" -f body="$notes" -F draft=true --jq .id)
+            -f name="Sailhand $TAG" -f body="$notes" -F draft=true --jq .id)
           echo "id=$id" | tee -a "$GITHUB_OUTPUT"
 
   build:
@@ -94,7 +94,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Publish the draft
         run: |
-          bash .github/scripts/attach-to-release.sh "$RELEASE_ID" scripts/get-freakymate.sh
+          bash .github/scripts/attach-to-release.sh "$RELEASE_ID" scripts/get-sailhand.sh
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" -F draft=false -f make_latest=true > /dev/null
 
   discard:

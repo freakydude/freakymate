@@ -1,5 +1,5 @@
 [package]
-name = "freakymate"
+name = "sailhand"
 description = "Touch screen UI for Klipper printers via Moonraker (Rust + Slint)"
 version.workspace = true
 edition.workspace = true
@@ -12,11 +12,11 @@ publish = false
 # Local builds include the development aids; release builds use `--no-default-features`.
 default = ["dev-mode"]
 # Development aids that are not shipped: option `--simulate-network`.
-dev-mode = ["freakymate-core/dev-mode"]
+dev-mode = ["sailhand-core/dev-mode"]
 
 [dependencies]
-freakymate-core.workspace = true
-freakymate-ui.workspace = true
+sailhand-core.workspace = true
+sailhand-ui.workspace = true
 chrono = { version = "0.4", default-features = false, features = [
     "clock",
     "std",

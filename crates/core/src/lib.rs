@@ -1,4 +1,4 @@
-//! UI-independent core of freakymate: Moonraker connection, printer state, commands and settings.
+//! UI-independent core of sailhand: Moonraker connection, printer state, commands and settings.
 //!
 //! Layers, each using only the ones before it: [`moonraker`] is the transport and knows no printer objects;
 //! [`sources`] has one module per origin of data (Klipper, Moonraker's components, Happy Hare, Spoolman, ...);
@@ -30,12 +30,12 @@ pub use settings::{Settings, SettingsStore};
 pub use sourced::{Provenance, Sourced};
 
 /// Version of this build: set by CI from git tags, otherwise the crate version marked as a local build.
-pub const VERSION: &str = match option_env!("FREAKYMATE_VERSION") {
+pub const VERSION: &str = match option_env!("SAILHAND_VERSION") {
     Some(version) => version,
     None => concat!(env!("CARGO_PKG_VERSION"), "-dev"),
 };
 
-/// Only builds from main (releases X.Y.0 and pre-releases X.Y.Z) are FreakyMate; a version with a suffix (`-dev`
+/// Only builds from main (releases X.Y.0 and pre-releases X.Y.Z) are Sailhand; a version with a suffix (`-dev`
 /// locally and on other branches, `-pr.N.M` for a pull request, see `.github/scripts/version.sh`) is a test build.
 pub fn is_test_build() -> bool {
     is_test_version(VERSION)
@@ -44,7 +44,7 @@ pub fn is_test_build() -> bool {
 /// The folder in the user's configuration directory: test builds keep their settings and logins apart, so trying one
 /// never changes the installed display.
 pub fn config_folder() -> &'static str {
-    if is_test_build() { "freakymate-dev" } else { "freakymate" }
+    if is_test_build() { "sailhand-dev" } else { "sailhand" }
 }
 
 fn is_test_version(version: &str) -> bool {
@@ -53,7 +53,7 @@ fn is_test_version(version: &str) -> bool {
 
 /// Log target for facts about the machine and the printer (`name: value`); the log file repeats the latest of each
 /// in its header.
-pub const HEADER_TARGET: &str = "freakymate::header";
+pub const HEADER_TARGET: &str = "sailhand::header";
 
 #[cfg(test)]
 mod tests {

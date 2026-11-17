@@ -4,8 +4,8 @@
 //! bed) stay empty, faulty regions are framed.
 
 use crate::{BedMeshMap, MeshCellItem, MeshFrameItem};
-use freakymate_core::sources::klipper::commands::MeshNameProblem;
-use freakymate_core::sources::klipper::{BedMesh, MeshPoint, MeshSpan};
+use sailhand_core::sources::klipper::commands::MeshNameProblem;
+use sailhand_core::sources::klipper::{BedMesh, MeshPoint, MeshSpan};
 use slint::{Color, Image, Rgba8Pixel, SharedPixelBuffer};
 
 /// Up to this many columns and rows the mesh is drawn as cells with values; the software renderer cannot scale a

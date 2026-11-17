@@ -1,10 +1,12 @@
-<img src="assets/logo/freakymate.svg" alt="FreakyMate logo" width="96" align="right">
+<img src="assets/logo/sailhand.svg" alt="Sailhand logo" width="96" align="right">
 
-# FreakyMate
+# Sailhand
 
 **A touch screen for Klipper, with Happy Hare, AFC, tool changers and Spoolman built in.**
 
-FreakyMate is a small native app for the display on your 3D printer. It runs on the printer host (Raspberry Pi, BTT
+Formerly FreakyMate.
+
+Sailhand is a small native app for the display on your 3D printer. It runs on the printer host (Raspberry Pi, BTT
 CB1/CB2 and similar), starts fullscreen at boot and talks to [Klipper](https://www.klipper3d.org/) through
 [Moonraker](https://moonraker.readthedocs.io/). Written in Rust with [Slint](https://slint.dev/): no browser, no
 desktop needed.
@@ -35,13 +37,13 @@ More pictures and every page in detail: [Features](docs/features.md). Which plug
 [Requirements and hardware](docs/hardware.md).
 
 > [!IMPORTANT]
-> **Young software, tested on a few printers.** My means to test are limited: FreakyMate runs on a modified Artillery
+> **Young software, tested on a few printers.** My means to test are limited: Sailhand runs on a modified Artillery
 > Sidewinder, a Voron 2.4 with Happy Hare and on a friend's Voron 2.4 with an ERCF, and it works well there (details in
 > [Requirements and hardware](docs/hardware.md#tested-setups)). Tool changers, AFC and Happy Hare with several units
 > have been built from the source code of these projects and tried against a simulated printer, not on real
 > machines. I am fairly confident that it works well on yours too; if it does not, please
 > [tell me](#contact-support-and-donations).
-> FreakyMate moves motors, heats and restarts services, so do not leave the printer unattended while you try it. It
+> Sailhand moves motors, heats and restarts services, so do not leave the printer unattended while you try it. It
 > comes without warranty or liability, as far as the law allows (sections 15 and 16 of the [GPL](LICENSE)).
 
 ## Install
@@ -49,11 +51,11 @@ More pictures and every page in detail: [Features](docs/features.md). Which plug
 On the printer host, as the user that runs Klipper and Moonraker:
 
 ```bash
-curl -fsSLO https://github.com/freakydude/freakymate/releases/latest/download/get-freakymate.sh
-bash get-freakymate.sh -m http://127.0.0.1:7125
+curl -fsSLO https://github.com/freakydude/sailhand/releases/latest/download/get-sailhand.sh
+bash get-sailhand.sh -m http://127.0.0.1:7125
 ```
 
-The script picks the build for your system, installs the few packages it needs and sets up a service. FreakyMate then
+The script picks the build for your system, installs the few packages it needs and sets up a service. Sailhand then
 starts on the display at every boot, and new versions show up in the update list of Mainsail, Fluidd and its own
 System page.
 
@@ -80,13 +82,13 @@ Other ways to run it, all described in [Install and update](docs/install.md):
 
 ## Contact, support and donations
 
-Questions, ideas or a printer to show? Meet me and others who use FreakyMate on Discord. Bugs and feature requests are
-welcome as [GitHub issues](https://github.com/freakydude/freakymate/issues/new/choose), pull requests too (see
+Questions, ideas or a printer to show? Meet me and others who use Sailhand on Discord. Bugs and feature requests are
+welcome as [GitHub issues](https://github.com/freakydude/sailhand/issues/new/choose), pull requests too (see
 [Contributing](CONTRIBUTING.md)).
 
 <a href="https://discord.gg/Ja2cxCcmJQ"><img src="https://img.shields.io/badge/Discord-join%20the%20chat-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Discord" height="40"></a>
 
-FreakyMate is a private project that I work on in my spare time, so answers may take a while. If you like it and want
+Sailhand is a private project that I work on in my spare time, so answers may take a while. If you like it and want
 to say thanks, you can support it here:
 
 <a href="https://ko-fi.com/freakydude"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" height="40"></a>
@@ -95,23 +97,23 @@ to say thanks, you can support it here:
 
 ## Made possible by
 
-FreakyMate only shows and controls what other projects do. Thank you to
+Sailhand only shows and controls what other projects do. Thank you to
 
 - [Klipper](https://github.com/Klipper3d/klipper) and [Moonraker](https://github.com/Arksine/moonraker): the firmware
-  and the API that FreakyMate talks to, including Moonraker's update manager, which installs its updates.
+  and the API that Sailhand talks to, including Moonraker's update manager, which installs its updates.
 - [Happy Hare](https://github.com/moggieuk/Happy-Hare) and [AFC](https://github.com/AFCProject/AFC-Klipper-Add-On)
   for multi-material, [klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger) and
   [klipper-toolchanger-easy](https://github.com/jwellman80/klipper-toolchanger-easy) for tool changers,
   [klipper-led_effect](https://github.com/julianschill/klipper-led_effect) for LED effects and
   [Spoolman](https://github.com/Donkie/Spoolman) for keeping track of the spools.
 - [Mainsail](https://github.com/mainsail-crew/mainsail) and [Fluidd](https://github.com/fluidd-core/fluidd), whose
-  macro conventions (layer pause, spools of tool heads) FreakyMate follows, and
+  macro conventions (layer pause, spools of tool heads) Sailhand follows, and
   [KlipperScreen](https://github.com/KlipperScreen/KlipperScreen) with the
   [KlipperScreen Happy Hare Edition](https://github.com/moggieuk/KlipperScreen-Happy-Hare-Edition) for their work on
   running Klipper and Happy Hare from a touch screen.
-- [cage](https://github.com/cage-kiosk/cage), the Wayland kiosk that puts FreakyMate fullscreen on the display, and
+- [cage](https://github.com/cage-kiosk/cage), the Wayland kiosk that puts Sailhand fullscreen on the display, and
   NetworkManager for the Wi-Fi settings.
-- [Slint](https://slint.dev/) for the UI toolkit, and the Rust crates FreakyMate is built with, among them
+- [Slint](https://slint.dev/) for the UI toolkit, and the Rust crates Sailhand is built with, among them
   [Tokio](https://tokio.rs/), [reqwest](https://github.com/seanmonstar/reqwest),
   [tokio-tungstenite](https://github.com/snapview/tokio-tungstenite), [serde](https://serde.rs/),
   [image](https://github.com/image-rs/image), [zbus](https://github.com/dbus2/zbus) and
@@ -124,7 +126,7 @@ GPL-3.0-or-later, see [LICENSE](LICENSE). Slint is used under its GPLv3 option. 
 all dependencies in `THIRD-PARTY-LICENSES.html`.
 
 - **Use is free for everyone**, companies included, for example on your own printers or in a print farm.
-- **Building FreakyMate into a product** (preinstalled on printers, displays or kits) is possible under the GPL's
+- **Building Sailhand into a product** (preinstalled on printers, displays or kits) is possible under the GPL's
   conditions. If they do not fit your plans, I am open to a commercial license: see [COMMERCIAL.md](COMMERCIAL.md).
 - **Name and logo** are not covered by the GPL; forks and products need their own name, see
   [TRADEMARKS.md](TRADEMARKS.md).

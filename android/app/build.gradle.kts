@@ -1,9 +1,9 @@
-// A native activity without Java code: Gradle only builds libfreakymate.so with cargo-ndk, packs it with the manifest
+// A native activity without Java code: Gradle only builds libsailhand.so with cargo-ndk, packs it with the manifest
 // and signs the APK.
 //   ./gradlew assembleDevRelease -PappVersion=0.6.1-dev   (appVersion as .github/scripts/version.sh prints it)
 //   ./gradlew assembleProdRelease -PappVersion=0.6.3      (CI on main only, needs the release key)
 // -Pabis=x86_64 builds for the emulator (`rustup target add x86_64-linux-android`); the release is arm64 only.
-// Release key: ANDROID_KEYSTORE (file), ANDROID_KEYSTORE_PASSWORD, alias `freakymate`.
+// Release key: ANDROID_KEYSTORE (file), ANDROID_KEYSTORE_PASSWORD, alias `release`.
 plugins {
     id("com.android.application")
 }
@@ -27,20 +27,20 @@ val cargoNdk = tasks.register<Exec>("cargoNdk") {
     environment("ANDROID_JAR", "$androidHome/platforms/android-$compileSdkLevel/android.jar")
     commandLine(
         listOf("cargo", "ndk") + abis.flatMap { listOf("-t", it) } +
-            listOf("-o", jniLibs.get().asFile.absolutePath, "build", "--release", "-p", "freakymate-android"),
+            listOf("-o", jniLibs.get().asFile.absolutePath, "build", "--release", "-p", "sailhand-android"),
     )
 }
 
-base.archivesName.set("freakymate-$appVersion-${abis.joinToString("+")}")
+base.archivesName.set("sailhand-$appVersion-${abis.joinToString("+")}")
 
 android {
-    namespace = "de.freakydu.freakymate"
+    namespace = "de.freakydu.sailhand"
     compileSdk = compileSdkLevel
     // Needed to strip the library; the same NDK as .github/scripts/setup-android.sh installs.
     ndkVersion = "30.0.16248370"
 
     defaultConfig {
-        applicationId = "de.freakydu.freakymate"
+        applicationId = "de.freakydu.sailhand"
         minSdk = 24
         targetSdk = compileSdkLevel
         versionCode = versionCodeOf(appVersion)
@@ -58,25 +58,25 @@ android {
             create("release") {
                 storeFile = file(keystore)
                 storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
-                keyAlias = "freakymate"
+                keyAlias = "release"
                 keyPassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
             }
         }
     }
 
-    // prod is FreakyMate, built only from main and always with the release key; dev is every other build (local, pull
+    // prod is Sailhand, built only from main and always with the release key; dev is every other build (local, pull
     // request): its own app beside it with its own data, signed with the debug key of the machine.
     flavorDimensions += "identity"
     productFlavors {
         create("prod") {
             dimension = "identity"
-            manifestPlaceholders["appLabel"] = "FreakyMate"
+            manifestPlaceholders["appLabel"] = "Sailhand"
             signingConfig = signingConfigs.findByName("release")
         }
         create("dev") {
             dimension = "identity"
             applicationIdSuffix = ".dev"
-            manifestPlaceholders["appLabel"] = "FreakyMate Dev"
+            manifestPlaceholders["appLabel"] = "Sailhand Dev"
             signingConfig = signingConfigs.getByName("debug")
         }
     }

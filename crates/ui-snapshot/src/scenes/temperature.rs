@@ -1,9 +1,9 @@
 //! Heat tabs, nozzle history, PID tuning, stalled fan and taps while temperatures change.
 
 use crate::session::Session;
-use freakymate::{Backlight, HeatTab, Navigation, Page, Printer};
-use freakymate_core::sources::moonraker_server::wled::{self, StripAction};
-use freakymate_core::{Command, Snapshot};
+use sailhand::{Backlight, HeatTab, Navigation, Page, Printer};
+use sailhand_core::sources::moonraker_server::wled::{self, StripAction};
+use sailhand_core::{Command, Snapshot};
 use slint::ComponentHandle;
 use std::time::{Duration, Instant};
 
@@ -151,7 +151,7 @@ pub(super) fn taps(session: &mut Session) -> Result<(), String> {
     }
     session.window.global::<Navigation>().set_page(Page::Temperature);
     let heating = |target| Command::SetHeaterTarget { heater: "extruder".into(), target };
-    let target = |snapshot: &freakymate_core::Snapshot| snapshot.status.heater("extruder").map(|heater| heater.target);
+    let target = |snapshot: &sailhand_core::Snapshot| snapshot.status.heater("extruder").map(|heater| heater.target);
     let mut missed = 0;
     for _ in 0..TAP_ROUNDS {
         session.service.send(heating(200.0));

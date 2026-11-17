@@ -1,4 +1,4 @@
-//! Development tool: renders the freakymate UI headless (software renderer, no window, no GPU)
+//! Development tool: renders the sailhand UI headless (software renderer, no window, no GPU)
 //! against a running (fake) Moonraker and writes one PNG per view.
 //!
 //! `cargo run -p ui-snapshot -- [--moonraker <url>] [--out <folder>] [--size 800x480] [--no-fit] [--scenes pages,network|all]`
@@ -6,7 +6,7 @@
 mod scenes;
 mod session;
 
-use freakymate::display::{DESIGN_HEIGHT, DESIGN_WIDTH};
+use sailhand::display::{DESIGN_HEIGHT, DESIGN_WIDTH};
 use scenes::Scene;
 use session::Session;
 use std::path::PathBuf;
@@ -25,7 +25,7 @@ struct Options {
 fn parse_options() -> Result<Options, String> {
     let mut options = Options {
         moonraker: "http://127.0.0.1:7125".to_owned(),
-        out: std::env::temp_dir().join("freakymate-ui-snapshots"),
+        out: std::env::temp_dir().join("sailhand-ui-snapshots"),
         width: 800,
         height: 480,
         fit: true,

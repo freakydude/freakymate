@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "freakymate-android"
+rootProject.name = "sailhand-android"
 include(":app")

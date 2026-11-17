@@ -2,8 +2,8 @@
 
 use crate::items::replace_rows;
 use crate::{MacroItem, MacroParamItem, Printer};
-use freakymate_core::sources::klipper::{MacroDetails, MacroForm, offered_macros};
-use freakymate_core::sources::macro_conventions::PRINT_START_MACRO;
+use sailhand_core::sources::klipper::{MacroDetails, MacroForm, offered_macros};
+use sailhand_core::sources::macro_conventions::PRINT_START_MACRO;
 use slint::{Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::collections::BTreeMap;

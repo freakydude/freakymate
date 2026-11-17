@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e
 
-# Stop and disable all enabled instances freakymate@<user>.
+# Stop and disable all enabled instances sailhand@<user>.
 if [ "$1" = "remove" ] && [ -d /run/systemd/system ]; then
-  for link in /etc/systemd/system/*.wants/freakymate@*.service; do
+  for link in /etc/systemd/system/*.wants/sailhand@*.service; do
     [ -e "$link" ] || continue
     systemctl disable --now "$(basename "$link")" || true
   done

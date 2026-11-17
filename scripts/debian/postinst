@@ -3,8 +3,8 @@ set -e
 
 if [ "$1" = "configure" ]; then
   # The program compares it with the setup it needs; the package always brings both together.
-  mkdir -p /etc/freakymate
-  /usr/bin/freakymate --setup-version > /etc/freakymate/setup-version || true
+  mkdir -p /etc/sailhand
+  /usr/bin/sailhand --setup-version > /etc/sailhand/setup-version || true
 fi
 
 if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
@@ -12,11 +12,11 @@ if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
   # The backlight rule applies to the device that is already there, without a reboot.
   udevadm control --reload-rules || true
   udevadm trigger --subsystem-match=backlight --action=add || true
-  echo "freakymate installed. Start it in kiosk mode on tty1 for user <name>:"
-  echo "  sudo systemctl enable --now freakymate@<name>"
+  echo "sailhand installed. Start it in kiosk mode on tty1 for user <name>:"
+  echo "  sudo systemctl enable --now sailhand@<name>"
   # install.sh from the release zip sets up its own kiosk service; both want tty1.
-  if [ -f /etc/systemd/system/freakymate.service ]; then
-    echo "FreakyMate is also installed from the release zip (freakymate.service); enable only one of the two kiosks."
+  if [ -f /etc/systemd/system/sailhand.service ]; then
+    echo "Sailhand is also installed from the release zip (sailhand.service); enable only one of the two kiosks."
   fi
   echo "Wi-Fi settings need NetworkManager and membership in the group netdev:"
   echo "  sudo usermod -aG netdev <name>"

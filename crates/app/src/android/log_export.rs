@@ -1,6 +1,6 @@
 //! Hands the log to the user: into the public Download folder, where a file manager or a mail app finds it.
 //!
-//! Android 10 and later: `MediaStore.Downloads` (`Download/FreakyMate`), which needs no permission. Android 7 to 9:
+//! Android 10 and later: `MediaStore.Downloads` (`Download/Sailhand`), which needs no permission. Android 7 to 9:
 //! the app's own folder on the shared storage (`Context.getExternalFilesDir`), also without permission (the public
 //! Download folder would need `WRITE_EXTERNAL_STORAGE`). The Java calls run on a thread of their own.
 
@@ -16,7 +16,7 @@ use thiserror::Error;
 /// First Android version with `MediaStore.Downloads`.
 const MEDIA_STORE_DOWNLOADS_API: i32 = 29;
 /// Folder in the public Download folder (Android 10 and later).
-const PUBLIC_FOLDER: &str = "Download/FreakyMate";
+const PUBLIC_FOLDER: &str = "Download/Sailhand";
 
 #[derive(Debug, Error)]
 enum ExportError {

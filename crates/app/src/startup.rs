@@ -3,16 +3,16 @@
 use crate::app::{Application, Options};
 use crate::logging;
 use clap::Parser;
-use freakymate_core::backlight::BacklightBackend;
-use freakymate_core::network::NetworkBackend;
-use freakymate_core::report::{self, ReportRequest};
-use freakymate_core::setup::{self, SetupState};
+use sailhand_core::backlight::BacklightBackend;
+use sailhand_core::network::NetworkBackend;
+use sailhand_core::report::{self, ReportRequest};
+use sailhand_core::setup::{self, SetupState};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 /// Touch screen UI for Klipper printers via Moonraker.
 #[derive(Debug, Parser)]
-#[command(version = freakymate_core::VERSION, about)]
+#[command(version = sailhand_core::VERSION, about)]
 pub struct Cli {
     /// Moonraker address for this start, e.g. http://printer.local:7125 (default: saved setting)
     #[arg(short, long)]
@@ -25,10 +25,10 @@ pub struct Cli {
     #[cfg(target_os = "linux")]
     #[arg(long)]
     framebuffer: bool,
-    /// Settings file, TOML (default: <config dir>/freakymate/settings.conf; the installer uses printer_data/config/freakymate.conf)
+    /// Settings file, TOML (default: <config dir>/sailhand/settings.conf; the installer uses printer_data/config/sailhand.conf)
     #[arg(long)]
     settings: Option<PathBuf>,
-    /// Credentials file for Moonraker logins (default: <config dir>/freakymate/credentials.json)
+    /// Credentials file for Moonraker logins (default: <config dir>/sailhand/credentials.json)
     #[arg(long, hide = true)]
     credentials: Option<PathBuf>,
     /// Log file, rotated daily like those of Klipper and Moonraker (default: stderr only)
@@ -42,11 +42,11 @@ pub struct Cli {
     #[cfg(feature = "dev-mode")]
     #[arg(long)]
     simulate_backlight: bool,
-    /// Prints the setup version install.sh writes to /etc/freakymate/setup-version and exits
+    /// Prints the setup version install.sh writes to /etc/sailhand/setup-version and exits
     #[arg(long, hide = true)]
     setup_version: bool,
     /// Writes a diagnostic report for a bug report and exits: versions, Klipper objects and configuration, what
-    /// FreakyMate detects; no passwords or network data (default: printer_data/logs/freakymate-report.json)
+    /// Sailhand detects; no passwords or network data (default: printer_data/logs/sailhand-report.json)
     #[arg(long, value_name = "FILE")]
     report: Option<Option<PathBuf>>,
 }
@@ -75,7 +75,7 @@ impl Cli {
         BacklightBackend::system()
     }
 
-    /// Whether the setup outside the program folder matches this program (see `freakymate_core::setup`).
+    /// Whether the setup outside the program folder matches this program (see `sailhand_core::setup`).
     fn setup_state(&self) -> SetupState {
         let marker = std::fs::read_to_string(setup::MARKER_FILE).ok();
         SetupState::detect(marker.as_deref(), self.settings.as_deref())
@@ -85,7 +85,7 @@ impl Cli {
     fn log_header(&self, setup: SetupState) -> Vec<(String, String)> {
         let command_line: Vec<String> = std::env::args().skip(1).collect();
         let mut header = vec![
-            ("Version".to_owned(), freakymate_core::VERSION.to_owned()),
+            ("Version".to_owned(), sailhand_core::VERSION.to_owned()),
             ("Command line".to_owned(), command_line.join(" ")),
             ("System".to_owned(), format!("{} {}", std::env::consts::OS, std::env::consts::ARCH)),
         ];
@@ -148,7 +148,7 @@ impl Cli {
             fullscreen: true,
             settings: Some(data_dir.join("settings.conf")),
             credentials: Some(data_dir.join("credentials.json")),
-            logfile: Some(data_dir.join("logs").join("freakymate.log")),
+            logfile: Some(data_dir.join("logs").join("sailhand.log")),
             #[cfg(feature = "dev-mode")]
             simulate_network: false,
             #[cfg(feature = "dev-mode")]

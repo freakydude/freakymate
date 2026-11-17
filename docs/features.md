@@ -1,6 +1,6 @@
 # Features
 
-What each page of FreakyMate does. Functions only appear when the printer has them (capabilities from
+What each page of Sailhand does. Functions only appear when the printer has them (capabilities from
 `printer.objects.list` and `server.info`). Configuration sections whose name starts with `_` are helpers and not
 shown, as in Mainsail: macros, heaters, temperature sensors, fans, LEDs, LED effects and filament sensors (a hidden
 probe still counts as the probe).
@@ -9,7 +9,7 @@ probe still counts as the probe).
   file browser with thumbnails, filament (material of each tool), nozzle and print time of each file.
   - **Prepare**: a tap on a file marks it; with one file marked, **Prepare** makes it the job of the print page and
     **Delete** removes it (with several marked, only **Delete**, which names the files first). Preparing happens only
-    in FreakyMate: Moonraker and other clients notice nothing, and after a restart the print page shows Klipper's current
+    in Sailhand: Moonraker and other clients notice nothing, and after a restart the print page shows Klipper's current
     file again. The page then shows the file's estimated time, filament, nozzle diameter and temperatures, and what each
     tool asks of the filament. A print that starts, from anywhere, takes the place of the prepared file; a prepared file
     that is deleted is dropped. **Print** asks for confirmation as before.
@@ -23,7 +23,7 @@ probe still counts as the probe).
     with full transparency) is not compared by colour.
     Each tool chip on the print page also shows the material the file asks for, in the warning colour when the gate
     holds another. A tap on a tool opens a comparison: material, colour, weight and name of the file against the
-    gate, differing values in the warning colour, the slicer's estimate with `~`. FreakyMate does not know why they
+    gate, differing values in the warning colour, the slicer's estimate with `~`. Sailhand does not know why they
     differ (wrong filament, or only the gate map or the spool in Spoolman), so it gives no instructions, only buttons
     for what can be done: open the gate, change its spool, choose another gate (a tick marks gates whose data fit).
     A tool the printer does not have (no gate mapped by Happy Hare, or without Happy Hare no command `T<n>`) shows as
@@ -37,7 +37,7 @@ probe still counts as the probe).
     (`SCREWS_TILT_CALCULATE` with the turns per screw, or the paper test `BED_SCREWS_ADJUST`), Z offset of the probe or
     the Z endstop, bed mesh (measure, a coloured map of the active mesh, load, save and remove profiles, clear) and
     what `SAVE_CONFIG` would write. While Klipper waits for the paper test or the Z height, a dialog shows its steps;
-    closing it aborts. FreakyMate only starts these commands, Klipper does the work.
+    closing it aborts. Sailhand only starts these commands, Klipper does the work.
     With an Eddy current probe (`[probe_eddy_current]`) the button "Eddy probe" opens its setup dialog: the steps of
     Klipper's Eddy probe guide (drive current, Z heights by paper test, tap threshold with guess, refine and verify),
     each with what the configuration file holds and what waits for Save config, buttons to put the nozzle or the sensor
@@ -146,9 +146,9 @@ gates and, on selectors with a servo, servo up and down.
 | ![Gate dialog](screenshots/gate-dialog.png)                          | ![Changer > Tools](screenshots/mmu-tools.png)                                                               |
 | A tap on a gate: select, load, preload, check, eject, pick its spool | Changer > Tools: T3 moved to gate 1, what each gate holds, EndlessSpool on                              |
 
-**Quieter console (recommended).** FreakyMate shows Klipper's console messages in its status bar. Happy Hare prints a
+**Quieter console (recommended).** Sailhand shows Klipper's console messages in its status bar. Happy Hare prints a
 lot there by default: the gate table at startup, a picture of the filament path and statistics after every tool
-change. FreakyMate draws the gates and the filament path itself from `printer.mmu`, so these lines only crowd the
+change. Sailhand draws the gates and the filament path itself from `printer.mmu`, so these lines only crowd the
 status bar.
 Happy Hare can keep the console to the essentials and still write everything to `mmu.log`; in `mmu_parameters.cfg`:
 

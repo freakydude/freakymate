@@ -32,7 +32,7 @@ pub fn hide() {
     let directory = std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir)
-        .join("freakymate-cursors");
+        .join("sailhand-cursors");
     match write_theme(&directory) {
         Ok(()) => {
             // SAFETY: the caller runs this before any thread or window exists (see the function docs), so
@@ -50,7 +50,7 @@ fn write_theme(directory: &Path) -> std::io::Result<()> {
     let theme = directory.join(THEME);
     let cursors = theme.join("cursors");
     std::fs::create_dir_all(&cursors)?;
-    std::fs::write(theme.join("index.theme"), "[Icon Theme]\nName=FreakyMate kiosk, no pointer\n")?;
+    std::fs::write(theme.join("index.theme"), "[Icon Theme]\nName=Sailhand kiosk, no pointer\n")?;
     let cursor = transparent_cursor();
     for name in CURSOR_NAMES {
         std::fs::write(cursors.join(name), &cursor)?;

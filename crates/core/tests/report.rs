@@ -2,8 +2,8 @@
 
 use fake_moonraker::machine::MachineProfile;
 use fake_moonraker::server::{ServerConfig, serve};
-use freakymate_core::report::collect;
-use freakymate_core::{CredentialStore, Endpoint};
+use sailhand_core::report::collect;
+use sailhand_core::{CredentialStore, Endpoint};
 use serde_json::{Value, json};
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -24,7 +24,7 @@ async fn report_of(profile: MachineProfile) -> Value {
 #[tokio::test]
 async fn reports_versions_objects_and_what_was_detected() {
     let report = report_of(MachineProfile::happy_hare(4)).await;
-    assert_eq!(report["freakymate"]["Version"], "test");
+    assert_eq!(report["sailhand"]["Version"], "test");
     assert_eq!(report["moonraker"]["access"], "trusted or open");
     assert!(report["moonraker"]["server.info"]["moonraker_version"].is_string());
     let objects = &report["klipper"]["printer.objects.query"];

@@ -1,6 +1,6 @@
 [package]
-name = "freakymate-ui"
-description = "Slint UI of freakymate: the compiled ui/*.slint files, without app logic"
+name = "sailhand-ui"
+description = "Slint UI of sailhand: the compiled ui/*.slint files, without app logic"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -14,7 +14,7 @@ publish = false
 test = false
 doctest = false
 
-# Kept free of freakymate-core, so changes in the core do not recompile the large generated UI code.
+# Kept free of sailhand-core, so changes in the core do not recompile the large generated UI code.
 [dependencies]
 slint = { workspace = true, features = ["std", "compat-1-2"] }
 

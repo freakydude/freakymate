@@ -1,7 +1,7 @@
 //! Names of commands for messages to people ("Pause Print: not possible while ..."). Fixed per command, so
 //! renaming a variant does not change what the display shows.
 
-use freakymate_core::Command;
+use sailhand_core::Command;
 
 /// Short name of a command for feedback in the UI; a macro or a G-code script shows what it runs.
 pub fn command_name(command: &Command) -> String {
@@ -124,7 +124,7 @@ pub fn running_label(command: &Command, script_line: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use freakymate_core::sources::klipper::Axis;
+    use sailhand_core::sources::klipper::Axis;
 
     #[test]
     fn names_commands_briefly() {

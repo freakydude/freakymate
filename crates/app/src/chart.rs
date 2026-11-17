@@ -2,7 +2,7 @@
 //! therefore testable. The view box is 1000 high and as wide as the chart's aspect ratio makes it: Slint scales a
 //! path evenly, so a box of another shape would squeeze the chart into the middle.
 
-use freakymate_core::sources::moonraker_server::temperature_store::HISTORY_LENGTH;
+use sailhand_core::sources::moonraker_server::temperature_store::HISTORY_LENGTH;
 
 /// Height of the view box; its width is this times the aspect ratio of the chart.
 pub const VIEW_HEIGHT: f64 = 1000.0;

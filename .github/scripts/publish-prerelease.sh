@@ -38,7 +38,7 @@ if [ "$(gh api "$release" --jq '.assets | length')" -eq 0 ]; then
   exit 1
 fi
 
-bash "$scripts/attach-to-release.sh" "$id" scripts/get-freakymate.sh
+bash "$scripts/attach-to-release.sh" "$id" scripts/get-sailhand.sh
 
 notes="Automatic build of main at $GITHUB_SHA, replaced by the next commit on main. Newest functions first, less time in use than a release; use it with care and at your own risk (see the README)."
 if [ -z "$failed" ]; then

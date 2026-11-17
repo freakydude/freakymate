@@ -1,9 +1,9 @@
 //! The Calibrate tab of the Motion page and the bed mesh dialogs.
 
 use crate::session::Session;
-use freakymate::{Actions, EddyDialog, MeshDialogs, MotionTab, Navigation, Page};
-use freakymate_core::sources::klipper::{CalibrationMode, EddyTap, TestZ};
-use freakymate_core::{Command, Snapshot};
+use sailhand::{Actions, EddyDialog, MeshDialogs, MotionTab, Navigation, Page};
+use sailhand_core::sources::klipper::{CalibrationMode, EddyTap, TestZ};
+use sailhand_core::{Command, Snapshot};
 use slint::ComponentHandle;
 use std::time::Duration;
 

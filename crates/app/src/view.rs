@@ -2,22 +2,22 @@
 
 use crate::{Severity, format};
 use chrono::{DateTime, Local};
-use freakymate_core::domain::estimates;
-use freakymate_core::domain::filament_match::{self, Difference, ToolMatch, Verdict};
-use freakymate_core::domain::file_catalog::FileInfo;
-use freakymate_core::domain::job_end;
-use freakymate_core::domain::pause::{Interruption, InterruptionFact};
-use freakymate_core::sources::happy_hare::{
+use sailhand_core::domain::estimates;
+use sailhand_core::domain::filament_match::{self, Difference, ToolMatch, Verdict};
+use sailhand_core::domain::file_catalog::FileInfo;
+use sailhand_core::domain::job_end;
+use sailhand_core::domain::pause::{Interruption, InterruptionFact};
+use sailhand_core::sources::happy_hare::{
     BufferSides, Emphasis, EncoderHeadroom, FlowGuardState, FlowGuardStatement, GateAvailability, LoadedFilament,
     ServoPosition, SyncFeedbackState,
 };
-use freakymate_core::sources::klipper::tuning::TuningRange;
-use freakymate_core::sources::klipper::{FanKind, PrintJob, PrintState};
-use freakymate_core::sources::mainsail_config::{self, PlannedLayerPause};
-use freakymate_core::sources::moonraker_server::files::FileMetadata;
-use freakymate_core::sources::moonraker_server::history::{FinishedJob, LastPrint};
-use freakymate_core::sources::spoolman::Spool;
-use freakymate_core::{Provenance, Sourced};
+use sailhand_core::sources::klipper::tuning::TuningRange;
+use sailhand_core::sources::klipper::{FanKind, PrintJob, PrintState};
+use sailhand_core::sources::mainsail_config::{self, PlannedLayerPause};
+use sailhand_core::sources::moonraker_server::files::FileMetadata;
+use sailhand_core::sources::moonraker_server::history::{FinishedJob, LastPrint};
+use sailhand_core::sources::spoolman::Spool;
+use sailhand_core::{Provenance, Sourced};
 
 const NO_VALUE: &str = "-";
 const ORIGIN_PACE_ONLY: &str = "measured pace only";
@@ -454,7 +454,7 @@ pub fn tuning_value(value: f64, range: &TuningRange) -> String {
 mod tests {
     use super::*;
     use chrono::TimeZone;
-    use freakymate_core::sources::moonraker_server::files::FileEntry;
+    use sailhand_core::sources::moonraker_server::files::FileEntry;
 
     #[test]
     fn a_buffer_names_the_sides_a_sensor_measures() {
@@ -828,9 +828,9 @@ mod tests {
         assert_eq!(fan_rpm(Some(2799.6)), "2800 rpm");
         assert_eq!(fan_rpm(None), "");
         assert_eq!(fan_kind(FanKind::Generic), "generic");
-        let accel = freakymate_core::sources::klipper::tuning::TuningKey::MaxAccel.range();
+        let accel = sailhand_core::sources::klipper::tuning::TuningKey::MaxAccel.range();
         assert_eq!(tuning_value(5000.0, &accel), "5000 mm/s²");
-        let advance = freakymate_core::sources::klipper::tuning::TuningKey::PressureAdvance.range();
+        let advance = sailhand_core::sources::klipper::tuning::TuningKey::PressureAdvance.range();
         assert_eq!(tuning_value(0.04, &advance), "0.040");
     }
 }

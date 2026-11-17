@@ -57,7 +57,7 @@ jobs:
             gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$old" || true
           done
           id=$(gh api "repos/$GITHUB_REPOSITORY/releases" -f tag_name="v$VERSION" -f target_commitish="$GITHUB_SHA" \
-            -f name="FreakyMate v$VERSION (pre-release)" -F draft=true -F prerelease=true --jq .id)
+            -f name="Sailhand v$VERSION (pre-release)" -F draft=true -F prerelease=true --jq .id)
           echo "id=$id" | tee -a "$GITHUB_OUTPUT"
 
   # Two callers of build.yml, because its jobs take the permissions of the caller: pull requests build with a read-only

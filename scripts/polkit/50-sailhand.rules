@@ -1,4 +1,4 @@
-// freakymate: members of the group "netdev" may manage Wi-Fi and Ethernet via NetworkManager.
+// sailhand: members of the group "netdev" may manage Wi-Fi and Ethernet via NetworkManager.
 polkit.addRule(function(action, subject) {
     var allowed = [
         "org.freedesktop.NetworkManager.network-control",

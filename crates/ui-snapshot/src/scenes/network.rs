@@ -2,9 +2,9 @@
 
 use super::ask;
 use crate::session::Session;
-use freakymate::{Confirm, Navigation, Page};
-use freakymate_core::Query;
-use freakymate_core::network::{Availability, NetworkCommand, NetworkState};
+use sailhand::{Confirm, Navigation, Page};
+use sailhand_core::Query;
+use sailhand_core::network::{Availability, NetworkCommand, NetworkState};
 use slint::ComponentHandle;
 use std::time::Duration;
 

@@ -1,16 +1,16 @@
 #!/bin/bash
-# Downloads the FreakyMate release zip for this system's architecture and runs its install.sh.
+# Downloads the Sailhand release zip for this system's architecture and runs its install.sh.
 #
-#   curl -fsSLO https://github.com/freakydude/freakymate/releases/latest/download/get-freakymate.sh
-#   bash get-freakymate.sh [-c stable|beta] [-m <moonraker-url>] [-d <printer_data>]
+#   curl -fsSLO https://github.com/freakydude/sailhand/releases/latest/download/get-sailhand.sh
+#   bash get-sailhand.sh [-c stable|beta] [-m <moonraker-url>] [-d <printer_data>]
 #
 # All options go to install.sh; -c beta also takes the newest pre-release. The zip is unpacked to a temporary
-# directory, which is removed afterwards: install.sh copies everything it needs to ~/freakymate.
+# directory, which is removed afterwards: install.sh copies everything it needs to ~/sailhand.
 # Young software: use it with care and at your own risk (see the README).
 
 set -euo pipefail
 
-REPO="freakydude/freakymate"
+REPO="freakydude/sailhand"
 
 channel="stable"
 arguments=("$@")
@@ -35,7 +35,7 @@ case $architecture in
   amd64 | x86_64) target="x86_64-unknown-linux-gnu" ;;
   arm64 | aarch64) target="aarch64-unknown-linux-gnu" ;;
   armhf | armv7l) target="armv7-unknown-linux-gnueabihf" ;;
-  *) echo "No FreakyMate build for the architecture '$architecture'."; exit 1 ;;
+  *) echo "No Sailhand build for the architecture '$architecture'."; exit 1 ;;
 esac
 
 case $channel in
@@ -44,7 +44,7 @@ case $channel in
   *) echo "channel must be stable or beta"; exit 2 ;;
 esac
 
-asset="freakymate-$target.zip"
+asset="sailhand-$target.zip"
 download_url=$(curl -fsSL "$release_url" | python3 -c '
 import json, sys
 release = json.load(sys.stdin)
@@ -57,9 +57,9 @@ if [ -z "$download_url" ]; then
 fi
 
 echo "Downloading $download_url"
-SETUP_DIR=$(mktemp -d -t freakymate-setup.XXXXXX)
+SETUP_DIR=$(mktemp -d -t sailhand-setup.XXXXXX)
 trap 'rm -rf "$SETUP_DIR"' EXIT
-# mktemp creates it with 0700, and install.sh copies the directory's mode to ~/freakymate.
+# mktemp creates it with 0700, and install.sh copies the directory's mode to ~/sailhand.
 chmod 0755 "$SETUP_DIR"
 curl -fSL "$download_url" -o "$SETUP_DIR/$asset"
 (cd "$SETUP_DIR" && unzip -q "$asset" && rm "$asset")

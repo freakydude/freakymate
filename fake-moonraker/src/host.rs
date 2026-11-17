@@ -75,13 +75,13 @@ impl Host {
                 "mainsail": { "name": "mainsail", "configured_type": "web", "version": "v2.14.0", "remote_version": "v2.14.0" },
                 "crowsnest": { "name": "crowsnest", "configured_type": "git_repo", "version": "v4.1.12", "remote_version": "v4.1.12", "is_valid": true, "commits_behind_count": 0 },
                 "moonraker-timelapse": { "name": "moonraker-timelapse", "configured_type": "git_repo", "version": "v0.0.1-150", "remote_version": "v0.0.1-150", "is_valid": true, "commits_behind_count": 0 },
-                "freakymate": { "name": "freakymate", "configured_type": "zip", "version": "v0.2.3", "remote_version": "v0.2.3" },
+                "sailhand": { "name": "sailhand", "configured_type": "zip", "version": "v0.2.3", "remote_version": "v0.2.3" },
             }
         })
     }
 
     /// `machine.update.upgrade`: like Moonraker, refuses a name that is not exactly a section of the update manager
-    /// (`Freakymate` for `freakymate` fails); without a name everything is updated.
+    /// (`Sailhand` for `sailhand` fails); without a name everything is updated.
     pub fn upgrade(&mut self, name: Option<&str>) -> Result<(), String> {
         if let Some(name) = name
             && self.update_status()["version_info"].get(name).is_none()
@@ -162,8 +162,8 @@ mod tests {
     fn upgrade_refuses_a_name_that_is_not_exactly_a_section() {
         let mut host = Host::default();
 
-        assert_eq!(host.upgrade(Some("Freakymate")), Err("Updater Freakymate not available".to_owned()));
-        assert_eq!(host.upgrade(Some("freakymate")), Ok(()));
+        assert_eq!(host.upgrade(Some("Sailhand")), Err("Updater Sailhand not available".to_owned()));
+        assert_eq!(host.upgrade(Some("sailhand")), Ok(()));
     }
 
     #[test]

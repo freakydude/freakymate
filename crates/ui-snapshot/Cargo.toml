@@ -1,6 +1,6 @@
 [package]
 name = "ui-snapshot"
-description = "Development tool: renders the freakymate UI headless to PNG files against a (fake) Moonraker"
+description = "Development tool: renders the sailhand UI headless to PNG files against a (fake) Moonraker"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,8 +9,8 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
-freakymate = { workspace = true, features = ["dev-mode"] }
-freakymate-core = { workspace = true, features = ["dev-mode"] }
+sailhand = { workspace = true, features = ["dev-mode"] }
+sailhand-core = { workspace = true, features = ["dev-mode"] }
 image.workspace = true
 slint = { workspace = true, features = [
     "std",

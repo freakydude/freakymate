@@ -144,7 +144,7 @@ impl From<zbus::Error> for NetworkError {
     fn from(error: zbus::Error) -> Self {
         let message = error.to_string();
         if message.contains("PermissionDenied") || message.contains("not authorized") {
-            Self::Backend("permission denied; is the polkit rule of freakymate installed?".to_owned())
+            Self::Backend("permission denied; is the polkit rule of sailhand installed?".to_owned())
         } else {
             Self::Backend(message)
         }

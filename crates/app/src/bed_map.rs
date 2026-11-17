@@ -2,7 +2,7 @@
 //! box is the bed in mm with Y upwards as in the slicer; Slint scales a path evenly, so the map has the bed's shape.
 //! Free of Slint types and therefore testable.
 
-use freakymate_core::sources::klipper::{Bed, BedPoint, PrintObject, object_at};
+use sailhand_core::sources::klipper::{Bed, BedPoint, PrintObject, object_at};
 
 /// Grid lines every this many mm, counted from Klipper's origin.
 const GRID_STEP_MM: f64 = 50.0;
