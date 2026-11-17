@@ -2,7 +2,7 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 
 use clap::Parser;
-use freakymate::startup::{self, Cli};
+use sailhand::startup::{self, Cli};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {

@@ -9,10 +9,10 @@ export component UpdatesSetupHintPreview inherits AppWindow {
     init => {
         Sample.ready-printer();
         Navigation.page = Page.updates;
-        UiSettings.setup-command = "/home/pi/freakymate/install.sh";
+        UiSettings.setup-command = "/home/pi/sailhand/install.sh";
         Printer.updates-busy = true;
         Printer.updates = [
-            { name: "freakymate", label: "FreakyMate", version: "v0.3.8", detail: "v0.3.8", has-update: false, up-to-date: true },
+            { name: "sailhand", label: "Sailhand", version: "v0.3.8", detail: "v0.3.8", has-update: false, up-to-date: true },
             { name: "klipper", label: "Klipper", version: "v0.13.0-100", detail: "v0.13.0-100 → v0.13.0-120", has-update: true, up-to-date: false },
             { name: "moonraker", label: "Moonraker", version: "v0.11.0-4", detail: "v0.11.0-4", has-update: false, up-to-date: true },
         ];

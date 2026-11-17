@@ -1,16 +1,16 @@
 //! Headless application session: the real UI bindings on a software-rendered window, driven step by step.
 
 use crate::Options;
-use freakymate::backlight_controller::BacklightController;
-use freakymate::display::{DESIGN_HEIGHT, DESIGN_WIDTH};
-use freakymate::network_controller::NetworkController;
-use freakymate::presenter::Presenter;
-use freakymate::settings_controller::{Bridges, SettingsController};
-use freakymate::{AppWindow, Navigation, Page, actions};
-use freakymate_core::backlight::{BacklightBackend, BacklightService, BacklightState};
-use freakymate_core::network::{NetworkBackend, NetworkChannels, NetworkService};
-use freakymate_core::settings::{Settings, SettingsStore};
-use freakymate_core::{CredentialStore, Endpoint, PrinterService, ServiceChannels, Snapshot};
+use sailhand::backlight_controller::BacklightController;
+use sailhand::display::{DESIGN_HEIGHT, DESIGN_WIDTH};
+use sailhand::network_controller::NetworkController;
+use sailhand::presenter::Presenter;
+use sailhand::settings_controller::{Bridges, SettingsController};
+use sailhand::{AppWindow, Navigation, Page, actions};
+use sailhand_core::backlight::{BacklightBackend, BacklightService, BacklightState};
+use sailhand_core::network::{NetworkBackend, NetworkChannels, NetworkService};
+use sailhand_core::settings::{Settings, SettingsStore};
+use sailhand_core::{CredentialStore, Endpoint, PrinterService, ServiceChannels, Snapshot};
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
 use slint::platform::{Platform, WindowAdapter};
 use slint::platform::{PointerEventButton, WindowEvent};
@@ -76,7 +76,7 @@ impl Session {
         window.window().set_size(PhysicalSize::new(options.width, options.height));
         window.show().map_err(|error| error.to_string())?;
         if options.fit {
-            freakymate::display::apply_fit(window.window());
+            sailhand::display::apply_fit(window.window());
         }
 
         let (service, channels) =

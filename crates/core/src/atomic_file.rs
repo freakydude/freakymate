@@ -36,7 +36,7 @@ mod tests {
 
     #[test]
     fn replaces_the_file_and_leaves_no_temporary_one() {
-        let directory = std::env::temp_dir().join(format!("freakymate-atomic-{}", std::process::id()));
+        let directory = std::env::temp_dir().join(format!("sailhand-atomic-{}", std::process::id()));
         let path = directory.join("nested").join("file.conf");
 
         write_atomically(&path, "first", false).unwrap();

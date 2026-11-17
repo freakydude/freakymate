@@ -3,20 +3,20 @@
 use fake_moonraker::access::AccessConfig;
 use fake_moonraker::machine::MachineProfile;
 use fake_moonraker::server::{ServerConfig, serve};
-use freakymate_core::credentials::Credential;
-use freakymate_core::domain::filament::{self, FilamentHandling};
-use freakymate_core::domain::load_path::{BufferSide, LOADED, head_path, load_path};
-use freakymate_core::domain::machine_tree::LaneId;
-use freakymate_core::domain::{changer, heads, job_end, light, pause, spools};
-use freakymate_core::sources::PrinterStatus;
-use freakymate_core::sources::afc::HubReturnBlock;
-use freakymate_core::sources::happy_hare::commands::{Gates, ServoCommand};
-use freakymate_core::sources::happy_hare::{GateAvailability, LoadedFilament, PathSensor, ServoPosition};
-use freakymate_core::sources::klipper::tuning::TuningKey;
-use freakymate_core::sources::klipper::{Axis, FanKind, KlippyState, Leveling, PrintState, WhiteChannel};
-use freakymate_core::sources::moonraker_server::files::ThumbnailImage;
-use freakymate_core::sources::moonraker_server::gcode_store::ConsoleKind;
-use freakymate_core::{
+use sailhand_core::credentials::Credential;
+use sailhand_core::domain::filament::{self, FilamentHandling};
+use sailhand_core::domain::load_path::{BufferSide, LOADED, head_path, load_path};
+use sailhand_core::domain::machine_tree::LaneId;
+use sailhand_core::domain::{changer, heads, job_end, light, pause, spools};
+use sailhand_core::sources::PrinterStatus;
+use sailhand_core::sources::afc::HubReturnBlock;
+use sailhand_core::sources::happy_hare::commands::{Gates, ServoCommand};
+use sailhand_core::sources::happy_hare::{GateAvailability, LoadedFilament, PathSensor, ServoPosition};
+use sailhand_core::sources::klipper::tuning::TuningKey;
+use sailhand_core::sources::klipper::{Axis, FanKind, KlippyState, Leveling, PrintState, WhiteChannel};
+use sailhand_core::sources::moonraker_server::files::ThumbnailImage;
+use sailhand_core::sources::moonraker_server::gcode_store::ConsoleKind;
+use sailhand_core::{
     Access, Command, ConnectionState, CredentialStore, Endpoint, Event, PrinterService, Query, ServiceChannels,
     Snapshot,
 };

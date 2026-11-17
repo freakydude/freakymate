@@ -2,8 +2,8 @@
 
 use super::mmu::filament_path_midway;
 use crate::session::Session;
-use freakymate::{Actions, Confirm, Navigation, Page, Printer, SpoolPicker};
-use freakymate_core::Command;
+use sailhand::{Actions, Confirm, Navigation, Page, Printer, SpoolPicker};
+use sailhand_core::Command;
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::time::Duration;
 

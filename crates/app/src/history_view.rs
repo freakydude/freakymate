@@ -3,10 +3,10 @@
 //! example stepper drivers) have no history.
 
 use crate::{AppWindow, ChartLabel, Navigation, PidValueItem, Printer, chart, items};
-use freakymate_core::domain::pid_tuning::PidTuning;
-use freakymate_core::sources::PrinterStatus;
-use freakymate_core::sources::klipper::PidValues;
-use freakymate_core::sources::moonraker_server::temperature_store::TemperatureSeries;
+use sailhand_core::domain::pid_tuning::PidTuning;
+use sailhand_core::sources::PrinterStatus;
+use sailhand_core::sources::klipper::PidValues;
+use sailhand_core::sources::moonraker_server::temperature_store::TemperatureSeries;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -202,7 +202,7 @@ fn current_text(status: &PrinterStatus, object: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use freakymate_core::sources::klipper::{Heater, TemperatureSensor};
+    use sailhand_core::sources::klipper::{Heater, TemperatureSensor};
 
     #[test]
     fn the_current_value_names_the_target_only_when_heating() {

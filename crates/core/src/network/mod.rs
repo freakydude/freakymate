@@ -1,4 +1,4 @@
-//! Network management of the host freakymate runs on: Wi-Fi and Ethernet via NetworkManager
+//! Network management of the host sailhand runs on: Wi-Fi and Ethernet via NetworkManager
 //! (Linux), or a simulation for development and tests.
 //!
 //! Moonraker can only report the printer host's interfaces; changing them needs local access to
@@ -24,7 +24,7 @@ const AP_KEY_MGMT_PSK: u32 = 0x100;
 const AP_KEY_MGMT_802_1X: u32 = 0x200;
 const AP_KEY_MGMT_SAE: u32 = 0x400;
 
-/// Protection of a Wi-Fi network as far as freakymate can join it.
+/// Protection of a Wi-Fi network as far as sailhand can join it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Security {
     #[default]

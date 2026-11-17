@@ -2,7 +2,7 @@
 set -e
 
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
-  rm -rf /etc/freakymate
+  rm -rf /etc/sailhand
 fi
 
 if [ -d /run/systemd/system ]; then

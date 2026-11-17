@@ -10,17 +10,17 @@ use crate::{
     AfcHubReturnItem, AfcToolItem, FilamentPathItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem, Printer,
     ToolMatchItem, view,
 };
-use freakymate_core::domain::changer;
-use freakymate_core::domain::filament_match::{self, ToolMatch, Verdict};
-use freakymate_core::domain::gate_pages::{self, BypassAt, GatePage};
-use freakymate_core::domain::heads::HeadRow;
-use freakymate_core::domain::load_path::{self, BufferSide, LoadPath, PathScope};
-use freakymate_core::domain::machine_tree::LaneId;
-use freakymate_core::domain::spools::{FilamentColors, Lane};
-use freakymate_core::sources::PrinterStatus;
-use freakymate_core::sources::afc::HubReturnBlock;
-use freakymate_core::sources::happy_hare::{self, LoadedFilament, MmuStatus};
-use freakymate_core::sources::spoolman::Spool;
+use sailhand_core::domain::changer;
+use sailhand_core::domain::filament_match::{self, ToolMatch, Verdict};
+use sailhand_core::domain::gate_pages::{self, BypassAt, GatePage};
+use sailhand_core::domain::heads::HeadRow;
+use sailhand_core::domain::load_path::{self, BufferSide, LoadPath, PathScope};
+use sailhand_core::domain::machine_tree::LaneId;
+use sailhand_core::domain::spools::{FilamentColors, Lane};
+use sailhand_core::sources::PrinterStatus;
+use sailhand_core::sources::afc::HubReturnBlock;
+use sailhand_core::sources::happy_hare::{self, LoadedFilament, MmuStatus};
+use sailhand_core::sources::spoolman::Spool;
 use slint::{Model, ModelRc, VecModel};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -542,7 +542,7 @@ mod tests {
     }
 
     fn afc_status() -> PrinterStatus {
-        let lane = |name: &str, in_tool| freakymate_core::sources::afc::AfcLane {
+        let lane = |name: &str, in_tool| sailhand_core::sources::afc::AfcLane {
             name: name.into(),
             in_tool,
             filled: true,
@@ -551,7 +551,7 @@ mod tests {
             ..Default::default()
         };
         PrinterStatus {
-            afc: Some(freakymate_core::sources::afc::AfcStatus {
+            afc: Some(sailhand_core::sources::afc::AfcStatus {
                 lanes: vec![lane("lane1", false), lane("lane2", true)],
                 ..Default::default()
             }),

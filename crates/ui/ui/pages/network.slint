@@ -207,7 +207,7 @@ component HostNetworkCard inherits Card {
         Text {
             text: Network.local
                 ? @tr("Wi-Fi and Ethernet can only be changed with NetworkManager on Linux: {}", Network.unavailable-reason)
-                : @tr("FreakyMate runs on another computer than Moonraker, so the network can only be viewed here. Change it on the printer's own display or via SSH.");
+                : @tr("Sailhand runs on another computer than Moonraker, so the network can only be viewed here. Change it on the printer's own display or via SSH.");
             color: Theme.muted;
             font-size: Theme.font-small;
             wrap: word-wrap;

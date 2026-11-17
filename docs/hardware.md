@@ -1,6 +1,6 @@
 # Requirements and hardware
 
-What FreakyMate needs, which Klipper plugins it understands and what hardware is typically behind them. FreakyMate
+What Sailhand needs, which Klipper plugins it understands and what hardware is typically behind them. Sailhand
 reads the state that Klipper and its plugins report through Moonraker; the hardware itself does not matter to it. A
 machine that one of these plugins drives is therefore covered, whatever its name.
 
@@ -15,14 +15,14 @@ machine that one of these plugins drives is therefore covered, whatever its name
 | Touch             | A touch screen; a mouse and keyboard work as well                                                                                     |
 | Optional          | NetworkManager for the Wi-Fi settings, a controllable backlight for brightness and standby, the plugins below                         |
 
-FreakyMate can also run as a window on a Linux or Windows desktop and talk to a Moonraker over the network (see
+Sailhand can also run as a window on a Linux or Windows desktop and talk to a Moonraker over the network (see
 [Install and update](install.md#desktop-linux-windows)).
 
 ## Plugins and typical hardware
 
 Every plugin is optional and detected by itself; a printer without it looks as if the plugin did not exist.
 
-| Plugin | What FreakyMate does with it | Typical hardware | Tested on |
+| Plugin | What Sailhand does with it | Typical hardware | Tested on |
 | ------ | ---------------------------- | ---------------- | --------- |
 | [Happy Hare](https://github.com/moggieuk/Happy-Hare) 4.1 or newer | Gates, filament path, buffer, FlowGuard, flow rate; select, load, eject; tool-to-gate map, EndlessSpool, service; several units on one printer | MMUs from its installer: ERCF, Tradrack, Box Turtle, Night Owl, QuattroBox, BTT ViViD, HTLF, EMU, Angry Beaver, 3MS, 3D Chameleon, Pico MMU, MMX, KMS, QIDI Box and custom designs | real printers with one unit (a custom type-B unit with one gate, an ERCF with 8 gates); several units against the simulator |
 | [AFC](https://github.com/AFCProject/AFC-Klipper-Add-On) (Armored Turtle) | Lanes and the lane in use, tool map, service ("Back to hub", clear error); AFC's own tool changer | Box Turtle, Night Owl, QuattroBox, HTLF, EMU, ViViD, Claymore, OpenAMS; Snapmaker U1 through `AFC_Toolchanger` | simulator, built from AFC's source code |
@@ -35,7 +35,7 @@ Happy Hare and AFC were read at the versions named in [multi-tool.md](multi-tool
 fake printer used for testing (see [Development](development.md#try-it-without-a-printer)) follows their source code
 field by field.
 
-**Conventions FreakyMate follows without a plugin.** Many configurations share macros by name. FreakyMate calls them
+**Conventions Sailhand follows without a plugin.** Many configurations share macros by name. Sailhand calls them
 like any other macro and reads back only what they declare openly (details in [Slicer and macros](printer-setup.md)):
 
 - the layer pause of [mainsail-config](https://github.com/mainsail-crew/mainsail-config) (`SET_PAUSE_AT_LAYER` and
@@ -44,12 +44,12 @@ like any other macro and reads back only what they declare openly (details in [S
 - tool macros `T0` … `Tn` with the variables `active`, `color` and `spool_id`, as Fluidd and Mainsail use them, for
   printers with several extruders, IDEX or a nozzle changer built from macros.
 
-Klipper's own `[extruder1]` and `[dual_carriage]` (IDEX) need no plugin; FreakyMate shows the heater of every
+Klipper's own `[extruder1]` and `[dual_carriage]` (IDEX) need no plugin; Sailhand shows the heater of every
 extruder, but no IDEX modes yet.
 
 ## Tested setups
 
-FreakyMate runs on these printers; everything else has been tried against the simulated printer only.
+Sailhand runs on these printers; everything else has been tried against the simulated printer only.
 
 | Printer                         | Plugins                                                                          |
 | ------------------------------- | -------------------------------------------------------------------------------- |
@@ -67,16 +67,16 @@ Displays: BTT HDMI5 (5", 800x480, HDMI), Raspberry Pi Touch Display v1 (7", 800x
 - **KTC** by TypQxQ (`ktc` objects): not read; tool macros `T<n>` still work.
 - **Kalico** (the Klipper fork) has not been tried.
 - **Touch rotation** in the [framebuffer fallback](install.md#framebuffer-fallback).
-- **HTTPS** to Moonraker: FreakyMate talks plain HTTP and WebSocket, like most home installations.
-- **Windows installer:** on Windows FreakyMate runs from the unpacked zip.
+- **HTTPS** to Moonraker: Sailhand talks plain HTTP and WebSocket, like most home installations.
+- **Windows installer:** on Windows Sailhand runs from the unpacked zip.
 - Own layouts for 7" and 4.3" displays are planned; until then the 800x480 layout is scaled.
 
-Missing something for your printer? Open a [hardware support issue](https://github.com/freakydude/freakymate/issues/new/choose)
+Missing something for your printer? Open a [hardware support issue](https://github.com/freakydude/sailhand/issues/new/choose)
 with the diagnostic report (see [Bug reports](configuration.md#bug-reports)).
 
 ## Privacy
 
-FreakyMate talks only to the Moonraker you set up, and on the printer host to NetworkManager for the Wi-Fi settings.
+Sailhand talks only to the Moonraker you set up, and on the printer host to NetworkManager for the Wi-Fi settings.
 Spoolman, power devices and WLED are reached through Moonraker. There is no telemetry and no call to any other
 server. Updates are downloaded by Moonraker's update manager from the GitHub releases, as for Mainsail and Fluidd.
 The log and the diagnostic report stay on the printer until you share them; what they contain is listed under

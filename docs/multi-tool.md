@@ -7,7 +7,7 @@ Draft, 2026-11-10. Nothing of this is implemented yet. Object and field names we
 
 A printer can bring more than one filament to the bed in many ways: a filament changer (MMU) in front of one
 extruder, several extruders into one nozzle, two nozzles on one head, heads to swap (tool changer), nozzles
-to swap under one fixed head (Bondtech INDX), several carriages (IDEX), and combinations of these. FreakyMate shows and controls all of them with **one model**: a tree
+to swap under one fixed head (Bondtech INDX), several carriages (IDEX), and combinations of these. Sailhand shows and controls all of them with **one model**: a tree
 that is assembled from what the detection finds. Screens, hints before a print (`filament_match`) and commands work
 against the tree only and never ask which plugin is behind it.
 
@@ -22,7 +22,7 @@ Principles:
 - **Built once, filled often.** The structure only changes with a Klipper restart, so it is assembled once at
   detection. Each status update only fills in the state (active, temperatures, spools) through indices prepared
   then.
-- **Hand configuration last.** FreakyMate settings or FreakyMate macros that describe the machine are the last
+- **Hand configuration last.** Sailhand settings or Sailhand macros that describe the machine are the last
   resort, or a way to individualise (experiments, new projects, special wishes); see
   [Overrides](#overrides-the-last-resort).
 
@@ -182,14 +182,14 @@ Setups built from macros only (INDX under Klipper, IDEX, several extruders) ofte
 Fluidd's tool buttons read: macros `T0` … `Tn` with the variables `active` and `color` (Fluidd
 `ToolChangeCommands.vue`; Mainsail reads neither). INDX sets them from its own state (`save_variables`:
 `active_tool`, offsets), see
-[indx-tc-macros.cfg](https://github.com/BondtechAB/INDX/blob/main/macros/indx-tc-macros.cfg). For FreakyMate this
+[indx-tc-macros.cfg](https://github.com/BondtechAB/INDX/blob/main/macros/indx-tc-macros.cfg). For Sailhand this
 is a convention source like `LOAD_FILAMENT`: what the macros report is shown, nothing more is assumed.
 
 A spool per tool follows the convention of both clients: a variable `spool_id` on `gcode_macro T<n>` (Fluidd
 `SpoolSelectionDialog.vue`, Mainsail `SpoolmanChangeSpoolDialog.vue`). Both assign it with
 `SET_GCODE_VARIABLE MACRO=T<n> VARIABLE=spool_id VALUE=<id|None>` and, if the printer has `save_variables`, also
 `SAVE_VARIABLE VARIABLE=t<n>__spool_id VALUE=<id>`; restoring it at start is up to the macros. Moonraker itself
-knows only one active spool. FreakyMate reads and assigns the variable the same way, so all clients agree; without
+knows only one active spool. Sailhand reads and assigns the variable the same way, so all clients agree; without
 the variable a head has no spool of its own and the active head shows Moonraker's active spool.
 
 | Source | Objects | Structure (read once) | State (per update) |
@@ -215,7 +215,7 @@ Notes:
 The tree only says what is there; commands stay with the source that carries them out.
 
 - **Select `Tn`**: always the `Tn` command. Happy Hare, AFC and the tool changers register it, and printers with
-  several extruders define it as a macro. FreakyMate never builds a tool change itself.
+  several extruders define it as a macro. Sailhand never builds a tool change itself.
 - **Lower-level actions** are offered only where a source supports them: select or load a gate (Happy Hare, AFC
   `CHANGE_TOOL LANE=`), pick up or drop a head (tool changer `SELECT_TOOL T=<n>` and `UNSELECT_TOOL`, the latter
   only if configured; KTC `KTC_T<n>`), set the carriage mode (`SET_DUAL_CARRIAGE`). Each one is a node action that the source provides, so the UI shows a button only on nodes
@@ -228,10 +228,10 @@ The tree only says what is there; commands stay with the source that carries the
 When a link cannot be detected, or someone wants something special, two layers can help. Both are optional and
 never needed for setups the detection covers:
 
-1. **Settings in FreakyMate's configuration file**: name the missing links (this nozzle sits on that carriage),
+1. **Settings in Sailhand's configuration file**: name the missing links (this nozzle sits on that carriage),
    give lanes or heads display names, hide a level. They change the tree after the build, before the UI sees it.
-2. **FreakyMate macros by convention**: if the printer defines, say, `FREAKYMATE_SELECT_TOOL` or
-   `FREAKYMATE_PARK`, FreakyMate calls them instead of the source's command, as it already does with
+2. **Sailhand macros by convention**: if the printer defines, say, `SAILHAND_SELECT_TOOL` or
+   `SAILHAND_PARK`, Sailhand calls them instead of the source's command, as it already does with
    `LOAD_FILAMENT` (`macro_conventions.rs`). That is the hook for experiments and new hardware that no source knows
    yet. Names and parameters to be defined once a real case needs them.
 

@@ -4,8 +4,8 @@
 
 use super::pages::prepared_job;
 use crate::session::Session;
-use freakymate::{ChangerTab, Confirm, FilamentTab, HeatTab, Navigation, Page, Printer, SpoolPicker};
-use freakymate_core::Command;
+use sailhand::{ChangerTab, Confirm, FilamentTab, HeatTab, Navigation, Page, Printer, SpoolPicker};
+use sailhand_core::Command;
 use slint::ComponentHandle;
 use slint::Model;
 use std::time::Duration;

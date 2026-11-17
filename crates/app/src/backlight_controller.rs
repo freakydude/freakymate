@@ -3,9 +3,9 @@
 
 use crate::presenter::Presenter;
 use crate::{AppWindow, Backlight};
-use freakymate_core::Snapshot;
-use freakymate_core::backlight::{Availability, BacklightService, BacklightState, Screen};
-use freakymate_core::domain::screen_wake::{WakeFacts, console_line_wake};
+use sailhand_core::Snapshot;
+use sailhand_core::backlight::{Availability, BacklightService, BacklightState, Screen};
+use sailhand_core::domain::screen_wake::{WakeFacts, console_line_wake};
 use slint::ComponentHandle;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;

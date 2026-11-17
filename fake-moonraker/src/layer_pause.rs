@@ -1,6 +1,6 @@
 //! Mainsail's layer pause macros (mainsail-config `client.cfg`): `SET_PAUSE_NEXT_LAYER`, `SET_PAUSE_AT_LAYER` and
 //! the override of `SET_PRINT_STATS_INFO` that pauses on a layer change. The fake has to know what the macros do;
-//! FreakyMate does not and only calls them.
+//! Sailhand does not and only calls them.
 
 use serde_json::{Value, json};
 

@@ -255,7 +255,7 @@
     {
       "label": "check",
       "type": "shell",
-      "command": "cargo clippy --workspace --all-targets; cargo clippy -p freakymate --no-default-features; cargo test --workspace",
+      "command": "cargo clippy --workspace --all-targets; cargo clippy -p sailhand --no-default-features; cargo test --workspace",
       "group": {
         "kind": "test",
         "isDefault": true

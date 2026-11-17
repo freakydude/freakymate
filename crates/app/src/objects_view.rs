@@ -3,7 +3,7 @@
 
 use crate::items::replace_rows;
 use crate::{BedMapItem, PrintObjectItem, Printer, bed_map};
-use freakymate_core::sources::klipper::{Bed, BedPoint, PrintObject};
+use sailhand_core::sources::klipper::{Bed, BedPoint, PrintObject};
 use slint::{ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -4,10 +4,10 @@ use super::STATUS_BAR_LIGHT;
 use super::ask;
 use super::temperature::{nozzle_history, temperature_leads_to_heaters};
 use crate::session::Session;
-use freakymate::{Actions, ChangerTab, Confirm, MmuDialogs, Navigation, Page, Printer};
-use freakymate_core::Command;
-use freakymate_core::domain::load_path;
-use freakymate_core::sources::klipper::PrintState;
+use sailhand::{Actions, ChangerTab, Confirm, MmuDialogs, Navigation, Page, Printer};
+use sailhand_core::Command;
+use sailhand_core::domain::load_path;
+use sailhand_core::sources::klipper::PrintState;
 use slint::{ComponentHandle, Model};
 use std::time::Duration;
 
@@ -51,7 +51,7 @@ pub(super) fn tools_match_the_job(session: &mut Session) -> Result<(), String> {
 
 /// T0 of the file mapped to the ABS of gate 3 for a moment: its dialog compares file and gate, then the map is reset.
 fn tool_compare(session: &mut Session) -> Result<(), String> {
-    let tool_0_gate = |snapshot: &freakymate_core::Snapshot| {
+    let tool_0_gate = |snapshot: &sailhand_core::Snapshot| {
         snapshot.status.mmu.as_ref().and_then(|mmu| mmu.tool_to_gate.first().copied())
     };
     session.window.global::<Actions>().invoke_mmu_map_tool(0, 3);
@@ -179,7 +179,7 @@ pub(super) fn print_error(session: &mut Session) -> Result<(), String> {
 /// switch is pressed, with an encoder until its headroom is half used (`print-flowguard-stress`). Skipped without
 /// anything FlowGuard watches.
 pub(super) fn flowguard_stress(session: &mut Session) -> Result<(), String> {
-    let watched = |snapshot: &freakymate_core::Snapshot| {
+    let watched = |snapshot: &sailhand_core::Snapshot| {
         snapshot.status.mmu.as_ref().is_some_and(|mmu| mmu.flowguard.is_some() || mmu.encoder_headroom.is_some())
     };
     if !watched(&session.presenter.snapshot()) {
@@ -193,7 +193,7 @@ pub(super) fn flowguard_stress(session: &mut Session) -> Result<(), String> {
         .as_ref()
         .and_then(|mmu| mmu.flowguard.as_ref())
         .is_some_and(|flowguard| flowguard.tangle_threshold.is_some());
-    let stressed = |snapshot: &freakymate_core::Snapshot| {
+    let stressed = |snapshot: &sailhand_core::Snapshot| {
         snapshot.status.mmu.as_ref().is_some_and(|mmu| {
             let flowguard = mmu.flowguard.as_ref();
             flowguard.is_some_and(|flowguard| flowguard.boosting || flowguard.level != 0.0)

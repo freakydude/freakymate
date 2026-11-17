@@ -9,21 +9,21 @@ body:
         Thanks for reporting! The more of the fields below you fill in, the faster a bug can be fixed without follow-up questions.
         Issues in German are welcome too.
 
-        This form is for Happy Hare, AFC, tool changers and IDEX. FreakyMate only reads these systems and starts their commands; the question about Mainsail/Fluidd below helps to separate FreakyMate bugs from bugs in those projects.
+        This form is for Happy Hare, AFC, tool changers and IDEX. Sailhand only reads these systems and starts their commands; the question about Mainsail/Fluidd below helps to separate Sailhand bugs from bugs in those projects.
 
         Please search the existing issues first. Questions and help are best asked on [Discord](https://discord.gg/Ja2cxCcmJQ).
   - type: input
     id: version
     attributes:
-      label: FreakyMate version
-      description: Shown on the Settings page and at the top of `freakymate.log`.
+      label: Sailhand version
+      description: Shown on the Settings page and at the top of `sailhand.log`.
       placeholder: "0.5.1"
     validations:
       required: true
   - type: dropdown
     id: install
     attributes:
-      label: How was FreakyMate installed?
+      label: How was Sailhand installed?
       options:
         - install.sh
         - .deb package
@@ -71,7 +71,7 @@ body:
       description: If yes, the bug is likely in the other project. Please report it there as well (see the links on the new-issue page).
       options:
         - Yes, also there
-        - No, only in FreakyMate
+        - No, only in Sailhand
         - Not checked
     validations:
       required: true
@@ -91,7 +91,7 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
-      description: Numbered steps, starting from a fresh start of FreakyMate if possible.
+      description: Numbered steps, starting from a fresh start of Sailhand if possible.
       placeholder: |
         1. ...
         2. ...
@@ -112,11 +112,11 @@ body:
     attributes:
       label: Diagnostic report
       description: |
-        On the printer host run `~/freakymate/freakymate --report` (installed with `install.sh`) or `freakymate --report` (`.deb` package).
-        This writes `freakymate-report.json` to `printer_data/logs`, so you can download it in Mainsail or Fluidd under Machine → logs.
+        On the printer host run `~/sailhand/sailhand --report` (installed with `install.sh`) or `sailhand --report` (`.deb` package).
+        This writes `sailhand-report.json` to `printer_data/logs`, so you can download it in Mainsail or Fluidd under Machine → logs.
         Drag the file into this field (drag and drop).
 
-        The report contains versions, system and setup, the Klipper configuration and object status, the last console lines and what FreakyMate detects.
+        The report contains versions, system and setup, the Klipper configuration and object status, the last console lines and what Sailhand detects.
         It leaves out Moonraker's configuration (API keys, passwords), network addresses, host name, serial numbers and user names.
     validations:
       required: true
@@ -125,8 +125,8 @@ body:
     attributes:
       label: Verbose log and klippy.log
       description: |
-        Set `verbose_log = true` in `freakymate.conf` (Mainsail: Machine → config) and restart FreakyMate (`sudo systemctl restart freakymate`, with the `.deb` `sudo systemctl restart freakymate@<user>`).
-        Reproduce the bug once, then drag `freakymate.log` (Machine → logs) into this field. Set `verbose_log` back to `false` afterwards.
+        Set `verbose_log = true` in `sailhand.conf` (Mainsail: Machine → config) and restart Sailhand (`sudo systemctl restart sailhand`, with the `.deb` `sudo systemctl restart sailhand@<user>`).
+        Reproduce the bug once, then drag `sailhand.log` (Machine → logs) into this field. Set `verbose_log` back to `false` afterwards.
         Also attach `klippy.log` (required here), and `moonraker.log` when Moonraker shows errors.
     validations:
       required: true

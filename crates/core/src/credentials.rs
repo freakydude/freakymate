@@ -105,7 +105,7 @@ mod tests {
     /// A store in a folder that does not exist yet; the folder is removed when the returned guard is dropped.
     fn temporary_store() -> (tempfile::TempDir, CredentialStore) {
         let dir = tempfile::tempdir().unwrap();
-        let store = CredentialStore::new(dir.path().join("freakymate").join(FILE_NAME));
+        let store = CredentialStore::new(dir.path().join("sailhand").join(FILE_NAME));
         (dir, store)
     }
 

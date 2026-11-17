@@ -5,12 +5,12 @@
 use std::path::Path;
 
 /// Raise by one whenever `install.sh` or the Debian package set up something new outside the program folder, and note
-/// what below. 1: `--logfile` in the service, the settings file `freakymate.conf` (the program also finds it when an
-/// older service still passes `freakymate.json`), the backlight udev rule, the groups `video` and `i2c`.
+/// what below. 1: `--logfile` in the service, the settings file `sailhand.conf` (the program also finds it when an
+/// older service still passes `sailhand.json`), the backlight udev rule, the groups `video` and `i2c`.
 pub const SETUP_VERSION: u32 = 1;
 
 /// Written by `install.sh` and the Debian package: the setup version they set up.
-pub const MARKER_FILE: &str = "/etc/freakymate/setup-version";
+pub const MARKER_FILE: &str = "/etc/sailhand/setup-version";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SetupState {
@@ -37,9 +37,9 @@ impl SetupState {
     }
 }
 
-/// `<printer_data>/config/freakymate.conf` (before: `.json`), where `install.sh` and the Debian package put the settings.
+/// `<printer_data>/config/sailhand.conf` (before: `.json`), where `install.sh` and the Debian package put the settings.
 fn is_installer_settings_file(path: &Path) -> bool {
-    path.file_name().is_some_and(|name| name == "freakymate.conf" || name == "freakymate.json")
+    path.file_name().is_some_and(|name| name == "sailhand.conf" || name == "sailhand.json")
         && path.parent().and_then(Path::file_name).is_some_and(|folder| folder == "config")
 }
 
@@ -47,7 +47,7 @@ fn is_installer_settings_file(path: &Path) -> bool {
 mod tests {
     use super::*;
 
-    const INSTALLED: &str = "/home/pi/printer_data/config/freakymate.conf";
+    const INSTALLED: &str = "/home/pi/printer_data/config/sailhand.conf";
 
     #[test]
     fn the_marker_tells_the_installed_version() {
@@ -66,7 +66,7 @@ mod tests {
     fn without_marker_only_the_installer_layout_counts_as_outdated() {
         assert_eq!(SetupState::detect(None, Some(Path::new(INSTALLED))), SetupState::Outdated { installed: None });
         assert_eq!(
-            SetupState::detect(None, Some(Path::new("/home/me/.config/freakymate/settings.conf"))),
+            SetupState::detect(None, Some(Path::new("/home/me/.config/sailhand/settings.conf"))),
             SetupState::NotInstalled
         );
         assert_eq!(SetupState::detect(None, None), SetupState::NotInstalled);

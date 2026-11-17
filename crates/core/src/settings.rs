@@ -1,4 +1,4 @@
-//! User settings as a TOML file with the ending `.conf`, like `moonraker.conf` and the other non-Klipper files in `printer_data/config`. FreakyMate
+//! User settings as a TOML file with the ending `.conf`, like `moonraker.conf` and the other non-Klipper files in `printer_data/config`. Sailhand
 //! saves it by changing only the values that changed, so comments written by hand stay.
 
 use crate::atomic_file::write_atomically;
@@ -15,8 +15,8 @@ const EXTENSION: &str = "conf";
 /// Up to 0.3.8 the settings were JSON; such a file stays where it is and is no longer read.
 const OLD_EXTENSION: &str = "json";
 /// The top of a new settings file.
-const HEADER: &str = "# FreakyMate settings (TOML). Comments stay when FreakyMate saves a change.\n\
-# Documentation: https://github.com/freakydude/freakymate/blob/main/docs/configuration.md#settings-file\n\n";
+const HEADER: &str = "# Sailhand settings (TOML). Comments stay when Sailhand saves a change.\n\
+# Documentation: https://github.com/freakydude/sailhand/blob/main/docs/configuration.md#settings-file\n\n";
 /// Presets the Thermal page has room for beside the heaters.
 pub const MAX_SHOWN_PRESETS: usize = 4;
 
@@ -26,7 +26,7 @@ pub struct Settings {
     /// Address of the Moonraker server, e.g. `http://127.0.0.1:7125`.
     pub moonraker: String,
     pub fullscreen: bool,
-    /// Android: the screen stays on while FreakyMate is in front, like a touch screen at the printer.
+    /// Android: the screen stays on while Sailhand is in front, like a touch screen at the printer.
     pub keep_screen_on: bool,
     pub steps: Steps,
     /// The step sizes the UI offers; edited in the settings file only. Missing keys mean the defaults.
@@ -145,7 +145,7 @@ impl SettingsStore {
         Self { path }
     }
 
-    /// Default location: `<config dir>/freakymate/settings.conf`.
+    /// Default location: `<config dir>/sailhand/settings.conf`.
     pub fn default_location() -> Result<Self, SettingsError> {
         let directory = dirs::config_dir().ok_or(SettingsError::NoConfigDirectory)?;
         Ok(Self::new(directory.join(crate::config_folder()).join(FILE_NAME)))
@@ -253,7 +253,7 @@ mod tests {
     /// A store in a folder that does not exist yet; the folder is removed when the returned guard is dropped.
     fn temporary_store() -> (tempfile::TempDir, SettingsStore) {
         let dir = tempfile::tempdir().unwrap();
-        let store = SettingsStore::new(dir.path().join("freakymate").join(FILE_NAME));
+        let store = SettingsStore::new(dir.path().join("sailhand").join(FILE_NAME));
         (dir, store)
     }
 
@@ -271,7 +271,7 @@ mod tests {
         assert_eq!(store.load_or_create().unwrap(), Settings::default());
 
         let text = std::fs::read_to_string(store.path()).unwrap();
-        assert!(text.starts_with("# FreakyMate settings"));
+        assert!(text.starts_with("# Sailhand settings"));
         assert!(text.contains("[[temperature_presets]]"));
         assert_eq!(store.load().unwrap(), Settings::default());
     }
@@ -292,7 +292,7 @@ mod tests {
 
         let saved = std::fs::read_to_string(store.path()).unwrap();
         assert!(saved.contains("# satin PLA wants it hotter\nname = \"PLA\""));
-        assert!(saved.starts_with("# FreakyMate settings"));
+        assert!(saved.starts_with("# Sailhand settings"));
         assert_eq!(store.load().unwrap(), settings);
     }
 
@@ -309,13 +309,13 @@ mod tests {
     #[test]
     fn an_old_json_path_means_the_conf_next_to_it_and_the_json_stays() {
         let dir = tempfile::tempdir().unwrap();
-        let json = dir.path().join("freakymate.json");
+        let json = dir.path().join("sailhand.json");
         std::fs::write(&json, r#"{ "fullscreen": true }"#).unwrap();
 
         let store = SettingsStore::new(&json);
         store.load_or_create().unwrap();
 
-        assert_eq!(store.path(), dir.path().join("freakymate.conf"));
+        assert_eq!(store.path(), dir.path().join("sailhand.conf"));
         assert!(!store.load().unwrap().fullscreen);
         assert_eq!(std::fs::read_to_string(&json).unwrap(), r#"{ "fullscreen": true }"#);
     }

@@ -8,7 +8,7 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
-log_dir=$(mktemp -d "${TMPDIR:-/tmp}/freakymate-verify.XXXXXX")
+log_dir=$(mktemp -d "${TMPDIR:-/tmp}/sailhand-verify.XXXXXX")
 with_snapshot=false
 snapshot_arguments=()
 case "${1:-}" in
@@ -34,7 +34,7 @@ run_step() {
 run_step "cargo fmt --check" cargo fmt --all -- --check
 run_step "cargo clippy" cargo clippy --workspace --all-targets -- -D warnings
 run_step "cargo test" cargo test --workspace
-# The whole workspace, not only -p freakymate: the same features as the test run, so the UI crate is not compiled again.
+# The whole workspace, not only -p sailhand: the same features as the test run, so the UI crate is not compiled again.
 run_step "cargo build" cargo build --workspace --bins
 run_step "ui previews" scripts/ui-preview.sh
 # The AI skills are local (.claude/ is not in the repository); check them only where they exist.

@@ -71,7 +71,7 @@ pub(crate) fn hide_status_bar() {
     set_window_flag(WindowManagerFlags::FULLSCREEN, true);
 }
 
-/// Keeps Android's keyboard away: FreakyMate brings its own, as on the touch screen at the printer. With the flag the
+/// Keeps Android's keyboard away: Sailhand brings its own, as on the touch screen at the printer. With the flag the
 /// window does not interact with the input method (`WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM` on a focusable
 /// window); a hardware keyboard still types.
 pub(crate) fn hide_system_keyboard() {

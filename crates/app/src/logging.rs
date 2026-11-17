@@ -6,8 +6,8 @@
 //! after a rotation.
 
 use chrono::{Local, NaiveDate};
-use freakymate_core::HEADER_TARGET;
 use log::{Level, LevelFilter, Log, Metadata, Record};
+use sailhand_core::HEADER_TARGET;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -125,7 +125,7 @@ impl Logger {
         match &self.filter {
             Some(filter) => filter.enabled(metadata),
             None => {
-                let verbose = self.verbose.load(Ordering::Relaxed) && metadata.target().starts_with("freakymate");
+                let verbose = self.verbose.load(Ordering::Relaxed) && metadata.target().starts_with("sailhand");
                 metadata.level() <= if verbose { Level::Debug } else { Level::Info }
             }
         }
@@ -197,7 +197,7 @@ fn format_line(stamp: &str, level: Level, target: &str, text: &str) -> String {
 fn spawn_writer(path: PathBuf, header: Vec<(String, String)>) -> io::Result<SyncSender<Message>> {
     let today = Local::now().date_naive();
     let mut file = RotatingFile::open(path, today, OLD_FILES_KEPT)?;
-    file.write_banner("FreakyMate log started", &Local::now().format(STAMP_FORMAT).to_string(), &header)?;
+    file.write_banner("Sailhand log started", &Local::now().format(STAMP_FORMAT).to_string(), &header)?;
     let (sender, receiver) = mpsc::sync_channel(QUEUE_LENGTH);
     thread::Builder::new().name("log-writer".to_owned()).spawn(move || write_all(file, header, receiver))?;
     Ok(sender)
@@ -265,7 +265,7 @@ impl RotatingFile {
             rotate(&self.path, self.day, self.old_files_kept)?;
             self.file = open_append(&self.path)?;
             self.day = day;
-            self.write_banner("FreakyMate log continued", stamp, header)?;
+            self.write_banner("Sailhand log continued", stamp, header)?;
         }
         self.file.write_all(text.as_bytes())
     }
@@ -357,8 +357,8 @@ mod tests {
 
     #[test]
     fn formats_like_moonraker_with_the_level() {
-        let line = format_line("2026-11-02 14:03:12,345", Level::Warn, "freakymate_core::service", "lost");
-        assert_eq!(line, "2026-11-02 14:03:12,345 WARN [freakymate_core::service] - lost\n");
+        let line = format_line("2026-11-02 14:03:12,345", Level::Warn, "sailhand_core::service", "lost");
+        assert_eq!(line, "2026-11-02 14:03:12,345 WARN [sailhand_core::service] - lost\n");
     }
 
     #[test]
@@ -376,29 +376,29 @@ mod tests {
     #[test]
     fn starts_with_the_header_and_appends_after_a_restart() {
         let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("logs").join("freakymate.log");
+        let path = directory.path().join("logs").join("sailhand.log");
         let header = vec![("Version".to_owned(), "1.0".to_owned())];
         for _ in 0..2 {
             let mut file = RotatingFile::open(path.clone(), day("2026-11-02"), 3).unwrap();
-            file.write_banner("FreakyMate log started", "t", &header).unwrap();
+            file.write_banner("Sailhand log started", "t", &header).unwrap();
         }
         let text = fs::read_to_string(&path).unwrap();
-        assert_eq!(text.matches("---- FreakyMate log started ----").count(), 2);
+        assert_eq!(text.matches("---- Sailhand log started ----").count(), 2);
         assert_eq!(text.matches("[header] - Version: 1.0").count(), 2);
     }
 
     #[test]
     fn rotates_at_midnight_and_repeats_the_header() {
         let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("freakymate.log");
+        let path = directory.path().join("sailhand.log");
         let header = vec![("Version".to_owned(), "1.0".to_owned())];
         let mut file = RotatingFile::open(path.clone(), day("2026-11-02"), 3).unwrap();
         file.write_line(day("2026-11-02"), "t", "evening\n", &header).unwrap();
         file.write_line(day("2026-11-03"), "t", "morning\n", &header).unwrap();
-        let old = fs::read_to_string(directory.path().join("freakymate.log.2026-11-02")).unwrap();
+        let old = fs::read_to_string(directory.path().join("sailhand.log.2026-11-02")).unwrap();
         assert_eq!(old, "evening\n");
         let current = fs::read_to_string(&path).unwrap();
-        assert!(current.contains("---- FreakyMate log continued ----"));
+        assert!(current.contains("---- Sailhand log continued ----"));
         assert!(current.contains("Version: 1.0"));
         assert!(current.ends_with("morning\n"));
     }
@@ -406,7 +406,7 @@ mod tests {
     #[test]
     fn rotates_a_file_from_an_earlier_day_when_opening() {
         let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("freakymate.log");
+        let path = directory.path().join("sailhand.log");
         fs::write(&path, "old\n").unwrap();
         let tomorrow = Local::now().date_naive().succ_opt().unwrap();
         RotatingFile::open(path.clone(), tomorrow, 3).unwrap();
@@ -418,7 +418,7 @@ mod tests {
     #[test]
     fn keeps_only_the_newest_old_files() {
         let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("freakymate.log");
+        let path = directory.path().join("sailhand.log");
         for old in ["2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"] {
             fs::write(dated_name(&path, day(old)), old).unwrap();
         }
@@ -427,12 +427,7 @@ mod tests {
         rotate(&path, day("2026-11-02"), 3).unwrap();
         assert_eq!(
             names(directory.path()),
-            [
-                "freakymate.log.2026-10-31",
-                "freakymate.log.2026-11-01",
-                "freakymate.log.2026-11-02",
-                "other.log.2026-10-01"
-            ]
+            ["other.log.2026-10-01", "sailhand.log.2026-10-31", "sailhand.log.2026-11-01", "sailhand.log.2026-11-02"]
         );
     }
 
@@ -451,19 +446,19 @@ mod tests {
     fn verbose_raises_only_the_programs_modules() {
         let logger = Logger::new(None, None);
         let metadata = |target| Metadata::builder().level(Level::Debug).target(target).build();
-        assert!(!logger.wanted(&metadata("freakymate_core::service")));
+        assert!(!logger.wanted(&metadata("sailhand_core::service")));
         logger.verbose.store(true, Ordering::Relaxed);
-        assert!(logger.wanted(&metadata("freakymate_core::service")));
+        assert!(logger.wanted(&metadata("sailhand_core::service")));
         assert!(!logger.wanted(&metadata("hyper::client")));
         assert_eq!(logger.max_level(), LevelFilter::Debug);
     }
 
     #[test]
     fn rust_log_has_the_say() {
-        let logger = Logger::new(None, Some("warn,freakymate_core=trace"));
+        let logger = Logger::new(None, Some("warn,sailhand_core=trace"));
         logger.verbose.store(false, Ordering::Relaxed);
         let metadata = |target| Metadata::builder().level(Level::Trace).target(target).build();
-        assert!(logger.wanted(&metadata("freakymate_core")));
+        assert!(logger.wanted(&metadata("sailhand_core")));
         assert!(!logger.wanted(&metadata("hyper")));
     }
 }

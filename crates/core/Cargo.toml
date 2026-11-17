@@ -1,6 +1,6 @@
 [package]
-name = "freakymate-core"
-description = "UI-independent Moonraker client, printer state and settings for freakymate"
+name = "sailhand-core"
+description = "UI-independent Moonraker client, printer state and settings for sailhand"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

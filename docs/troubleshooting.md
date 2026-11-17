@@ -5,20 +5,20 @@ open an issue with the diagnostic report and the verbose log (see [Bug reports](
 
 ## Where is the log?
 
-`printer_data/logs/freakymate.log`, next to `klippy.log`; Mainsail and Fluidd list it under Machine → logs. The
+`printer_data/logs/sailhand.log`, next to `klippy.log`; Mainsail and Fluidd list it under Machine → logs. The
 service also writes to the journal:
 
 ```bash
-systemctl status freakymate                 # installed with install.sh
-journalctl -u freakymate -b                 # this boot; with the .deb: freakymate@<user>
+systemctl status sailhand                 # installed with install.sh
+journalctl -u sailhand -b                 # this boot; with the .deb: sailhand@<user>
 ```
 
 For more detail switch on `verbose_log` (see [Log](configuration.md#log)).
 
 ## The display stays black or shows the text console
 
-- Check that the service runs: `systemctl status freakymate`, and read the end of the log.
-- Changed the display after installing? Run `~/freakymate/install.sh` again; it chooses between the normal kiosk
+- Check that the service runs: `systemctl status sailhand`, and read the end of the log.
+- Changed the display after installing? Run `~/sailhand/install.sh` again; it chooses between the normal kiosk
   (`cage`, needs `/dev/dri/card*`) and the framebuffer fallback for displays without DRM/KMS (see
   [Install](install.md#framebuffer-fallback)).
 - Something else on `tty1`? The installer disables the login console there; a second kiosk (for example a Debian
@@ -41,9 +41,9 @@ The layout is made for 800x480 and scaled to other sizes in fullscreen. `SLINT_S
 
 ## Touch is rotated or off
 
-FreakyMate has no setting for touch rotation yet; the [framebuffer fallback](install.md#framebuffer-fallback) says what
+Sailhand has no setting for touch rotation yet; the [framebuffer fallback](install.md#framebuffer-fallback) says what
 applies there. Please tell me your display on Discord or in a
-[hardware support issue](https://github.com/freakydude/freakymate/issues/new/choose).
+[hardware support issue](https://github.com/freakydude/sailhand/issues/new/choose).
 
 ## A function is missing
 
@@ -57,8 +57,8 @@ Functions only appear when the printer has them. Some common cases:
 - **Happy Hare** needs version 4.1 or newer; with an older one the screen shows a notice instead of the gates.
 - **Load and unload** buttons need the macros `LOAD_FILAMENT` and `UNLOAD_FILAMENT` (see [Macros](printer-setup.md#macros)).
 
-## FreakyMate is missing from the update list
+## Sailhand is missing from the update list
 
-The installer adds `[update_manager freakymate]` to `moonraker.conf`. If your `moonraker.conf` lives elsewhere, add
+The installer adds `[update_manager sailhand]` to `moonraker.conf`. If your `moonraker.conf` lives elsewhere, add
 the section by hand (see [Updates and channels](install.md#updates-and-channels)). When an update needs more than the
-program folder, the Updates tab of the System page says so: run `~/freakymate/install.sh` once.
+program folder, the Updates tab of the System page says so: run `~/sailhand/install.sh` once.

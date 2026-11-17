@@ -4,8 +4,8 @@
 use crate::bed_mesh_view;
 use crate::items::replace_rows;
 use crate::{BedMeshMap, EddyValue, MeshCellItem, MeshFrameItem, Printer, ScrewItem};
-use freakymate_core::domain::manual_probe::{Direction, Heights, ProbeSteps};
-use freakymate_core::sources::klipper::{
+use sailhand_core::domain::manual_probe::{Direction, Heights, ProbeSteps};
+use sailhand_core::sources::klipper::{
     BedMesh, CalibrationMode, CalibrationState, EddyOption, EddyProbe, PendingSection, ScrewAdjustment, Setup,
     tap_height_fits,
 };

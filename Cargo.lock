@@ -1517,67 +1517,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "freakymate"
-version = "0.0.0"
-dependencies = [
- "android_logger",
- "chrono",
- "clap",
- "embed-resource",
- "env_filter 2.0.0",
- "freakymate-core",
- "freakymate-ui",
- "input",
- "jni 0.22.4",
- "libc",
- "log",
- "memmap2",
- "slint",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "xcursor",
-]
-
-[[package]]
-name = "freakymate-android"
-version = "0.0.0"
-dependencies = [
- "android-activity 0.6.1",
- "freakymate",
- "slint",
-]
-
-[[package]]
-name = "freakymate-core"
-version = "0.0.0"
-dependencies = [
- "dirs",
- "fake-moonraker",
- "futures-util",
- "image",
- "log",
- "reqwest",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tokio-tungstenite 0.30.0",
- "toml",
- "toml_edit",
- "zbus",
-]
-
-[[package]]
-name = "freakymate-ui"
-version = "0.0.0"
-dependencies = [
- "slint",
- "slint-build",
-]
-
-[[package]]
 name = "futures"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4257,6 +4196,67 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
+name = "sailhand"
+version = "0.0.0"
+dependencies = [
+ "android_logger",
+ "chrono",
+ "clap",
+ "embed-resource",
+ "env_filter 2.0.0",
+ "input",
+ "jni 0.22.4",
+ "libc",
+ "log",
+ "memmap2",
+ "sailhand-core",
+ "sailhand-ui",
+ "slint",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "xcursor",
+]
+
+[[package]]
+name = "sailhand-android"
+version = "0.0.0"
+dependencies = [
+ "android-activity 0.6.1",
+ "sailhand",
+ "slint",
+]
+
+[[package]]
+name = "sailhand-core"
+version = "0.0.0"
+dependencies = [
+ "dirs",
+ "fake-moonraker",
+ "futures-util",
+ "image",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-tungstenite 0.30.0",
+ "toml",
+ "toml_edit",
+ "zbus",
+]
+
+[[package]]
+name = "sailhand-ui"
+version = "0.0.0"
+dependencies = [
+ "slint",
+ "slint-build",
+]
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5286,9 +5286,9 @@ dependencies = [
 name = "ui-snapshot"
 version = "0.0.0"
 dependencies = [
- "freakymate",
- "freakymate-core",
  "image",
+ "sailhand",
+ "sailhand-core",
  "slint",
  "tokio",
 ]

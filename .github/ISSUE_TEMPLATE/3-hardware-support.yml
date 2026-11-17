@@ -1,5 +1,5 @@
 name: Support for new hardware
-description: Ask FreakyMate to support an MMU, tool changer, buffer, sensor or other hardware
+description: Ask Sailhand to support an MMU, tool changer, buffer, sensor or other hardware
 title: "[Hardware]: "
 labels: [hardware-support, needs-triage]
 body:
@@ -8,7 +8,7 @@ body:
       value: |
         Issues in German are welcome too. Please search the existing issues first. Questions and help are best asked on [Discord](https://discord.gg/Ja2cxCcmJQ).
 
-        FreakyMate is tested against simulated printers built from diagnostic reports. Testers with real hardware make support possible.
+        Sailhand is tested against simulated printers built from diagnostic reports. Testers with real hardware make support possible.
   - type: dropdown
     id: kind
     attributes:
@@ -40,8 +40,8 @@ body:
     attributes:
       label: Diagnostic report
       description: |
-        On the printer host run `~/freakymate/freakymate --report` (installed with `install.sh`) or `freakymate --report` (`.deb` package).
-        This writes `freakymate-report.json` to `printer_data/logs`, so you can download it in Mainsail or Fluidd under Machine → logs.
+        On the printer host run `~/sailhand/sailhand --report` (installed with `install.sh`) or `sailhand --report` (`.deb` package).
+        This writes `sailhand-report.json` to `printer_data/logs`, so you can download it in Mainsail or Fluidd under Machine → logs.
         Drag the file into this field (drag and drop). The report lets us build a simulated printer from it.
     validations:
       required: true

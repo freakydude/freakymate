@@ -3,7 +3,7 @@
 use crate::items::replace_rows;
 use crate::status_log::{StatusLog, display_time};
 use crate::{AppWindow, MessageItem, Printer, format};
-use freakymate_core::sources::moonraker_server::gcode_store::ConsoleLine;
+use sailhand_core::sources::moonraker_server::gcode_store::ConsoleLine;
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use std::cell::RefCell;
 use std::rc::Rc;

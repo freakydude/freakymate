@@ -1,5 +1,5 @@
-//! The diagnostic report for a bug report (`freakymate --report`): what Moonraker and Klipper tell about this printer
-//! and what FreakyMate detects in it, as one JSON file. It is the state at one moment; the verbose log tells what led
+//! The diagnostic report for a bug report (`sailhand --report`): what Moonraker and Klipper tell about this printer
+//! and what Sailhand detects in it, as one JSON file. It is the state at one moment; the verbose log tells what led
 //! there.
 //!
 //! The report only reads. It leaves out what is secret or personal: Moonraker's configuration (API keys, passwords),
@@ -20,11 +20,11 @@ use std::time::Duration;
 use thiserror::Error;
 
 /// Name of the report file.
-pub const FILE_NAME: &str = "freakymate-report.json";
+pub const FILE_NAME: &str = "sailhand-report.json";
 /// Raised when the layout of the report changes, so a reader knows what to expect.
 const FORMAT_VERSION: u32 = 1;
 /// The settings as the installer places them, relative to the home folder; the service is started with this path.
-const INSTALLED_SETTINGS: &str = "printer_data/config/freakymate.conf";
+const INSTALLED_SETTINGS: &str = "printer_data/config/sailhand.conf";
 const CALL_TIMEOUT: Duration = Duration::from_secs(10);
 /// Lines of Klipper's console in the report, the newest ones.
 const CONSOLE_LINES: u32 = 100;
@@ -55,7 +55,7 @@ const UPDATE_FIELDS: &[&str] = &[
 const CPU_FIELDS: &[&str] =
     &["cpu_count", "bits", "processor", "cpu_desc", "hardware_desc", "model", "total_memory", "memory_units"];
 
-/// What `freakymate --report` was asked for.
+/// What `sailhand --report` was asked for.
 #[derive(Debug, Default)]
 pub struct ReportRequest {
     /// Moonraker's address; the saved setting otherwise.
@@ -88,19 +88,19 @@ pub async fn write(request: ReportRequest) -> Result<PathBuf, ReportError> {
         Settings::default()
     });
     let endpoint = Endpoint::parse(request.moonraker.as_deref().unwrap_or(&settings.moonraker))?;
-    let freakymate = freakymate_section(&request.facts, &store, &settings);
-    let report = collect(&endpoint, &CredentialStore::default_location(), freakymate).await?;
+    let sailhand = sailhand_section(&request.facts, &store, &settings);
+    let report = collect(&endpoint, &CredentialStore::default_location(), sailhand).await?;
     let path = output_path(request.output.as_deref(), store.path(), Path::new("."));
     let text = serde_json::to_string_pretty(&report).unwrap_or_default();
     std::fs::write(&path, text).map_err(|source| ReportError::Write { path: path.clone(), source })?;
     Ok(path)
 }
 
-/// The report of the printer behind `endpoint`, with `freakymate` as what this program says about itself.
+/// The report of the printer behind `endpoint`, with `sailhand` as what this program says about itself.
 pub async fn collect(
     endpoint: &Endpoint,
     credentials: &CredentialStore,
-    freakymate: Value,
+    sailhand: Value,
 ) -> Result<Value, ReportError> {
     let url = endpoint.websocket_url();
     let connect_failed = |reason: String| ReportError::Connect { url: url.clone(), reason };
@@ -137,7 +137,7 @@ pub async fn collect(
 
     Ok(json!({
         "format": FORMAT_VERSION,
-        "freakymate": freakymate,
+        "sailhand": sailhand,
         "moonraker": {
             "address": endpoint.display(),
             "access": access_kind(&access),
@@ -193,7 +193,7 @@ fn settings_store(explicit: Option<PathBuf>) -> SettingsStore {
     }
 }
 
-fn freakymate_section(facts: &[(String, String)], store: &SettingsStore, settings: &Settings) -> Value {
+fn sailhand_section(facts: &[(String, String)], store: &SettingsStore, settings: &Settings) -> Value {
     let mut section: Map<String, Value> =
         facts.iter().map(|(name, value)| (name.clone(), Value::String(value.clone()))).collect();
     section.insert("Settings file".to_owned(), json!(store.path().display().to_string()));
@@ -258,7 +258,7 @@ fn without_raw_config(answer: &Value) -> Value {
     status
 }
 
-/// What FreakyMate makes of the printer: the detected sources and the tree of carriages, heads, nozzles and lanes.
+/// What Sailhand makes of the printer: the detected sources and the tree of carriages, heads, nozzles and lanes.
 fn detected(names: &[String], components: &[String], status: &Value, help: Option<&Value>) -> Value {
     let mut sources = Sources::detect(names, ServerComponents::from_names(components.iter().map(String::as_str)));
     sources.apply_settings(status.pointer("/configfile/settings"));
@@ -329,12 +329,12 @@ mod tests {
         let data = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(data.path().join("config")).unwrap();
         std::fs::create_dir_all(data.path().join("logs")).unwrap();
-        let settings = data.path().join("config/freakymate.conf");
+        let settings = data.path().join("config/sailhand.conf");
         let current = Path::new("/somewhere");
         assert_eq!(output_path(None, &settings, current), data.path().join("logs").join(FILE_NAME));
         // Settings elsewhere: the current folder.
         assert_eq!(
-            output_path(None, Path::new("/home/x/.config/freakymate/settings.conf"), current),
+            output_path(None, Path::new("/home/x/.config/sailhand/settings.conf"), current),
             current.join(FILE_NAME)
         );
         // A given folder gets the file name, a given file stays.

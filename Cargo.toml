@@ -16,13 +16,13 @@ default-members = ["crates/app"]
 version = "0.0.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/freakydude/freakymate"
+repository = "https://github.com/freakydude/sailhand"
 rust-version = "1.95"
 
 [workspace.dependencies]
-freakymate-core = { path = "crates/core" }
-freakymate-ui = { path = "crates/ui" }
-freakymate = { path = "crates/app" }
+sailhand-core = { path = "crates/core" }
+sailhand-ui = { path = "crates/ui" }
+sailhand = { path = "crates/app" }
 fake-moonraker = { path = "fake-moonraker" }
 futures-util = { version = "0.3.34", default-features = false, features = [
     "sink",

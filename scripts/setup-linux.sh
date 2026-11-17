@@ -71,7 +71,7 @@ if grep -qsi microsoft /proc/version && [[ $root == /mnt/* ]]; then
 fi
 
 if [[ $missing -eq 0 ]]; then
-    echo "Done. Next: scripts/ui-preview.sh, scripts/ui-snapshot.sh, cargo run -p freakymate"
+    echo "Done. Next: scripts/ui-preview.sh, scripts/ui-snapshot.sh, cargo run -p sailhand"
 else
     echo "$missing item(s) missing, see above." >&2
     exit 1

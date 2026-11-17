@@ -1,4 +1,4 @@
-//! Macros of mainsail-config (`client.cfg`, optional) that FreakyMate calls. Macros are black boxes: they are called
+//! Macros of mainsail-config (`client.cfg`, optional) that Sailhand calls. Macros are black boxes: they are called
 //! by name with their documented parameters, and nothing is assumed about what they do inside. The one thing read
 //! back is the plan of the layer pause macros: the variables `pause_next_layer` and `pause_at_layer` of their
 //! `SET_PRINT_STATS_INFO`, only if they exist in the expected form (Frank, 2026-10-31).

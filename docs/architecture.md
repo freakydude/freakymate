@@ -7,17 +7,17 @@ what the printer has only decides whether a step is offered.
 
 ```mermaid
 flowchart LR
-    subgraph ui [crates/ui – freakymate-ui]
+    subgraph ui [crates/ui – sailhand-ui]
         UI[ui/*.slint<br/>pages, components, globals]
     end
-    subgraph app [crates/app – freakymate]
+    subgraph app [crates/app – sailhand]
         P[presenter.rs<br/>state → globals]
         A[actions.rs<br/>callbacks → Command]
         S[settings_controller.rs]
         N[network_controller.rs]
         V[view.rs / format.rs<br/>pure derivations]
     end
-    subgraph core [crates/core – freakymate-core]
+    subgraph core [crates/core – sailhand-core]
         SVC[service/<br/>PrinterService, only collects]
         CMD[commands/<br/>Command → source]
         DOM[domain/*<br/>questions across sources]
@@ -47,7 +47,7 @@ flowchart LR
 | -------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `crates/core`        | Connection, the sources of the printer, questions across them, commands, settings. No UI code.    | tokio, tokio-tungstenite, reqwest, serde |
 | `crates/ui`          | Slint UI (`ui/*.slint`) compiled to Rust. Kept free of the core, so core changes do not recompile it. | slint                                    |
-| `crates/app`         | Binding of the UI to the core; binary `freakymate` (the only shipped program).                    | core, ui, slint                          |
+| `crates/app`         | Binding of the UI to the core; binary `sailhand` (the only shipped program).                    | core, ui, slint                          |
 | `crates/ui-snapshot` | Development tool: renders the UI headless to PNG against a running (fake) Moonraker, in scenes.   | app, core                                |
 | `crates/icon-index`  | Checks `assets/icons` and generates `crates/ui/ui/icons.slint` and `assets/icons/overview.html`. | –                                        |
 | `fake-moonraker`     | Simulated Moonraker/Klipper for development and tests (profiles `basic`, `voron`, `happy-hare`, `ercf`).  | axum, tokio                              |
@@ -141,7 +141,7 @@ history).
    trusts the machine anyway is dropped for that connection. An authorized connection asks `server.info` every 30 s,
    because Moonraker sends nothing to a connection whose user logged out elsewhere, not even the logout. Thumbnails
    over HTTP get a one-time token (`access.oneshot_token`, `?token=`). The credentials stay in
-   `~/.config/freakymate/credentials.json` (mode 0600) also when the settings lie in `printer_data/config`, which
+   `~/.config/sailhand/credentials.json` (mode 0600) also when the settings lie in `printer_data/config`, which
    Moonraker serves and which is often backed up to git.
 8. Network: `NetworkService` (own task, `NetworkCommand` in, `NetworkState`/`NetworkNotice` out) uses the backend
    `networkmanager.rs` (zbus, only compiled on Linux) or `simulated.rs` (feature `dev-mode`: `--simulate-network`, tests). The
@@ -191,7 +191,7 @@ history).
   the one winit event filter (`app::watch_window_events`): Slint keeps only one per window. Responsive layouts for
   7" and 4.3" displays are planned.
 - No mouse pointer in the kiosk (`--fullscreen`, as both services start it): `kiosk_pointer.rs` writes a cursor theme
-  of transparent pointers to `$XDG_RUNTIME_DIR/freakymate-cursors` and sets `XCURSOR_PATH`/`XCURSOR_THEME` before the
+  of transparent pointers to `$XDG_RUNTIME_DIR/sailhand-cursors` and sets `XCURSOR_PATH`/`XCURSOR_THEME` before the
   window exists. Hiding the pointer through the window does not last, because Slint shows it again with every change
   of the pointer shape, and a tap is a pointer event to Slint. cage hides its pointer by itself only when no pointing
   device is attached; the BTT HDMI5 also registers as a mouse. On the desktop, in a window and in fullscreen switched

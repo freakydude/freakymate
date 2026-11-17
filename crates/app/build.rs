@@ -6,16 +6,16 @@ fn main() {
     }
 }
 
-/// Embeds the app icon into `freakymate.exe` (Explorer, taskbar, shortcuts), with rc.exe (MSVC) or windres (GNU).
+/// Embeds the app icon into `sailhand.exe` (Explorer, taskbar, shortcuts), with rc.exe (MSVC) or windres (GNU).
 fn embed_windows_icon() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("cargo sets CARGO_MANIFEST_DIR");
-    let icon = Path::new(&manifest_dir).join("../../assets/logo/freakymate.ico");
-    let icon = icon.canonicalize().expect("assets/logo/freakymate.ico must exist");
+    let icon = Path::new(&manifest_dir).join("../../assets/logo/sailhand.ico");
+    let icon = icon.canonicalize().expect("assets/logo/sailhand.ico must exist");
     println!("cargo:rerun-if-changed={}", icon.display());
 
     // Written with an absolute path, so neither compiler depends on its working directory; rc accepts "/".
     let out_dir = std::env::var("OUT_DIR").expect("cargo sets OUT_DIR");
-    let resource = Path::new(&out_dir).join("freakymate.rc");
+    let resource = Path::new(&out_dir).join("sailhand.rc");
     let icon_path = icon.to_string_lossy().replace('\\', "/");
     let icon_path = icon_path.strip_prefix("//?/").unwrap_or(&icon_path);
     std::fs::write(&resource, format!("1 ICON \"{icon_path}\"\n")).expect("OUT_DIR must be writable");

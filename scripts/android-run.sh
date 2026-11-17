@@ -1,14 +1,14 @@
 #!/bin/bash
-# Builds FreakyMate for Android, installs it on the emulator (or a connected device) and shows its log until stopped.
+# Builds Sailhand for Android, installs it on the emulator (or a connected device) and shows its log until stopped.
 #   scripts/android-run.sh            keeps the app's saved settings
 #   scripts/android-run.sh --fresh    clears them first: the app starts with the default address 127.0.0.1:7125,
 #                                     which `adb reverse` leads to the fake Moonraker on this machine
 # Needs ANDROID_HOME (SDK with the NDK of android/app/build.gradle.kts), cargo-ndk and the Rust target of the device
-# (x86_64-linux-android for the emulator). Without a device it starts the AVD $FREAKYMATE_AVD (default freakymate-test).
+# (x86_64-linux-android for the emulator). Without a device it starts the AVD $SAILHAND_AVD (default sailhand-test).
 set -euo pipefail
 
-# A local build is always the app FreakyMate Dev (flavor dev), beside an installed FreakyMate.
-readonly package=de.freakydu.freakymate.dev
+# A local build is always the app Sailhand Dev (flavor dev), beside an installed Sailhand.
+readonly package=de.freakydu.sailhand.dev
 readonly moonraker_port=7125
 fresh=false
 case "${1:-}" in
@@ -32,8 +32,8 @@ ndk_version=$(sed -n 's/^ *ndkVersion = "\(.*\)"/\1/p' "$repo/android/app/build.
 export ANDROID_NDK_HOME=$sdk/ndk/$ndk_version
 
 start_emulator() {
-  local avd=${FREAKYMATE_AVD:-freakymate-test}
-  local log=${TMPDIR:-/tmp}/freakymate-emulator.log
+  local avd=${SAILHAND_AVD:-sailhand-test}
+  local log=${TMPDIR:-/tmp}/sailhand-emulator.log
   echo "starting the emulator $avd (log: $log)"
   nohup "$sdk/emulator/emulator" -avd "$avd" >"$log" 2>&1 &
   "$adb" wait-for-device
@@ -47,13 +47,13 @@ fi
 abi=$("$adb" shell getprop ro.product.cpu.abi | tr -d '\r')
 version=$(bash "$repo/.github/scripts/version.sh")
 # The program shows it (crates/core VERSION), as in CI.
-export FREAKYMATE_VERSION=$version
+export SAILHAND_VERSION=$version
 echo "building $version for $abi"
 (cd "$repo/android" && ./gradlew -q assembleDevRelease "-PappVersion=$version" "-Pabis=$abi")
-apk=$repo/android/app/build/outputs/apk/dev/release/freakymate-$version-$abi-dev-release.apk
+apk=$repo/android/app/build/outputs/apk/dev/release/sailhand-$version-$abi-dev-release.apk
 
 if ! "$adb" install -r "$apk"; then
-  echo "install failed; FreakyMate Dev from another machine or from CI (other debug key) must be uninstalled first:" >&2
+  echo "install failed; Sailhand Dev from another machine or from CI (other debug key) must be uninstalled first:" >&2
   echo "  $adb uninstall $package" >&2
   exit 1
 fi
@@ -66,5 +66,5 @@ fi
 pid=$("$adb" shell pidof "$package" | tr -d '\r')
 [ -n "$pid" ] || { echo "the app did not start; see: $adb logcat" >&2; exit 1; }
 trap '"$adb" shell am force-stop "$package"' EXIT
-echo "FreakyMate runs (pid $pid); stop with Ctrl+C or the stop button of the debugger"
+echo "Sailhand runs (pid $pid); stop with Ctrl+C or the stop button of the debugger"
 "$adb" logcat -v time --pid="$pid"

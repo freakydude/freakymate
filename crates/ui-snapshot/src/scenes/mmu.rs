@@ -1,9 +1,9 @@
 //! Gates, tools, groups, bypass and service tab of the MMU, and the filament path.
 
 use crate::session::Session;
-use freakymate::{Actions, ChangerTab, FilamentTab, MmuDialogs, Navigation, Page, Printer};
-use freakymate_core::Command;
-use freakymate_core::sources::happy_hare::ServoPosition;
+use sailhand::{Actions, ChangerTab, FilamentTab, MmuDialogs, Navigation, Page, Printer};
+use sailhand_core::Command;
+use sailhand_core::sources::happy_hare::ServoPosition;
 use slint::ComponentHandle;
 use std::time::Duration;
 
@@ -171,7 +171,7 @@ pub(super) fn mmu_gate(session: &mut Session) -> Result<(), String> {
 /// The filament path during a load: the fake holds the filament in the bowden, then lets it go back to the gate.
 pub(super) fn filament_path_midway(session: &mut Session) -> Result<(), String> {
     let at = |position: i32| {
-        move |snapshot: &freakymate_core::Snapshot| {
+        move |snapshot: &sailhand_core::Snapshot| {
             snapshot.status.mmu.as_ref().is_some_and(|mmu| mmu.filament_pos == position)
         }
     };

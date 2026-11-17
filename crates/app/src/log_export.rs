@@ -33,9 +33,9 @@ fn read(current: &Path, now: NaiveDateTime) -> io::Result<LogExport> {
     Ok(LogExport { file_name: file_name(now), content: combine(&parts) })
 }
 
-/// `freakymate-log-20261117-153000.txt`
+/// `sailhand-log-20261117-153000.txt`
 fn file_name(now: NaiveDateTime) -> String {
-    format!("freakymate-log-{}.txt", now.format("%Y%m%d-%H%M%S"))
+    format!("sailhand-log-{}.txt", now.format("%Y%m%d-%H%M%S"))
 }
 
 /// The rotated files by day, then the current one; a missing current file (nothing written yet) is left out.
@@ -73,7 +73,7 @@ mod tests {
 
     #[test]
     fn the_name_carries_the_time() {
-        assert_eq!(file_name(moment()), "freakymate-log-20261117-153000.txt");
+        assert_eq!(file_name(moment()), "sailhand-log-20261117-153000.txt");
     }
 
     #[test]
@@ -86,25 +86,25 @@ mod tests {
     #[test]
     fn old_files_come_first_in_the_order_of_their_days() {
         let directory = tempfile::tempdir().unwrap();
-        let current = directory.path().join("freakymate.log");
+        let current = directory.path().join("sailhand.log");
         fs::write(&current, "now\n").unwrap();
-        fs::write(directory.path().join("freakymate.log.2026-11-16"), "later\n").unwrap();
-        fs::write(directory.path().join("freakymate.log.2026-11-09"), "earlier\n").unwrap();
+        fs::write(directory.path().join("sailhand.log.2026-11-16"), "later\n").unwrap();
+        fs::write(directory.path().join("sailhand.log.2026-11-09"), "earlier\n").unwrap();
         fs::write(directory.path().join("other.log"), "unrelated\n").unwrap();
         let export = read(&current, moment()).unwrap();
         let text = String::from_utf8(export.content).unwrap();
         assert_eq!(
             text,
-            "===== freakymate.log.2026-11-09 =====\nearlier\n===== freakymate.log.2026-11-16 =====\nlater\n\
-             ===== freakymate.log =====\nnow\n"
+            "===== sailhand.log.2026-11-09 =====\nearlier\n===== sailhand.log.2026-11-16 =====\nlater\n\
+             ===== sailhand.log =====\nnow\n"
         );
-        assert_eq!(export.file_name, "freakymate-log-20261117-153000.txt");
+        assert_eq!(export.file_name, "sailhand-log-20261117-153000.txt");
     }
 
     #[test]
     fn a_missing_current_file_is_left_out() {
         let directory = tempfile::tempdir().unwrap();
-        let current = directory.path().join("freakymate.log");
+        let current = directory.path().join("sailhand.log");
         assert!(files_oldest_first(&current).is_empty());
     }
 }

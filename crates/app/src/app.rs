@@ -8,10 +8,10 @@ use crate::network_controller::NetworkController;
 use crate::presenter::Presenter;
 use crate::settings_controller::{Bridges, SettingsController};
 use crate::{AppWindow, UiSettings};
-use freakymate_core::backlight::{BacklightBackend, BacklightService};
-use freakymate_core::network::{NetworkBackend, NetworkService};
-use freakymate_core::settings::{SettingsError, SettingsStore};
-use freakymate_core::{CredentialStore, Endpoint, PrinterService};
+use sailhand_core::backlight::{BacklightBackend, BacklightService};
+use sailhand_core::network::{NetworkBackend, NetworkService};
+use sailhand_core::settings::{SettingsError, SettingsStore};
+use sailhand_core::{CredentialStore, Endpoint, PrinterService};
 #[cfg(not(target_os = "android"))]
 use slint::winit_030::winit::event::{ElementState, KeyEvent, WindowEvent};
 #[cfg(not(target_os = "android"))]
@@ -46,7 +46,7 @@ pub enum AppError {
     #[error(transparent)]
     Settings(#[from] SettingsError),
     #[error(transparent)]
-    Endpoint(#[from] freakymate_core::moonraker::InvalidEndpoint),
+    Endpoint(#[from] sailhand_core::moonraker::InvalidEndpoint),
     #[error("cannot start background runtime: {0}")]
     Runtime(#[from] std::io::Error),
     #[error(transparent)]
@@ -75,7 +75,7 @@ impl Application {
         };
         let settings = store.load_or_create().unwrap_or_else(|error| {
             log::warn!("{error}; using defaults");
-            freakymate_core::Settings::default()
+            sailhand_core::Settings::default()
         });
         crate::logging::set_verbose(settings.verbose_log);
         let renderer = if options.framebuffer {
@@ -95,10 +95,10 @@ impl Application {
             crate::framebuffer::install_platform(input_target.clone())?;
         }
         let window = AppWindow::new()?;
-        // Wayland and X11 desktops find the icon through the app id and `freakymate.desktop`, not the window icon.
+        // Wayland and X11 desktops find the icon through the app id and `sailhand.desktop`, not the window icon.
         #[cfg(not(target_os = "android"))]
         if !options.framebuffer
-            && let Err(error) = slint::set_xdg_app_id("freakymate")
+            && let Err(error) = slint::set_xdg_app_id("sailhand")
         {
             log::warn!("cannot set the app id: {error}");
         }

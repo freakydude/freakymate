@@ -3,12 +3,12 @@
 use crate::presenter::Presenter;
 use crate::settings_controller::SettingsController;
 use crate::{Actions, AppWindow};
-use freakymate_core::domain::machine_tree::LaneId;
-use freakymate_core::domain::manual_probe::Direction;
-use freakymate_core::sources::happy_hare::commands::{Gates, ServoCommand};
-use freakymate_core::sources::klipper::tuning::TuningKey;
-use freakymate_core::sources::klipper::{Axis, CentreOf, EddyTap, TestZ};
-use freakymate_core::{Command, PrinterService, Query};
+use sailhand_core::domain::machine_tree::LaneId;
+use sailhand_core::domain::manual_probe::Direction;
+use sailhand_core::sources::happy_hare::commands::{Gates, ServoCommand};
+use sailhand_core::sources::klipper::tuning::TuningKey;
+use sailhand_core::sources::klipper::{Axis, CentreOf, EddyTap, TestZ};
+use sailhand_core::{Command, PrinterService, Query};
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::rc::Rc;

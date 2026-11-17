@@ -6,7 +6,7 @@ the Moonraker login, displays and the network settings.
 ## Command line
 
 ```text
-freakymate [--moonraker <url>] [--fullscreen] [--framebuffer] [--settings <file>] [--logfile <file>] [--report [<file>]] [--simulate-network] [--simulate-backlight]
+sailhand [--moonraker <url>] [--fullscreen] [--framebuffer] [--settings <file>] [--logfile <file>] [--report [<file>]] [--simulate-network] [--simulate-backlight]
 ```
 
 | Option               | Meaning                                                                                          |
@@ -14,9 +14,9 @@ freakymate [--moonraker <url>] [--fullscreen] [--framebuffer] [--settings <file>
 | `-m, --moonraker`    | Moonraker address for this start, e.g. `http://printer.local:7125` (otherwise the saved setting) |
 | `-f, --fullscreen`   | Kiosk mode for a touch screen, as the services start it: fullscreen, no window frame, no mouse pointer |
 | `--framebuffer`      | Fallback for displays without DRM/KMS (Linux): draws straight to `/dev/fbN` without cage, implies `--fullscreen`. See [Framebuffer fallback](install.md#framebuffer-fallback) |
-| `--settings`         | Settings file (TOML), default `~/.config/freakymate/settings.conf` (Windows: `%APPDATA%`). The installer passes `printer_data/config/freakymate.conf` |
-| `-l, --logfile`      | Log file, rotated daily like those of Klipper and Moonraker (default: stderr only). The installer passes `printer_data/logs/freakymate.log` |
-| `--report [FILE]`    | Writes a diagnostic report `freakymate-report.json` and exits, see [Bug reports](#bug-reports). Without FILE it goes to `printer_data/logs` (when the settings are in `printer_data/config`), otherwise to the current folder; FILE may also be a folder |
+| `--settings`         | Settings file (TOML), default `~/.config/sailhand/settings.conf` (Windows: `%APPDATA%`). The installer passes `printer_data/config/sailhand.conf` |
+| `-l, --logfile`      | Log file, rotated daily like those of Klipper and Moonraker (default: stderr only). The installer passes `printer_data/logs/sailhand.log` |
+| `--report [FILE]`    | Writes a diagnostic report `sailhand-report.json` and exits, see [Bug reports](#bug-reports). Without FILE it goes to `printer_data/logs` (when the settings are in `printer_data/config`), otherwise to the current folder; FILE may also be a folder |
 | `--simulate-network` | Simulated Wi-Fi/Ethernet instead of NetworkManager (development builds only, see [Development](development.md#development-builds-and-releases)) |
 | `--simulate-backlight` | Simulated backlight with brightness and standby (development builds only) |
 
@@ -25,14 +25,14 @@ driver causes trouble), `SLINT_SCALE_FACTOR=1.5` (sets the scale by hand and tur
 
 ## Settings file
 
-FreakyMate keeps its settings in a [TOML](https://toml.io) file with the ending `.conf`, like `moonraker.conf`:
-`printer_data/config/freakymate.conf` when installed with the installer or the `.deb` (so it can be edited in Mainsail or
-Fluidd next to the Klipper configs), otherwise `~/.config/freakymate/settings.conf` (Windows:
-`%APPDATA%\freakymate\settings.conf`). Test builds (built locally or for a pull request; their version has a suffix such
-as `-dev` or `-pr.…`) use the folder `freakymate-dev` instead, so trying one leaves the installed FreakyMate alone; the
+Sailhand keeps its settings in a [TOML](https://toml.io) file with the ending `.conf`, like `moonraker.conf`:
+`printer_data/config/sailhand.conf` when installed with the installer or the `.deb` (so it can be edited in Mainsail or
+Fluidd next to the Klipper configs), otherwise `~/.config/sailhand/settings.conf` (Windows:
+`%APPDATA%\sailhand\settings.conf`). Test builds (built locally or for a pull request; their version has a suffix such
+as `-dev` or `-pr.…`) use the folder `sailhand-dev` instead, so trying one leaves the installed Sailhand alone; the
 same holds for the credentials below. The file is created with the defaults at the first start. Comments (`# …`) are
-yours: when a setting changes on the screen, FreakyMate changes only that value and leaves comments, blank lines and
-order as they are. If the file cannot be read, FreakyMate starts with the defaults and does not overwrite it; the log
+yours: when a setting changes on the screen, Sailhand changes only that value and leaves comments, blank lines and
+order as they are. If the file cannot be read, Sailhand starts with the defaults and does not overwrite it; the log
 says what is wrong.
 
 Most entries are changed on the screen; the **temperature presets** only here:
@@ -49,7 +49,7 @@ extruder = 240.0
 bed = 80.0
 ```
 
-The Thermal page shows the first four. Restart FreakyMate after editing (`sudo systemctl restart freakymate`).
+The Thermal page shows the first four. Restart Sailhand after editing (`sudo systemctl restart sailhand`).
 
 The **step sizes** the screen offers (Motion, Z offset, Thermal, Filament, the paper test) can be changed in the table
 `[step_choices]`. Every key is optional; without it the default applies:
@@ -64,32 +64,32 @@ extrude_speed = [1, 2, 5, 10]
 manual_probe_mm = [0.01, 0.05, 0.1, 1]
 ```
 
-The order does not matter: FreakyMate sorts each list and removes duplicates. Values that are not above zero are left out,
+The order does not matter: Sailhand sorts each list and removes duplicates. Values that are not above zero are left out,
 and a list with nothing usable, or with more than six values (`manual_probe_mm`: four, the paper test offers each of them
 as minus and plus), is replaced by the default; the log says which key. If the step chosen last is not in a list any
 more, the nearest one is selected. Lengths in `extrude_mm` above Klipper's `max_extrude_only_distance` stay in the row but
-are disabled; if none fits, the limit itself is offered as well. Restart FreakyMate after editing.
+are disabled; if none fits, the limit itself is offered as well. Restart Sailhand after editing.
 
-Up to 0.3.8 the settings were a JSON file (`freakymate.json`, `settings.json`). It stays where it is and is no longer
-read; FreakyMate starts with the defaults in the new file. Take over what you had changed by hand (presets) and delete
+Up to 0.3.8 the settings were a JSON file (`sailhand.json`, `settings.json`). It stays where it is and is no longer
+read; Sailhand starts with the defaults in the new file. Take over what you had changed by hand (presets) and delete
 the JSON file when you like.
 
 ## Log
 
-With the installer or the `.deb` the log is `printer_data/logs/freakymate.log`, next to `klippy.log` and
+With the installer or the `.deb` the log is `printer_data/logs/sailhand.log`, next to `klippy.log` and
 `moonraker.log`, so Mainsail and Fluidd list it under Machine → logs. It rotates at midnight, keeps three old files
-(`freakymate.log.YYYY-MM-DD`) and also goes to the journal (`journalctl -u freakymate` with `install.sh`,
-`journalctl -u freakymate@<user>` with the `.deb`). An installation from before 0.3.7 writes no log file until
-`install.sh` runs again (see [Updates and channels](install.md#updates-and-channels)). The FreakyMate version is shown
+(`sailhand.log.YYYY-MM-DD`) and also goes to the journal (`journalctl -u sailhand` with `install.sh`,
+`journalctl -u sailhand@<user>` with the `.deb`). An installation from before 0.3.7 writes no log file until
+`install.sh` runs again (see [Updates and channels](install.md#updates-and-channels)). The Sailhand version is shown
 on the Settings page and at the top of each log file.
 
-The normal log holds the basics: a header (FreakyMate version, command line, system, the versions of Moonraker, Klipper
+The normal log holds the basics: a header (Sailhand version, command line, system, the versions of Moonraker, Klipper
 and Happy Hare, the detected hardware including a "Changers" line), the connection, Klipper state changes with Klipper's
 reason, print state changes (without file names), failed commands with Moonraker's error, and warnings. It leaves out
 user names, Wi-Fi network names and file names.
 
-The verbose log adds more detail. Set `verbose_log = true` in `freakymate.conf` (Mainsail: Machine → config) and restart
-FreakyMate: `sudo systemctl restart freakymate`, with the `.deb` `sudo systemctl restart freakymate@<user>`. Mainsail
+The verbose log adds more detail. Set `verbose_log = true` in `sailhand.conf` (Mainsail: Machine → config) and restart
+Sailhand: `sudo systemctl restart sailhand`, with the `.deb` `sudo systemctl restart sailhand@<user>`. Mainsail
 can restart it too, because the installer adds it to `moonraker.asvc`. It then also logs:
 
 - every command from the screen: the intent, the Moonraker call with its parameters, the answer and how long it took,
@@ -100,50 +100,50 @@ can restart it too, because the installer adds it to `moonraker.asvc`. It then a
 - file names, network names and the Moonraker user name
 
 It costs nothing while it is off. Turn it off again after the bug is captured, because it writes more to the SD card.
-`RUST_LOG` takes precedence over the setting; `RUST_LOG=freakymate_core=trace` also logs every raw Moonraker
+`RUST_LOG` takes precedence over the setting; `RUST_LOG=sailhand_core=trace` also logs every raw Moonraker
 notification.
 
 ## Bug reports
 
 A bug report that can be fixed without follow-up questions has three parts:
 
-1. The diagnostic report. On the printer host run `~/freakymate/freakymate --report` (installed with `install.sh`) or
-   `freakymate --report` (`.deb`). It finds the settings itself; `--settings` and `--moonraker` work as usual if
-   needed. The file `freakymate-report.json` lands in `printer_data/logs`, so Mainsail and Fluidd offer it under
+1. The diagnostic report. On the printer host run `~/sailhand/sailhand --report` (installed with `install.sh`) or
+   `sailhand --report` (`.deb`). It finds the settings itself; `--settings` and `--moonraker` work as usual if
+   needed. The file `sailhand-report.json` lands in `printer_data/logs`, so Mainsail and Fluidd offer it under
    Machine → logs for download. Without that folder it lands in the current folder; `--report <file or folder>` picks
    another place.
-2. The verbose log: set `verbose_log = true` (see [Log](#log)), restart FreakyMate, reproduce the problem once and
-   download `freakymate.log`. Add `klippy.log` and `moonraker.log` when Klipper or Moonraker show errors. Set
+2. The verbose log: set `verbose_log = true` (see [Log](#log)), restart Sailhand, reproduce the problem once and
+   download `sailhand.log`. Add `klippy.log` and `moonraker.log` when Klipper or Moonraker show errors. Set
    `verbose_log` back to `false` afterwards.
 3. The steps to reproduce, numbered, and what you expected.
 
-The report contains the FreakyMate version, system, setup and settings; Moonraker `server.info` and `printer.info`
+The report contains the Sailhand version, system, setup and settings; Moonraker `server.info` and `printer.info`
 (without host name); board and OS (without network, serial numbers and SD card); the installed versions from the update
 manager (Klipper, Moonraker, Happy Hare, AFC, Mainsail and so on, without commit history); the Spoolman status; the last
 100 console lines; `printer.objects.list`; the status of all Klipper objects including the Klipper configuration
-(`configfile.settings`); Klipper's command list; and what FreakyMate detects (summary, changer systems Happy Hare, AFC
+(`configfile.settings`); Klipper's command list; and what Sailhand detects (summary, changer systems Happy Hare, AFC
 and tool changer, machine tree). It does not contain Moonraker's configuration (API keys, passwords), network
 addresses, the host name, serial numbers, user names or the stored access of the display. Have a look at the file
 before you share it.
 
-Open a bug on the [issue page](https://github.com/freakydude/freakymate/issues/new/choose) and drag the files into
+Open a bug on the [issue page](https://github.com/freakydude/sailhand/issues/new/choose) and drag the files into
 the form.
 
 ## Moonraker login
 
-Usually Moonraker trusts the machine FreakyMate runs on (`trusted_clients` in `moonraker.conf`, on the printer host
-`localhost`), and nothing needs to be set up. If it does not, for example with FreakyMate on another machine or with
+Usually Moonraker trusts the machine Sailhand runs on (`trusted_clients` in `moonraker.conf`, on the printer host
+`localhost`), and nothing needs to be set up. If it does not, for example with Sailhand on another machine or with
 `force_logins: True`, the screen says that Moonraker wants a login and offers one:
 
-- **Log in on the screen** with a Moonraker user. FreakyMate keeps only Moonraker's refresh token, not the password,
+- **Log in on the screen** with a Moonraker user. Sailhand keeps only Moonraker's refresh token, not the password,
   and logs in again with it at every start until it expires (`login_timeout` in `moonraker.conf`, 90 days by default)
   or the user logs out; then the screen asks again. Logging out (Settings tab, or the same user logging out in
   Mainsail or Fluidd) ends every login of that user, so a user of its own for the display avoids surprises.
 - **API key**, entered by hand in the credentials file below. Moonraker hands it out to an authorized client, for
   example on the printer host, which it usually trusts: `curl http://localhost:7125/access/api_key`.
 
-The credentials are kept per Moonraker address in `~/.config/freakymate/credentials.json` (Windows:
-`%APPDATA%\freakymate\credentials.json`), readable by the owner only. They stay there also when the settings lie in
+The credentials are kept per Moonraker address in `~/.config/sailhand/credentials.json` (Windows:
+`%APPDATA%\sailhand\credentials.json`), readable by the owner only. They stay there also when the settings lie in
 `printer_data/config`, because Moonraker serves that folder and it is often backed up to a git repository.
 
 ```json
@@ -154,12 +154,12 @@ The credentials are kept per Moonraker address in `~/.config/freakymate/credenti
 }
 ```
 
-FreakyMate talks plain HTTP and WebSocket to Moonraker so far (no HTTPS), like most installations in a home network;
+Sailhand talks plain HTTP and WebSocket to Moonraker so far (no HTTPS), like most installations in a home network;
 the password of a login goes over the network unencrypted.
 
 ## Displays
 
-FreakyMate works best on a display of 5" or more at 800x480: the layout is made for that size. It has been tested on
+Sailhand works best on a display of 5" or more at 800x480: the layout is made for that size. It has been tested on
 the BTT HDMI5 (5") and the Raspberry Pi Touch Display v1 (7", DSI), both 800x480, and on a TFT35 SPI display through
 the [framebuffer fallback](install.md#framebuffer-fallback). In fullscreen, other resolutions show the same layout scaled up or down to fit, so
 a 7" 1024x600 display fills its screen and a smaller one, say a 4.3" 480x272, shows everything, only smaller. A window on
@@ -170,14 +170,14 @@ and 4.3" displays are planned.
 
 ## Network settings
 
-Moonraker can only report the host's network (`machine.system_info`), it cannot change it. FreakyMate therefore talks
+Moonraker can only report the host's network (`machine.system_info`), it cannot change it. Sailhand therefore talks
 to NetworkManager over D-Bus. Managing Wi-Fi (open, WPA/WPA2, WPA3, hidden, remove saved networks,
 on/off) and Ethernet (status, connect/disconnect) is offered when
 
-- FreakyMate runs on Linux with NetworkManager (default on Raspberry Pi OS Bookworm and newer), and
+- Sailhand runs on Linux with NetworkManager (default on Raspberry Pi OS Bookworm and newer), and
 - Moonraker runs on the same host (`localhost`/`127.0.0.1`), so the changed network is the printer's network.
 
-The user needs the polkit rule `50-freakymate.rules` (allows the NetworkManager actions for the group `netdev`).
+The user needs the polkit rule `50-sailhand.rules` (allows the NetworkManager actions for the group `netdev`).
 `install.sh` installs it to `/etc/polkit-1/rules.d` and adds the user to `netdev`; the Debian package ships it in
 `/usr/share/polkit-1/rules.d`, add the user yourself: `sudo usermod -aG netdev $USER` (takes effect after re-login or a
 service restart). Changing the network while printing asks for confirmation, because the connection may drop.
@@ -198,7 +198,7 @@ second. The printer wakes it too: a print starts or ends, pauses or fails, Klipp
 Klipper answers with an error (`!!`).
 
 **Monitors on HDMI or DisplayPort** are controlled through DDC/CI with the program `ddcutil` (`apt install ddcutil` or
-`pacman -S ddcutil`), if it is installed and lists a monitor that answers on brightness. The user of FreakyMate needs
+`pacman -S ddcutil`), if it is installed and lists a monitor that answers on brightness. The user of Sailhand needs
 access to `/dev/i2c-*` (group `i2c`, the installer adds it) and the kernel module `i2c-dev`, which the `ddcutil`
 package normally loads. With several monitors the first that answers is used; `device = "ddc:i2c-8"` names one, the
 log file lists them with their bus. Off switches the monitor through its power mode; a monitor without one is only
@@ -207,9 +207,9 @@ so, and the standby is then not for that monitor. DDC is slow (a tenth of a seco
 monitor are not followed.
 
 Displays on HDMI that have no DDC/CI, such as the BTT HDMI5, keep their backlight on as long as they get a signal and
-have no `/sys/class/backlight`; there FreakyMate shows neither the slider nor the standby settings.
+have no `/sys/class/backlight`; there Sailhand shows neither the slider nor the standby settings.
 
-Changing the backlight needs the udev rule `70-freakymate-backlight.rules` (makes `brightness` and `bl_power` writable
+Changing the backlight needs the udev rule `70-sailhand-backlight.rules` (makes `brightness` and `bl_power` writable
 for the group `video`) and the user in `video`. `install.sh` sets up both; the Debian package ships the rule in
 `/lib/udev/rules.d`, add the user yourself: `sudo usermod -aG video $USER` (takes effect after a service restart). An
 installation from before this version gets the rule by running `install.sh` again (see
@@ -226,7 +226,7 @@ off_when_printing_minutes = 30
 ```
 
 `device` picks a device by its name under `/sys/class/backlight` (for example `10-0045` or `intel_backlight`) or a
-DDC/CI monitor as `ddc:i2c-N`; without it FreakyMate takes the first by type (firmware, platform, raw) and, where
+DDC/CI monitor as `ddc:i2c-N`; without it Sailhand takes the first by type (firmware, platform, raw) and, where
 there is none, the first monitor on DDC/CI. `brightness` is the last value set on the screen in
 percent, set again at the start; without it the brightness stays as the system set it. Without the minutes the screen
 never goes off by itself.

@@ -442,7 +442,7 @@ export global Backlight {
     callback idle-minutes-chosen(int);
     callback printing-minutes-chosen(int);
 }
-// Networks of the host freakymate runs on. Rust writes the state, the UI calls the callbacks.
+// Networks of the host sailhand runs on. Rust writes the state, the UI calls the callbacks.
 export global Network {
     // Changes are possible: NetworkManager present and Moonraker runs on this host.
     in property <bool> managed;

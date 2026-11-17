@@ -1,4 +1,4 @@
-//! Backlight of the display freakymate runs on: brightness and screen standby.
+//! Backlight of the display sailhand runs on: brightness and screen standby.
 //!
 //! Like the network this goes to the local system, not over Moonraker, and is not always there: the BTT HDMI5 has
 //! no controllable backlight, DSI and SPI displays and laptops have one under `/sys/class/backlight`. Each kind of
@@ -35,7 +35,7 @@ pub trait Backlight: Send {
     fn set_power(&mut self, on: bool) -> Result<(), BacklightError>;
 }
 
-/// Backlight part of `freakymate.conf`. Everything off by default: after an update the display behaves as before.
+/// Backlight part of `sailhand.conf`. Everything off by default: after an update the display behaves as before.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct BacklightSettings {

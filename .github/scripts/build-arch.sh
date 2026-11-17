@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds an Arch Linux package freakymate-<version>-1-<arch>.pkg.tar.zst from a Linux build artifact with makepkg.
+# Builds an Arch Linux package sailhand-<version>-1-<arch>.pkg.tar.zst from a Linux build artifact with makepkg.
 # Usage: build-arch.sh <artifact-folder> <tag>  (tag like v0.2.5 or v0.2.5-pr.147.3; in the artifacts folder, repo one level up)
 # The package lands in the current folder. Runs makepkg in an archlinux container (makepkg refuses root);
 # FM_NO_DOCKER=1 runs it directly on an Arch system as a normal user.
@@ -40,14 +40,14 @@ if [ -z "${FM_NO_DOCKER:-}" ]; then
   docker run --rm \
     -v "$repo:/repo:ro" -v "$artifact:/artifact:ro" -v "$PWD:/out" -e FM_ARCH="$arch" -e FM_DEPENDS="$depends" \
     archlinux:latest bash /repo/.github/scripts/build-arch.sh --container /artifact "$release"
-  ls "freakymate-${pkgver}-1-${arch}.pkg.tar.zst"
+  ls "sailhand-${pkgver}-1-${arch}.pkg.tar.zst"
   exit 0
 fi
 
 work=$(mktemp -d)
 sed -e "s|@PKGVER@|$pkgver|" -e "s|@ARCH@|$arch|" -e "s|@DEPENDS@|$depends|" \
   "$repo/scripts/arch/PKGBUILD.in" > "$work/PKGBUILD"
-cp "$repo/scripts/arch/freakymate.install" "$work/"
+cp "$repo/scripts/arch/sailhand.install" "$work/"
 
 # The runner is x86_64: makepkg only builds for its CARCH, so use a config copy with the target architecture.
 conf="$work/makepkg.conf"

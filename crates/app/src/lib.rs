@@ -1,9 +1,9 @@
-//! freakymate: touch UI for Klipper via Moonraker.
+//! sailhand: touch UI for Klipper via Moonraker.
 //!
-//! Structure: `freakymate-ui` (`crates/ui/ui/*.slint`) describes the UI, [`presenter`] writes the state from
-//! `freakymate-core` into it, [`actions`] forwards user input as commands.
+//! Structure: `sailhand-ui` (`crates/ui/ui/*.slint`) describes the UI, [`presenter`] writes the state from
+//! `sailhand-core` into it, [`actions`] forwards user input as commands.
 
-pub use freakymate_ui::*;
+pub use sailhand_ui::*;
 
 pub mod actions;
 #[cfg(target_os = "android")]

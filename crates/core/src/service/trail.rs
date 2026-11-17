@@ -1,5 +1,5 @@
 //! The course of the printer in the verbose log (the setting `verbose_log`): the changes of the objects that decide what
-//! FreakyMate shows and does, the console and Moonraker's notifications, so a bug report shows what happened in which
+//! Sailhand shows and does, the console and Moonraker's notifications, so a bug report shows what happened in which
 //! order. Measurements that change all the time (temperatures, positions, speeds) are left out. Nothing here is
 //! computed unless the log asks for debug records.
 

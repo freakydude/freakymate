@@ -4,10 +4,10 @@ use crate::items::float_model;
 use crate::network_controller::NetworkController;
 use crate::presenter::Presenter;
 use crate::{AppWindow, Backlight, PresetItem, UiSettings};
-use freakymate_core::backlight::{BacklightService, BacklightSettings, usable_brightness};
-use freakymate_core::settings::{MAX_SHOWN_PRESETS, Settings, SettingsStore, TemperaturePreset};
-use freakymate_core::step_choices::{StepLists, mirrored_row, nearest_step};
-use freakymate_core::{Endpoint, PrinterService};
+use sailhand_core::backlight::{BacklightService, BacklightSettings, usable_brightness};
+use sailhand_core::settings::{MAX_SHOWN_PRESETS, Settings, SettingsStore, TemperaturePreset};
+use sailhand_core::step_choices::{StepLists, mirrored_row, nearest_step};
+use sailhand_core::{Endpoint, PrinterService};
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -97,7 +97,7 @@ impl SettingsController {
         if cfg!(not(target_os = "android")) {
             ui.set_settings_file(self.store.path().display().to_string().into());
         }
-        ui.set_version(freakymate_core::VERSION.into());
+        ui.set_version(sailhand_core::VERSION.into());
         let backlight = window.global::<Backlight>();
         backlight.set_idle_minutes(minutes_shown(settings.backlight.off_when_idle_minutes));
         backlight.set_printing_minutes(minutes_shown(settings.backlight.off_when_printing_minutes));

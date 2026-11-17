@@ -6,22 +6,22 @@ use crate::{
     UpdateItem,
 };
 use crate::{format, view};
-use freakymate_core::ConnectionState;
-use freakymate_core::color::Rgba;
-use freakymate_core::domain::filament_match::{self, Difference, Supply, ToolMatch, Verdict};
-use freakymate_core::domain::heads::{HeadRow, PickUp};
-use freakymate_core::domain::load_path::{self, BufferSide, Fill, LoadPath, PathPart, PathScope, Stage, Stretch};
-use freakymate_core::domain::machine_tree::MachineTree;
-use freakymate_core::domain::spools::{self, FilamentColors, Lane, SpoolHolder};
-use freakymate_core::domain::temperature_limits::{self, Level, Limits};
-use freakymate_core::sources::PrinterStatus;
-use freakymate_core::sources::klipper::tuning::{TuningKey, TuningValue};
-use freakymate_core::sources::klipper::{Fan, Heater, Led, TemperatureSensor};
-use freakymate_core::sources::led_effect::LedEffect;
-use freakymate_core::sources::moonraker_server::machine::HostInterface;
-use freakymate_core::sources::moonraker_server::power::PowerDevice;
-use freakymate_core::sources::moonraker_server::update_manager::UpdateInfo;
-use freakymate_core::sources::spoolman::Spool;
+use sailhand_core::ConnectionState;
+use sailhand_core::color::Rgba;
+use sailhand_core::domain::filament_match::{self, Difference, Supply, ToolMatch, Verdict};
+use sailhand_core::domain::heads::{HeadRow, PickUp};
+use sailhand_core::domain::load_path::{self, BufferSide, Fill, LoadPath, PathPart, PathScope, Stage, Stretch};
+use sailhand_core::domain::machine_tree::MachineTree;
+use sailhand_core::domain::spools::{self, FilamentColors, Lane, SpoolHolder};
+use sailhand_core::domain::temperature_limits::{self, Level, Limits};
+use sailhand_core::sources::PrinterStatus;
+use sailhand_core::sources::klipper::tuning::{TuningKey, TuningValue};
+use sailhand_core::sources::klipper::{Fan, Heater, Led, TemperatureSensor};
+use sailhand_core::sources::led_effect::LedEffect;
+use sailhand_core::sources::moonraker_server::machine::HostInterface;
+use sailhand_core::sources::moonraker_server::power::PowerDevice;
+use sailhand_core::sources::moonraker_server::update_manager::UpdateInfo;
+use sailhand_core::sources::spoolman::Spool;
 use slint::{Model, ModelRc, SharedString, VecModel};
 use std::rc::Rc;
 
@@ -576,7 +576,7 @@ pub fn float_model(values: &[f64]) -> ModelRc<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use freakymate_core::domain::filament_match::ToolRequest;
+    use sailhand_core::domain::filament_match::ToolRequest;
 
     fn part(fill: Fill) -> PathPartItem {
         path_part_item(PathPart::Tube { stretch: Stretch::Bowden, fill })
@@ -721,7 +721,7 @@ mod tests {
     }
 
     fn tree(heads: &[(Option<&str>, bool, &str)]) -> MachineTree {
-        use freakymate_core::domain::machine_tree::{Carriage, Head, Nozzle};
+        use sailhand_core::domain::machine_tree::{Carriage, Head, Nozzle};
         let head = |(name, active, extruder): &(Option<&str>, bool, &str)| Head {
             name: name.map(str::to_owned),
             active: *active,
@@ -758,7 +758,7 @@ mod tests {
         Fan {
             object: object.into(),
             label: object.into(),
-            kind: freakymate_core::sources::klipper::FanKind::of(object).expect("a fan object in the test"),
+            kind: sailhand_core::sources::klipper::FanKind::of(object).expect("a fan object in the test"),
             speed: 0.4,
             rpm: None,
             off_below: 0.0,
@@ -1016,11 +1016,11 @@ mod tests {
 
     #[test]
     fn update_items_keep_the_section_name_for_the_upgrade_and_capitalise_only_the_label() {
-        let update = UpdateInfo { name: "freakymate".into(), version: "0.4.5".into(), ..UpdateInfo::default() };
+        let update = UpdateInfo { name: "sailhand".into(), version: "0.4.5".into(), ..UpdateInfo::default() };
 
         let item = update_item(&update);
 
-        assert_eq!(item.name, "freakymate");
-        assert_eq!(item.label, "Freakymate");
+        assert_eq!(item.name, "sailhand");
+        assert_eq!(item.label, "Sailhand");
     }
 }

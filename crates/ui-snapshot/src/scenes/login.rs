@@ -2,8 +2,8 @@
 
 use super::ask;
 use crate::session::Session;
-use freakymate::{Actions, Confirm, Page, Printer};
-use freakymate_core::ConnectionState;
+use sailhand::{Actions, Confirm, Page, Printer};
+use sailhand_core::ConnectionState;
 use slint::ComponentHandle;
 use std::time::Duration;
 

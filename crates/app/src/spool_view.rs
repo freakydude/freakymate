@@ -2,8 +2,8 @@
 
 use crate::items::{id_or_none, replace_rows, spool_colors, spool_rows};
 use crate::{Printer, SpoolItem, view};
-use freakymate_core::domain::spools::Lane;
-use freakymate_core::sources::spoolman::Spool;
+use sailhand_core::domain::spools::Lane;
+use sailhand_core::sources::spoolman::Spool;
 use slint::{Model, ModelRc, VecModel};
 use std::rc::Rc;
 
