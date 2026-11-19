@@ -346,6 +346,31 @@ export component TabBar inherits Rectangle {
 }
 
 // Panel with optional heading for related controls.
+// A row of a list that is tapped as a whole (networks, printers). The row content goes in as children; the border of
+// the active row lies above it, so it also frames the buttons inside.
+export component ListRow inherits Rectangle {
+    in property <bool> active;
+    // A tap on the row calls `clicked`; buttons inside lie above and keep their taps.
+    in property <bool> tappable;
+    callback clicked;
+    height: Theme.row-height-small;
+    border-radius: Theme.radius;
+    background: row-touch.pressed || root.active ? Theme.surface-active : Theme.surface-raised;
+    accessible-role: button;
+
+    row-touch := TouchArea {
+        enabled: root.tappable;
+        clicked => { root.clicked(); }
+    }
+    @children
+    Rectangle {
+        background: transparent;
+        border-radius: Theme.radius;
+        border-width: root.active ? 2px : 0px;
+        border-color: Theme.foreground;
+    }
+}
+
 export component Card inherits Rectangle {
     in property <string> title;
     in property <image> icon;

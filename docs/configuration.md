@@ -11,7 +11,7 @@ sailhand [--moonraker <url>] [--fullscreen] [--framebuffer] [--settings <file>] 
 
 | Option               | Meaning                                                                                          |
 | -------------------- | ------------------------------------------------------------------------------------------------ |
-| `-m, --moonraker`    | Moonraker address for this start, e.g. `http://printer.local:7125` (otherwise the saved setting) |
+| `-m, --moonraker`    | Moonraker address for this start, e.g. `http://printer.local:7125` (otherwise the printer chosen last) |
 | `-f, --fullscreen`   | Kiosk mode for a touch screen, as the services start it: fullscreen, no window frame, no mouse pointer |
 | `--framebuffer`      | Fallback for displays without DRM/KMS (Linux): draws straight to `/dev/fbN` without cage, implies `--fullscreen`. See [Framebuffer fallback](install.md#framebuffer-fallback) |
 | `--settings`         | Settings file (TOML), default `~/.config/sailhand/settings.conf` (Windows: `%APPDATA%`). The installer passes `printer_data/config/sailhand.conf` |
@@ -69,6 +69,23 @@ and a list with nothing usable, or with more than six values (`manual_probe_mm`:
 as minus and plus), is replaced by the default; the log says which key. If the step chosen last is not in a list any
 more, the nearest one is selected. Lengths in `extrude_mm` above Klipper's `max_extrude_only_distance` stay in the row but
 are disabled; if none fits, the limit itself is offered as well. Restart Sailhand after editing.
+
+The printers chosen on System → Printers are kept as `[[printers]]`, each with the macros hidden from its console;
+`moonraker` is the printer in use, which Sailhand tries again at the next start (see [Several printers](#several-printers)):
+
+```toml
+moonraker = "http://192.168.40.6:7125"
+
+[[printers]]
+name = "voron"
+address = "http://192.168.40.6:7125"
+uuid = "29f7565a940247049493e8ff2a0d0c87"
+known_macros = ["PARK", "LOAD_FILAMENT"]
+hidden_macros = ["LOAD_FILAMENT"]
+```
+
+The name can be changed here. A file without `[[printers]]` (up to 0.7) becomes one saved printer at the first start,
+with the macro lists that were at the top of the file.
 
 Up to 0.3.8 the settings were a JSON file (`sailhand.json`, `settings.json`). It stays where it is and is no longer
 read; Sailhand starts with the defaults in the new file. Take over what you had changed by hand (presets) and delete
@@ -128,6 +145,26 @@ before you share it.
 
 Open a bug on the [issue page](https://github.com/freakydude/sailhand/issues/new/choose) and drag the files into
 the form.
+
+## Several printers
+
+One Sailhand can operate several printers, one at a time. System → Printers lists them, like the Wi-Fi networks:
+first the printer in use, then saved printers that answer, printers found on the network that are not saved yet, and
+last saved printers that do not answer. A tap switches to a printer and saves it; the bin removes a saved printer
+together with its login and trusted certificate. **Add** takes an address by hand, for example
+`http://voron.local` behind nginx, `https://…`, or a printer that does not announce itself. A running print goes on when
+you switch; it is the printer's job, not the screen's.
+
+Printers announce themselves when Moonraker's zeroconf component is switched on (it is not by default):
+
+```ini
+[zeroconf]
+```
+
+in `moonraker.conf`, then restart Moonraker. Sailhand searches and checks the saved printers only while the Printers
+page is open. Sailhand starts with the printer chosen last; if it does not answer, the screen says so and offers the
+list, it does not switch to another printer by itself. Per printer Sailhand keeps the macros hidden from the console;
+presets, step sizes and the display settings apply to all printers.
 
 ## Moonraker login
 

@@ -17,6 +17,7 @@ dirs = "7.0.0"
 futures-util.workspace = true
 image.workspace = true
 log.workspace = true
+mdns-sd = "0.22.0"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"] }
 ring = "0.17.14"
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }

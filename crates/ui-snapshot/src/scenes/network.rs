@@ -1,4 +1,4 @@
-//! Settings > Network: list, connecting, confirmation, read-only fallback.
+//! System > Network: list, connecting, confirmation, read-only fallback; System > Printers: list and removal.
 
 use super::ask;
 use crate::session::Session;
@@ -31,5 +31,22 @@ pub(super) fn network(session: &mut Session) -> Result<(), String> {
     session.pump(Duration::from_secs(1));
     session.capture("network-unavailable")?;
     session.network_service.send(NetworkCommand::Refresh);
+    printers(session)
+}
+
+fn printers(session: &mut Session) -> Result<(), String> {
+    session.window.global::<Navigation>().set_page(Page::Printers);
+    session.pump(Duration::from_millis(500));
+    session.capture("printers")?;
+
+    ask(
+        session,
+        "Remove printer",
+        "The login and trusted certificate of \"ender\" are deleted.",
+        "forget-printer",
+        "http://192.0.2.48:7125",
+    );
+    session.capture("printers-forget")?;
+    session.window.global::<Confirm>().set_open(false);
     Ok(())
 }

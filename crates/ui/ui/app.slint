@@ -1,7 +1,7 @@
 // Main window: status bar, navigation, current page and overlays.
 
 import { Theme } from "theme.slint";
-import { Actions, Backlight, Confirm, Dialogs, EddyDialog, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, UiSettings } from "state.slint";
+import { Actions, Backlight, Confirm, Dialogs, EddyDialog, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, PrinterChoice, SpoolPicker, UiSettings } from "state.slint";
 import { NavRail, StatusBar } from "components/chrome.slint";
 import { CalibrationDialog } from "components/calibration-dialog.slint";
 import { ConfirmDialog } from "components/confirm-dialog.slint";
@@ -21,10 +21,11 @@ import { SystemPage } from "pages/system.slint";
 import { UpdatesPage } from "pages/updates.slint";
 import { SettingsPage } from "pages/settings.slint";
 import { NetworkPage } from "pages/network-page.slint";
+import { PrintersPage } from "pages/printers.slint";
 import { ConnectionPage } from "pages/connection.slint";
 
-export { Actions, Backlight, Confirm, EddyDialog, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, SpoolPicker, UiSettings }
-export { ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, FileItem, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem, AfcHubReturnItem, AfcToolItem, SpoolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, ScrewItem, EddyValue, WifiItem, WiredItem, HostInterfaceItem } from "state.slint";
+export { Actions, Backlight, Confirm, EddyDialog, MeshDialogs, MmuDialogs, Navigation, Network, Page, Printer, PrinterChoice, SpoolPicker, UiSettings }
+export { ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, FileItem, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, MmuGateItem, MmuGatePage, MmuPageRange, MmuSensorItem, AfcHubReturnItem, AfcToolItem, SpoolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, PrinterItem, ScrewItem, EddyValue, WifiItem, WiredItem, HostInterfaceItem } from "state.slint";
 
 export component AppWindow inherits Window {
     title: "Sailhand";
@@ -47,13 +48,15 @@ export component AppWindow inherits Window {
 
     // Pages that are useful even without a ready printer.
     property <bool> page-works-offline: Navigation.page == Page.system || Navigation.page == Page.settings
-        || Navigation.page == Page.network
+        || Navigation.page == Page.network || Navigation.page == Page.printers
         || ((Navigation.page == Page.console || Navigation.page == Page.updates) && Printer.is-connected);
     property <bool> network-visible: Navigation.page == Page.network;
+    property <bool> printers-visible: Navigation.page == Page.printers;
     property <bool> printer-ready: Printer.ready;
     property <bool> motion-locked: Printer.motion-locked;
 
     changed network-visible => { Network.watch(self.network-visible); }
+    changed printers-visible => { PrinterChoice.watch(self.printers-visible); }
     // A print that starts (here or elsewhere) must not get the moves of an open dialog or confirmation: they close. The
     // Filament page stays with its moves locked, the Motion page shows Tune only.
     changed motion-locked => {
@@ -95,6 +98,7 @@ export component AppWindow inherits Window {
                     if Navigation.page == Page.updates: UpdatesPage { }
                     if Navigation.page == Page.settings: SettingsPage { }
                     if Navigation.page == Page.network: NetworkPage { }
+                    if Navigation.page == Page.printers: PrintersPage { }
                     if !Printer.ready && !root.page-works-offline: ConnectionPage { }
                 }
                 // Dialogs cover only the content area: the status bar and the navigation stay usable, and a tap

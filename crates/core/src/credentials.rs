@@ -41,6 +41,12 @@ struct CredentialFile {
     certificates: BTreeMap<String, CertificateFingerprint>,
 }
 
+impl CredentialFile {
+    fn knows(&self, address: &str) -> bool {
+        self.moonraker.contains_key(address) || self.certificates.contains_key(address)
+    }
+}
+
 /// Reads and writes the credentials; without a path (tests, snapshots) nothing is kept.
 #[derive(Debug, Clone, Default)]
 pub struct CredentialStore {
@@ -91,6 +97,18 @@ impl CredentialStore {
     pub fn trust_certificate(&self, endpoint: &Endpoint, fingerprint: CertificateFingerprint) -> std::io::Result<()> {
         self.change(|file| {
             file.certificates.insert(endpoint.display(), fingerprint);
+        })
+    }
+
+    /// Removes the credential and the trusted certificate of this address, when the user forgets the printer.
+    pub fn forget(&self, endpoint: &Endpoint) -> std::io::Result<()> {
+        let key = endpoint.display();
+        if !self.read().knows(&key) {
+            return Ok(());
+        }
+        self.change(|file| {
+            file.moonraker.remove(&key);
+            file.certificates.remove(&key);
         })
     }
 
@@ -214,6 +232,34 @@ mod tests {
 
         let written = std::fs::read_to_string(store.path().unwrap()).unwrap();
         assert!(!written.contains("certificates"), "{written}");
+    }
+
+    #[test]
+    fn forgetting_a_printer_removes_its_login_and_certificate_only() {
+        let (_dir, store) = temporary_store();
+        let forgotten = Endpoint::parse("https://pi").unwrap();
+        let kept = Endpoint::parse("https://voron").unwrap();
+        let fingerprint = CertificateFingerprint::of(b"certificate");
+        for endpoint in [&forgotten, &kept] {
+            store.store(endpoint, Some(login())).unwrap();
+            store.trust_certificate(endpoint, fingerprint).unwrap();
+        }
+
+        store.forget(&forgotten).unwrap();
+
+        assert_eq!(store.credential(&forgotten), None);
+        assert_eq!(store.trusted_certificate(&forgotten), None);
+        assert_eq!(store.credential(&kept), Some(login()));
+        assert_eq!(store.trusted_certificate(&kept), Some(fingerprint));
+    }
+
+    #[test]
+    fn forgetting_an_unknown_printer_writes_no_file() {
+        let (_dir, store) = temporary_store();
+
+        store.forget(&Endpoint::parse("pi").unwrap()).unwrap();
+
+        assert!(!store.path().unwrap().exists());
     }
 
     #[test]

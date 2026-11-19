@@ -139,6 +139,13 @@ export component ConnectionPage inherits Rectangle {
                 clicked => { Confirm.ask(@tr("Firmware restart"), @tr("Restarts Klipper and resets all MCUs, e.g. after a firmware update or an MCU error."), "firmware-restart", "", false); }
             }
             IconButton {
+                icon: Icons.nav-printer;
+                text: @tr("Printers");
+                horizontal: true;
+                align-start: true;
+                clicked => { Navigation.page = Page.printers; }
+            }
+            IconButton {
                 icon: Icons.nav-settings;
                 text: @tr("Settings");
                 horizontal: true;

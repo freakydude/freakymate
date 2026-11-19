@@ -28,7 +28,7 @@ For more detail switch on `verbose_log` (see [Log](configuration.md#log)).
 
 ## "Cannot connect" or "Moonraker wants a login"
 
-- Check the Moonraker address on System → Settings, card "Moonraker address" (or `-m` on the command line). On the printer host it is
+- Check the address of the printer on System → Printers (or `-m` on the command line). On the printer host it is
   usually `http://127.0.0.1:7125`.
 - Check that Moonraker runs: `systemctl status moonraker`.
 - If Moonraker asks for a login, log in on the screen or use an API key, see

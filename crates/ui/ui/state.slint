@@ -2,10 +2,10 @@
 
 import { Icons } from "icons.slint";
 import { Theme } from "theme.slint";
-import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, PrinterItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 import { Actions } from "actions.slint";
 
-export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, PrinterItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
 export { Actions } from "actions.slint";
 
 
@@ -426,7 +426,6 @@ export global UiSettings {
 
     // Rust saves after every change.
     callback steps-changed();
-    callback moonraker-entered(string);
     callback fullscreen-toggled(bool);
     callback keep-screen-on-toggled(bool);
     callback log-export-clicked();
@@ -449,6 +448,21 @@ export global Backlight {
     callback idle-minutes-chosen(int);
     callback printing-minutes-chosen(int);
 }
+// The printers (Moonraker servers) this display can use. Rust writes the state, the UI calls the callbacks.
+export global PrinterChoice {
+    in property <[PrinterItem]> printers;
+    // Name of the active printer, for the Settings card.
+    in property <string> active-name;
+    // The Printers page is shown: Rust searches the network and checks the saved printers only meanwhile.
+    callback watch(bool);
+    // Address: connect to it and keep it.
+    callback choose(string);
+    // Address: remove the saved printer with its login and certificate.
+    callback forget(string);
+    // Address typed by hand.
+    callback add(string);
+}
+
 // Networks of the host sailhand runs on. Rust writes the state, the UI calls the callbacks.
 export global Network {
     // Changes are possible: NetworkManager present and Moonraker runs on this host.
@@ -687,6 +701,7 @@ export global Confirm {
         if (self.action == "connect-network") { Network.connect-pending(); }
         if (self.action == "disconnect-network") { Network.disconnect(); }
         if (self.action == "forget-network") { Network.forget(self.argument); }
+        if (self.action == "forget-printer") { PrinterChoice.forget(self.argument); }
         if (self.action == "wifi-off") { Network.set-wifi-enabled(false); }
         if (self.action == "wired-off") { Network.set-wired(self.argument, false); }
     }

@@ -5,10 +5,12 @@ use sailhand::backlight_controller::BacklightController;
 use sailhand::display::{DESIGN_HEIGHT, DESIGN_WIDTH};
 use sailhand::network_controller::NetworkController;
 use sailhand::presenter::Presenter;
+use sailhand::printers_controller::{PrinterBridges, PrintersController};
 use sailhand::settings_controller::{Bridges, SettingsController};
 use sailhand::{AppWindow, Navigation, Page, actions};
 use sailhand_core::backlight::{BacklightBackend, BacklightService, BacklightState};
 use sailhand_core::network::{NetworkBackend, NetworkChannels, NetworkService};
+use sailhand_core::printers::{DiscoveryBackend, DiscoveryService, DiscoveryState};
 use sailhand_core::settings::{Settings, SettingsStore};
 use sailhand_core::{CredentialStore, Endpoint, PrinterService, ServiceChannels, Snapshot};
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
@@ -46,10 +48,12 @@ pub struct Session {
     pub network: Rc<NetworkController>,
     pub network_service: NetworkService,
     pub backlight: Rc<BacklightController>,
+    pub printers: Rc<PrintersController>,
     platform_window: Rc<MinimalSoftwareWindow>,
     channels: ServiceChannels,
     network_channels: NetworkChannels,
     backlight_states: tokio::sync::watch::Receiver<BacklightState>,
+    discovery_states: tokio::sync::watch::Receiver<DiscoveryState>,
     options: Options,
     count: usize,
     _runtime: tokio::runtime::Runtime,
@@ -98,13 +102,23 @@ impl Session {
         let settings = SettingsController::bind(
             &window,
             store,
-            Settings::default(),
+            snapshot_settings(&endpoint),
             &endpoint,
             Bridges {
                 service: service.clone(),
                 presenter: presenter.clone(),
                 network: network.clone(),
                 backlight: backlight_service,
+            },
+        );
+        let (discovery, discovery_states) = DiscoveryService::start(runtime.handle(), DiscoveryBackend::Simulated);
+        let printers = PrintersController::bind(
+            &window,
+            PrinterBridges {
+                settings: settings.clone(),
+                discovery,
+                credentials: CredentialStore::in_memory(),
+                presenter: presenter.clone(),
             },
         );
         actions::bind(&window, &service, &presenter, &settings);
@@ -116,10 +130,12 @@ impl Session {
             network,
             network_service,
             backlight,
+            printers,
             platform_window,
             channels,
             network_channels,
             backlight_states,
+            discovery_states,
             options,
             count: 0,
             _runtime: runtime,
@@ -170,6 +186,10 @@ impl Session {
         if self.backlight_states.has_changed().unwrap_or(false) {
             let state = self.backlight_states.borrow_and_update().clone();
             self.backlight.apply_state(&state);
+        }
+        if self.discovery_states.has_changed().unwrap_or(false) {
+            let state = self.discovery_states.borrow_and_update().clone();
+            self.printers.apply_discovery(state);
         }
         while let Ok(notice) = self.network_channels.notices.try_recv() {
             self.network.show_notice(&notice);
@@ -264,4 +284,13 @@ impl Session {
         self.window.global::<Navigation>().set_page(page);
         self.capture(name)
     }
+}
+
+/// The fake is the printer in use, saved beside one that never answers (TEST-NET-1, RFC 5737).
+fn snapshot_settings(endpoint: &Endpoint) -> Settings {
+    let mut settings = Settings::default();
+    let unreachable = Endpoint::parse("http://192.0.2.48:7125").expect("a valid address");
+    settings.choose_printer(&unreachable, "ender", None);
+    settings.choose_printer(endpoint, "voron", None);
+    settings
 }

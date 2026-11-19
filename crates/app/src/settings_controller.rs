@@ -5,7 +5,7 @@ use crate::network_controller::NetworkController;
 use crate::presenter::Presenter;
 use crate::{AppWindow, Backlight, PresetItem, UiSettings};
 use sailhand_core::backlight::{BacklightService, BacklightSettings, usable_brightness};
-use sailhand_core::settings::{MAX_SHOWN_PRESETS, Settings, SettingsStore, TemperaturePreset};
+use sailhand_core::settings::{MAX_SHOWN_PRESETS, SavedPrinter, Settings, SettingsStore, TemperaturePreset};
 use sailhand_core::step_choices::{StepLists, mirrored_row, nearest_step};
 use sailhand_core::{Endpoint, PrinterService};
 use slint::{ComponentHandle, ModelRc, VecModel};
@@ -25,6 +25,8 @@ pub struct SettingsController {
     store: SettingsStore,
     /// File contents; an address from the command line is not saved.
     settings: RefCell<Settings>,
+    /// The address in use (`Endpoint::display`), also when it came from the command line.
+    active: RefCell<String>,
     service: PrinterService,
     presenter: Rc<Presenter>,
     network: Rc<NetworkController>,
@@ -45,6 +47,7 @@ impl SettingsController {
             window: window.as_weak(),
             store,
             settings: RefCell::new(settings),
+            active: RefCell::new(endpoint.display()),
             service,
             presenter,
             network,
@@ -112,12 +115,6 @@ impl SettingsController {
         ui.on_steps_changed(move || {
             if let Some(controller) = controller.upgrade() {
                 controller.store_steps();
-            }
-        });
-        let controller = Rc::downgrade(self);
-        ui.on_moonraker_entered(move |address| {
-            if let Some(controller) = controller.upgrade() {
-                controller.change_moonraker(&address);
             }
         });
         let controller = Rc::downgrade(self);
@@ -191,20 +188,34 @@ impl SettingsController {
         });
     }
 
-    fn change_moonraker(&self, address: &str) {
-        match Endpoint::parse(address) {
-            Ok(endpoint) => {
-                let display = endpoint.display();
-                self.update(|settings| settings.moonraker.clone_from(&display));
-                if let Some(window) = self.window.upgrade() {
-                    window.global::<UiSettings>().set_moonraker(display.as_str().into());
-                }
-                self.network.set_endpoint(&endpoint);
-                self.service.connect_to(endpoint);
-                self.presenter.show_notice(&format!("Connecting to {display}"), false);
-            }
-            Err(error) => self.presenter.show_notice(&error.to_string(), true),
+    /// The saved printers, as in the settings file.
+    pub fn saved_printers(&self) -> Vec<SavedPrinter> {
+        self.settings.borrow().printers.clone()
+    }
+
+    pub fn active_address(&self) -> String {
+        self.active.borrow().clone()
+    }
+
+    /// Uses this printer from now on, also after the next start, and keeps it.
+    pub fn switch_printer(&self, endpoint: Endpoint, name: &str, uuid: Option<&str>) {
+        let display = endpoint.display();
+        self.update(|settings| settings.choose_printer(&endpoint, name, uuid));
+        self.active.replace(display.clone());
+        if let Some(window) = self.window.upgrade() {
+            window.global::<UiSettings>().set_moonraker(display.as_str().into());
         }
+        self.apply_hidden_macros();
+        self.network.set_endpoint(&endpoint);
+        self.service.connect_to(endpoint);
+        self.presenter.show_notice(&format!("Connecting to {name}"), false);
+    }
+
+    /// Removes the saved printer; the display keeps using it if it is the active one. Returns whether it was saved.
+    pub fn forget_printer(&self, address: &str) -> bool {
+        let mut forgotten = false;
+        self.update(|settings| forgotten = settings.forget_printer(address));
+        forgotten
     }
 
     fn change_fullscreen(&self, fullscreen: bool) {
@@ -216,10 +227,12 @@ impl SettingsController {
 
     /// Shows a macro in the console or hides it; the choice is kept in the settings file.
     pub fn set_macro_visible(&self, name: &str, visible: bool) {
+        let active = self.active_address();
         self.update(|settings| {
-            settings.hidden_macros.retain(|hidden| hidden != name);
+            let Some(printer) = settings.printer_mut(&active) else { return };
+            printer.hidden_macros.retain(|hidden| hidden != name);
             if !visible {
-                settings.hidden_macros.push(name.to_owned());
+                printer.hidden_macros.push(name.to_owned());
             }
         });
         self.apply_hidden_macros();
@@ -227,14 +240,18 @@ impl SettingsController {
 
     /// Forgets macros the printer no longer has; new macros are known and visible.
     fn reconcile_macros(&self, macros: &[String]) {
+        let active = self.active_address();
         self.update(|settings| {
-            settings.reconcile_macros(macros);
+            if let Some(printer) = settings.printer_mut(&active) {
+                printer.reconcile_macros(macros);
+            }
         });
         self.apply_hidden_macros();
     }
 
     fn apply_hidden_macros(&self) {
-        self.presenter.set_hidden_macros(self.settings.borrow().hidden_macros.clone());
+        let hidden = self.settings.borrow().hidden_macros(&self.active.borrow());
+        self.presenter.set_hidden_macros(hidden);
     }
 
     fn update(&self, change: impl FnOnce(&mut Settings)) {

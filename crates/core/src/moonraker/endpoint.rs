@@ -2,6 +2,9 @@
 
 use thiserror::Error;
 
+const HTTP_PORT: u16 = 80;
+const HTTPS_PORT: u16 = 443;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Endpoint {
     secure: bool,
@@ -49,12 +52,30 @@ impl Endpoint {
         self.secure
     }
 
-    /// Moonraker runs on this machine, so local settings (e.g. the network) belong to the printer host.
-    pub fn is_local(&self) -> bool {
-        let host = match self.authority.strip_prefix('[') {
+    /// The host name or IP address, without port and brackets.
+    pub fn host(&self) -> &str {
+        match self.authority.strip_prefix('[') {
             Some(bracketed) => bracketed.split(']').next().unwrap_or_default(),
             None => self.authority.rsplit_once(':').map_or(self.authority.as_str(), |(host, _)| host),
+        }
+    }
+
+    /// `host:port` to open a TCP connection to, with the default port of the scheme when the address has none.
+    pub fn socket_address(&self) -> String {
+        let has_port = match self.authority.rsplit_once(']') {
+            Some((_, rest)) => rest.starts_with(':'),
+            None => self.authority.contains(':'),
         };
+        if has_port {
+            return self.authority.clone();
+        }
+        let port = if self.secure { HTTPS_PORT } else { HTTP_PORT };
+        format!("{}:{port}", self.authority)
+    }
+
+    /// Moonraker runs on this machine, so local settings (e.g. the network) belong to the printer host.
+    pub fn is_local(&self) -> bool {
+        let host = self.host();
         host.eq_ignore_ascii_case("localhost")
             || host.parse::<std::net::IpAddr>().is_ok_and(|address| address.is_loopback())
     }
@@ -96,6 +117,22 @@ mod tests {
         }
         for address in ["http://printer.local:7125", "192.168.1.5", "http://[fe80::1]:7125"] {
             assert!(!Endpoint::parse(address).unwrap().is_local(), "{address}");
+        }
+    }
+
+    #[test]
+    fn socket_address_adds_the_default_port_of_the_scheme() {
+        let cases = [
+            ("voron.local:7125", "voron.local", "voron.local:7125"),
+            ("http://voron.local", "voron.local", "voron.local:80"),
+            ("https://voron.local", "voron.local", "voron.local:443"),
+            ("http://[::1]:7125", "::1", "[::1]:7125"),
+            ("http://[::1]", "::1", "[::1]:80"),
+        ];
+        for (address, host, socket) in cases {
+            let endpoint = Endpoint::parse(address).unwrap();
+            assert_eq!(endpoint.host(), host, "{address}");
+            assert_eq!(endpoint.socket_address(), socket, "{address}");
         }
     }
 }

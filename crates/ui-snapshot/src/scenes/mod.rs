@@ -44,7 +44,7 @@ pub enum Scene {
     /// dialog of AFC lanes, the path card, the head's part of the path and the sensors of the machine on System; with AFC
     /// also the Changer page (tool map, service) and the error state.
     Lanes,
-    /// Settings > Network: list, connecting, confirmation, read-only fallback.
+    /// System > Network: list, connecting, confirmation, read-only fallback; System > Printers.
     Network,
     /// Taps that last longer than a status update still count while the temperatures change.
     Taps,

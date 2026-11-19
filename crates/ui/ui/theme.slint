@@ -83,6 +83,8 @@ export global Theme {
     // Rows of controls (label, slider, buttons) and the narrow square-ish buttons in them.
     out property <length> row-height: 60px;
     out property <length> row-height-small: 52px;
+    // Distance from one row of a list to the next (`ScrollList` rows of `ListRow`).
+    out property <length> list-row-pitch: self.row-height-small + self.spacing-small;
     // A file or job name: room for two lines of `font-normal`.
     out property <length> name-height: 48px;
     out property <length> button-narrow: 64px;
