@@ -242,9 +242,7 @@ export component MmuStrip inherits Rectangle {
         // Where the filament is, while it is on its way: once loaded the line would only repeat itself.
         if !Printer.mmu-paused && !Printer.mmu-path-settled: FilamentPath { path: Printer.mmu-path; compact: true; }
         // While the MMU holds the print, the reason and the buttons need the room; the reason already names the cause.
-        if !Printer.mmu-paused && (Printer.mmu-has-buffer || Printer.mmu-flowguard-state != "off"): FlowGuardInstrument {
-            measured-flow-only: true;
-        }
+        if !Printer.mmu-paused && (Printer.mmu-has-buffer || Printer.mmu-flowguard-state != "off"): FlowGuardInstrument { }
         // The reason of the pause stands in the banner of the print page.
         if Printer.mmu-paused || Printer.mmu-locked: MmuRecoverRow { }
     }

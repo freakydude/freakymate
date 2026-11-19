@@ -120,7 +120,7 @@ holds **Tools** and **Service**. The Gates tab and a strip on the print page sho
   level, or triggered with its reason. A buffer with one switch shows the side it does not measure as an outline;
 - with an encoder, what is left before FlowGuard trips on it (headroom);
 - the flow rate, measured by the encoder or estimated by the sync-feedback controller with a proportional sensor
-  (the print page shows the measured one only).
+  (the estimate marked with "~").
 
 A tap on a gate opens what can be done with it: select, load, preload, check or eject it, and pick its spool. Without
 a spool the dialog sets material, colour and nozzle temperature of the gate in Happy Hare's gate map instead, from a

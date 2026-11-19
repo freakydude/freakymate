@@ -298,8 +298,6 @@ component BufferScale inherits Rectangle {
 // Buffer, tangle prevention and FlowGuard of Happy Hare as one instrument, as all of them read the buffer: one line
 // that states what stands out most, and the scale. Without a buffer (an encoder alone) only the line.
 export component FlowGuardInstrument inherits VerticalLayout {
-    // The print page shows the flow rate only where an encoder measures it; the estimate stays on the Filament page.
-    in property <bool> measured-flow-only;
     // The buffer is the selected gate's: the card of another lane keeps FlowGuard's line and leaves the scale out.
     in property <bool> with-buffer: true;
 
@@ -312,7 +310,6 @@ export component FlowGuardInstrument inherits VerticalLayout {
     property <float> level: Printer.mmu-flowguard-level;
     property <int> percent: Printer.mmu-flowguard-percent;
     property <color> tone: StateIcons.severity-color(Printer.mmu-flowguard-line);
-    property <bool> shows-flow: Printer.mmu-has-flow-rate && (Printer.mmu-flow-measured || !root.measured-flow-only);
     property <string> guard-word: root.guard == "monitoring" ? @tr("FlowGuard monitoring") : @tr("FlowGuard ready");
     property <string> statement: {
         if (root.kind == "triggered") {
@@ -357,10 +354,13 @@ export component FlowGuardInstrument inherits VerticalLayout {
             color: Theme.muted;
             font-size: Theme.font-small;
         }
-        if root.shows-flow: IconLabel {
+        if Printer.mmu-has-flow-rate: IconLabel {
             horizontal-stretch: 0;
             icon: Icons.filament-flow;
-            text: @tr("Flow {} %", round(Printer.mmu-flow-rate));
+            // "~" marks the estimate of the sync controller; only the encoder measures the flow.
+            text: Printer.mmu-flow-measured
+                ? @tr("Flow {} %", round(Printer.mmu-flow-rate))
+                : @tr("Flow ~{} %", round(Printer.mmu-flow-rate));
             color: Theme.muted;
             font-size: Theme.font-small;
         }
