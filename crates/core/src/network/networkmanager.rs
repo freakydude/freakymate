@@ -14,6 +14,8 @@ const DEVICE_TYPE_ETHERNET: u32 = 1;
 const DEVICE_TYPE_WIFI: u32 = 2;
 /// Device state below which a wired device has no cable (`NM_DEVICE_STATE_UNAVAILABLE`).
 const DEVICE_STATE_UNAVAILABLE: u32 = 20;
+/// First state of an activation in progress (`NM_DEVICE_STATE_PREPARE`); it runs until `ACTIVATED`.
+const DEVICE_STATE_PREPARE: u32 = 40;
 const DEVICE_STATE_ACTIVATED: u32 = 100;
 const ACTIVE_CONNECTION_ACTIVATED: u32 = 2;
 const ACTIVE_CONNECTION_DEACTIVATED: u32 = 4;
@@ -199,22 +201,21 @@ impl NetworkManager {
             wifi_enabled: self.manager.wireless_enabled().await?,
             ..NetworkState::default()
         };
+        if let Some((path, device)) = self.find_wifi_device().await? {
+            state.wifi_present = true;
+            let wireless = at!(WirelessProxy, &self.connection, path);
+            let active = self.active_ssid(&wireless).await?;
+            let access_points = self.access_points(&wireless).await?;
+            state.networks = wifi_networks(&access_points, &known_names, active.as_deref());
+            if active.is_some() {
+                state.wifi_address = self.address(&device).await?;
+            }
+            state.active_ssid = active;
+        }
         for path in self.manager.get_devices().await? {
             let device = at!(DeviceProxy, &self.connection, path);
-            match device.device_type().await? {
-                DEVICE_TYPE_WIFI if !state.wifi_present => {
-                    state.wifi_present = true;
-                    let wireless = at!(WirelessProxy, &self.connection, path);
-                    let active = self.active_ssid(&wireless).await?;
-                    let access_points = self.access_points(&wireless).await?;
-                    state.networks = wifi_networks(&access_points, &known_names, active.as_deref());
-                    if active.is_some() {
-                        state.wifi_address = self.address(&device).await?;
-                    }
-                    state.active_ssid = active;
-                }
-                DEVICE_TYPE_ETHERNET => state.wired.push(self.wired_link(&device).await?),
-                _ => {}
+            if device.device_type().await? == DEVICE_TYPE_ETHERNET {
+                state.wired.push(self.wired_link(&device).await?);
             }
         }
         Ok(state)
@@ -301,14 +302,26 @@ impl NetworkManager {
     }
 
     async fn wifi_device(&self) -> Result<(OwnedObjectPath, WirelessProxy<'static>), NetworkError> {
+        let (path, _) =
+            self.find_wifi_device().await?.ok_or_else(|| NetworkError::NotFound("Wi-Fi adapter".to_owned()))?;
+        let wireless = at!(WirelessProxy, &self.connection, path);
+        Ok((path, wireless))
+    }
+
+    /// The one Wi-Fi adapter the UI shows and acts on, see [`wifi_preference`].
+    async fn find_wifi_device(&self) -> Result<Option<(OwnedObjectPath, DeviceProxy<'static>)>, NetworkError> {
+        let mut best: Option<(u8, OwnedObjectPath, DeviceProxy<'static>)> = None;
         for path in self.manager.get_devices().await? {
             let device = at!(DeviceProxy, &self.connection, path);
-            if device.device_type().await? == DEVICE_TYPE_WIFI {
-                let wireless = at!(WirelessProxy, &self.connection, path);
-                return Ok((path, wireless));
+            if device.device_type().await? != DEVICE_TYPE_WIFI {
+                continue;
+            }
+            let preference = wifi_preference(device.state().await?);
+            if best.as_ref().is_none_or(|(current, ..)| preference < *current) {
+                best = Some((preference, path, device));
             }
         }
-        Err(NetworkError::NotFound("Wi-Fi adapter".to_owned()))
+        Ok(best.map(|(_, path, device)| (path, device)))
     }
 
     async fn access_points(&self, wireless: &WirelessProxy<'_>) -> Result<Vec<AccessPoint>, NetworkError> {
@@ -408,6 +421,19 @@ impl NetworkManager {
     }
 }
 
+/// Rank of a Wi-Fi adapter by its device state, lower is preferred; on a tie the first adapter wins.
+///
+/// With a second adapter (say a USB stick next to the built-in one) the UI must manage the one that
+/// carries the connection; acting on another would move the saved profile over to it.
+fn wifi_preference(state: u32) -> u8 {
+    match state {
+        DEVICE_STATE_ACTIVATED => 0,
+        DEVICE_STATE_PREPARE..DEVICE_STATE_ACTIVATED => 1,
+        state if state > DEVICE_STATE_UNAVAILABLE => 2,
+        _ => 3,
+    }
+}
+
 fn no_object() -> ObjectPath<'static> {
     ObjectPath::from_static_str_unchecked(NO_OBJECT)
 }
@@ -457,5 +483,17 @@ fn bytes(value: &OwnedValue) -> Vec<u8> {
             })
             .collect(),
         _ => Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn connected_adapter_comes_before_connecting_idle_and_unavailable_ones() {
+        // NM_DEVICE_STATE: 10 unmanaged, 20 unavailable, 30 disconnected, 70 ip-config, 100 activated, 110 deactivating.
+        let order = [100, 70, 30, 110, 20, 10].map(wifi_preference);
+        assert_eq!(order, [0, 1, 2, 2, 3, 3]);
     }
 }
