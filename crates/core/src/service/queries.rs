@@ -58,6 +58,7 @@ fn missing_component(query: &Query, components: &ServerComponents) -> Option<&'s
         Query::PrintHistory if !components.history => Some("history"),
         Query::Spoolman | Query::SpoolList if !components.spoolman => Some("spoolman"),
         Query::PowerDevices if !components.power => Some("power"),
+        Query::Updates if !components.update_manager => Some("update_manager"),
         _ => None,
     }
 }
@@ -150,6 +151,7 @@ mod tests {
         assert_eq!(missing_component(&Query::PowerDevices, &none), Some("power"));
         assert_eq!(missing_component(&Query::PrintHistory, &none), Some("history"));
         assert_eq!(missing_component(&Query::SpoolList, &none), Some("spoolman"));
+        assert_eq!(missing_component(&Query::Updates, &none), Some("update_manager"));
         assert_eq!(missing_component(&Query::Files, &none), None);
 
         let power = ServerComponents { power: true, ..ServerComponents::default() };

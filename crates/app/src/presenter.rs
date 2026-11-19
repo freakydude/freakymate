@@ -228,6 +228,9 @@ impl Presenter {
             observer(snapshot);
         }
         let printer = window.global::<Printer>();
+        if is_other_printer(&self.cache.borrow().snapshot.endpoint, &snapshot.endpoint) {
+            self.forget_printer(&printer);
+        }
         let status = &snapshot.status;
         let ready = snapshot.connection == ConnectionState::Connected && status.klippy_state == KlippyState::Ready;
 
@@ -249,6 +252,25 @@ impl Presenter {
             self.show_job_thumbnail();
         }
         self.refresh_job_texts();
+    }
+
+    /// Another printer was chosen: what came from the previous one outside the snapshot (files, spools, updates, power
+    /// devices, the host's network, console, charts, waiting commands) is dropped; the new printer's arrives anew.
+    fn forget_printer(&self, printer: &Printer) {
+        *self.cache.borrow_mut() = Cache::default();
+        *self.heater_watch.borrow_mut() = HeaterWatch::default();
+        self.running_commands.borrow_mut().clear();
+        self.show_running_command();
+        self.history.close();
+        self.console.clear();
+        replace_rows(&self.power_devices, Vec::new());
+        replace_rows(&self.updates, Vec::new());
+        replace_rows(&self.host_interfaces, Vec::new());
+        printer.set_updates_available(0);
+        printer.set_updates_busy(false);
+        self.show_file_rows();
+        self.show_spool_rows();
+        self.show_job_thumbnail();
     }
 
     /// The connection to Moonraker, Klipper's state and who is logged in.
@@ -1004,5 +1026,23 @@ impl Presenter {
             }
             None => printer.set_has_job_thumbnail(false),
         }
+    }
+}
+
+/// The snapshot comes from another printer than the shown one; the empty address is the display before its first
+/// snapshot.
+fn is_other_printer(shown: &str, arrived: &str) -> bool {
+    !shown.is_empty() && shown != arrived
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_other_printer;
+
+    #[test]
+    fn only_a_change_of_address_is_another_printer() {
+        assert!(is_other_printer("http://voron:7125", "http://sidewinder:7125"));
+        assert!(!is_other_printer("http://voron:7125", "http://voron:7125"));
+        assert!(!is_other_printer("", "http://voron:7125"));
     }
 }

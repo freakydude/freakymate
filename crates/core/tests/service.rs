@@ -671,6 +671,31 @@ async fn firmware_restart_after_shutdown_during_a_print() {
     wait_for(&mut channels, ready).await;
 }
 
+/// The System tabs show the host's updates and power devices; after another printer was chosen they must be that
+/// printer's without anyone asking.
+#[tokio::test(flavor = "multi_thread")]
+async fn updates_and_power_devices_arrive_after_each_connection() {
+    let first = start_fake().await;
+    let second = start_fake().await;
+    let (service, mut channels) = start_service(first, CredentialStore::in_memory());
+    host_lists_arrive(&mut channels).await;
+
+    service.connect_to(second.clone());
+    wait_for(&mut channels, |snapshot| snapshot.endpoint == second.display() && ready(snapshot)).await;
+    host_lists_arrive(&mut channels).await;
+}
+
+/// Waits for the updates and the power devices, in whatever order they come.
+async fn host_lists_arrive(channels: &mut ServiceChannels) {
+    let (mut updates, mut power) = (false, false);
+    while !(updates && power) {
+        match next_event(channels, |event| matches!(event, Event::Updates(_) | Event::PowerDevices(_))).await {
+            Event::Updates(_) => updates = true,
+            _ => power = true,
+        }
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn queries_host_functions() {
     let endpoint = start_fake().await;
