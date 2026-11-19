@@ -76,7 +76,7 @@ impl Application {
             Some(path) => SettingsStore::new(path),
             None => SettingsStore::default_location()?,
         };
-        let settings = store.load_or_create().unwrap_or_else(|error| {
+        let mut settings = store.load_or_create().unwrap_or_else(|error| {
             log::warn!("{error}; using defaults");
             sailhand_core::Settings::default()
         });
@@ -87,7 +87,8 @@ impl Application {
             std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "default".to_owned())
         };
         crate::logging::header("Renderer", &renderer);
-        let endpoint = Endpoint::parse(options.moonraker.as_deref().unwrap_or(&settings.moonraker))?;
+        let endpoint = Endpoint::parse(&settings.start_address(options.moonraker.as_deref()))?;
+        settings.keep_first_printer(&endpoint);
         log::info!("Moonraker at {}", endpoint.display());
 
         let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build()?;

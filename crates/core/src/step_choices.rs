@@ -1,7 +1,7 @@
-//! The step sizes the UI offers, configurable in the `[step_choices]` table of the settings file. A missing key means
+//! The step sizes the UI offers, configurable in the `[step_choices]` section of the settings file. A missing key means
 //! the defaults; a list written by hand is sorted, cleaned and checked here, so the UI only shows what fits.
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 /// Most steps one row of the UI has room for at 800x480.
 const MAX_STEPS: usize = 6;
@@ -18,8 +18,7 @@ pub const DEFAULT_MANUAL_PROBE_MM: [f64; 4] = [0.01, 0.05, 0.1, 1.0];
 
 /// The lists as written in the settings file; `None` is a key that is not there. Kept as written, so saving the
 /// settings does not rearrange what someone typed.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct StepChoices {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub move_mm: Option<Vec<f64>>,
@@ -179,16 +178,5 @@ mod tests {
     #[test]
     fn the_probe_row_mirrors_the_steps() {
         assert_eq!(mirrored_row(&[0.01, 0.1, 1.0]), [-1.0, -0.1, -0.01, 0.01, 0.1, 1.0]);
-    }
-
-    #[test]
-    fn the_table_is_read_from_toml_and_only_written_when_there_is_an_entry() {
-        let text = "[step_choices]\nmove_mm = [100, 1, 0.5]\n";
-        let settings: crate::Settings = toml::from_str(text).unwrap();
-
-        assert_eq!(settings.step_choices.move_mm, Some(vec![100.0, 1.0, 0.5]));
-        assert_eq!(settings.step_choices.lists().move_mm, [0.5, 1.0, 100.0]);
-        assert!(toml::to_string(&settings).unwrap().contains("move_mm = [100.0, 1.0, 0.5]"));
-        assert!(!toml::to_string(&crate::Settings::default()).unwrap().contains("step_choices"));
     }
 }

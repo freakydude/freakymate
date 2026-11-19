@@ -11,6 +11,7 @@ pub mod color;
 pub mod commands;
 pub mod credentials;
 pub mod domain;
+mod klipper_ini;
 pub mod moonraker;
 pub mod network;
 pub mod printers;
@@ -21,7 +22,6 @@ pub mod setup;
 pub mod sourced;
 pub mod sources;
 pub mod step_choices;
-mod toml_merge;
 
 pub use commands::Command;
 pub use credentials::CredentialStore;

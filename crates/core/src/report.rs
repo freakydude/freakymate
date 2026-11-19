@@ -87,7 +87,7 @@ pub async fn write(request: ReportRequest) -> Result<PathBuf, ReportError> {
         log::warn!("{error}; using defaults");
         Settings::default()
     });
-    let endpoint = Endpoint::parse(request.moonraker.as_deref().unwrap_or(&settings.moonraker))?;
+    let endpoint = Endpoint::parse(&settings.start_address(request.moonraker.as_deref()))?;
     let sailhand = sailhand_section(&request.facts, &store, &settings);
     let report = collect(&endpoint, &CredentialStore::default_location(), sailhand).await?;
     let path = output_path(request.output.as_deref(), store.path(), Path::new("."));

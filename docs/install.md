@@ -83,7 +83,7 @@ architecture and packages first and stops with a message if something does not f
 
    Options: `-m <moonraker url>`, `-d <printer_data folder>` (default `~/printer_data`), `-c stable|beta` (update channel, see [Updates and channels](#updates-and-channels)).
    Run again, it keeps the address and folder of the existing installation unless you give them.
-   Settings go to `printer_data/config/sailhand.conf` (TOML), next to the Klipper configs, so they can be edited in
+   Settings go to `printer_data/config/sailhand.conf` (INI, like `moonraker.conf`), next to the Klipper configs, so they can be edited in
    Mainsail or Fluidd (see [Configuration](configuration.md#settings-file)). The log is `printer_data/logs/sailhand.log` (Mainsail: Machine → logs), see [Configuration](configuration.md#log).
    To remove it again, see [Uninstall](#uninstall).
 
