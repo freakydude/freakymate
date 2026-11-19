@@ -243,13 +243,16 @@ export component TabButton inherits Rectangle {
     in property <string> text;
     in property <bool> checked;
     in property <bool> enabled: true;
-    // Waiting items (updates), as a small badge after the text.
+    // Waiting items (updates), as a small badge on the corner of the icon: it takes no width, so a badge does not
+    // shorten the texts of a full tab bar.
     in property <int> count;
     // Something needs a look: a small dot in the top right corner.
     in property <bool> warn;
     callback clicked;
 
     property <color> content: !root.enabled ? Theme.disabled-foreground : root.checked ? Theme.accent : Theme.muted;
+    // Diameter of the count badge.
+    property <length> badge-size: 16px;
 
     min-width: 130px;
     max-width: 190px;
@@ -271,12 +274,32 @@ export component TabButton inherits Rectangle {
         padding-bottom: 3px;
         spacing: Theme.spacing;
         alignment: center;
-        if root.icon.width > 0: Image {
+        if root.icon.width > 0: Rectangle {
             cross-axis-self-alignment: center;
-            source: root.icon;
-            colorize: root.content;
             width: Theme.icon-small;
             height: Theme.icon-small;
+            Image {
+                source: root.icon;
+                colorize: root.content;
+                width: parent.width;
+                height: parent.height;
+            }
+            if root.count > 0: Rectangle {
+                x: parent.width - root.badge-size * 0.75;
+                y: -root.badge-size / 2;
+                width: max(root.badge-size, count-text.preferred-width + 6px);
+                height: root.badge-size;
+                border-radius: self.height / 2;
+                background: Theme.accent;
+                count-text := Text {
+                    text: root.count;
+                    color: Theme.on-accent;
+                    font-size: Theme.font-small;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
         }
         Text {
             text: root.text;
@@ -285,21 +308,6 @@ export component TabButton inherits Rectangle {
             font-weight: root.checked ? 700 : 600;
             vertical-alignment: center;
             overflow: elide;
-        }
-        if root.count > 0: Rectangle {
-            cross-axis-self-alignment: center;
-            width: max(18px, count-text.preferred-width + 8px);
-            height: 18px;
-            border-radius: 9px;
-            background: Theme.accent;
-            count-text := Text {
-                text: root.count;
-                color: Theme.on-accent;
-                font-size: Theme.font-small;
-                font-weight: 700;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
         }
     }
 

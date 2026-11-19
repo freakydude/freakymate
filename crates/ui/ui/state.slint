@@ -454,8 +454,10 @@ export global Backlight {
 // The printers (Moonraker servers) this display can use. Rust writes the state, the UI calls the callbacks.
 export global PrinterChoice {
     in property <[PrinterItem]> printers;
-    // Name of the active printer, for the Settings card.
+    // Name of the active printer, for the Settings card and, with several saved printers, the status bar.
     in property <string> active-name;
+    // More than one printer is saved: the status bar says which one this display shows.
+    in property <bool> several-saved;
     // The Printers page is shown: Rust searches the network and checks the saved printers only meanwhile.
     callback watch(bool);
     // Address: connect to it and keep it.

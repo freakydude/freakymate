@@ -2,7 +2,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, Severity } from "../state.slint";
+import { Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, PrinterChoice, Severity } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
 import { BusyWheel } from "busy-wheel.slint";
 
@@ -85,6 +85,8 @@ export component StatusBar inherits Rectangle {
         : Network.busy;
     property <Severity> severity: StateIcons.summary-severity();
     property <bool> shows-progress: !StateIcons.print-page-open() && Printer.ready && (Printer.print-state == "printing" || Printer.print-state == "paused");
+    // A long printer name is shortened; the state beside it needs the room.
+    property <length> printer-name-max-width: 160px;
 
     height: 44px;
     background: Theme.surface;
@@ -197,6 +199,16 @@ export component StatusBar inherits Rectangle {
                             overflow: elide;
                         }
                     }
+                }
+
+                // Which printer this is, when there is a choice; it stays while messages and activities come and go.
+                if PrinterChoice.several-saved && PrinterChoice.active-name != "": Text {
+                    max-width: root.printer-name-max-width;
+                    text: PrinterChoice.active-name;
+                    color: Theme.muted;
+                    font-size: Theme.font-normal;
+                    vertical-alignment: center;
+                    overflow: elide;
                 }
 
                 if Printer.unread-errors > 0: UnreadCounter {

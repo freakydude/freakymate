@@ -147,7 +147,9 @@ impl PrintersController {
         replace_rows(&self.rows, entries.iter().map(printer_item).collect());
         if let Some(window) = self.window.upgrade() {
             let active = entries.iter().find(|entry| entry.active).map(|entry| entry.name.as_str()).unwrap_or_default();
-            window.global::<PrinterChoice>().set_active_name(active.into());
+            let choice = window.global::<PrinterChoice>();
+            choice.set_active_name(active.into());
+            choice.set_several_saved(self.settings.saved_printers().len() > 1);
         }
         self.entries.replace(entries);
     }
