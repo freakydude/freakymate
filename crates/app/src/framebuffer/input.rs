@@ -8,13 +8,14 @@
 //! the UI. With the verbose log every touch is logged with its place and with how late the event loop read it.
 
 use super::InputTarget;
+use super::rotation::Rotation;
 use input::event::keyboard::{KeyState, KeyboardEventTrait};
 use input::event::pointer::ButtonState;
 use input::event::touch::{TouchEventPosition, TouchEventSlot, TouchEventTrait};
 use input::event::{KeyboardEvent, PointerEvent, TouchEvent};
 use input::{Event, Libinput, LibinputInterface};
 use slint::platform::{PointerEventButton, WindowEvent};
-use slint::{LogicalPosition, Window};
+use slint::{LogicalPosition, PhysicalSize, Window};
 use std::fs::{File, OpenOptions};
 use std::os::fd::{AsFd, BorrowedFd, OwnedFd};
 use std::os::unix::fs::OpenOptionsExt;
@@ -29,13 +30,16 @@ pub struct Input {
     /// The seat slot of the finger that acts as the pointer.
     finger: Option<u32>,
     position: LogicalPosition,
+    rotation: Rotation,
+    /// The framebuffer, which is where the touch device reports; the window is turned against it by `rotation`.
+    panel: PhysicalSize,
 }
 
 impl Input {
-    pub fn open(target: InputTarget) -> Result<Self, String> {
+    pub fn open(target: InputTarget, rotation: Rotation, panel: PhysicalSize) -> Result<Self, String> {
         let mut libinput = Libinput::new_with_udev(Devices);
         libinput.udev_assign_seat("seat0").map_err(|()| "libinput cannot use seat0".to_owned())?;
-        Ok(Self { libinput, target, finger: None, position: LogicalPosition::default() })
+        Ok(Self { libinput, target, finger: None, position: LogicalPosition::default(), rotation, panel })
     }
 
     /// Reads the waiting events and hands them to `window`.
@@ -46,7 +50,7 @@ impl Input {
         }
         while let Some(event) = self.libinput.next() {
             let swallowed = self.wakes_the_screen(&event);
-            log_touch(&event, window, swallowed);
+            log_touch(&event, self.panel, self.touch_place(window), swallowed);
             if swallowed {
                 continue;
             }
@@ -65,9 +69,12 @@ impl Input {
     }
 
     fn translate(&mut self, event: &Event, window: &Window) -> Vec<WindowEvent> {
-        let size = window.size();
+        let (rotation, size) = (self.rotation, self.panel);
         let scale = window.scale_factor();
-        let place = |x: f64, y: f64| LogicalPosition::new(x as f32 / scale, y as f32 / scale);
+        let place = |x: f64, y: f64| {
+            let (x, y) = rotation.touch_to_window(x, y, f64::from(size.width), f64::from(size.height));
+            LogicalPosition::new(x as f32 / scale, y as f32 / scale)
+        };
         let left = PointerEventButton::Left;
         match event {
             Event::Touch(TouchEvent::Down(down)) if self.finger.is_none() => {
@@ -94,6 +101,15 @@ impl Input {
                 }
             }
             _ => Vec::new(),
+        }
+    }
+
+    /// Where a touch device position (0 to `width`/`height` of the panel) is in layout pixels, for the log.
+    fn touch_place<'a>(&'a self, window: &'a Window) -> impl Fn(f64, f64) -> (f64, f64) + 'a {
+        let scale = f64::from(window.scale_factor());
+        move |x, y| {
+            let (x, y) = self.rotation.touch_to_window(x, y, f64::from(self.panel.width), f64::from(self.panel.height));
+            (x / scale, y / scale)
         }
     }
 
@@ -129,20 +145,15 @@ fn input_activity(event: &Event) -> Option<bool> {
 
 /// Verbose log of a touch going down or up: where (in layout pixels, as in the .slint files) and how long after the
 /// driver the event loop read it.
-fn log_touch(event: &Event, window: &Window, swallowed: bool) {
+fn log_touch(event: &Event, panel: PhysicalSize, place: impl Fn(f64, f64) -> (f64, f64), swallowed: bool) {
     if !log::log_enabled!(log::Level::Debug) {
         return;
     }
     let note = if swallowed { ", only wakes the screen" } else { "" };
     match event {
         Event::Touch(TouchEvent::Down(down)) => {
-            let (size, scale) = (window.size(), f64::from(window.scale_factor()));
-            log::debug!(
-                "touch down at {:.0},{:.0}, read {} ms late{note}",
-                down.x_transformed(size.width) / scale,
-                down.y_transformed(size.height) / scale,
-                lateness_ms(down.time_usec()),
-            );
+            let (x, y) = place(down.x_transformed(panel.width), down.y_transformed(panel.height));
+            log::debug!("touch down at {x:.0},{y:.0}, read {} ms late{note}", lateness_ms(down.time_usec()));
         }
         Event::Touch(TouchEvent::Up(up)) => {
             log::debug!("touch up, read {} ms late{note}", lateness_ms(up.time_usec()));

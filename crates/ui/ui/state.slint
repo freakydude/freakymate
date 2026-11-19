@@ -304,8 +304,6 @@ export global Printer {
 
     // Lists
     in property <[string]> macros;
-    // The macro that starts a print: while one runs, its tile is disabled.
-    in property <string> print-start-macro;
     // Every macro of the printer with its visibility, for the settings.
     in property <[MacroItem]> macro-items;
     // Parameter form of the macro chosen in the console.
@@ -353,6 +351,11 @@ export global Printer {
     // The tools the prepared file uses and how they compare: with their gates (MMU), or tool 0 with the spool in use;
     // `gate` is -1 without MMU.
     in property <[ToolMatchItem]> prepared-tools;
+    // What the prepared file asks of the machine itself (nozzle diameter, temperature limits) that it does not fit, one
+    // line each; the flags mark the tiles of the facts.
+    in property <[string]> prepared-hints;
+    in property <bool> prepared-nozzle-differs;
+    in property <bool> prepared-temperature-differs;
     // Files marked in the file list; the path and name only when it is a single one, which can be prepared.
     in property <int> marked-file-count;
     in property <string> marked-file-path;

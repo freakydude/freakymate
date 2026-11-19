@@ -182,7 +182,7 @@ impl Session {
             "access.oneshot_token" => Ok(json!(backend.access().oneshot_token())),
             "server.info" => Ok(server_info(backend)),
             "printer.info" => Ok(printer_info(backend)),
-            "printer.gcode.help" => Ok(gcode_help(backend)),
+            "printer.gcode.help" if backend.gcode_help_enabled() => Ok(gcode_help(backend)),
             "server.gcode_store" => Ok(backend.with_host(|host| {
                 host.gcode_store(params.get("count").and_then(Value::as_u64).map(|count| count as usize))
             })),
@@ -225,7 +225,7 @@ impl Session {
             }
             "server.files.list" => Ok(backend.catalog().list()),
             "server.files.metadata" => Ok(find_file(backend, params)?.metadata()),
-            "server.history.list" => Ok(backend.history()),
+            "server.history.list" if backend.history_enabled() => Ok(backend.history()),
             "server.files.delete_file" => delete_file(backend, params),
             "server.files.thumbnails" => Ok(find_file(backend, params)?.thumbnails()),
             "server.spoolman.status" if backend.spoolman_enabled() => {
@@ -335,7 +335,10 @@ fn spoolman_proxy(backend: &Backend, params: &Value) -> Value {
 
 fn server_info(backend: &Backend) -> Value {
     let state = backend.with_printer(|printer| printer.klippy_state());
-    let mut components = vec!["file_manager", "machine", "data_store", "update_manager", "power", "history"];
+    let mut components = vec!["file_manager", "machine", "data_store", "update_manager", "power"];
+    if backend.history_enabled() {
+        components.push("history");
+    }
     if backend.spoolman_enabled() {
         components.push("spoolman");
     }
@@ -767,6 +770,28 @@ mod tests {
 
         assert_eq!(reply["error"]["code"], 400);
         assert_eq!(reply["error"]["message"], "Must home axis first");
+    }
+
+    #[test]
+    fn profile_without_history_has_no_history_component_or_methods() {
+        let backend = Backend::with_profile(1.0, MachineProfile::voron().without_history());
+        let mut session = Session::new(1);
+
+        let info = exchange(&mut session, &backend, call("server.info", json!({})));
+        let reply = exchange(&mut session, &backend, call("server.history.list", json!({})));
+
+        assert!(!info["result"]["components"].as_array().unwrap().iter().any(|name| name == "history"));
+        assert_eq!(reply["error"]["code"], -32601);
+    }
+
+    #[test]
+    fn profile_without_gcode_help_reports_the_method_as_unknown() {
+        let backend = Backend::with_profile(1.0, MachineProfile::voron().without_gcode_help());
+        let mut session = Session::new(1);
+
+        let reply = exchange(&mut session, &backend, call("printer.gcode.help", json!({})));
+
+        assert_eq!(reply["error"]["code"], -32601);
     }
 
     #[test]

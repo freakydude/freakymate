@@ -79,6 +79,9 @@ pub fn file_path() -> Option<&'static Path> {
     LOG_FILE.get().map(PathBuf::as_path)
 }
 
+/// The clipboard crate warns twice at every start under cage (no clipboard manager); only its errors matter.
+const QUIET_TARGET: &str = "arboard";
+
 struct Logger {
     /// From `RUST_LOG`.
     filter: Option<env_filter::Filter>,
@@ -125,8 +128,16 @@ impl Logger {
         match &self.filter {
             Some(filter) => filter.enabled(metadata),
             None => {
-                let verbose = self.verbose.load(Ordering::Relaxed) && metadata.target().starts_with("sailhand");
-                metadata.level() <= if verbose { Level::Debug } else { Level::Info }
+                let target = metadata.target();
+                let verbose = self.verbose.load(Ordering::Relaxed) && target.starts_with("sailhand");
+                let level = if verbose {
+                    Level::Debug
+                } else if target.starts_with(QUIET_TARGET) {
+                    Level::Error
+                } else {
+                    Level::Info
+                };
+                metadata.level() <= level
             }
         }
     }
@@ -451,6 +462,14 @@ mod tests {
         assert!(logger.wanted(&metadata("sailhand_core::service")));
         assert!(!logger.wanted(&metadata("hyper::client")));
         assert_eq!(logger.max_level(), LevelFilter::Debug);
+    }
+
+    #[test]
+    fn clipboard_crate_only_logs_errors() {
+        let logger = Logger::new(None, None);
+        let metadata = |level| Metadata::builder().level(level).target("arboard::platform").build();
+        assert!(!logger.wanted(&metadata(Level::Warn)));
+        assert!(logger.wanted(&metadata(Level::Error)));
     }
 
     #[test]

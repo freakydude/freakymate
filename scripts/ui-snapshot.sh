@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Renders the pages of the Slint UI headless as PNG against a freshly started fake Moonraker.
 # Usage (repo root): scripts/ui-snapshot.sh [-o <folder>] [-p voron] [-s 800x480] [-F] [-S pages,network] [-P 7126]
+#                    [-X "--round-bed --no-history"]
+# -X: further options for the fake, space separated (see fake-moonraker --help).
 # -P: port of its own fake; 7126 by default, so a fake on Moonraker's 7125 (the debug setup) is left alone.
 # -F: no fit; the window of the given size without scaling the layout to 800x480 (as a desktop window; at least
 #     800x480). Without -F the layout is fitted to the size like the app does in fullscreen.
@@ -15,8 +17,9 @@ size=800x480
 scenes=
 port=7126
 fit_flag=()
+extra_fake_arguments=()
 
-while getopts "o:p:s:S:P:Fh" option; do
+while getopts "o:p:s:S:P:X:Fh" option; do
     case $option in
         o) out_dir=$OPTARG ;;
         p) profile=$OPTARG ;;
@@ -24,7 +27,8 @@ while getopts "o:p:s:S:P:Fh" option; do
         S) scenes=$OPTARG ;;
         P) port=$OPTARG ;;
         F) fit_flag=(--no-fit) ;;
-        *) sed -n '2,8p' "$0"; exit 2 ;;
+        X) read -r -a extra_fake_arguments <<< "$OPTARG" ;;
+        *) sed -n '2,10p' "$0"; exit 2 ;;
     esac
 done
 
@@ -41,7 +45,7 @@ pkill -f "fake-moonraker --port $port( |$)" 2>/dev/null || true
 pkill -f "ui-snapshot --moonraker http://127.0.0.1:$port( |$)" 2>/dev/null || true
 rm -rf "$out_dir"
 
-fake_arguments=(--port "$port" --time-scale 20 --profile "$profile")
+fake_arguments=(--port "$port" --time-scale 20 --profile "$profile" "${extra_fake_arguments[@]}")
 if [[ ,$scenes, == *,login,* ]]; then
     fake_arguments+=(--auth test:secret)
 fi

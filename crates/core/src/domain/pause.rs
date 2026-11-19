@@ -53,7 +53,29 @@ pub fn interruption(status: &PrinterStatus) -> Option<Interruption> {
                 .map(|sensor| InterruptionFact::SensorEmpty { label: sensor.label.clone() }),
         ),
     }
-    Some(Interruption { failed, facts })
+    Some(Interruption { failed, facts: without_repeats(facts) })
+}
+
+/// Happy Hare may hand its reason to Klipper as well; a text stated twice is shown once, at its first place.
+fn without_repeats(facts: Vec<InterruptionFact>) -> Vec<InterruptionFact> {
+    let mut kept: Vec<InterruptionFact> = Vec::with_capacity(facts.len());
+    for fact in facts {
+        let repeated = fact.text().is_some_and(|text| kept.iter().any(|seen| seen.text() == Some(text)));
+        if !repeated {
+            kept.push(fact);
+        }
+    }
+    kept
+}
+
+impl InterruptionFact {
+    /// The text a source stated; `None` for facts built from a reading.
+    fn text(&self) -> Option<&str> {
+        match self {
+            Self::KlipperMessage(text) | Self::MmuReason(text) | Self::MmuHint(text) => Some(text),
+            Self::SensorEmpty { .. } => None,
+        }
+    }
 }
 
 fn non_empty(text: &str) -> Option<String> {
@@ -187,6 +209,17 @@ mod tests {
                 InterruptionFact::MmuHint("Check the nozzle, then RESUME".into())
             ]
         );
+    }
+
+    #[test]
+    fn a_text_stated_by_klipper_and_happy_hare_is_shown_once() {
+        let mut status = status(PrintState::Paused);
+        status.job.message = " Runout at gate 1 ".into();
+        status.mmu = Some(happy_hare(true));
+
+        let facts = interruption(&status).unwrap().facts;
+
+        assert_eq!(facts, [InterruptionFact::KlipperMessage("Runout at gate 1".into())]);
     }
 
     #[test]

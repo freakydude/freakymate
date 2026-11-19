@@ -399,6 +399,40 @@ async fn a_printer_without_spoolman_has_no_spoolman_component() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_moonraker_without_history_is_not_asked_for_it() {
+    let endpoint = start_fake_with(MachineProfile::voron().without_history()).await;
+    let (service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+    let snapshot = wait_for(&mut channels, ready).await;
+
+    service.query(Query::PrintHistory);
+    service.query(Query::PowerDevices);
+
+    assert!(!snapshot.sources.moonraker.history);
+    // No history event comes before (or instead of) that of the power devices, and the service keeps answering.
+    let first =
+        next_event(&mut channels, |event| matches!(event, Event::PrintHistory(_) | Event::PowerDevices(_))).await;
+    assert!(matches!(first, Event::PowerDevices(_)));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_klipper_without_the_command_list_still_connects_and_works() {
+    let endpoint = start_fake_with(MachineProfile::voron().without_gcode_help()).await;
+    let (service, mut channels) =
+        PrinterService::start(&tokio::runtime::Handle::current(), endpoint, CredentialStore::in_memory());
+
+    let snapshot = wait_for(&mut channels, ready).await;
+
+    // What only the command list tells stays unknown; what the configuration tells is still read.
+    assert_eq!(snapshot.sources.klipper.tool_commands, None);
+    assert!(!snapshot.sources.klipper.has_unselect_tool);
+    assert!(snapshot.sources.klipper.has_macro("LOAD_FILAMENT"));
+    service.send(Command::SetHeaterTarget { heater: "extruder".into(), target: 180.0 });
+    wait_for(&mut channels, |snapshot| snapshot.status.heater("extruder").is_some_and(|heater| heater.target == 180.0))
+        .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn the_active_spool_is_set_and_reported_back() {
     let endpoint = start_fake().await;
     let (service, mut channels) =

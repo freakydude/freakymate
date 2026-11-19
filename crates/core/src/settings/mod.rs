@@ -40,6 +40,8 @@ pub struct Settings {
     pub hide_temperature_reports: bool,
     /// Logs the program's own debug messages as well (for a bug report); `RUST_LOG` overrides it.
     pub verbose_log: bool,
+    /// Rotation of picture and touch in degrees (0, 90, 180 or 270, clockwise); only the framebuffer fallback uses it.
+    pub rotation: u16,
     /// Brightness and standby of this display; only used where a backlight can be controlled.
     pub backlight: BacklightSettings,
 }
@@ -198,6 +200,7 @@ impl Default for Settings {
             ],
             hide_temperature_reports: true,
             verbose_log: false,
+            rotation: 0,
             backlight: BacklightSettings::default(),
         }
     }

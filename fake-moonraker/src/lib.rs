@@ -3,6 +3,7 @@
 pub mod access;
 pub mod afc;
 pub mod backend;
+pub mod bed_mesh;
 pub mod calibration;
 pub mod devices;
 pub mod eddy_probe;

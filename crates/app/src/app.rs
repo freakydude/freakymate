@@ -96,7 +96,7 @@ impl Application {
         let input_target = crate::framebuffer::InputTarget::default();
         #[cfg(target_os = "linux")]
         if options.framebuffer {
-            crate::framebuffer::install_platform(input_target.clone())?;
+            crate::framebuffer::install_platform(input_target.clone(), settings.rotation)?;
         }
         let window = AppWindow::new()?;
         // Wayland and X11 desktops find the icon through the app id and `sailhand.desktop`, not the window icon.

@@ -218,6 +218,11 @@ export struct MmuGateItem {
     // Nozzle temperature in °C that the source heats to when it loads this gate or lane outside a print (its own
     // record, else its default for the material); 0 when it keeps none.
     temperature: int,
+    // What the lane's entry and exit sensors say: "detected", "empty", or "" where it has none (or it is disabled).
+    entry-sensor: string,
+    exit-sensor: string,
+    // A sensor contradicts the gate's state (Happy Hare only): shown as a small dot on the tile.
+    sensor-conflict: bool,
 }
 
 // A page of tiles on the Gates tab: a run of rows of `Printer.mmu-gates` (the gates of one unit, at most five), the

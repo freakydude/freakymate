@@ -103,7 +103,7 @@ off_when_idle_minutes: 5
 
 | Section | Options |
 | ------- | ------- |
-| `[sailhand]` | `fullscreen`, `keep_screen_on`, `hide_temperature_reports`, `verbose_log` |
+| `[sailhand]` | `fullscreen`, `keep_screen_on`, `hide_temperature_reports`, `verbose_log`, `rotation` |
 | `[printer <name>]` | `moonraker` (required): the address; `hidden_macros` (optional): list of macros hidden from the console of this printer |
 | `[preset <name>]` | `extruder` and `bed` (both required): the temperature presets |
 | `[step_choices]` | `move_mm`, `z_offset_mm`, `temperature`, `extrude_mm`, `extrude_speed`, `manual_probe_mm`; each optional |
@@ -111,6 +111,10 @@ off_when_idle_minutes: 5
 
 Most of this is changed on the screen; the **temperature presets** only here. The Thermal page shows the first four.
 Restart Sailhand after editing (`sudo systemctl restart sailhand`).
+
+`rotation` (`0`, `90`, `180` or `270`, default `0`) turns the picture clockwise by that angle and the touch with it. Only
+the [framebuffer fallback](install.md#framebuffer-fallback) uses it; under `cage` rotate the display in the system.
+Example for a display mounted upside down: `rotation: 180` in `[sailhand]`.
 
 **Below the SAVE_CONFIG line** (every line starts with `#*#`, exactly as in Klipper) is what nobody edits: the printer
 in use (`printer = <name>`, or `moonraker = <address>` for one that is not saved), the step sizes chosen last

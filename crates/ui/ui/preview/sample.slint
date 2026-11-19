@@ -38,7 +38,7 @@ export global Sample {
         Printer.bed-temperature = 59.8;
         Printer.bed-target = 60;
         Printer.fans = [
-            { object: "fan", label: "Part fan", kind: "part", controllable: true, speed: 40, rpm: "" },
+            { object: "fan", label: "Fan", kind: "part", controllable: true, speed: 40, rpm: "" },
             { object: "fan_generic nevermore", label: "Nevermore", kind: "generic", controllable: true, speed: 0, rpm: "" },
             { object: "fan_generic exhaust", label: "Exhaust", kind: "generic", controllable: true, speed: 60, rpm: "1680 rpm" },
             { object: "heater_fan hotend", label: "Hotend", kind: "heater", controllable: false, speed: 100, rpm: "7200 rpm" },
@@ -67,7 +67,7 @@ export global Sample {
         Printer.heaters = [
             {
                 object: "extruder",
-                label: "Nozzle",
+                label: "Extruder",
                 temperature: 214.6,
                 target: 215,
                 power: 0.42,
@@ -75,7 +75,7 @@ export global Sample {
             },
             {
                 object: "heater_bed",
-                label: "Bed",
+                label: "Heater Bed",
                 temperature: 59.8,
                 target: 60,
                 power: 0.3,
@@ -98,7 +98,6 @@ export global Sample {
             { label: "Toolhead Runout", enabled: true, detected: true },
             { label: "Extruder Encoder", enabled: true, detected: false },
         ];
-        Printer.print-start-macro = "PRINT_START";
         Printer.macros = ["PRINT_START", "PRINT_END", "LOAD_FILAMENT", "UNLOAD_FILAMENT", "PARK"];
         Printer.power-devices = [{ name: "printer", on: true, locked: true }, { name: "lights", on: false, locked: false }];
         Printer.updates = [
@@ -140,7 +139,7 @@ export global Sample {
         Printer.has-lanes = true;
         Printer.afc-state = "Idle";
         Printer.mmu-gates = [
-            { title: "lane1", index: -1, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", group: -1, selected: true, temperature: 210, spool-id: -1 },
+            { title: "lane1", index: -1, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", group: -1, selected: true, temperature: 210, spool-id: -1, entry-sensor: "detected", exit-sensor: "detected" },
             { title: "lane2", index: -1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", group: -1, selected: false, temperature: 240, spool-id: -1 },
             { title: "lane3", index: -1, availability: "available", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", group: -1, selected: false, temperature: 255, spool-id: -1 },
             { title: "lane4", index: -1, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", group: -1, selected: false, spool-id: -1 },
@@ -171,10 +170,10 @@ export global Sample {
         Printer.mmu-gate = 0;
         Printer.mmu-tool = 0;
         Printer.mmu-gates = [
-            { title: "Gate 0", index: 0, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", group: 0, selected: true, temperature: 210 },
-            { title: "Gate 1", index: 1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", group: 1, selected: false, temperature: 240 },
+            { title: "Gate 0", index: 0, availability: "available", name: "Red PLA", material: "PLA", colors: { first: #e03131, count: 1 }, has-color: true, tools: "T0", group: 0, selected: true, temperature: 210, entry-sensor: "detected", exit-sensor: "empty" },
+            { title: "Gate 1", index: 1, availability: "available", name: "Green PETG", material: "PETG", colors: { first: #37b24d, count: 1 }, has-color: true, tools: "T1", group: 1, selected: false, temperature: 240, entry-sensor: "empty", sensor-conflict: true },
             { title: "Gate 2", index: 2, availability: "buffered", name: "", material: "ABS", colors: { first: #4dabf7, count: 1 }, has-color: true, tools: "T2", group: 2, selected: false, temperature: 255 },
-            { title: "Gate 3", index: 3, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", group: 3, selected: false },
+            { title: "Gate 3", index: 3, availability: "empty", name: "", material: "", colors: { first: #000000 }, has-color: false, tools: "T3", group: 3, selected: false, entry-sensor: "detected", sensor-conflict: true },
         ];
         Printer.mmu-pages = [{ first-row: 0, count: 4, bypass: true, unit: "", head: "", first-gate: 0, last-gate: 3 }];
         Printer.mmu-page-ranges = [{ first: 0, count: 1, start: 0 }];
@@ -296,10 +295,10 @@ export global Sample {
             { object: "heater_fan hotend", label: "Hotend", kind: "heater", controllable: false, speed: 100, rpm: "7200 rpm" },
         ];
         Printer.heaters = [
-            { object: "extruder", label: "Nozzle T0", temperature: 24, target: 0, power: 0, can-raise: true, nozzle: true },
-            { object: "extruder1", label: "Nozzle T1", temperature: 214.6, target: 215, power: 0.42, can-raise: true, nozzle: true },
-            { object: "extruder2", label: "Nozzle T2", temperature: 24, target: 0, power: 0, can-raise: true, nozzle: true },
-            { object: "heater_bed", label: "Bed", temperature: 59.8, target: 60, power: 0.3, can-raise: true },
+            { object: "extruder", label: "Extruder T0", temperature: 24, target: 0, power: 0, can-raise: true, nozzle: true },
+            { object: "extruder1", label: "Extruder1 T1", temperature: 214.6, target: 215, power: 0.42, can-raise: true, nozzle: true },
+            { object: "extruder2", label: "Extruder2 T2", temperature: 24, target: 0, power: 0, can-raise: true, nozzle: true },
+            { object: "heater_bed", label: "Heater Bed", temperature: 59.8, target: 60, power: 0.3, can-raise: true },
             { object: "heater_generic chamber", label: "Chamber", temperature: 38.2, target: 0, power: 0, can-raise: true },
         ];
     }
@@ -311,7 +310,7 @@ export global Sample {
         Printer.heaters = [
             {
                 object: "extruder",
-                label: "Nozzle",
+                label: "Extruder",
                 temperature: 214.6,
                 target: 215,
                 power: 0.42,
@@ -333,7 +332,7 @@ export global Sample {
             },
             {
                 object: "heater_bed",
-                label: "Bed",
+                label: "Heater Bed",
                 temperature: 112,
                 target: 0,
                 power: 0,

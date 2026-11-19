@@ -92,8 +92,10 @@ architecture and packages first and stops with a message if something does not f
 `cage` needs a DRM/KMS device (`/dev/dri/card*`). Small displays with only a framebuffer driver (SPI, fbtft, e.g.
 `fb_st7796s`) have none. On such a system the installer sets up the service differently: Sailhand draws straight to
 `/dev/fbN` without `cage` (`--framebuffer`, software rendering, see [Configuration](configuration.md#command-line)), and
-the text console is detached from the framebuffer while it runs. Rotate such a display in its driver (e.g.
-`armbianEnv.txt`); touch rotation is not handled yet. This is a fallback: HDMI and DSI displays use the normal kiosk.
+the text console is detached from the framebuffer while it runs. Leave the display driver at `rotate=0` and set
+`rotation: 90`, `180` or `270` in the `[sailhand]` section of `sailhand.conf` instead
+([settings](configuration.md#settings-file)): Sailhand then turns the picture (clockwise by that angle) and the touch
+itself, which a driver of an SPI display (e.g. TFT35) often does not do for touch. This is a fallback: HDMI and DSI displays use the normal kiosk.
 
 ## Android
 

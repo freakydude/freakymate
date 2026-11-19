@@ -11,7 +11,7 @@ const DEFAULT_TIME_SCALE: f64 = 10.0;
 const DEFAULT_MMU_GATES: usize = 4;
 const USAGE: &str = "Usage: fake-moonraker [--port <port>] [--time-scale <factor>] \
     [--profile basic|voron|happy-hare|ercf|happy-hare-encoder|happy-hare-co|happy-hare-to|toolchanger|toolchanger-required|happy-hare-units|toolchanger-mmu|afc|afc-toolchanger] \
-    [--gates <1-16>, only for the Happy Hare profiles] [--auth <user>:<password>] [--tls]";
+    [--gates <1-16>, only for the Happy Hare profiles] [--auth <user>:<password>] [--tls] [--no-history] [--no-gcode-help] [--round-bed]";
 
 enum Profile {
     Basic,
@@ -36,10 +36,20 @@ struct Options {
     gates: usize,
     access: Option<AccessConfig>,
     tls: bool,
+    no_history: bool,
+    no_gcode_help: bool,
+    round_bed: bool,
 }
 
 impl Options {
     fn machine_profile(&self) -> MachineProfile {
+        let profile = self.base_profile();
+        let profile = if self.no_history { profile.without_history() } else { profile };
+        let profile = if self.no_gcode_help { profile.without_gcode_help() } else { profile };
+        if self.round_bed { profile.with_round_bed() } else { profile }
+    }
+
+    fn base_profile(&self) -> MachineProfile {
         match self.profile {
             Profile::Basic => MachineProfile::basic(),
             Profile::Voron => MachineProfile::voron(),
@@ -66,12 +76,30 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<Options, Stri
         gates: DEFAULT_MMU_GATES,
         access: None,
         tls: false,
+        no_history: false,
+        no_gcode_help: false,
+        round_bed: false,
     };
 
     while let Some(flag) = args.next() {
-        if flag == "--tls" {
-            options.tls = true;
-            continue;
+        match flag.as_str() {
+            "--tls" => {
+                options.tls = true;
+                continue;
+            }
+            "--no-history" => {
+                options.no_history = true;
+                continue;
+            }
+            "--round-bed" => {
+                options.round_bed = true;
+                continue;
+            }
+            "--no-gcode-help" => {
+                options.no_gcode_help = true;
+                continue;
+            }
+            _ => {}
         }
         let value = args.next().ok_or_else(|| format!("missing value for {flag}"))?;
         match flag.as_str() {

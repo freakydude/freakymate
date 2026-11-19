@@ -202,6 +202,13 @@ export component BedMeshProfilesDialog inherits Scrim {
                     width: profiles.row-width;
                     height: Theme.touch;
                     spacing: Theme.spacing;
+                    // The list opens at the active profile.
+                    property <bool> reveal: root.visible && profile == Printer.bed-mesh-active;
+                    changed reveal => {
+                        if (self.reveal) {
+                            profiles.show-row(self.y, self.height);
+                        }
+                    }
                     IconButton {
                         horizontal: true;
                         align-start: true;

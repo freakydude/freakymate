@@ -36,6 +36,18 @@ pub const VERSION: &str = match option_env!("SAILHAND_VERSION") {
     None => concat!(env!("CARGO_PKG_VERSION"), "-dev"),
 };
 
+/// Short git commit of this build, "unknown" without git.
+pub const BUILD_COMMIT: &str = env!("SAILHAND_BUILD_COMMIT");
+
+/// Release channel of this build: "stable" (release), "beta" (pre-release from main) or "dev" (local, branch, pull
+/// request).
+pub const BUILD_CHANNEL: &str = env!("SAILHAND_BUILD_CHANNEL");
+
+/// Version with channel and commit for logs and the About page, e.g. `0.5.8 (beta, a7e1407)`.
+pub fn version_label() -> String {
+    format!("{VERSION} ({BUILD_CHANNEL}, {BUILD_COMMIT})")
+}
+
 /// Only builds from main (releases X.Y.0 and pre-releases X.Y.Z) are Sailhand; a version with a suffix (`-dev`
 /// locally and on other branches, `-pr.N.M` for a pull request, see `.github/scripts/version.sh`) is a test build.
 pub fn is_test_build() -> bool {

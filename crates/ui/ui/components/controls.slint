@@ -417,6 +417,8 @@ export component ValueTile inherits Rectangle {
     in property <image> icon;
     // A state that the tile reports (a finished print) colours its icon.
     in property <color> icon-color: Theme.muted;
+    // The value in another colour, e.g. the warning colour of a value that does not fit.
+    in property <color> value-color: Theme.foreground;
     // Share of the width among tiles side by side (4 and 5: four to five).
     in property <float> weight: 1;
     // A tile that opens something on a tap shows a small muted icon at its right edge.
@@ -462,7 +464,7 @@ export component ValueTile inherits Rectangle {
 
             Text {
                 text: root.value;
-                color: Theme.foreground;
+                color: root.value-color;
                 font-size: Theme.font-normal;
                 font-weight: 600;
                 overflow: elide;
@@ -514,6 +516,30 @@ export component ScrollList inherits Rectangle {
     // The content does not fit, so the bar is shown and the rows are narrower.
     out property <bool> scrollable: root.content-height > root.height;
     property <length> bar-width: 36px;
+    // A row to show that waits for the list to know its size (a list just created has none yet).
+    property <bool> reveal-pending;
+    property <length> reveal-y;
+    property <length> reveal-height;
+    property <length> viewport-height: list.height;
+
+    // Scrolls the list so that the row at `row-y` of `row-height` is in the middle, or as near as the ends allow.
+    // Use it where a list opens: the row with the active entry.
+    public function show-row(row-y: length, row-height: length) {
+        root.reveal-y = row-y;
+        root.reveal-height = row-height;
+        root.reveal-pending = true;
+        root.apply-reveal();
+    }
+
+    function apply-reveal() {
+        if (root.reveal-pending && list.height > 0) {
+            list.content-y = -clamp(root.reveal-y - (list.height - root.reveal-height) / 2, 0, root.range);
+            root.reveal-pending = false;
+        }
+    }
+
+    changed viewport-height => { root.apply-reveal(); }
+    changed content-height => { root.apply-reveal(); }
 
     // Fixed geometry instead of a layout: the bar must not change the size of the list's container.
     list := Flickable {

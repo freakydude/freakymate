@@ -29,6 +29,7 @@ use sailhand_core::domain::heads::{self, ChangerNote};
 use sailhand_core::domain::machine_tree::LaneId;
 use sailhand_core::domain::manual_probe::Direction;
 use sailhand_core::domain::prepared_job::PreparedJob;
+use sailhand_core::domain::print_hints;
 use sailhand_core::domain::spools::{self, Lane};
 use sailhand_core::domain::temperature_limits::HeaterWatch;
 use sailhand_core::domain::{estimates, light, pause};
@@ -232,9 +233,9 @@ impl Presenter {
 
         self.show_connection(&printer, snapshot, ready);
         self.show_job(&printer, snapshot);
-        self.show_motion(&window, status);
-        self.show_devices(&printer, snapshot);
         let lanes = self.lanes(snapshot);
+        self.show_motion(&window, status, &lanes);
+        self.show_devices(&printer, snapshot);
         let active_spool = spools::active_spool(&lanes).cloned();
         self.show_temperatures(&printer, snapshot, &lanes);
         self.history.show_pid(status);
@@ -320,7 +321,7 @@ impl Presenter {
     }
 
     /// Position, speed, the z offset and what the extruder can do.
-    fn show_motion(&self, window: &AppWindow, status: &PrinterStatus) {
+    fn show_motion(&self, window: &AppWindow, status: &PrinterStatus, lanes: &[Lane]) {
         let printer = window.global::<Printer>();
         let motion = &status.motion;
         printer.set_position_x(motion.live_position[0] as f32);
@@ -335,7 +336,11 @@ impl Presenter {
         printer.set_thermal_z(motion.thermal_z_adjust.unwrap_or_default() as f32);
         printer.set_speed_factor((motion.speed_factor * 100.0) as f32);
         printer.set_live_velocity(motion.live_velocity as f32);
-        let flow = estimates::volumetric_flow(motion.live_extruder_velocity, status.extruder.filament_diameter);
+        // Klipper's `motion_report.live_extruder_velocity` is the velocity of the active extruder (see
+        // `ExtruderState::active_filament_diameter`), so its diameter counts.
+        let spool = spools::active_spool_of_extruder(lanes, status.extruder.active_name());
+        let diameter = estimates::filament_diameter(status.extruder.active_filament_diameter(), spool);
+        let flow = estimates::volumetric_flow(motion.live_extruder_velocity, diameter);
         self.note_origin("volumetric flow", Some(flow.origin));
         printer.set_live_flow(flow.value as f32);
         printer.set_can_extrude(status.extruder.can_extrude);
@@ -681,13 +686,21 @@ impl Presenter {
 
     /// The prepared file with its facts and how its tools fit, for the print page; all empty without one.
     fn show_prepared(&self, printer: &Printer, matches: &[ToolMatch], status: &PrinterStatus, lanes: &[Lane]) {
-        let (path, row) = {
+        let (path, row, hints) = {
             let cache = self.cache.borrow();
             let path = cache.prepared.path().unwrap_or_default().to_owned();
             let row =
                 cache.files.catalog.position(&path).map(|index| cache.files.row(&cache.files.catalog.entries()[index]));
-            (path, row)
+            let hints = cache.files.catalog.metadata(&path).map_or_else(Vec::new, |metadata| {
+                print_hints::print_hints(metadata, status, &print_hints::tool_extruders(matches, lanes))
+            });
+            (path, row, view::prepared_hints(&hints))
         };
+        printer.set_prepared_hints(ModelRc::from(Rc::new(VecModel::from(
+            hints.lines.into_iter().map(SharedString::from).collect::<Vec<_>>(),
+        ))));
+        printer.set_prepared_nozzle_differs(hints.nozzle_differs);
+        printer.set_prepared_temperature_differs(hints.temperature_differs);
         self.mmu.show_prepared_tools(if path.is_empty() { &[] } else { matches }, status, lanes);
         printer.set_prepared_path(path.into());
         printer.set_prepared(row.unwrap_or_default());

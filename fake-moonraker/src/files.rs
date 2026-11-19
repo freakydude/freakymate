@@ -7,6 +7,11 @@ use std::borrow::Cow;
 const PLACEHOLDER_SIZE: u32 = 300;
 /// Layer height of every fake file; the first layer is as high.
 pub const LAYER_HEIGHT: f64 = 0.2;
+/// The nozzle of the fake printer (`nozzle_diameter` of its extruders, mm) and what most files are sliced for.
+pub const NOZZLE_DIAMETER: f64 = 0.4;
+/// What `long_job.gcode` is sliced for (mm), and its first layer nozzle temperature (°C, above the extruder's `max_temp`).
+const WIDE_NOZZLE_DIAMETER: f64 = 0.6;
+const HOT_FIRST_LAYER_TEMPERATURE: f64 = 310.0;
 
 /// The benchy's thumbnails as preFlight 1.4.1 rendered them in Sailhand's accent colour, so screenshots show a real
 /// print preview. #3DBenchy (3DBenchy.com) is licensed CC0 1.0.
@@ -63,6 +68,8 @@ pub struct GcodeFile {
     pub layer_count: u32,
     pub first_layer_extruder_temperature: f64,
     pub first_layer_bed_temperature: f64,
+    /// `nozzle_diameter` of the slicer's profile in mm.
+    pub nozzle_diameter: f64,
 }
 
 impl GcodeFile {
@@ -75,7 +82,17 @@ impl GcodeFile {
             layer_count,
             first_layer_extruder_temperature: 210.0,
             first_layer_bed_temperature: 60.0,
+            nozzle_diameter: NOZZLE_DIAMETER,
         }
+    }
+
+    /// Sliced for another nozzle than the printer's and with a first layer above its `max_temp`, so that the print
+    /// page shows its hints. Moonraker's `metadata.py` reports `nozzle_diameter` and `first_layer_extr_temp` from the
+    /// slicer's G-code comments; the values are made up.
+    fn sliced_beyond_the_printer(mut self) -> Self {
+        self.nozzle_diameter = WIDE_NOZZLE_DIAMETER;
+        self.first_layer_extruder_temperature = HOT_FIRST_LAYER_TEMPERATURE;
+        self
     }
 
     fn printed(mut self, print_duration: f64) -> Self {
@@ -181,7 +198,7 @@ impl GcodeFile {
             "layer_height": LAYER_HEIGHT,
             "first_layer_height": LAYER_HEIGHT,
             "object_height": f64::from(self.layer_count) * LAYER_HEIGHT,
-            "nozzle_diameter": 0.4,
+            "nozzle_diameter": self.nozzle_diameter,
             // Moonraker reports several filaments as a JSON list in text, one as the plain value.
             "filament_name": if self.path == "long_job.gcode" { r#"["Fake PLA", "Fake PETG"]"# } else { "Fake PLA" },
             "filament_type": if self.path == "long_job.gcode" { r#"["PLA", "PETG"]"# } else { "PLA" },
@@ -214,7 +231,7 @@ impl Catalog {
             files: vec![
                 GcodeFile::sample("calibration_cube.gcode", 1_700_000_000.0, 1_500.0, 100).printed(1_380.0),
                 GcodeFile::sample("benchy.gcode", 1_700_200_000.0, 7_200.0, 250).printed(7_650.0),
-                GcodeFile::sample("long_job.gcode", 1_700_100_000.0, 36_000.0, 600),
+                GcodeFile::sample("long_job.gcode", 1_700_100_000.0, 36_000.0, 600).sliced_beyond_the_printer(),
             ],
         }
     }

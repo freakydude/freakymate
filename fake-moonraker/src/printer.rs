@@ -331,7 +331,10 @@ impl Printer {
             devices: profile.devices.then(Devices::default),
             temperatures: TemperatureStore::default(),
             z_offset: 0.0,
-            calibration: Calibration::new(profile.probe, profile.eddy, profile.bed_mesh, profile.bed_screws),
+            calibration: {
+                let calibration = Calibration::new(profile.probe, profile.eddy, profile.bed_mesh, profile.bed_screws);
+                if profile.round_bed { calibration.with_round_mesh() } else { calibration }
+            },
             pid_config: PidConfig::new(),
             pid_run: None,
             gantry_leveled: false,

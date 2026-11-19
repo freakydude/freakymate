@@ -19,6 +19,7 @@ pub const ORIGIN_KLIPPER_REPORT: &str = "reported by Klipper";
 pub const ORIGIN_LAYER_HEIGHT: &str = "object height divided by layer height";
 pub const ORIGIN_HEIGHT_AHEAD: &str = "current height plus the slicer's layer height per layer ahead";
 pub const ORIGIN_CONFIGURED_DIAMETER: &str = "configured filament diameter";
+pub const ORIGIN_SPOOL_DIAMETER: &str = "filament diameter of the active spool in Spoolman";
 pub const ORIGIN_ASSUMED_DIAMETER: &str = "assumed filament diameter of 1.75 mm";
 pub const ORIGIN_LAST_PRINT: &str = "last completed print";
 pub const ORIGIN_SLICER_ESTIMATE: &str = "slicer estimate";
@@ -74,13 +75,25 @@ pub fn total_layers(job: &PrintJob, metadata: Option<&FileMetadata>) -> Option<S
     prefer_measured(reported, derived)
 }
 
-/// Volumetric flow in mm³/s from the extruder velocity in mm/s and the configured filament diameter in mm.
-pub fn volumetric_flow(extruder_velocity: f64, filament_diameter: Option<f64>) -> Sourced<f64> {
-    let configured = filament_diameter.filter(|diameter| *diameter > 0.0);
-    let diameter = configured.unwrap_or(ASSUMED_FILAMENT_DIAMETER_MM);
-    let flow = extruder_velocity.max(0.0) * std::f64::consts::PI * (diameter / 2.0).powi(2);
-    match configured {
-        Some(_) => Sourced::measured(flow, ORIGIN_CONFIGURED_DIAMETER),
+/// Filament diameter in mm of the nozzle that extrudes: the diameter Spoolman has for its active spool, else the
+/// `filament_diameter` configured for the active extruder (see `ExtruderState::active_filament_diameter`).
+pub fn filament_diameter(configured: Option<f64>, active_spool: Option<&Spool>) -> Option<Sourced<f64>> {
+    let positive = |diameter: &f64| *diameter > 0.0;
+    let from_spool = active_spool.and_then(|spool| spool.diameter).filter(positive);
+    match (from_spool, configured.filter(positive)) {
+        (Some(diameter), _) => Some(Sourced::measured(diameter, ORIGIN_SPOOL_DIAMETER)),
+        (None, Some(diameter)) => Some(Sourced::measured(diameter, ORIGIN_CONFIGURED_DIAMETER)),
+        (None, None) => None,
+    }
+}
+
+/// Volumetric flow in mm³/s from the extruder velocity in mm/s and the filament diameter (see
+/// [`filament_diameter`]); 1.75 mm is assumed, and said so, without one.
+pub fn volumetric_flow(extruder_velocity: f64, diameter: Option<Sourced<f64>>) -> Sourced<f64> {
+    let radius = diameter.as_ref().map_or(ASSUMED_FILAMENT_DIAMETER_MM, |diameter| diameter.value) / 2.0;
+    let flow = extruder_velocity.max(0.0) * std::f64::consts::PI * radius.powi(2);
+    match diameter {
+        Some(diameter) => Sourced::measured(flow, diameter.origin),
         None => Sourced::estimated(flow, ORIGIN_ASSUMED_DIAMETER),
     }
 }
@@ -283,10 +296,14 @@ mod tests {
         assert_eq!(total_layers(&PrintJob::default(), Some(&flat)), None);
     }
 
+    fn spool_with_diameter(diameter: Option<f64>) -> Spool {
+        Spool { diameter, ..Spool::default() }
+    }
+
     #[test]
-    fn flow_follows_the_configured_filament_diameter() {
-        let thin = volumetric_flow(10.0, Some(1.75));
-        let thick = volumetric_flow(10.0, Some(2.85));
+    fn flow_follows_the_filament_diameter() {
+        let thin = volumetric_flow(10.0, filament_diameter(Some(1.75), None));
+        let thick = volumetric_flow(10.0, filament_diameter(Some(2.85), None));
 
         assert!((thin.value - 24.05).abs() < 0.01);
         assert!((thick.value - 63.79).abs() < 0.01);
@@ -294,8 +311,33 @@ mod tests {
     }
 
     #[test]
-    fn flow_assumes_1_75_mm_without_a_configured_diameter_and_says_so() {
-        let flow = volumetric_flow(10.0, None);
+    fn the_diameter_of_the_active_spool_beats_the_configured_one() {
+        let spool = spool_with_diameter(Some(2.85));
+        let chosen = filament_diameter(Some(1.75), Some(&spool)).unwrap();
+
+        assert_eq!((chosen.value, chosen.origin), (2.85, ORIGIN_SPOOL_DIAMETER));
+        assert!((volumetric_flow(10.0, Some(chosen)).value - 63.79).abs() < 0.01);
+    }
+
+    #[test]
+    fn the_configured_diameter_stays_when_the_spool_has_none() {
+        for spool in [spool_with_diameter(None), spool_with_diameter(Some(0.0))] {
+            let chosen = filament_diameter(Some(2.85), Some(&spool)).unwrap();
+            assert_eq!((chosen.value, chosen.origin), (2.85, ORIGIN_CONFIGURED_DIAMETER));
+        }
+        assert_eq!(filament_diameter(Some(0.0), None), None);
+    }
+
+    #[test]
+    fn the_spool_diameter_serves_without_configuration() {
+        let chosen = filament_diameter(None, Some(&spool_with_diameter(Some(1.75)))).unwrap();
+
+        assert_eq!((chosen.value, chosen.origin), (1.75, ORIGIN_SPOOL_DIAMETER));
+    }
+
+    #[test]
+    fn flow_assumes_1_75_mm_without_a_diameter_and_says_so() {
+        let flow = volumetric_flow(10.0, filament_diameter(None, None));
 
         assert!((flow.value - 24.05).abs() < 0.01);
         assert_eq!((flow.provenance, flow.origin), (Provenance::Estimated, ORIGIN_ASSUMED_DIAMETER));

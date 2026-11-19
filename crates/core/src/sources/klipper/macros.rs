@@ -46,7 +46,9 @@ pub fn parse_params(template: &str) -> Vec<MacroParam> {
         let after = &rest[position + "params.".len()..];
         let name_length = after.chars().take_while(|c| is_identifier_char(*c)).count();
         rest = &after[name_length..];
-        if preceded_by_identifier || name_length == 0 {
+        // `params.__setitem__(...)` and `params.get(...)` call a method of the dictionary; they name no parameter.
+        let is_method_call = rest.starts_with('(');
+        if preceded_by_identifier || name_length == 0 || is_method_call {
             continue;
         }
         let default = default_argument(rest).and_then(literal_default);
@@ -231,6 +233,14 @@ mod tests {
         let params = parse_params("{% set Z = params.Z|default(10) %}\nG1 Z{Z} F{params.SPEED|default('1200')}");
 
         assert_eq!(params, [param("Z", Some("10")), param("SPEED", Some("1200"))]);
+    }
+
+    #[test]
+    fn method_calls_on_params_are_no_parameters() {
+        // Collection jschuh/klipper-macros, macro `m701`: `params.__setitem__("L", params.U)`.
+        let template = "{% set dummy = params.__setitem__(\"L\", params.U) %}{% set x = params.get('A') %}";
+
+        assert_eq!(parse_params(template), [param("U", None)]);
     }
 
     #[test]

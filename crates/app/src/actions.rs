@@ -450,13 +450,13 @@ fn parse_weight(text: &str) -> Option<f64> {
 }
 
 /// Callback without arguments that sends the command.
-fn send(service: &PrinterService, command: fn() -> Command) -> impl Fn() + 'static + use<> {
+fn send(service: &PrinterService, command: fn() -> Command) -> impl Fn() + 'static {
     let service = service.clone();
     move || service.send(command())
 }
 
 /// Callback with a gate number that sends the command for that gate; a negative number sends nothing.
-fn with_gate(service: &PrinterService, command: fn(usize) -> Command) -> impl Fn(i32) + 'static + use<> {
+fn with_gate(service: &PrinterService, command: fn(usize) -> Command) -> impl Fn(i32) + 'static {
     with(service, move |service, gate: i32| {
         if let Ok(gate) = usize::try_from(gate) {
             service.send(command(gate));
@@ -474,7 +474,7 @@ fn with_lane(
     service: &PrinterService,
     presenter: &Rc<Presenter>,
     command: fn(LaneId) -> Command,
-) -> impl Fn(i32) + 'static + use<> {
+) -> impl Fn(i32) + 'static {
     let (service, presenter) = (service.clone(), Rc::clone(presenter));
     move |row| {
         if let Some(lane) = lane_of_row(&presenter, row) {

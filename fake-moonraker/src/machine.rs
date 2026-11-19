@@ -125,6 +125,13 @@ pub struct MachineProfile {
     pub eddy: bool,
     /// An encoder on the Happy Hare machine (`mmu.encoder`, `mmu.sensors.encoder`).
     pub encoder: bool,
+    /// Moonraker's `[history]` component is loaded (it is by default in a normal install; `server.history.*` exists
+    /// only then).
+    pub history: bool,
+    /// Klipper answers `printer.gcode.help`; when off, the method is unknown (see `without_gcode_help`).
+    pub gcode_help: bool,
+    /// A round bed: `[bed_mesh]` with `mesh_radius` (`bed_mesh.py` `_init_mesh_config`) instead of a rectangle.
+    pub round_bed: bool,
 }
 
 /// Which sync-feedback buffer the Happy Hare machine has; the variant follows from the sensors in `mmu.sensors`
@@ -193,6 +200,9 @@ impl MachineProfile {
             buffer: BufferKind::Proportional,
             eddy: false,
             encoder: false,
+            history: true,
+            gcode_help: true,
+            round_bed: false,
         }
     }
 
@@ -218,6 +228,9 @@ impl MachineProfile {
             buffer: BufferKind::Proportional,
             eddy: true,
             encoder: false,
+            history: true,
+            gcode_help: true,
+            round_bed: false,
         }
     }
 
@@ -243,6 +256,9 @@ impl MachineProfile {
             buffer: BufferKind::Proportional,
             eddy: false,
             encoder: false,
+            history: true,
+            gcode_help: true,
+            round_bed: false,
         }
     }
 
@@ -290,6 +306,24 @@ impl MachineProfile {
 }
 
 impl MachineProfile {
+    /// Moonraker without the `[history]` component: `server.history.*` is not registered (`history.py` registers
+    /// its endpoints in `HistoryComponent.__init__`), so the methods are unknown and `server.info` omits `history`.
+    pub fn without_history(self) -> Self {
+        Self { history: false, ..self }
+    }
+
+    /// A round bed, as on a delta: the bed mesh has a radius and only the points inside the circle are probed.
+    pub fn with_round_bed(self) -> Self {
+        Self { round_bed: true, ..self }
+    }
+
+    /// `printer.gcode.help` unknown, as Moonraker answers a method it has not registered
+    /// (`common.py` `JsonRPC.process_object`: code -32601, "Method not found"). Assumption: the real cause would be
+    /// a Klippy that lacks the endpoint; Moonraker's answer to the client is the same.
+    pub fn without_gcode_help(self) -> Self {
+        Self { gcode_help: false, ..self }
+    }
+
     /// Happy Hare with an encoder and no buffer: FlowGuard runs on the encoder alone.
     pub fn happy_hare_encoder(gates: usize) -> Self {
         Self { buffer: BufferKind::None, encoder: true, ..Self::happy_hare(gates) }

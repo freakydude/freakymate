@@ -395,7 +395,7 @@ Heads with a unit of their own (rare): heads and machine tabs above, the path ta
 - **Fit:** four to five heads, gates or tools fit without paging; from six on the row pages with chevrons left and
   right, like the gate tiles today. A head tab shows a colour edge, `T<n>` with the nozzle temperature at its right
   and, only where the section name is not `T<n>` itself, the name small and muted below (elided; about 98 px).
-  A head without a number shows its name instead. Every other screen (status bar, Thermal "Nozzle T1", "Spool for
+  A head without a number shows its name instead. Every other screen (status bar, Thermal "Extruder1 T1", "Spool for
   T1", "T2 is not mounted", "Select T2") uses `T<n>` only. Five heads plus Tools and Service page already; check
   with the longest names in the fake.
 
@@ -442,8 +442,8 @@ nozzle is the selected head's (`tool_number`); without a head level `toolhead.ex
 
 ### D5 Names on existing screens
 
-- **Thermal:** nozzle rows named after their head, in head order before the bed: "Nozzle T0", "Nozzle T1" instead of
-  "Nozzle", "Extruder1". Without heads unchanged.
+- **Thermal:** nozzle rows in head order before the bed, their Klipper name with the head: "Extruder T0",
+  "Extruder1 T1". Without heads unchanged. Heaters, sensors and fans keep their Klipper names, only made readable.
 - **Spool picker title:** gate → "Spool for gate 5" (as today); AFC lane → "Spool for lane2"; `T<n>` macro of a head
   → "Spool for T1"; one nozzle → "Spool in use" (as today).
 

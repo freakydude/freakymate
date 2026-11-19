@@ -366,6 +366,16 @@ off_when_idle_minutes: 5
     }
 
     #[test]
+    fn rotation_is_one_of_four_angles_and_defaults_to_none() {
+        let (_dir, store) = store_with("[sailhand]\nrotation: 270\n");
+        assert_eq!(store.load().unwrap().rotation, 270);
+        let (_dir, store) = store_with("[sailhand]\nfullscreen: True\n");
+        assert_eq!(store.load().unwrap().rotation, 0);
+        let (_dir, store) = store_with("[sailhand]\nrotation: 45\n");
+        assert!(matches!(store.load(), Err(SettingsError::Format { .. })));
+    }
+
+    #[test]
     fn a_printer_or_preset_without_what_it_needs_is_an_error() {
         for text in ["[printer voron]\n", "[printer]\nmoonraker: x\n", "[preset PLA]\nbed: 60\n"] {
             let (_dir, store) = store_with(text);

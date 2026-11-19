@@ -31,6 +31,7 @@ impl Printer {
         sections.insert(
             "extruder".to_owned(),
             json!({
+                "nozzle_diameter": crate::files::NOZZLE_DIAMETER,
                 "filament_diameter": 1.75,
                 "pressure_advance": CONFIGURED_PRESSURE_ADVANCE,
                 "pressure_advance_smooth_time": CONFIGURED_SMOOTH_TIME,

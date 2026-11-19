@@ -14,12 +14,14 @@
 mod device;
 mod input;
 mod presenter;
+mod rotation;
 
 use crate::AppWindow;
 use crate::backlight_controller::BacklightController;
 use device::FrameBuffer;
 use input::Input;
 use presenter::Presenter;
+use rotation::Rotation;
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
 use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
 use slint::{ComponentHandle, EventLoopError, PlatformError, Timer};
@@ -39,13 +41,15 @@ pub type InputTarget = Rc<OnceCell<Rc<BacklightController>>>;
 const ANIMATION_FRAME: Duration = Duration::from_millis(16);
 
 /// Sets the platform; call it before the window exists. Fails when no framebuffer or no input can be opened.
-pub fn install_platform(target: InputTarget) -> Result<(), PlatformError> {
+/// `rotation_degrees` (the setting `rotation`) turns picture and touch together.
+pub fn install_platform(target: InputTarget, rotation_degrees: u16) -> Result<(), PlatformError> {
     let device = FrameBuffer::open_first().map_err(PlatformError::Other)?;
-    log::info!("framebuffer {}", device.describe());
+    log::info!("framebuffer {}, rotation {rotation_degrees}", device.describe());
+    let rotation = Rotation::from_degrees(rotation_degrees);
     let presenter = Presenter::start(device).map_err(|error| PlatformError::Other(error.to_string()))?;
-    let input = Input::open(target).map_err(PlatformError::Other)?;
-    let platform =
-        FramebufferPlatform::new(presenter, input).map_err(|error| PlatformError::Other(error.to_string()))?;
+    let input = Input::open(target, rotation, presenter.size()).map_err(PlatformError::Other)?;
+    let platform = FramebufferPlatform::new(presenter, input, rotation)
+        .map_err(|error| PlatformError::Other(error.to_string()))?;
     slint::platform::set_platform(Box::new(platform)).map_err(|error| PlatformError::Other(error.to_string()))
 }
 
@@ -63,12 +67,13 @@ struct FramebufferPlatform {
     window: Rc<MinimalSoftwareWindow>,
     presenter: Presenter,
     input: RefCell<Input>,
+    rotation: Rotation,
     wake: Arc<Wake>,
     wake_receiver: UnixStream,
 }
 
 impl FramebufferPlatform {
-    fn new(presenter: Presenter, input: Input) -> std::io::Result<Self> {
+    fn new(presenter: Presenter, input: Input, rotation: Rotation) -> std::io::Result<Self> {
         let (sender, wake_receiver) = UnixStream::pair()?;
         sender.set_nonblocking(true)?;
         wake_receiver.set_nonblocking(true)?;
@@ -76,6 +81,7 @@ impl FramebufferPlatform {
             window: MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer),
             presenter,
             input: RefCell::new(input),
+            rotation,
             wake: Arc::new(Wake { queue: Mutex::default(), quit: AtomicBool::new(false), sender }),
             wake_receiver,
         })
@@ -101,14 +107,17 @@ impl Platform for FramebufferPlatform {
 
     fn run_event_loop(&self) -> Result<(), PlatformError> {
         self.wake.quit.store(false, Ordering::Relaxed);
-        self.window.set_size(self.presenter.size());
+        self.window.set_size(self.rotation.window_size(self.presenter.size()));
         loop {
             slint::platform::update_timers_and_animations();
             self.wake.run_queued();
             if self.wake.quit.load(Ordering::Relaxed) {
                 return Ok(());
             }
-            self.window.draw_if_needed(|renderer| self.presenter.render(renderer));
+            self.window.draw_if_needed(|renderer| {
+                renderer.set_rendering_rotation(self.rotation.to_renderer());
+                self.presenter.render(renderer);
+            });
             let timeout = if self.window.has_active_animations() {
                 Some(ANIMATION_FRAME)
             } else {

@@ -23,6 +23,10 @@ export global MmuTexts {
         if (availability == "empty") { return @tr("Empty"); }
         return @tr("Unknown");
     }
+    // The state of an entry or exit sensor (`MmuGateItem.entry-sensor`).
+    pure public function sensor(state: string) -> string {
+        return state == "detected" ? @tr("Detected") : @tr("Empty");
+    }
 }
 
 // Whether a gate has filament, as an icon with a word; shared by the Gates tab and the gate dialog.
@@ -176,8 +180,17 @@ export component GateTile inherits SlotTile {
             }
             Rectangle { vertical-stretch: 1; }
             HorizontalLayout {
+                spacing: Theme.spacing-small;
                 GateAvailabilityLabel {
                     availability: root.gate.availability;
+                }
+                // The sensors of the gate say otherwise than its state; the gate's dialog tells which.
+                if root.gate.sensor-conflict: Rectangle {
+                    cross-axis-self-alignment: center;
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 4px;
+                    background: StateIcons.severity-color(Severity.attention);
                 }
                 if Printer.mmu-endless-spool && root.gate.group >= 0: IconLabel {
                     icon: Icons.mmu-endless-spool;

@@ -100,7 +100,7 @@ impl SettingsController {
         if cfg!(not(target_os = "android")) {
             ui.set_settings_file(self.store.path().display().to_string().into());
         }
-        ui.set_version(sailhand_core::VERSION.into());
+        ui.set_version(sailhand_core::version_label().into());
         let backlight = window.global::<Backlight>();
         backlight.set_idle_minutes(minutes_shown(settings.backlight.off_when_idle_minutes));
         backlight.set_printing_minutes(minutes_shown(settings.backlight.off_when_printing_minutes));

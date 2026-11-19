@@ -211,6 +211,12 @@ component WifiCard inherits Card {
             width: wifi-list.row-width;
             network: network;
             selected => { root.choose(network); }
+            // The list opens at the connected network.
+            init => {
+                if (network.active) {
+                    wifi-list.show-row(self.y, Theme.list-row-pitch);
+                }
+            }
         }
     }
     if !Network.wifi-enabled: Text {

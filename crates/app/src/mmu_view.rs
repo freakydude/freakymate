@@ -19,7 +19,7 @@ use sailhand_core::domain::machine_tree::LaneId;
 use sailhand_core::domain::spools::{FilamentColors, Lane};
 use sailhand_core::sources::PrinterStatus;
 use sailhand_core::sources::afc::HubReturnBlock;
-use sailhand_core::sources::happy_hare::{self, LoadedFilament, MmuStatus};
+use sailhand_core::sources::happy_hare::{self, LoadedFilament, MmuStatus, PathSensor};
 use sailhand_core::sources::spoolman::Spool;
 use slint::{Model, ModelRc, VecModel};
 use std::cell::RefCell;
@@ -86,7 +86,7 @@ impl MmuView {
         let tiles = tile_lanes(status, lanes);
         printer.set_has_lanes(in_charge.is_some() || !tiles.is_empty());
         let items = match in_charge {
-            Some(mmu) => gate_items(mmu, lanes, file.matches),
+            Some(mmu) => gate_items(status, mmu, lanes, file.matches),
             None => lane_items(status, &tiles),
         };
         let ids = match in_charge {
@@ -404,13 +404,27 @@ fn page_item(page: &GatePage, heads: &[HeadRow]) -> MmuGatePage {
     }
 }
 
-fn gate_items(mmu: &MmuStatus, lanes: &[Lane], matches: &[ToolMatch]) -> Vec<MmuGateItem> {
+/// What the sensors of a lane say, for its dialog: `""` for a sensor that is not fitted or disabled, else
+/// `"detected"` or `"empty"`.
+fn sensor_key(sensor: PathSensor) -> &'static str {
+    match sensor {
+        PathSensor::Absent => "",
+        PathSensor::Free => "empty",
+        PathSensor::Triggered => "detected",
+    }
+}
+
+fn gate_items(status: &PrinterStatus, mmu: &MmuStatus, lanes: &[Lane], matches: &[ToolMatch]) -> Vec<MmuGateItem> {
     mmu.gates
         .iter()
         .map(|gate| {
             let spool = gate_spool(lanes, gate.index);
             let selected = usize::try_from(mmu.gate) == Ok(gate.index);
+            let path = load_path::load_path(status, &LaneId::Gate(gate.index)).unwrap_or_else(LoadPath::empty);
             MmuGateItem {
+                entry_sensor: sensor_key(path.entry).into(),
+                exit_sensor: sensor_key(path.exit).into(),
+                sensor_conflict: load_path::sensor_contradicts_gate(&path, gate.availability),
                 title: format!("Gate {}", gate.index).into(),
                 loaded: selected && mmu.filament != LoadedFilament::Unloaded,
                 spool_text: spool.map(view::spool_remaining).unwrap_or_default().into(),
@@ -444,7 +458,11 @@ fn lane_items(status: &PrinterStatus, tiles: &[Lane]) -> Vec<MmuGateItem> {
             let spool = lane.spool.as_ref();
             let name = lane.name.clone().unwrap_or_default();
             let reported = status.afc.as_ref().and_then(|afc| afc.lane(&name));
+            let path = load_path::load_path(status, &LaneId::Afc(name.clone())).unwrap_or_else(LoadPath::empty);
             MmuGateItem {
+                entry_sensor: sensor_key(path.entry).into(),
+                exit_sensor: sensor_key(path.exit).into(),
+                sensor_conflict: false,
                 title: name.as_str().into(),
                 index: -1,
                 spool_text: spool.map(view::spool_remaining).unwrap_or_default().into(),
