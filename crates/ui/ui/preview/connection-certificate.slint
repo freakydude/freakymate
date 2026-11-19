@@ -1,0 +1,15 @@
+// Preview: Moonraker presents a certificate that is not trusted yet (first contact). Render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Printer } from "../state.slint";
+
+export component ConnectionCertificatePreview inherits AppWindow {
+    init => {
+        Printer.connection = "untrusted-certificate";
+        Printer.klippy-state = "disconnected";
+        Printer.ready = false;
+        Printer.endpoint = "https://voron.local";
+        Printer.certificate-fingerprint = "3F:A1:9C:07:B2:44:D8:61:0E:9A:73:C5:18:E4:2B:F0:6D:85:A9:31:CC:57:12:8E:F4:90:6B:D3:5E:22:B0:4D";
+        Printer.certificate-fingerprint-lines = "3F:A1:9C:07:B2:44:D8:61\n0E:9A:73:C5:18:E4:2B:F0\n6D:85:A9:31:CC:57:12:8E\nF4:90:6B:D3:5E:22:B0:4D";
+    }
+}

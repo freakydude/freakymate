@@ -64,6 +64,12 @@ component ConnectionCard inherits Card {
         font-size: Theme.font-small;
         overflow: elide;
     }
+    if Printer.trusted-certificate != "": Text {
+        text: @tr("Trusted certificate {}", Printer.trusted-certificate);
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        wrap: word-wrap;
+    }
     HorizontalLayout {
         spacing: Theme.spacing;
         IconButton {

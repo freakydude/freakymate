@@ -14,7 +14,7 @@ use crate::commands::{Command, CommandError};
 use crate::credentials::CredentialStore;
 use crate::domain::machine_tree::MachineTree;
 pub use crate::moonraker::ConnectionState;
-use crate::moonraker::Endpoint;
+use crate::moonraker::{CertificateFingerprint, Endpoint, UntrustedCertificate};
 use crate::sources::moonraker_server::files::{FileEntry, FileMetadata, ThumbnailImage};
 use crate::sources::moonraker_server::gcode_store::ConsoleLine;
 use crate::sources::moonraker_server::history::PrintHistory;
@@ -70,6 +70,11 @@ impl Access {
 pub struct Snapshot {
     pub endpoint: String,
     pub connection: ConnectionState,
+    /// The refused certificate while the connection is [`ConnectionState::UntrustedCertificate`].
+    pub untrusted_certificate: Option<UntrustedCertificate>,
+    /// The certificate the user trusted for this `https://` address, while connected; none if the system's roots
+    /// suffice or the address is `http://`.
+    pub trusted_certificate: Option<CertificateFingerprint>,
     pub access: Access,
     pub status: PrinterStatus,
     /// The machine from carriage to lane, built from `status` with every update.
@@ -152,6 +157,7 @@ enum Request {
         password: String,
     },
     LogOut,
+    TrustCertificate(CertificateFingerprint),
 }
 
 /// Handle for the UI; cheap to clone.
@@ -210,10 +216,18 @@ impl PrinterService {
     pub fn log_out(&self) {
         let _ = self.requests.send(Request::LogOut);
     }
+
+    /// Trusts this certificate for the current address from now on and connects again; for
+    /// [`ConnectionState::UntrustedCertificate`], after the user compared [`Snapshot::untrusted_certificate`].
+    pub fn trust_certificate(&self, fingerprint: CertificateFingerprint) {
+        let _ = self.requests.send(Request::TrustCertificate(fingerprint));
+    }
 }
 
 enum SessionEnd {
     ConnectionLost,
+    /// Only before a session: the TLS handshake refused the certificate.
+    Untrusted(UntrustedCertificate),
     SwitchTo(Endpoint),
     Shutdown,
 }

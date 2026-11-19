@@ -12,7 +12,9 @@ use crate::commands::CommandError;
 use crate::credentials::{Credential, CredentialStore};
 use crate::domain::machine_tree::MachineTree;
 use crate::moonraker::access::{self, AccessError};
-use crate::moonraker::{CallError, Connection, ConnectionState, Endpoint, Notification};
+use crate::moonraker::{
+    CallError, CertificateFingerprint, Connection, ConnectionState, Endpoint, Notification, Tls, UntrustedCertificate,
+};
 use crate::sources::happy_hare::stale_gate_map;
 use crate::sources::klipper::{FanWatch, HeightWatch, KlippyState, PendingTargets, PrintState};
 use crate::sources::moonraker_server::gcode_store::ConsoleKind;
@@ -31,22 +33,24 @@ pub(super) async fn run(
     mut requests: mpsc::UnboundedReceiver<Request>,
     outputs: Outputs,
 ) {
-    let http = reqwest::Client::new();
     // A printer that stays off would otherwise fill the log (an SD card) with the same failure on every retry.
     let mut reported_failure: Option<String> = None;
     loop {
         publish_connection(&outputs, &endpoint, ConnectionState::Connecting);
-        let end = match Connection::open(&endpoint.websocket_url()).await {
-            Ok((connection, notifications)) => {
+        let end = match open(&endpoint, &credentials).await {
+            Ok((opened, notifications)) => {
                 reported_failure = None;
                 log::info!("connected to {}", endpoint.websocket_url());
                 let (wled_answers, wled_answers_rx) = mpsc::unbounded_channel();
-                let session =
-                    Session::new(connection, http.clone(), endpoint.clone(), &credentials, &outputs, wled_answers);
+                let session = Session::new(opened, endpoint.clone(), &credentials, &outputs, wled_answers);
                 session.run(notifications, wled_answers_rx, &mut requests).await
             }
-            Err(error) => {
-                let failure = error.to_string();
+            Err(OpenError::Untrusted(certificate)) => {
+                reported_failure = None;
+                log::warn!("{} presented an untrusted certificate ({})", endpoint.display(), certificate.fingerprint);
+                SessionEnd::Untrusted(certificate)
+            }
+            Err(OpenError::Failed(failure)) => {
                 if reported_failure.as_deref() != Some(failure.as_str()) {
                     log::info!("cannot connect to {}: {failure}", endpoint.websocket_url());
                     reported_failure = Some(failure);
@@ -54,23 +58,68 @@ pub(super) async fn run(
                 SessionEnd::ConnectionLost
             }
         };
-        match end {
+        let retry = match end {
             SessionEnd::Shutdown => return,
-            SessionEnd::SwitchTo(next) => endpoint = next,
+            SessionEnd::SwitchTo(next) => Retry::SwitchTo(next),
             SessionEnd::ConnectionLost => {
                 publish_connection(&outputs, &endpoint, ConnectionState::Disconnected);
-                match wait_for_retry(&mut requests, &outputs, &endpoint, &credentials).await {
-                    Retry::Same => {}
-                    Retry::SwitchTo(next) => endpoint = next,
-                    Retry::Shutdown => return,
-                }
+                wait_for_retry(&mut requests, &outputs, &endpoint, &credentials).await
             }
+            SessionEnd::Untrusted(certificate) => {
+                publish_untrusted(&outputs, &endpoint, certificate);
+                wait_for_trust(&mut requests, &outputs, &endpoint, &credentials).await
+            }
+        };
+        match retry {
+            Retry::Same => {}
+            Retry::SwitchTo(next) => endpoint = next,
+            Retry::Shutdown => return,
+        }
+    }
+}
+
+/// An open connection with the HTTP client of the same trust.
+struct Opened {
+    connection: Connection,
+    http: reqwest::Client,
+    trusted_certificate: Option<CertificateFingerprint>,
+}
+
+enum OpenError {
+    /// Neither the system nor the user trusts the certificate of this `https://` address.
+    Untrusted(UntrustedCertificate),
+    Failed(String),
+}
+
+/// Opens the WebSocket and the HTTP client, both with the certificate the user trusted for this address.
+async fn open(
+    endpoint: &Endpoint,
+    credentials: &CredentialStore,
+) -> Result<(Opened, mpsc::UnboundedReceiver<Notification>), OpenError> {
+    let tls = Tls::new(credentials.trusted_certificate(endpoint));
+    let http = tls.http_client().map_err(|error| OpenError::Failed(format!("HTTP client: {error}")))?;
+    match Connection::open(&endpoint.websocket_url(), &tls).await {
+        Ok((connection, notifications)) => {
+            let trusted_certificate = tls.trusted().filter(|_| endpoint.is_secure());
+            Ok((Opened { connection, http, trusted_certificate }, notifications))
+        }
+        Err(error) => {
+            Err(tls.take_rejected().map_or_else(|| OpenError::Failed(error.to_string()), OpenError::Untrusted))
         }
     }
 }
 
 fn publish_connection(outputs: &Outputs, endpoint: &Endpoint, connection: ConnectionState) {
     outputs.snapshot.send_replace(Snapshot { endpoint: endpoint.display(), connection, ..Snapshot::default() });
+}
+
+fn publish_untrusted(outputs: &Outputs, endpoint: &Endpoint, certificate: UntrustedCertificate) {
+    outputs.snapshot.send_replace(Snapshot {
+        endpoint: endpoint.display(),
+        connection: ConnectionState::UntrustedCertificate,
+        untrusted_certificate: Some(certificate),
+        ..Snapshot::default()
+    });
 }
 
 enum Retry {
@@ -91,20 +140,55 @@ async fn wait_for_retry(
     loop {
         tokio::select! {
             () = &mut delay => return Retry::Same,
-            request = requests.recv() => match request {
-                None => return Retry::Shutdown,
-                Some(Request::Connect(endpoint)) => return Retry::SwitchTo(endpoint),
-                Some(Request::Reconnect) => return Retry::Same,
-                Some(Request::Command(command)) => outputs.event(Event::CommandFailed {
-                    command,
-                    error: CommandError::NotConnected,
-                }),
-                Some(Request::LogIn { .. }) => outputs.event(Event::LoginFailed("not connected to Moonraker".to_owned())),
-                // Moonraker is not reachable to end the login there; the display forgets it anyway.
-                Some(Request::LogOut) => forget_credential(credentials, endpoint),
-                Some(Request::Query(_)) => {}
+            request = requests.recv() => if let Some(retry) = answer_offline(request, outputs, endpoint, credentials) {
+                return retry;
             }
         }
+    }
+}
+
+/// Waits until the user trusts the certificate or picks another address; trying again alone would fail the same way.
+async fn wait_for_trust(
+    requests: &mut mpsc::UnboundedReceiver<Request>,
+    outputs: &Outputs,
+    endpoint: &Endpoint,
+    credentials: &CredentialStore,
+) -> Retry {
+    loop {
+        if let Some(retry) = answer_offline(requests.recv().await, outputs, endpoint, credentials) {
+            return retry;
+        }
+    }
+}
+
+/// Answers a request while there is no connection; `Some` ends the wait.
+fn answer_offline(
+    request: Option<Request>,
+    outputs: &Outputs,
+    endpoint: &Endpoint,
+    credentials: &CredentialStore,
+) -> Option<Retry> {
+    let Some(request) = request else { return Some(Retry::Shutdown) };
+    match request {
+        Request::Connect(endpoint) => return Some(Retry::SwitchTo(endpoint)),
+        Request::Reconnect => return Some(Retry::Same),
+        Request::TrustCertificate(fingerprint) => {
+            trust_certificate(credentials, endpoint, fingerprint);
+            return Some(Retry::Same);
+        }
+        Request::Command(command) => outputs.event(Event::CommandFailed { command, error: CommandError::NotConnected }),
+        Request::LogIn { .. } => outputs.event(Event::LoginFailed("not connected to Moonraker".to_owned())),
+        // Moonraker is not reachable to end the login there; the display forgets it anyway.
+        Request::LogOut => forget_credential(credentials, endpoint),
+        Request::Query(_) => {}
+    }
+    None
+}
+
+fn trust_certificate(credentials: &CredentialStore, endpoint: &Endpoint, fingerprint: CertificateFingerprint) {
+    log::info!("trusting certificate {fingerprint} of {}", endpoint.display());
+    if let Err(error) = credentials.trust_certificate(endpoint, fingerprint) {
+        log::warn!("cannot store the trusted certificate of {}: {error}", endpoint.display());
     }
 }
 
@@ -166,6 +250,8 @@ pub(super) struct Session<'a> {
     pub(super) connection: Connection,
     pub(super) http: reqwest::Client,
     pub(super) endpoint: Endpoint,
+    /// The certificate the user trusted for this address, for the settings.
+    pub(super) trusted_certificate: Option<CertificateFingerprint>,
     pub(super) credentials: &'a CredentialStore,
     pub(super) access: Access,
     pub(super) outputs: &'a Outputs,
@@ -195,17 +281,17 @@ pub(super) struct Session<'a> {
 
 impl<'a> Session<'a> {
     fn new(
-        connection: Connection,
-        http: reqwest::Client,
+        opened: Opened,
         endpoint: Endpoint,
         credentials: &'a CredentialStore,
         outputs: &'a Outputs,
         wled_answers: mpsc::UnboundedSender<Vec<WledStrip>>,
     ) -> Self {
         Self {
-            connection,
-            http,
+            connection: opened.connection,
+            http: opened.http,
             endpoint,
+            trusted_certificate: opened.trusted_certificate,
             credentials,
             access: Access::Open,
             outputs,
@@ -269,6 +355,7 @@ impl<'a> Session<'a> {
                     Some(Request::Query(query)) => self.answer(query),
                     Some(Request::LogIn { .. }) => log::debug!("login ignored: Moonraker already answers"),
                     Some(Request::LogOut) => return self.log_out().await,
+                    Some(Request::TrustCertificate(_)) => log::debug!("trust ignored: the certificate was accepted"),
                 },
                 _ = access_check.tick(), if self.access.is_authorized() => {
                     if !self.still_authorized().await {
@@ -331,7 +418,7 @@ impl<'a> Session<'a> {
                         error: CommandError::LoginRequired,
                     }),
                     Some(Request::LogOut) => forget_credential(self.credentials, &self.endpoint),
-                    Some(Request::Connect(_) | Request::Query(_)) => {}
+                    Some(Request::Connect(_) | Request::Query(_) | Request::TrustCertificate(_)) => {}
                 },
             }
         }
@@ -597,6 +684,8 @@ impl<'a> Session<'a> {
         self.outputs.snapshot.send_replace(Snapshot {
             endpoint: self.endpoint.display(),
             connection: ConnectionState::Connected,
+            untrusted_certificate: None,
+            trusted_certificate: self.trusted_certificate,
             access: self.access.clone(),
             tree,
             status,

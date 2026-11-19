@@ -267,6 +267,7 @@ impl Presenter {
         if snapshot.connection != ConnectionState::LoginRequired {
             printer.set_login_error(SharedString::new());
         }
+        self.show_certificate(printer, snapshot);
         let state = format!(
             "{} {} {}",
             connection_name(snapshot.connection),
@@ -274,6 +275,22 @@ impl Presenter {
             status.job.state.as_str()
         );
         self.status.note_state(&state);
+    }
+
+    /// The certificate to decide on while Moonraker waits for it, and the one that is trusted while connected.
+    fn show_certificate(&self, printer: &Printer, snapshot: &Snapshot) {
+        let untrusted = snapshot.untrusted_certificate.as_ref();
+        let fingerprint = untrusted.map(|certificate| certificate.fingerprint.to_string()).unwrap_or_default();
+        printer.set_certificate_fingerprint(fingerprint.as_str().into());
+        printer.set_certificate_fingerprint_lines(format::fingerprint_lines(&fingerprint).into());
+        let before = untrusted.and_then(|certificate| certificate.trusted_before.as_ref());
+        printer.set_certificate_before(
+            before.map(|known| format::fingerprint_short(&known.to_string())).unwrap_or_default().into(),
+        );
+        let trusted = snapshot.trusted_certificate.as_ref();
+        printer.set_trusted_certificate(
+            trusted.map(|known| format::fingerprint_short(&known.to_string())).unwrap_or_default().into(),
+        );
     }
 
     /// The print: state, progress, interruption and the pause at a layer.

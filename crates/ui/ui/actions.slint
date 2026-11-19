@@ -67,6 +67,8 @@ export global Actions {
     // User and password; only Moonraker sees the password.
     callback log-in(string, string);
     callback log-out();
+    // The fingerprint as shown by `Printer.certificate-fingerprint`.
+    callback trust-certificate(string);
     // The index of the print object under a tap on the bed map, or -1: position and the finger's reach as shares of
     // the map's width and height, from the top left.
     callback print-object-at(float, float, float) -> int;

@@ -154,8 +154,38 @@ The credentials are kept per Moonraker address in `~/.config/sailhand/credential
 }
 ```
 
-Sailhand talks plain HTTP and WebSocket to Moonraker so far (no HTTPS), like most installations in a home network;
-the password of a login goes over the network unencrypted.
+## Encrypted connection (HTTPS)
+
+With an `http://` address Sailhand talks plain HTTP and WebSocket to Moonraker, like most installations in a home
+network; the password of a login then goes over the network unencrypted. With an `https://` address (e.g.
+`https://printer.local:7130`) the connection uses TLS. Moonraker serves TLS itself on `ssl_port` (7130 by default)
+once `ssl_certificate_path` and `ssl_key_path` are set in its `[server]` section, or a reverse proxy such as nginx does
+it.
+
+A certificate that the system trusts (signed by a known authority, e.g. Let's Encrypt) is accepted without a
+question. Moonraker's certificate is usually self-signed, though; then the screen shows its SHA-256 fingerprint and
+asks whether to trust it. Compare it with the fingerprint on the printer host before you do:
+
+```sh
+openssl x509 -noout -fingerprint -sha256 -in <ssl_certificate_path from moonraker.conf>
+```
+
+Sailhand remembers the trusted certificate per address in
+the credentials file, in the section `certificates`, and shows it shortened in the settings. If the printer presents
+a different certificate later, the screen says that it has changed and shows the new fingerprint beside the one
+trusted before; replacing it needs a confirmation. To forget a trusted certificate, delete its line in the file.
+
+```json
+{
+  "moonraker": {},
+  "certificates": {
+    "https://printer.local:7130": "3F:A1:9C:07:…:5E:22:B0:4D"
+  }
+}
+```
+
+`sailhand --report` uses the trusted certificate as well; an address whose certificate is not trusted yet has to be
+trusted on the screen first.
 
 ## Displays
 

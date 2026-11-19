@@ -17,7 +17,10 @@ dirs = "7.0.0"
 futures-util.workspace = true
 image.workspace = true
 log.workspace = true
-reqwest = { version = "0.13.5", default-features = false }
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"] }
+ring = "0.17.14"
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+rustls-native-certs = "0.8.5"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

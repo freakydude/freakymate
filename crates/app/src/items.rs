@@ -31,6 +31,7 @@ pub(crate) fn connection_name(state: ConnectionState) -> &'static str {
         ConnectionState::Connected => "connected",
         ConnectionState::Disconnected => "disconnected",
         ConnectionState::LoginRequired => "login-required",
+        ConnectionState::UntrustedCertificate => "untrusted-certificate",
     }
 }
 

@@ -1,6 +1,7 @@
 use fake_moonraker::access::AccessConfig;
 use fake_moonraker::machine::MachineProfile;
 use fake_moonraker::server::{ServerConfig, serve};
+use fake_moonraker::tls::TlsIdentity;
 use std::process::ExitCode;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -10,7 +11,7 @@ const DEFAULT_TIME_SCALE: f64 = 10.0;
 const DEFAULT_MMU_GATES: usize = 4;
 const USAGE: &str = "Usage: fake-moonraker [--port <port>] [--time-scale <factor>] \
     [--profile basic|voron|happy-hare|ercf|happy-hare-encoder|happy-hare-co|happy-hare-to|toolchanger|toolchanger-required|happy-hare-units|toolchanger-mmu|afc|afc-toolchanger] \
-    [--gates <1-16>, only for the Happy Hare profiles] [--auth <user>:<password>]";
+    [--gates <1-16>, only for the Happy Hare profiles] [--auth <user>:<password>] [--tls]";
 
 enum Profile {
     Basic,
@@ -34,6 +35,7 @@ struct Options {
     profile: Profile,
     gates: usize,
     access: Option<AccessConfig>,
+    tls: bool,
 }
 
 impl Options {
@@ -63,9 +65,14 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<Options, Stri
         profile: Profile::Voron,
         gates: DEFAULT_MMU_GATES,
         access: None,
+        tls: false,
     };
 
     while let Some(flag) = args.next() {
+        if flag == "--tls" {
+            options.tls = true;
+            continue;
+        }
         let value = args.next().ok_or_else(|| format!("missing value for {flag}"))?;
         match flag.as_str() {
             "--port" => options.port = value.parse().map_err(|_| format!("invalid port '{value}'"))?,
@@ -127,8 +134,19 @@ async fn run() -> Result<(), String> {
         .await
         .map_err(|error| format!("cannot listen on port {}: {error}", options.port))?;
 
+    let tls = options
+        .tls
+        .then(TlsIdentity::generate)
+        .transpose()
+        .map_err(|error| format!("cannot create certificate: {error}"))?;
     println!("Fake-Moonraker listening. Start sailhand with:");
-    println!("  cargo run -p sailhand -- --moonraker http://127.0.0.1:{}", options.port);
+    match &tls {
+        Some(identity) => {
+            println!("  cargo run -p sailhand -- --moonraker https://127.0.0.1:{}", options.port);
+            println!("certificate SHA-256 fingerprint: {}", identity.fingerprint());
+        }
+        None => println!("  cargo run -p sailhand -- --moonraker http://127.0.0.1:{}", options.port),
+    }
     if let Some(access) = &options.access {
         println!("Login required: user '{}', API key '{}'", access.username, access.api_key);
     }
@@ -138,6 +156,7 @@ async fn run() -> Result<(), String> {
         status_interval: Duration::from_millis(250),
         profile: options.machine_profile(),
         access: options.access.clone(),
+        tls,
     };
     serve(listener, config).await.map_err(|error| error.to_string())
 }

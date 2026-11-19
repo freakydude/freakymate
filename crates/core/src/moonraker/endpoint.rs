@@ -44,6 +44,11 @@ impl Endpoint {
         self.http_url("").trim_end_matches('/').to_owned()
     }
 
+    /// `https://` or `wss://`: the connection uses TLS.
+    pub fn is_secure(&self) -> bool {
+        self.secure
+    }
+
     /// Moonraker runs on this machine, so local settings (e.g. the network) belong to the printer host.
     pub fn is_local(&self) -> bool {
         let host = match self.authority.strip_prefix('[') {

@@ -41,6 +41,7 @@ export global StateIcons {
     public pure function klippy-label(connection: string, state: string) -> string {
         if (connection == "connecting") { return @tr("Moonraker: connecting"); }
         if (connection == "login-required") { return @tr("Moonraker: login required"); }
+        if (connection == "untrusted-certificate") { return @tr("Moonraker: certificate not trusted"); }
         if (connection != "connected") { return @tr("Moonraker: not reachable"); }
         if (state == "ready") { return @tr("Klipper ready"); }
         if (state == "startup") { return @tr("Klipper: starting"); }
@@ -95,7 +96,7 @@ export global StateIcons {
     public pure function summary-severity() -> Severity {
         if (!Printer.ready) {
             if (Printer.connection == "connecting") { return Severity.info; }
-            if (Printer.connection == "login-required") { return Severity.attention; }
+            if (Printer.connection == "login-required" || Printer.connection == "untrusted-certificate") { return Severity.attention; }
             if (Printer.is-connected && Printer.klippy-state == "startup") { return Severity.info; }
             return Severity.error;
         }
@@ -135,7 +136,7 @@ export global StateIcons {
     }
 
     public pure function klippy-state(connection: string, state: string) -> image {
-        if (connection == "login-required") { return Icons.ui-lock; }
+        if (connection == "login-required" || connection == "untrusted-certificate") { return Icons.ui-lock; }
         if (connection != "connected") { return Icons.system-disconnected; }
         if (state == "ready") { return Icons.state-ready; }
         if (state == "startup") { return Icons.state-startup; }

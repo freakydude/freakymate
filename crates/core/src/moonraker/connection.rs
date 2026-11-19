@@ -1,6 +1,7 @@
 //! WebSocket connection to Moonraker: matches responses to their requests and forwards notifications.
 
 use super::rpc::{self, Incoming, RpcError};
+use super::tls::Tls;
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -9,6 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
+use tokio_tungstenite::Connector;
 use tokio_tungstenite::tungstenite::{self, Message};
 
 type Replies = HashMap<u64, oneshot::Sender<Result<Value, RpcError>>>;
@@ -30,6 +32,9 @@ pub enum ConnectionState {
     Disconnected,
     /// Connected, but Moonraker answers only after a login ([`PrinterService::log_in`]).
     LoginRequired,
+    /// The `https://` server presented a certificate nobody trusts yet; waits for
+    /// [`PrinterService::trust_certificate`] or another address.
+    UntrustedCertificate,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -73,16 +78,22 @@ pub struct Connection {
 
 impl Connection {
     /// Opens the connection; notifications arrive via the returned receiver,
-    /// which ends as soon as the connection closes.
-    pub async fn open(url: &str) -> Result<(Self, mpsc::UnboundedReceiver<Notification>), tungstenite::Error> {
-        Self::open_with(url, KEEPALIVE).await
+    /// which ends as soon as the connection closes. `tls` applies to `wss://` only.
+    pub async fn open(
+        url: &str,
+        tls: &Tls,
+    ) -> Result<(Self, mpsc::UnboundedReceiver<Notification>), tungstenite::Error> {
+        Self::open_with(url, tls, KEEPALIVE).await
     }
 
     async fn open_with(
         url: &str,
+        tls: &Tls,
         keepalive: Keepalive,
     ) -> Result<(Self, mpsc::UnboundedReceiver<Notification>), tungstenite::Error> {
-        let (socket, _) = tokio::time::timeout(keepalive.connect_timeout, tokio_tungstenite::connect_async(url))
+        let connector = Connector::Rustls(tls.client_config());
+        let handshake = tokio_tungstenite::connect_async_tls_with_config(url, None, false, Some(connector));
+        let (socket, _) = tokio::time::timeout(keepalive.connect_timeout, handshake)
             .await
             .map_err(|_| tungstenite::Error::Io(std::io::ErrorKind::TimedOut.into()))??;
         let (mut sink, mut stream) = socket.split();
@@ -188,7 +199,7 @@ mod tests {
             drop(socket);
         });
 
-        let (connection, mut notifications) = Connection::open_with(&url, SHORT).await.unwrap();
+        let (connection, mut notifications) = Connection::open_with(&url, &Tls::new(None), SHORT).await.unwrap();
         let ended = tokio::time::timeout(Duration::from_secs(2), notifications.recv()).await;
 
         assert_eq!(ended.expect("connection loss not detected"), None);
@@ -207,7 +218,7 @@ mod tests {
             while socket.next().await.is_some() {}
         });
 
-        let (_connection, mut notifications) = Connection::open_with(&url, SHORT).await.unwrap();
+        let (_connection, mut notifications) = Connection::open_with(&url, &Tls::new(None), SHORT).await.unwrap();
         tokio::time::sleep(SHORT.idle_timeout * 3).await;
 
         assert_eq!(notifications.try_recv(), Err(mpsc::error::TryRecvError::Empty));

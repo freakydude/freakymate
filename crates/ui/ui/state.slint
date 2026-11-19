@@ -10,7 +10,7 @@ export { Actions } from "actions.slint";
 
 
 export global Printer {
-    // Connection: connection = connecting | connected | disconnected | login-required; klippy-state as in Moonraker.
+    // Connection: connection = connecting | connected | disconnected | login-required | untrusted-certificate; klippy-state as in Moonraker.
     in property <string> connection: "connecting";
     out property <bool> is-connected: self.connection == "connected";
     in property <string> klippy-state: "disconnected";
@@ -25,6 +25,13 @@ export global Printer {
     in property <bool> api-key;
     // Moonraker's reason for refusing the last login; empty once a login is no longer asked for.
     in property <string> login-error;
+    // The certificate Moonraker presents while `connection` is untrusted-certificate: the full fingerprint (the argument
+    // of the action), in lines of 8 pairs, and the short form of the one trusted before for this address (empty on first contact).
+    in property <string> certificate-fingerprint;
+    in property <string> certificate-fingerprint-lines;
+    in property <string> certificate-before;
+    // The short form of the certificate trusted for the connection; empty without one.
+    in property <string> trusted-certificate;
 
     // Print job (print_stats.state)
     in property <string> print-state: "standby";
@@ -674,6 +681,7 @@ export global Confirm {
         if (self.action == "firmware-restart") { Actions.firmware-restart(); }
         if (self.action == "restart-klipper") { Actions.restart-klipper(); }
         if (self.action == "log-out") { Actions.log-out(); }
+        if (self.action == "trust-certificate") { Actions.trust-certificate(self.argument); }
         if (self.action == "disable-motors") { Actions.disable-motors(); }
         if (self.action == "power-off") { Actions.set-power(self.argument, false); }
         if (self.action == "connect-network") { Network.connect-pending(); }
