@@ -24,8 +24,8 @@ thiserror.workspace = true
 tokio.workspace = true
 tokio-tungstenite.workspace = true
 # The settings file: read with serde, saved by changing only what changed, so the user's comments stay.
-toml = "1.1.8"
-toml_edit = "0.25.17"
+toml = "1.2.1"
+toml_edit = "0.25.19"
 
 # Network management via NetworkManager over D-Bus (pure Rust, no libdbus).
 [target.'cfg(target_os = "linux")'.dependencies]

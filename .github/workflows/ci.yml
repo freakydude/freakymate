@@ -28,7 +28,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: version
@@ -103,7 +103,7 @@ jobs:
       TAG: v${{ needs.version.outputs.version }}
       BUILD_RESULT: ${{ needs.build-main.result }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
       - run: bash .github/scripts/publish-prerelease.sh "$RELEASE_ID" "$TAG" "$BUILD_RESULT"
 
   comment:
@@ -123,7 +123,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
       - name: Link packages in the pull request
         continue-on-error: true
         run: |

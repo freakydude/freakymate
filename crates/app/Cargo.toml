@@ -17,11 +17,11 @@ dev-mode = ["sailhand-core/dev-mode"]
 [dependencies]
 sailhand-core.workspace = true
 sailhand-ui.workspace = true
-chrono = { version = "0.4", default-features = false, features = [
+chrono = { version = "0.4.45", default-features = false, features = [
     "clock",
     "std",
 ] }
-clap = { version = "4.6.7", features = ["derive"] }
+clap = { version = "4.6.8", features = ["derive"] }
 env_filter = { version = "2.0.0", default-features = false, features = ["std"] }
 log.workspace = true
 slint = { workspace = true, features = ["std", "compat-1-2"] }
@@ -49,7 +49,7 @@ slint = { workspace = true, features = ["backend-android-activity-06", "renderer
 [target.'cfg(target_os = "linux")'.dependencies]
 input = "0.10.0"
 libc = "0.2.191"
-memmap2 = "0.9.11"
+memmap2 = "0.9.12"
 
 [dev-dependencies]
 tempfile = "3.27.0"
