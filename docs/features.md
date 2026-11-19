@@ -30,6 +30,8 @@ probe still counts as the probe).
     "No gate". Tools that share a gate share its spool, so their planned weights add up against what the spool has
     left; with EndlessSpool the rest of its group is shown as its own line. The question before the start shows the
     same comparison, compact, for each tool that does not fit.
+    The print page also points out a nozzle diameter the file was sliced for that differs from the printer's
+    `nozzle_diameter`, and a first-layer temperature above the heater's `max_temp`; only a hint, the print can start.
 - **Motion**: the **Axes** tab jogs X/Y/Z with selectable steps, homes (all/XY/Z), turns motors off, runs Quad Gantry Level
   or Z-Tilt when configured. Filament is locked while a print runs and the screen leaves it when a print starts; on
   Motion the Axes and Calibrate tabs are greyed out then and the page shows the Tune tab.
@@ -124,7 +126,9 @@ holds **Tools** and **Service**. The Gates tab and a strip on the print page sho
 - the flow rate, measured by the encoder or estimated by the sync-feedback controller with a proportional sensor
   (the estimate marked with "~").
 
-A tap on a gate opens what can be done with it: select, load, preload, check or eject it, and pick its spool. Without
+A tap on a gate opens what can be done with it: select, load, preload, check or eject it, and pick its spool. Where the
+gate has its own filament sensors (entry, exit), the dialog shows what they see; a small dot on the gate tile marks a
+sensor that disagrees with Happy Hare's gate state. Without
 a spool the dialog sets material, colour and nozzle temperature of the gate in Happy Hare's gate map instead, from a
 set of common materials and colours. The temperature is the one Happy Hare heats to when it loads the gate outside a
 print (in a print the slicer sets it); a new material sets it back to Happy Hare's `default_extruder_temp`, and a tap

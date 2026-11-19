@@ -251,6 +251,20 @@ impl Stretch {
     }
 }
 
+/// The gate's own sensors contradict what Happy Hare's `gate_status` says, by the rule Happy Hare applies itself
+/// (`validate_gate_status`, `extras/mmu/mmu_gate_maps.py` L287-307 @ c4c767a): a sensor detects filament in an empty
+/// gate, or the entry sensor sees none in a gate with filament, whether from the spool (1) or parked in the gate after
+/// an unload (2, "from buffer"). Only the entry sensor can tell "no filament": the exit sensor is free while filament
+/// waits in the gate. Happy Hare corrects this only at start-up and before a load, so it can persist meanwhile.
+/// A disabled or missing sensor and an unknown status contradict nothing.
+pub fn sensor_contradicts_gate(path: &LoadPath, availability: GateAvailability) -> bool {
+    match availability {
+        GateAvailability::Empty => path.entry == PathSensor::Triggered || path.exit == PathSensor::Triggered,
+        GateAvailability::Available | GateAvailability::Buffered => path.entry == PathSensor::Free,
+        GateAvailability::Unknown => false,
+    }
+}
+
 /// The load path of `lane`; `None` for a lane the sources do not know (the direct feed has no path of its own).
 pub fn load_path(status: &PrinterStatus, lane: &LaneId) -> Option<LoadPath> {
     match lane {
@@ -522,6 +536,25 @@ mod tests {
             switch("t0:extruder", true),
         ];
         PrinterStatus { mmu: Some(mmu), filament_sensors, ..PrinterStatus::default() }
+    }
+
+    #[test]
+    fn a_gate_sensor_against_the_gate_status_is_a_contradiction() {
+        let path = |entry, exit| LoadPath { entry, exit, ..LoadPath::empty() };
+        let (free, triggered, absent) = (PathSensor::Free, PathSensor::Triggered, PathSensor::Absent);
+
+        assert!(sensor_contradicts_gate(&path(triggered, absent), GateAvailability::Empty));
+        assert!(sensor_contradicts_gate(&path(free, triggered), GateAvailability::Empty));
+        assert!(sensor_contradicts_gate(&path(free, free), GateAvailability::Available));
+        assert!(
+            sensor_contradicts_gate(&path(free, absent), GateAvailability::Buffered),
+            "filament parked in the gate"
+        );
+        assert!(!sensor_contradicts_gate(&path(triggered, free), GateAvailability::Buffered), "exit free after unload");
+        assert!(!sensor_contradicts_gate(&path(free, free), GateAvailability::Empty));
+        assert!(!sensor_contradicts_gate(&path(triggered, free), GateAvailability::Available), "exit may be free");
+        assert!(!sensor_contradicts_gate(&path(absent, free), GateAvailability::Available), "only entry says none");
+        assert!(!sensor_contradicts_gate(&path(triggered, triggered), GateAvailability::Unknown));
     }
 
     #[test]

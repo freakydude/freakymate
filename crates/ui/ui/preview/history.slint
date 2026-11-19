@@ -10,7 +10,7 @@ export component HistoryPreview inherits AppWindow {
         Sample.ready-printer();
         Navigation.page = Page.temperature;
         Navigation.history-open = true;
-        Printer.history-title = "Nozzle";
+        Printer.history-title = "Extruder";
         Printer.history-current = "214.6 °C";
         // The paths are as wide as the plot area is (aspect about 2.3, 1000 high).
         // Scale 0..220 °C: round steps of 50, as `chart.rs` makes them; the share is counted from the top.

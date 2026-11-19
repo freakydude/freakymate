@@ -283,12 +283,29 @@ export component PreparedJob inherits VerticalLayout {
             icon: Icons.print-nozzle-diameter;
             label: @tr("Nozzle diameter");
             value: Printer.prepared.nozzle != "" ? Printer.prepared.nozzle + " mm" : "-";
+            value-color: Printer.prepared-nozzle-differs ? StateIcons.severity-color(Severity.attention) : Theme.foreground;
         }
         ValueTile {
             weight: 5;
             icon: Icons.thermal-nozzle;
             label: Printer.prepared.chamber-temperature != "" ? @tr("Nozzle / Bed / Chamber") : @tr("Nozzle / Bed");
             value: Printer.prepared.extruder-temperature == "" && Printer.prepared.bed-temperature == "" ? "-" : Printer.prepared.extruder-temperature + " / " + Printer.prepared.bed-temperature + (Printer.prepared.chamber-temperature != "" ? " / " + Printer.prepared.chamber-temperature : "");
+            value-color: Printer.prepared-temperature-differs ? StateIcons.severity-color(Severity.attention) : Theme.foreground;
+        }
+    }
+    // Where the file asks for more than the machine takes: a quiet line each, nothing stops the print.
+    for hint in Printer.prepared-hints: HorizontalLayout {
+        spacing: Theme.spacing-medium;
+        VerdictIcon {
+            cross-axis-self-alignment: start;
+            verdict: "differs";
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: hint;
+            color: StateIcons.severity-color(Severity.attention);
+            font-size: Theme.font-small;
+            wrap: word-wrap;
         }
     }
     if Printer.has-mmu: ToolMatchCard { }

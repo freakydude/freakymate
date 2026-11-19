@@ -2,10 +2,10 @@
 
 import { Icons } from "icons.slint";
 import { Theme } from "theme.slint";
-import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, PrinterItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, PrinterItem, WifiItem, AdapterStatus, AdapterItem, HostInterfaceItem } from "structs.slint";
 import { Actions } from "actions.slint";
 
-export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, PrinterItem, WifiItem, WiredItem, HostInterfaceItem } from "structs.slint";
+export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, PrinterItem, WifiItem, AdapterStatus, AdapterItem, HostInterfaceItem } from "structs.slint";
 export { Actions } from "actions.slint";
 
 
@@ -304,8 +304,6 @@ export global Printer {
 
     // Lists
     in property <[string]> macros;
-    // The macro that starts a print: while one runs, its tile is disabled.
-    in property <string> print-start-macro;
     // Every macro of the printer with its visibility, for the settings.
     in property <[MacroItem]> macro-items;
     // Parameter form of the macro chosen in the console.
@@ -353,6 +351,11 @@ export global Printer {
     // The tools the prepared file uses and how they compare: with their gates (MMU), or tool 0 with the spool in use;
     // `gate` is -1 without MMU.
     in property <[ToolMatchItem]> prepared-tools;
+    // What the prepared file asks of the machine itself (nozzle diameter, temperature limits) that it does not fit, one
+    // line each; the flags mark the tiles of the facts.
+    in property <[string]> prepared-hints;
+    in property <bool> prepared-nozzle-differs;
+    in property <bool> prepared-temperature-differs;
     // Files marked in the file list; the path and name only when it is a single one, which can be prepared.
     in property <int> marked-file-count;
     in property <string> marked-file-path;
@@ -470,13 +473,12 @@ export global Network {
     // Moonraker runs on this host (otherwise only the printer host's interfaces are shown).
     in property <bool> local;
     in property <string> unavailable-reason;
-    in property <bool> wifi-present;
     in property <bool> wifi-enabled;
-    in property <string> active-ssid;
-    in property <string> wifi-address;
     in property <string> busy;
     in property <[WifiItem]> networks;
-    in property <[WiredItem]> wired;
+    in property <[AdapterItem]> adapters;
+    // interface "" when there is no adapter.
+    in property <AdapterItem> selected;
     in property <[HostInterfaceItem]> host-interfaces;
 
     // Connection waiting for confirmation while a print is running.
@@ -487,6 +489,8 @@ export global Network {
     callback refresh();
     // The network tab is shown or hidden; NetworkManager is only read regularly while it is visible.
     callback watch(bool);
+    // Chooses the adapter shown on the right (interface).
+    callback select(string);
     callback scan();
     callback connect(string, string, bool);
     callback disconnect();

@@ -7,6 +7,7 @@ use sailhand_core::domain::filament_match::{self, Difference, ToolMatch, Verdict
 use sailhand_core::domain::file_catalog::FileInfo;
 use sailhand_core::domain::job_end;
 use sailhand_core::domain::pause::{Interruption, InterruptionFact};
+use sailhand_core::domain::print_hints::PrintHint;
 use sailhand_core::sources::happy_hare::{
     BufferSides, Emphasis, EncoderHeadroom, FlowGuardState, FlowGuardStatement, GateAvailability, LoadedFilament,
     ServoPosition, SyncFeedbackState,
@@ -262,6 +263,38 @@ pub fn file_facts(info: &FileInfo) -> FileFacts {
         facts.chamber_temperature = degrees(metadata.chamber_temp);
     }
     facts
+}
+
+/// What the prepared file's hints show: one line each, and which tiles of the facts they mark.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PreparedHints {
+    pub lines: Vec<String>,
+    pub nozzle_differs: bool,
+    pub temperature_differs: bool,
+}
+
+/// The hints of the prepared file in words; an extruder other than Klipper's `extruder` is named.
+pub fn prepared_hints(hints: &[PrintHint]) -> PreparedHints {
+    let named = |extruder: &str| if extruder == "extruder" { String::new() } else { format!(" ({extruder})") };
+    let mut shown = PreparedHints::default();
+    for hint in hints {
+        let line = match hint {
+            PrintHint::NozzleDiameter { extruder, file, printer } => {
+                shown.nozzle_differs = true;
+                format!("File plans a {file} mm nozzle, the printer has {printer} mm{}", named(extruder))
+            }
+            PrintHint::NozzleTemperature { extruder, file, max } => {
+                shown.temperature_differs = true;
+                format!("Nozzle {file:.0}° is above the printer's maximum of {max:.0}°{}", named(extruder))
+            }
+            PrintHint::BedTemperature { file, max } => {
+                shown.temperature_differs = true;
+                format!("Bed {file:.0}° is above the printer's maximum of {max:.0}°")
+            }
+        };
+        shown.lines.push(line);
+    }
+    shown
 }
 
 /// Each material of the used tools once, in tool order.
@@ -787,6 +820,26 @@ mod tests {
             (facts.extruder_temperature.as_str(), facts.bed_temperature.as_str(), facts.chamber_temperature.as_str()),
             ("", "", "")
         );
+    }
+
+    #[test]
+    fn hints_of_the_prepared_file_read_as_lines_and_mark_their_tiles() {
+        let hints = [
+            PrintHint::NozzleDiameter { extruder: "extruder1".into(), file: 0.6, printer: 0.4 },
+            PrintHint::BedTemperature { file: 130.0, max: 120.0 },
+        ];
+
+        let shown = prepared_hints(&hints);
+
+        assert_eq!(
+            shown.lines,
+            [
+                "File plans a 0.6 mm nozzle, the printer has 0.4 mm (extruder1)",
+                "Bed 130° is above the printer's maximum of 120°"
+            ]
+        );
+        assert!(shown.nozzle_differs && shown.temperature_differs);
+        assert_eq!(prepared_hints(&[]), PreparedHints::default());
     }
 
     #[test]

@@ -111,7 +111,7 @@ impl KlipperParts {
                 object("gcode_move"),
                 object("z_thermal_adjust"),
             ),
-            extruder: read_extruder(object("extruder"), object("configfile").pointer("/settings/extruder")),
+            extruder: read_extruder(object("extruder"), object("toolhead"), object("configfile").get("settings")),
             heaters: read_heaters(store),
             sensors: read_sensors(store),
             fans: devices::read_fans(store),
@@ -126,13 +126,10 @@ impl KlipperParts {
     }
 }
 
-/// Display name from the object name: `heater_generic chamber` → `Chamber`, `heater_bed` → `Bed`.
+/// Display name from the object name, never renamed, only made readable: `heater_generic chamber` → `Chamber`,
+/// `heater_bed` → `Heater Bed`, `extruder` → `Extruder`.
 pub fn label(object: &str) -> String {
-    let base = match object {
-        "extruder" => "nozzle",
-        "heater_bed" => "bed",
-        other => other.split_once(' ').map_or(other, |(_, instance)| instance),
-    };
+    let base = object.split_once(' ').map_or(object, |(_, instance)| instance);
     let words: Vec<String> = base
         .split(['_', ' '])
         .filter(|word| !word.is_empty())
@@ -193,7 +190,7 @@ mod tests {
         assert_eq!(status.motion.thermal_z_adjust, Some(0.0125));
         assert!(status.extruder.can_extrude);
         let heaters: Vec<&str> = status.heaters.iter().map(|heater| heater.label.as_str()).collect();
-        assert_eq!(heaters, ["Nozzle", "Bed", "Chamber"]);
+        assert_eq!(heaters, ["Extruder", "Heater Bed", "Chamber"]);
         let sensors: Vec<(&str, Option<f64>)> =
             status.sensors.iter().map(|sensor| (sensor.label.as_str(), sensor.temperature)).collect();
         assert_eq!(sensors, [("Mcu Temp", Some(41.0)), ("Pi", Some(48.5)), ("Stepper X", None)]);
@@ -217,8 +214,8 @@ mod tests {
 
     #[test]
     fn labels_are_human_readable() {
-        assert_eq!(label("extruder"), "Nozzle");
-        assert_eq!(label("heater_bed"), "Bed");
+        assert_eq!(label("extruder"), "Extruder");
+        assert_eq!(label("heater_bed"), "Heater Bed");
         assert_eq!(label("temperature_fan electronics_fan"), "Electronics Fan");
         assert_eq!(label("extruder1"), "Extruder1");
     }

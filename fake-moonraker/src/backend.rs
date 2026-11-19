@@ -22,6 +22,8 @@ pub struct Backend {
     wled: Mutex<Wled>,
     /// Moonraker's `wled` component, with the extra devices of the profile.
     wled_enabled: bool,
+    history_enabled: bool,
+    gcode_help_enabled: bool,
     catalog: Mutex<Catalog>,
     /// Jobs that ended while the fake runs, newest first; the history lists them before the demo jobs.
     ended_jobs: Mutex<Vec<Value>>,
@@ -43,6 +45,8 @@ impl Backend {
             spoolman_enabled: profile.spoolman,
             wled: Mutex::new(Wled::default()),
             wled_enabled: profile.devices,
+            history_enabled: profile.history,
+            gcode_help_enabled: profile.gcode_help,
             catalog: Mutex::new(Catalog::demo()),
             ended_jobs: Mutex::new(Vec::new()),
             started: Instant::now(),
@@ -88,6 +92,15 @@ impl Backend {
 
     pub fn spoolman_enabled(&self) -> bool {
         self.spoolman_enabled
+    }
+
+    /// Moonraker's `history` component is loaded.
+    pub fn history_enabled(&self) -> bool {
+        self.history_enabled
+    }
+
+    pub fn gcode_help_enabled(&self) -> bool {
+        self.gcode_help_enabled
     }
 
     pub fn wled_enabled(&self) -> bool {
@@ -141,7 +154,7 @@ impl Backend {
             let ended = was_active && !printer.print_state().is_active();
             (result, ended.then(|| printer.ended_job(unix_time())).flatten())
         };
-        if let Some(job) = ended_job {
+        if let Some(job) = ended_job.filter(|_| self.history_enabled) {
             self.ended_jobs.lock().expect("history lock poisoned").insert(0, job.clone());
             self.notify("notify_history_changed", json!([{ "action": "finished", "job": job }]));
         }

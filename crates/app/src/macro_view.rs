@@ -3,7 +3,6 @@
 use crate::items::replace_rows;
 use crate::{MacroItem, MacroParamItem, Printer};
 use sailhand_core::sources::klipper::{MacroDetails, MacroForm, offered_macros};
-use sailhand_core::sources::macro_conventions::PRINT_START_MACRO;
 use slint::{Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -28,7 +27,6 @@ pub struct MacroView {
 
 impl MacroView {
     pub fn bind(&self, printer: &Printer) {
-        printer.set_print_start_macro(PRINT_START_MACRO.into());
         printer.set_macros(ModelRc::from(self.visible.clone()));
         printer.set_macro_items(ModelRc::from(self.items.clone()));
         printer.set_macro_form(ModelRc::from(self.form.clone()));

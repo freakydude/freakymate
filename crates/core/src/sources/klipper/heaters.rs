@@ -27,6 +27,8 @@ pub struct Heater {
     pub hysteresis: f64,
     /// A nozzle extrudes only above this (`min_extrude_temp`, Klipper's default 170); `None` for other heaters.
     pub min_extrude_temp: Option<f64>,
+    /// The nozzle's `nozzle_diameter` in mm from the configuration; `None` for other heaters.
+    pub nozzle_diameter: Option<f64>,
     /// Only cools (`temperature_fan`): staying below the target is no deviation.
     pub cools_only: bool,
     /// Moonraker keeps a temperature history of it; see [`history_objects`].
@@ -161,6 +163,7 @@ fn heater(
             .unwrap_or(DEFAULT_HYSTERESIS),
         min_extrude_temp: is_nozzle
             .then(|| settings.get("min_extrude_temp").and_then(Value::as_f64).unwrap_or(DEFAULT_MIN_EXTRUDE_TEMP)),
+        nozzle_diameter: is_nozzle.then(|| settings.get("nozzle_diameter").and_then(Value::as_f64)).flatten(),
         cools_only: object.starts_with("temperature_fan "),
         has_history,
         pid: read_pid(settings),

@@ -6,6 +6,7 @@ use sailhand_core::sources::klipper::KlippyState;
 use sailhand_core::{Command, ConnectionState, Query};
 use slint::ComponentHandle;
 
+mod bed_mesh_dense;
 mod calibrate;
 mod console;
 mod lanes;
@@ -19,6 +20,7 @@ mod system;
 mod temperature;
 mod toolchanger;
 
+use bed_mesh_dense::bed_mesh_dense;
 use calibrate::calibrate;
 use console::typing;
 use lanes::lanes;
@@ -52,6 +54,8 @@ pub enum Scene {
     Typing,
     /// The Calibrate tab of the Motion page: results of the bed mesh and the screws, the dialogs of the waiting modes.
     Calibrate,
+    /// A dense bed mesh (30 x 40 points, 31 x 31 on a fake with `--round-bed`), which the UI draws as an image.
+    BedMeshDense,
     /// Print running, system page locked, cancel.
     Printing,
     /// Emergency stop and firmware restart.
@@ -64,7 +68,7 @@ pub enum Scene {
 }
 
 impl Scene {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::Pages,
         Self::Spools,
         Self::Toolchanger,
@@ -73,6 +77,7 @@ impl Scene {
         Self::Taps,
         Self::Typing,
         Self::Calibrate,
+        Self::BedMeshDense,
         Self::Printing,
         Self::Shutdown,
         Self::Idle,
@@ -102,7 +107,7 @@ impl Scene {
     fn parse(name: &str) -> Result<Self, String> {
         Self::ALL.into_iter().find(|scene| scene.name() == name).ok_or_else(|| {
             format!(
-                "unknown scene '{name}' (pages, spools, toolchanger, lanes, network, taps, typing, calibrate, printing, shutdown, idle, \
+                "unknown scene '{name}' (pages, spools, toolchanger, lanes, network, taps, typing, calibrate, bed-mesh-dense, printing, shutdown, idle, \
                  login, all)"
             )
         })
@@ -118,6 +123,7 @@ impl Scene {
             Self::Taps => "taps",
             Self::Typing => "typing",
             Self::Calibrate => "calibrate",
+            Self::BedMeshDense => "bed-mesh-dense",
             Self::Printing => "printing",
             Self::Shutdown => "shutdown",
             Self::Idle => "idle",
@@ -135,6 +141,7 @@ impl Scene {
             Self::Taps => taps(session),
             Self::Typing => typing(session),
             Self::Calibrate => calibrate(session),
+            Self::BedMeshDense => bed_mesh_dense(session),
             Self::Printing => printing(session),
             Self::Shutdown => shutdown(session),
             Self::Idle => idle(session),

@@ -50,6 +50,13 @@ export component SpoolDialog inherits Scrim {
                     border-radius: Theme.radius;
                     border-width: spool.id == root.selected ? 2px : 0px;
                     border-color: Theme.accent;
+                    // The list opens at the spool in use (`selected` is set when the dialog opens).
+                    property <bool> reveal: root.visible && spool.id == root.selected;
+                    changed reveal => {
+                        if (self.reveal) {
+                            spools-list.show-row(self.y, self.height);
+                        }
+                    }
                     HorizontalLayout {
                         padding-left: Theme.dialog-padding;
                         padding-right: Theme.dialog-padding;

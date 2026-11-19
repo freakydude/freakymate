@@ -178,6 +178,13 @@ export component HeadPicker inherits Scrim {
                     head: head;
                     viewed: row == root.head-index;
                     can-change: root.can-change;
+                    // The list opens at the head the page shows.
+                    property <bool> reveal: root.visible && row == root.head-index;
+                    changed reveal => {
+                        if (self.reveal) {
+                            list.show-row(self.y, self.height);
+                        }
+                    }
                     chosen => {
                         Navigation.filament-head = row;
                         Navigation.mmu-page = -1;

@@ -57,11 +57,14 @@ component InterruptionBanner inherits Rectangle {
                     overflow: elide;
                 }
             }
+            // Reason and hint can be long (`max-height` does not limit a wrapped text).
             if root.details != "": Text {
+                max-lines: 5;
                 text: root.details;
                 color: Theme.foreground;
                 font-size: Theme.font-small;
                 wrap: word-wrap;
+                overflow: elide;
             }
         }
     }

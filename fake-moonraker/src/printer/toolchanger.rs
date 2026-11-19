@@ -476,7 +476,7 @@ pub(super) fn extruder_name(index: usize) -> String {
 /// The settings of an extruder; `extruder` itself lists a few more (pressure advance, ...).
 pub(super) fn extruder_config() -> Value {
     json!({
-        "nozzle_diameter": 0.4,
+        "nozzle_diameter": crate::files::NOZZLE_DIAMETER,
         "filament_diameter": 1.75,
         "min_extrude_temp": MIN_EXTRUDE_TEMPERATURE,
         "min_temp": MIN_HEATER_TEMPERATURE,

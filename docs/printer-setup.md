@@ -51,7 +51,6 @@ Macros Sailhand recognises by name and uses when they exist:
 | -------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | `LOAD_FILAMENT`, `UNLOAD_FILAMENT`           | a naming convention documented by [KlipperScreen][ks-macros]; Mainsail and Fluidd call the same names | the Load and Unload buttons without Happy Hare, called without parameters ([below](#load-and-unload-filament)) |
 | `SET_PAUSE_NEXT_LAYER`, `SET_PAUSE_AT_LAYER` | [mainsail-config][mainsail-config] `client.cfg`, with `ENABLE` since v1.1.0    | planning a pause at a layer, with `ENABLE` and `LAYER` ([below](#pause-at-a-layer))               |
-| `PRINT_START`                                | a common name in printer configurations                                        | never called; the console's macro list greys it out during a print, since it would start a second one |
 | `T0` … `Tn` (any `T<n>` command)             | your macros, or a plugin that registers them (Happy Hare, tool changers)       | the comparison before a print: a tool of the file without its `T<n>` command is marked, because the print would stop there |
 
 Every other macro shows in the console's macro list, except those whose name starts with `_` and those that replace

@@ -1,0 +1,11 @@
+// Preview: System > Network with several adapters, Wi-Fi adapter selected.
+
+import { AppWindow } from "../app.slint";
+import { Sample } from "sample.slint";
+
+export component NetworkAdaptersPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Sample.managed-network-many();
+    }
+}

@@ -53,6 +53,11 @@ pub fn nozzle_spool<'a>(lanes: &'a [Lane], extruder: &str) -> Option<&'a Spool> 
     lane.spool.as_ref()
 }
 
+/// The spool of the lane in use at the nozzle of `extruder`; none for an extruder that is not feeding.
+pub fn active_spool_of_extruder<'a>(lanes: &'a [Lane], extruder: &str) -> Option<&'a Spool> {
+    lanes.iter().find(|lane| lane.active && lane.extruder == extruder).and_then(|lane| lane.spool.as_ref())
+}
+
 /// The lane `tool` prints from outside Happy Hare's gates: the AFC lane mapped to it, else its direct feed (the head of
 /// a tool changer, or tool 0 without MMU). AFC's map comes first, since it registers the `T<n>` commands.
 pub fn tool_lane(lanes: &[Lane], tool: usize) -> Option<&Lane> {

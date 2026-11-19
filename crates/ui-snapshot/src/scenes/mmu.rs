@@ -4,7 +4,7 @@ use crate::session::Session;
 use sailhand::{Actions, ChangerTab, FilamentTab, MmuDialogs, Navigation, Page, Printer};
 use sailhand_core::Command;
 use sailhand_core::sources::happy_hare::ServoPosition;
-use slint::ComponentHandle;
+use slint::{ComponentHandle, Model};
 use std::time::Duration;
 
 /// Where taps land in the 800x480 layout: the tile of gate 2 on the Gates tab, and the button "Select" of the gate
@@ -150,6 +150,7 @@ pub(super) fn mmu_gate(session: &mut Session) -> Result<(), String> {
             return Err("the gate dialog stays open after Select".into());
         }
     }
+    gate_sensors(session)?;
     if session.window.global::<Printer>().get_has_spoolman() {
         return Ok(());
     }
@@ -164,6 +165,23 @@ pub(super) fn mmu_gate(session: &mut Session) -> Result<(), String> {
         gate.material == "PETG" && gate.color == Some([0xff, 0x80, 0x00, 0xff])
     })?;
     session.show_page(Page::Filament, "filament-mmu-gate-local")?;
+    session.window.global::<MmuDialogs>().set_gate_row(-1);
+    Ok(())
+}
+
+/// The gate dialog with the sensor lines of the fake's gate 2, and the sensor hint dot on its tile and the hint in the
+/// dialog. The fake's entry sensors follow `gate_status`, so no contradiction arises there: the scene marks the row
+/// itself (a UI-only state, replaced by the next status update).
+fn gate_sensors(session: &mut Session) -> Result<(), String> {
+    let gates = session.window.global::<Printer>().get_mmu_gates();
+    let Some(mut gate) = gates.row_data(2) else { return Ok(()) };
+    if gate.entry_sensor.is_empty() {
+        return Ok(());
+    }
+    gate.sensor_conflict = true;
+    gates.set_row_data(2, gate);
+    session.window.global::<MmuDialogs>().set_gate_row(2);
+    session.show_page(Page::Filament, "filament-mmu-gate-sensors")?;
     session.window.global::<MmuDialogs>().set_gate_row(-1);
     Ok(())
 }

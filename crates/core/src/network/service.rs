@@ -90,12 +90,13 @@ impl Backend {
     }
 
     // `match *self` instead of `match self`: it also compiles when the enum has no variant.
-    async fn read(&self) -> Result<NetworkState, NetworkError> {
+    #[cfg_attr(not(any(target_os = "linux", feature = "dev-mode")), allow(unused_variables))]
+    async fn read(&self, requested: Option<&str>) -> Result<NetworkState, NetworkError> {
         match *self {
             #[cfg(target_os = "linux")]
-            Self::NetworkManager(ref manager) => manager.read().await,
+            Self::NetworkManager(ref manager) => manager.read(requested).await,
             #[cfg(feature = "dev-mode")]
-            Self::Simulated(ref simulated) => Ok(simulated.read()),
+            Self::Simulated(ref simulated) => Ok(simulated.read(requested)),
         }
     }
 
@@ -129,8 +130,8 @@ impl Outputs {
             .send_replace(NetworkState { availability: Availability::Unavailable(reason), ..NetworkState::default() });
     }
 
-    async fn refresh(&self, backend: &Backend) {
-        match backend.read().await {
+    async fn refresh(&self, backend: &Backend, requested: Option<&str>) {
+        match backend.read(requested).await {
             Ok(state) => {
                 self.state.send_replace(state);
             }
@@ -141,7 +142,12 @@ impl Outputs {
         }
     }
 
-    async fn execute(&self, backend: &mut Backend, command: NetworkCommand) {
+    async fn execute(&self, backend: &mut Backend, requested: &mut Option<String>, command: NetworkCommand) {
+        if let NetworkCommand::Select { interface } = command {
+            *requested = Some(interface);
+            self.refresh(backend, requested.as_deref()).await;
+            return;
+        }
         if let Some(busy) = busy_text(&command) {
             self.state.send_modify(|state| state.busy = Some(busy));
         }
@@ -158,7 +164,7 @@ impl Outputs {
                 self.notice(error.to_string(), true);
             }
         }
-        self.refresh(backend).await;
+        self.refresh(backend, requested.as_deref()).await;
     }
 }
 
@@ -174,23 +180,24 @@ async fn run(choice: NetworkBackend, mut requests: mpsc::UnboundedReceiver<Reque
         }
     };
     // One read decides whether the UI offers management at all.
-    outputs.refresh(&backend).await;
+    let mut requested: Option<String> = None;
+    outputs.refresh(&backend, None).await;
     let mut watching = false;
     let mut refresh = tokio::time::interval(REFRESH_INTERVAL);
     loop {
         tokio::select! {
             request = requests.recv() => match request {
-                Some(Request::Command(command)) => outputs.execute(&mut backend, command).await,
+                Some(Request::Command(command)) => outputs.execute(&mut backend, &mut requested, command).await,
                 Some(Request::Watch(visible)) => {
                     watching = visible;
                     if visible {
                         refresh.reset();
-                        outputs.refresh(&backend).await;
+                        outputs.refresh(&backend, requested.as_deref()).await;
                     }
                 }
                 None => return,
             },
-            _ = refresh.tick(), if watching => outputs.refresh(&backend).await,
+            _ = refresh.tick(), if watching => outputs.refresh(&backend, requested.as_deref()).await,
         }
     }
 }
@@ -198,16 +205,16 @@ async fn run(choice: NetworkBackend, mut requests: mpsc::UnboundedReceiver<Reque
 fn busy_text(command: &NetworkCommand) -> Option<String> {
     match command {
         NetworkCommand::Connect { ssid, .. } => Some(format!("Connecting to {ssid}")),
-        NetworkCommand::Scan => Some("Searching for networks".to_owned()),
+        NetworkCommand::Scan { .. } => Some("Searching for networks".to_owned()),
         _ => None,
     }
 }
 
 fn success_text(command: &NetworkCommand) -> Option<String> {
     match command {
-        NetworkCommand::Refresh | NetworkCommand::Scan => None,
+        NetworkCommand::Refresh | NetworkCommand::Select { .. } | NetworkCommand::Scan { .. } => None,
         NetworkCommand::Connect { ssid, .. } => Some(format!("Connected to {ssid}")),
-        NetworkCommand::Disconnect => Some("Wi-Fi disconnected".to_owned()),
+        NetworkCommand::Disconnect { .. } => Some("Wi-Fi disconnected".to_owned()),
         NetworkCommand::Forget { ssid } => Some(format!("Removed {ssid}")),
         NetworkCommand::SetWifiEnabled(true) => Some("Wi-Fi switched on".to_owned()),
         NetworkCommand::SetWifiEnabled(false) => Some("Wi-Fi switched off".to_owned()),
@@ -260,8 +267,12 @@ mod tests {
 
     #[test]
     fn log_description_hides_the_password() {
-        let command =
-            NetworkCommand::Connect { ssid: "Home".into(), password: Some("secret-pw".into()), hidden: false };
+        let command = NetworkCommand::Connect {
+            interface: "wlan0".into(),
+            ssid: "Home".into(),
+            password: Some("secret-pw".into()),
+            hidden: false,
+        };
         assert!(!describe(&command).contains("secret-pw"));
     }
 

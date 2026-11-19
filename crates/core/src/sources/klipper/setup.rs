@@ -159,6 +159,7 @@ impl Setup {
                 "max_accel",
                 "square_corner_velocity",
                 "minimum_cruise_ratio",
+                "extruder",
             ]),
         );
         subscription.add("motion_report", Some(&["live_position", "live_velocity", "live_extruder_velocity"]));

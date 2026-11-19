@@ -22,6 +22,7 @@ mod key {
     pub(super) const KEEP_SCREEN_ON: &str = "keep_screen_on";
     pub(super) const HIDE_TEMPERATURE_REPORTS: &str = "hide_temperature_reports";
     pub(super) const VERBOSE_LOG: &str = "verbose_log";
+    pub(super) const ROTATION: &str = "rotation";
     pub(super) const MOONRAKER: &str = "moonraker";
     pub(super) const HIDDEN_MACROS: &str = "hidden_macros";
     pub(super) const EXTRUDER: &str = "extruder";
@@ -41,7 +42,9 @@ mod key {
     pub(super) const KNOWN_MACROS: &str = "known_macros";
 }
 
-const GENERAL_KEYS: [&str; 4] = [key::FULLSCREEN, key::KEEP_SCREEN_ON, key::HIDE_TEMPERATURE_REPORTS, key::VERBOSE_LOG];
+const GENERAL_KEYS: [&str; 5] =
+    [key::FULLSCREEN, key::KEEP_SCREEN_ON, key::HIDE_TEMPERATURE_REPORTS, key::VERBOSE_LOG, key::ROTATION];
+const ROTATIONS: [u16; 4] = [0, 90, 180, 270];
 const PRINTER_KEYS: [&str; 2] = [key::MOONRAKER, key::HIDDEN_MACROS];
 const PRESET_KEYS: [&str; 2] = [key::EXTRUDER, key::BED];
 const STEP_CHOICE_KEYS: [&str; 6] =
@@ -89,6 +92,18 @@ fn flag(key: &'static str) -> Field<bool> {
 
 fn number<T: FromStr + ToString>(key: &'static str) -> Field<T> {
     Field { key, parse: value::parse_number::<T>, format: value::format_number::<T> }
+}
+
+/// The screen rotation in degrees: 0, 90, 180 or 270.
+fn rotation(key: &'static str) -> Field<u16> {
+    Field {
+        key,
+        parse: |text| {
+            let degrees = value::parse_number::<u16>(text)?;
+            if ROTATIONS.contains(&degrees) { Ok(degrees) } else { Err(format!("`{text}` is not 0, 90, 180 or 270")) }
+        },
+        format: value::format_number::<u16>,
+    }
 }
 
 fn numbers(key: &'static str) -> Field<Vec<f64>> {
@@ -166,6 +181,7 @@ fn read_general(section: &Section, settings: &mut Settings) -> Result<(), String
     settings.hide_temperature_reports =
         flag(key::HIDE_TEMPERATURE_REPORTS).read(section)?.unwrap_or(defaults.hide_temperature_reports);
     settings.verbose_log = flag(key::VERBOSE_LOG).read(section)?.unwrap_or(defaults.verbose_log);
+    settings.rotation = rotation(key::ROTATION).read(section)?.unwrap_or(defaults.rotation);
     Ok(())
 }
 
@@ -178,7 +194,8 @@ fn write_general(settings: &Settings, body: &mut Document, complete: bool) {
         (key::VERBOSE_LOG, settings.verbose_log, defaults.verbose_log),
     ];
     let present = body.section(GENERAL, None).is_some();
-    if !complete && !present && options.iter().all(|(_, value, default)| value == default) {
+    let default_rotation = settings.rotation == defaults.rotation;
+    if !complete && !present && default_rotation && options.iter().all(|(_, value, default)| value == default) {
         return;
     }
     let section = body.ensure_section(GENERAL, None);
@@ -186,6 +203,10 @@ fn write_general(settings: &Settings, body: &mut Document, complete: bool) {
         if complete || value != default || section.get(key).is_some() {
             flag(key).write(section, &value);
         }
+    }
+    // Only for the framebuffer fallback: written when set, never as a hint in a new file.
+    if !default_rotation || section.get(key::ROTATION).is_some() {
+        rotation(key::ROTATION).write(section, &settings.rotation);
     }
 }
 

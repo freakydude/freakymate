@@ -9,8 +9,9 @@ use sailhand_core::sources::klipper::tuning::TuningKey;
 use slint::{ComponentHandle, Model, SharedString};
 use std::time::Duration;
 
-/// The chip of T1 in the Tool-to-gate map of the prepared `long_job.gcode` (800x480, Happy Hare).
-const PREPARED_CHIP_T1: (f32, f32) = (585.0, 311.0);
+/// The chip of T1 in the Tool-to-gate map of the prepared `long_job.gcode` (800x480, Happy Hare), below the two hints
+/// the file raises (nozzle diameter, temperature).
+const PREPARED_CHIP_T1: (f32, f32) = (585.0, 360.0);
 
 /// A file prepared from the list: the print page shows it with its facts and the comparison of its tools (the fake's
 /// `long_job.gcode` asks for PLA and PETG). Dropped afterwards, so the other scenes see the printer's job.

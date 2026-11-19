@@ -66,7 +66,6 @@ Displays: BTT HDMI5 (5", 800x480, HDMI), Raspberry Pi Touch Display v1 (7", 800x
 - **IDEX modes** (copy, mirror) and which head sits on which carriage.
 - **KTC** by TypQxQ (`ktc` objects): not read; tool macros `T<n>` still work.
 - **Kalico** (the Klipper fork) has not been tried.
-- **Touch rotation** in the [framebuffer fallback](install.md#framebuffer-fallback).
 - **HTTPS** to Moonraker: Sailhand talks plain HTTP and WebSocket, like most home installations.
 - **Windows installer:** on Windows Sailhand runs from the unpacked zip.
 - Own layouts for 7" and 4.3" displays are planned; until then the 800x480 layout is scaled.

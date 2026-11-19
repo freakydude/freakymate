@@ -7,7 +7,7 @@ import { Actions, Confirm, MmuDialogs, MmuGateItem, Printer, SpoolPicker, Severi
 import { IconButton, IconLabel, TextWithValue } from "../components/controls.slint";
 import { FilamentColors, FilamentSwatch } from "../components/filament-swatch.slint";
 import { DialogHeader, DialogPanel, Scrim } from "../components/dialog.slint";
-import { GateAvailabilityLabel } from "../components/mmu-tiles.slint";
+import { GateAvailabilityLabel, MmuTexts } from "../components/mmu-tiles.slint";
 import { NumberEntryDialog } from "../components/entry-dialogs.slint";
 
 // Happy Hare unloads loaded filament before it checks another gate, and loads it again afterwards outside a print.
@@ -137,6 +137,34 @@ export component GateDialog inherits Scrim {
                     text: root.item.spool-id >= 0 ? @tr("Change spool") : @tr("Pick spool");
                     horizontal: true;
                     clicked => { SpoolPicker.show-lane(MmuDialogs.gate-row, root.item.spool-id, root.item.title); }
+                }
+            }
+
+            // The sensors of the gate, where it has them; the line keeps its place so that the dialog keeps its size.
+            HorizontalLayout {
+                property <bool> has-sensors: root.item.entry-sensor != "" || root.item.exit-sensor != "";
+                spacing: Theme.spacing-medium;
+                height: self.has-sensors ? Theme.font-small * 1.6 : 0px;
+                visible: self.has-sensors;
+                if root.item.entry-sensor != "": Text {
+                    text: @tr("Entry sensor: {}", MmuTexts.sensor(root.item.entry-sensor));
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                    vertical-alignment: center;
+                }
+                if root.item.exit-sensor != "": Text {
+                    text: @tr("Exit sensor: {}", MmuTexts.sensor(root.item.exit-sensor));
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                    vertical-alignment: center;
+                }
+                if root.item.sensor-conflict: Text {
+                    horizontal-stretch: 1;
+                    text: @tr("Differs from the gate state");
+                    color: StateIcons.severity-color(Severity.attention);
+                    font-size: Theme.font-small;
+                    vertical-alignment: center;
+                    overflow: elide;
                 }
             }
 

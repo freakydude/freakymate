@@ -423,49 +423,6 @@
       "request": "launch",
       "name": "android: sailhand (saved settings)",
       "command": "scripts/android-run.sh"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "debug: fake-moonraker (choose profile)",
-      "cargo": {
-        "args": [
-          "build",
-          "-p",
-          "fake-moonraker"
-        ]
-      },
-      "args": [
-        "--port",
-        "7125",
-        "--time-scale",
-        "10",
-        "--profile",
-        "${input:fakeProfile}"
-      ]
-    }
-  ],
-  "inputs": [
-    {
-      "id": "fakeProfile",
-      "type": "pickString",
-      "description": "Fake-Moonraker profile",
-      "options": [
-        "voron",
-        "basic",
-        "happy-hare",
-        "ercf",
-        "happy-hare-encoder",
-        "happy-hare-co",
-        "happy-hare-to",
-        "toolchanger",
-        "toolchanger-required",
-        "happy-hare-units",
-        "toolchanger-mmu",
-        "afc",
-        "afc-toolchanger"
-      ],
-      "default": "voron"
     }
   ]
 }

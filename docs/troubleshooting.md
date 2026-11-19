@@ -41,8 +41,9 @@ The layout is made for 800x480 and scaled to other sizes in fullscreen. `SLINT_S
 
 ## Touch is rotated or off
 
-Sailhand has no setting for touch rotation yet; the [framebuffer fallback](install.md#framebuffer-fallback) says what
-applies there. Please tell me your display on Discord or in a
+In the [framebuffer fallback](install.md#framebuffer-fallback) (SPI displays) set `rotation: 90`, `180` or `270` in
+`[sailhand]` of `sailhand.conf` and leave the driver at `rotate=0`; Sailhand turns picture and touch together. Under
+`cage` it has no setting for touch rotation; rotate the display in the system. Please tell me your display on Discord or in a
 [hardware support issue](https://github.com/freakydude/sailhand/issues/new/choose).
 
 ## A function is missing

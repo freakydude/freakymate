@@ -33,6 +33,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   SAILHAND_VERSION: ${{ inputs.version }}
+  # The channel (stable: X.Y.0, beta: X.Y.N from main, dev: with suffix) follows from the version in crates/core/build.rs.
+  SAILHAND_COMMIT: ${{ github.sha }}
 
 jobs:
   check:

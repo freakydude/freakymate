@@ -28,7 +28,6 @@ component MacroTiles inherits Rectangle {
             text: macro;
             icon-size: Theme.icon-small;
             horizontal: true;
-            enabled: !Printer.is-printing || macro != Printer.print-start-macro;
             clicked => { root.run(macro); }
         }
     }

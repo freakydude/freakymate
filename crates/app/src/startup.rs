@@ -85,7 +85,7 @@ impl Cli {
     fn log_header(&self, setup: SetupState) -> Vec<(String, String)> {
         let command_line: Vec<String> = std::env::args().skip(1).collect();
         let mut header = vec![
-            ("Version".to_owned(), sailhand_core::VERSION.to_owned()),
+            ("Version".to_owned(), sailhand_core::version_label()),
             ("Command line".to_owned(), command_line.join(" ")),
             ("System".to_owned(), format!("{} {}", std::env::consts::OS, std::env::consts::ARCH)),
         ];

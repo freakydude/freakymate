@@ -161,7 +161,7 @@ pub(super) fn read_fans(store: &ObjectStore) -> Vec<Fan> {
             let setting = |key: &str| section.and_then(|section| section.get(key)).and_then(Value::as_f64);
             Some(Fan {
                 object: name.to_owned(),
-                label: if kind == FanKind::Part { "Part fan".to_owned() } else { label(name) },
+                label: label(name),
                 kind,
                 speed: value.get("speed").and_then(Value::as_f64).unwrap_or_default().clamp(0.0, 1.0),
                 rpm: value.get("rpm").and_then(Value::as_f64),
@@ -216,7 +216,7 @@ mod tests {
             names,
             ["fan", "fan_generic chamber_light", "fan_generic nevermore", "heater_fan hotend", "controller_fan board"]
         );
-        assert_eq!(fans[0].label, "Part fan");
+        assert_eq!(fans[0].label, "Fan", "Klipper's name, not renamed");
         assert_eq!(fans[1].speed, 1.0, "speed is clamped");
         assert_eq!(fans[2].rpm, None);
         assert_eq!(fans[4].rpm, Some(3100.0));
@@ -245,6 +245,18 @@ mod tests {
         assert_eq!(heaters("heater_fan both"), ["extruder", "extruder1"]);
         assert!(heaters("heater_fan unknown").is_empty(), "no section, no claim");
         assert!(heaters("fan").is_empty());
+    }
+
+    #[test]
+    fn fans_keep_their_klipper_names() {
+        let fans = read_fans(&store(json!({
+            "heater_fan extruder": { "speed": 1.0 },
+            "heater_fan hotend_fan": { "speed": 1.0 }
+        })));
+
+        let label = |object: &str| fans.iter().find(|fan| fan.object == object).unwrap().label.clone();
+        assert_eq!(label("heater_fan extruder"), "Extruder");
+        assert_eq!(label("heater_fan hotend_fan"), "Hotend Fan");
     }
 
     #[test]

@@ -115,8 +115,8 @@ pub(crate) fn no_head_selected(tree: &MachineTree) -> bool {
     tree.has_swappable_heads() && tree.selected_extruder().is_none()
 }
 
-/// The heaters for the Thermal page: with heads, the nozzles of the heads first in head order, named after their head
-/// ("Nozzle T1"), then the others as they come; without heads as they come.
+/// The heaters for the Thermal page: with heads, the nozzles of the heads first in head order, their Klipper name with
+/// the head ("Extruder1 T1"), then the others as they come; without heads as they come.
 pub(crate) fn heaters_by_head<'a>(
     heaters: &'a [Heater],
     nozzles: &[(&str, &str)],
@@ -125,7 +125,7 @@ pub(crate) fn heaters_by_head<'a>(
         .iter()
         .filter_map(|(head, extruder)| {
             let heater = heaters.iter().find(|heater| heater.object == *extruder)?;
-            Some((heater, Some(format!("Nozzle {head}"))))
+            Some((heater, Some(format!("{} {head}", heater.label))))
         })
         .collect();
     let rest = heaters.iter().filter(|heater| !nozzles.iter().any(|(_, extruder)| heater.object == *extruder));
@@ -842,7 +842,10 @@ mod tests {
         let rows = heaters_by_head(&heaters, &head_nozzles(&head_rows(&heads)));
         let seen: Vec<(&str, Option<&str>)> =
             rows.iter().map(|(heater, name)| (heater.object.as_str(), name.as_deref())).collect();
-        assert_eq!(seen, [("extruder", Some("Nozzle T0")), ("extruder1", Some("Nozzle T1")), ("heater_bed", None)]);
+        assert_eq!(
+            seen,
+            [("extruder", Some("extruder T0")), ("extruder1", Some("extruder1 T1")), ("heater_bed", None)]
+        );
         let fixed = tree(&[(None, true, "extruder")]);
         assert!(head_nozzles(&head_rows(&fixed)).is_empty());
         assert_eq!(heaters_by_head(&heaters, &[]).len(), 3);
@@ -854,7 +857,7 @@ mod tests {
         let mut rows = head_rows(&heads);
         rows[0].label = "T4".into();
         assert_eq!(selected_head(&rows), Some("T4"));
-        assert_eq!(heaters_by_head(&[heater("extruder")], &head_nozzles(&rows))[0].1.as_deref(), Some("Nozzle T4"));
+        assert_eq!(heaters_by_head(&[heater("extruder")], &head_nozzles(&rows))[0].1.as_deref(), Some("extruder T4"));
     }
 
     #[test]
