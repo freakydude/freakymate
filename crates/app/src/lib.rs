@@ -32,6 +32,7 @@ mod mmu_view;
 pub mod network_controller;
 mod objects_view;
 pub mod presenter;
+pub mod printers_controller;
 pub mod settings_controller;
 mod spool_view;
 pub mod startup;

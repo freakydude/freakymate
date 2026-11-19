@@ -1,11 +1,10 @@
-// The Settings tab of the system pages: settings of this display (Moonraker address, fullscreen, standby). The
+// The Settings tab of the system pages: settings of this display (printer, fullscreen, standby). The
 // settings of the console are on the Console tab, temperature presets in the settings file, see docs/configuration.md.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Backlight, Confirm, Printer, UiSettings } from "../state.slint";
+import { Backlight, Confirm, Navigation, Page, Printer, PrinterChoice, UiSettings } from "../state.slint";
 import { Card, IconButton, ToggleRow } from "../components/controls.slint";
-import { TextEntryDialog } from "../components/entry-dialogs.slint";
 import { SystemTabs } from "../components/system-tabs.slint";
 
 // One row of minute choices for the standby; 0 is never.
@@ -47,14 +46,20 @@ component LogExportRow inherits VerticalLayout {
 }
 
 component ConnectionCard inherits Card {
-    title: @tr("Moonraker address");
-    icon: Icons.system-host;
-    callback change();
+    title: @tr("Printer");
+    icon: Icons.nav-printer;
 
     Text {
-        text: UiSettings.moonraker;
+        text: PrinterChoice.active-name;
         color: Theme.foreground;
         font-size: Theme.font-normal;
+        font-weight: 700;
+        overflow: elide;
+    }
+    Text {
+        text: UiSettings.moonraker;
+        color: Theme.muted;
+        font-size: Theme.font-small;
         overflow: elide;
     }
     // Only when the display shows credentials; a trusted display has nothing to say here.
@@ -64,14 +69,20 @@ component ConnectionCard inherits Card {
         font-size: Theme.font-small;
         overflow: elide;
     }
+    if Printer.trusted-certificate != "": Text {
+        text: @tr("Trusted certificate {}", Printer.trusted-certificate);
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        wrap: word-wrap;
+    }
     HorizontalLayout {
         spacing: Theme.spacing;
         IconButton {
             height: Theme.row-height-small;
-            icon: Icons.ui-edit;
-            text: @tr("Change");
+            icon: Icons.nav-printer;
+            text: @tr("Printers");
             horizontal: true;
-            clicked => { root.change(); }
+            clicked => { Navigation.page = Page.printers; }
         }
         if Printer.login-user != "": IconButton {
             height: Theme.row-height-small;
@@ -143,13 +154,7 @@ export component SettingsPage inherits Rectangle {
                 // Room for "Change" and "Log out" side by side; below each other they would not fit in height.
                 width: 290px;
                 spacing: Theme.spacing;
-                ConnectionCard {
-                    vertical-stretch: 0;
-                    change => {
-                        address.text = UiSettings.moonraker;
-                        address.open = true;
-                    }
-                }
+                ConnectionCard { vertical-stretch: 0; }
                 Rectangle { vertical-stretch: 1; }
                 if UiSettings.log-export-available: LogExportRow { vertical-stretch: 0; }
                 Text {
@@ -168,10 +173,5 @@ export component SettingsPage inherits Rectangle {
                 Rectangle { vertical-stretch: 1; }
             }
         }
-    }
-
-    address := TextEntryDialog {
-        title: @tr("Moonraker");
-        accepted(text) => { UiSettings.moonraker-entered(text); }
     }
 }

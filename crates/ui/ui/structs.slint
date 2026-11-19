@@ -5,7 +5,7 @@
 // What a state or a message means; each meaning has one colour (`StateIcons.severity-color`).
 export enum Severity { neutral, calm, fine, running, attention, error, info }
 
-export enum Page { print, motion, temperature, filament, changer, console, system, settings, updates, network }
+export enum Page { print, motion, temperature, filament, changer, console, system, settings, updates, network, printers }
 
 // The scale under a temperature (`TemperatureScale`), decided in the core; `shown` is false without a `max_temp`.
 export struct ScaleItem {
@@ -498,6 +498,19 @@ export struct WifiItem {
     active: bool,
     // false: saved network that is currently not received.
     in-range: bool,
+}
+
+// One printer (Moonraker server) in the list of the Printers page; the order comes from the core.
+export struct PrinterItem {
+    name: string,
+    // Canonical address, e.g. "http://192.168.40.6:7125"; the key for choose/forget.
+    address: string,
+    // Kept in the settings (otherwise only found on the network, or given on the command line).
+    saved: bool,
+    // The printer this display uses now.
+    active: bool,
+    // "reachable" | "unreachable" | "checking" (not used for the active one: that shows Printer.connection).
+    reachability: string,
 }
 
 export struct WiredItem {

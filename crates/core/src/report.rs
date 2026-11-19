@@ -8,7 +8,7 @@
 
 use crate::credentials::CredentialStore;
 use crate::domain::machine_tree::MachineTree;
-use crate::moonraker::{Connection, Endpoint, InvalidEndpoint};
+use crate::moonraker::{Connection, Endpoint, InvalidEndpoint, Tls};
 use crate::service::{Access, introduce};
 use crate::settings::{Settings, SettingsStore};
 use crate::sources::moonraker_server::{ServerComponents, server_info};
@@ -87,7 +87,7 @@ pub async fn write(request: ReportRequest) -> Result<PathBuf, ReportError> {
         log::warn!("{error}; using defaults");
         Settings::default()
     });
-    let endpoint = Endpoint::parse(request.moonraker.as_deref().unwrap_or(&settings.moonraker))?;
+    let endpoint = Endpoint::parse(&settings.start_address(request.moonraker.as_deref()))?;
     let sailhand = sailhand_section(&request.facts, &store, &settings);
     let report = collect(&endpoint, &CredentialStore::default_location(), sailhand).await?;
     let path = output_path(request.output.as_deref(), store.path(), Path::new("."));
@@ -104,10 +104,17 @@ pub async fn collect(
 ) -> Result<Value, ReportError> {
     let url = endpoint.websocket_url();
     let connect_failed = |reason: String| ReportError::Connect { url: url.clone(), reason };
-    let (connection, _notifications) = tokio::time::timeout(CALL_TIMEOUT, Connection::open(&url))
+    let tls = Tls::new(credentials.trusted_certificate(endpoint));
+    let (connection, _notifications) = tokio::time::timeout(CALL_TIMEOUT, Connection::open(&url, &tls))
         .await
         .map_err(|_| connect_failed("no answer".to_owned()))?
-        .map_err(|error| connect_failed(error.to_string()))?;
+        .map_err(|error| match tls.take_rejected() {
+            Some(certificate) => connect_failed(format!(
+                "untrusted certificate {}; trust it on the touch screen first",
+                certificate.fingerprint
+            )),
+            None => connect_failed(error.to_string()),
+        })?;
     let access =
         introduce(&connection, credentials, endpoint).await.map_err(|error| ReportError::Access(error.to_string()))?;
     let moonraker = Asker(&connection);

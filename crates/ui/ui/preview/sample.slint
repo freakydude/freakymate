@@ -1,7 +1,7 @@
 // Sample data for previews (VS Code Slint preview, slint-viewer, scripts/ui-preview.sh).
 // Not part of the app: nothing in app.slint imports this folder. In the app, Rust fills these globals.
 
-import { FilamentPathItem, MotionTab, Navigation, Network, Page, PathPartKind, Printer, Severity, UiSettings } from "../state.slint";
+import { FilamentPathItem, MotionTab, Navigation, Network, Page, PathPartKind, Printer, PrinterChoice, Severity, UiSettings } from "../state.slint";
 
 export global Sample {
     // The way at a head without sensors of its own, as the core builds it (`LoadPath::parts`, `PathScope::HeadOnly`) and
@@ -23,6 +23,8 @@ export global Sample {
         Printer.klippy-state = "ready";
         Printer.ready = true;
         Printer.endpoint = "http://voron.local:7125";
+        UiSettings.moonraker = "http://voron.local:7125";
+        PrinterChoice.active-name = "voron";
         Printer.activity = "ready";
         Printer.homed-x = true;
         Printer.homed-y = true;
@@ -386,6 +388,17 @@ export global Sample {
                     max-text: "max 100 °C"
                 }
             },
+        ];
+    }
+
+    // Printers page: the active printer, a saved one in reach, one found on the network, a saved one that does not answer.
+    public function printers() {
+        PrinterChoice.active-name = "voron";
+        PrinterChoice.printers = [
+            { name: "voron", address: "http://192.168.40.6:7125", saved: true, active: true, reachability: "reachable" },
+            { name: "sidewinder", address: "http://192.168.40.21:7125", saved: true, active: false, reachability: "reachable" },
+            { name: "mainsailos", address: "http://192.168.40.35:7125", saved: false, active: false, reachability: "reachable" },
+            { name: "ender", address: "http://192.168.40.48:7125", saved: true, active: false, reachability: "unreachable" },
         ];
     }
 

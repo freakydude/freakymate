@@ -194,8 +194,7 @@ chmod 0755 "$INSTALL_DIR/$NAME" "$INSTALL_DIR/install.sh" "$INSTALL_DIR/uninstal
 
 report "Creating $SERVICE_FILE"
 # Settings live next to the Klipper configs, so they can be edited in Mainsail or Fluidd and backups of printer_data
-# include them. The program creates the file with the defaults at its first start; an old sailhand.json stays as it
-# is and is no longer read.
+# include them. The program creates the file with the defaults at its first start.
 SETTINGS_FILE="$DATA_DIR/config/sailhand.conf"
 USER_ID=$(id -u)
 ARGUMENTS="--moonraker $MOONRAKER --settings $SETTINGS_FILE --logfile $DATA_DIR/logs/sailhand.log"

@@ -6,10 +6,12 @@ use crate::backlight_controller::BacklightController;
 use crate::display;
 use crate::network_controller::NetworkController;
 use crate::presenter::Presenter;
+use crate::printers_controller::{PrinterBridges, PrintersController};
 use crate::settings_controller::{Bridges, SettingsController};
 use crate::{AppWindow, UiSettings};
 use sailhand_core::backlight::{BacklightBackend, BacklightService};
 use sailhand_core::network::{NetworkBackend, NetworkService};
+use sailhand_core::printers::{DiscoveryBackend, DiscoveryService};
 use sailhand_core::settings::{SettingsError, SettingsStore};
 use sailhand_core::{CredentialStore, Endpoint, PrinterService};
 #[cfg(not(target_os = "android"))]
@@ -62,6 +64,7 @@ pub struct Application {
     pub service: PrinterService,
     _settings: std::rc::Rc<SettingsController>,
     _network: std::rc::Rc<NetworkController>,
+    _printers: std::rc::Rc<PrintersController>,
     _backlight: std::rc::Rc<BacklightController>,
     _clock: Timer,
     _runtime: tokio::runtime::Runtime,
@@ -73,7 +76,7 @@ impl Application {
             Some(path) => SettingsStore::new(path),
             None => SettingsStore::default_location()?,
         };
-        let settings = store.load_or_create().unwrap_or_else(|error| {
+        let mut settings = store.load_or_create().unwrap_or_else(|error| {
             log::warn!("{error}; using defaults");
             sailhand_core::Settings::default()
         });
@@ -84,7 +87,8 @@ impl Application {
             std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "default".to_owned())
         };
         crate::logging::header("Renderer", &renderer);
-        let endpoint = Endpoint::parse(options.moonraker.as_deref().unwrap_or(&settings.moonraker))?;
+        let endpoint = Endpoint::parse(&settings.start_address(options.moonraker.as_deref()))?;
+        settings.keep_first_printer(&endpoint);
         log::info!("Moonraker at {}", endpoint.display());
 
         let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build()?;
@@ -104,7 +108,7 @@ impl Application {
         }
         // Always in the user's configuration directory, also when the settings lie in printer_data/config.
         let credentials = options.credentials_file.map_or_else(CredentialStore::default_location, CredentialStore::new);
-        let (service, channels) = PrinterService::start(runtime.handle(), endpoint.clone(), credentials);
+        let (service, channels) = PrinterService::start(runtime.handle(), endpoint.clone(), credentials.clone());
         let presenter = Presenter::new(&window, service.clone());
         let (network_service, network_channels) = NetworkService::start(runtime.handle(), options.network);
         let network = NetworkController::bind(
@@ -130,9 +134,15 @@ impl Application {
                 backlight: backlight_service,
             },
         );
+        let (discovery, discovery_states) = DiscoveryService::start(runtime.handle(), DiscoveryBackend::Network);
+        let printers = PrintersController::bind(
+            &window,
+            PrinterBridges { settings: settings.clone(), discovery, credentials, presenter: presenter.clone() },
+        );
         actions::bind(&window, &service, &presenter, &settings);
         presenter.follow(channels)?;
         network.follow(network_channels)?;
+        printers.follow(discovery_states)?;
         backlight.follow(backlight_states)?;
 
         let clock = Timer::default();
@@ -175,6 +185,7 @@ impl Application {
             service,
             _settings: settings,
             _network: network,
+            _printers: printers,
             _backlight: backlight,
             _clock: clock,
             _runtime: runtime,

@@ -73,6 +73,8 @@ probe still counts as the probe).
   - **Machine**: Klipper/firmware restart, host reboot/shutdown, service restart, power devices.
   - **Updates**: Moonraker's update manager; the tab shows how many updates are waiting.
   - **Network**: Wi-Fi and Ethernet (see [Network settings](configuration.md#network-settings)).
+  - **Printers**: switch between several printers, found on the network or added by address, and see which of them
+    answer (see [Several printers](configuration.md#several-printers)).
   - **Console** (also from the message flyout): G-code history and live responses, a command field (on-screen keyboard
     or physical keyboard), and an expandable list of macros. Like Mainsail it hides the temperature reports Klipper
     sends while waiting for a heater (the thermometer button next to the command field shows them). Macros starting
@@ -80,7 +82,7 @@ probe still counts as the probe).
     switches further macros off and on. Macros with parameters
     open a form first: each parameter is read from the macro's template, Klipper defaults show as placeholders in
     brackets.
-  - **Settings**: Moonraker address and login (see [Moonraker login](configuration.md#moonraker-login)), fullscreen,
+  - **Settings**: the printer in use and its login (see [Moonraker login](configuration.md#moonraker-login)), fullscreen,
     and when the screen goes off by itself (see [Brightness and standby](configuration.md#brightness-and-standby)).
     Temperature presets are set in the [settings file](configuration.md#settings-file).
 
@@ -120,7 +122,7 @@ holds **Tools** and **Service**. The Gates tab and a strip on the print page sho
   level, or triggered with its reason. A buffer with one switch shows the side it does not measure as an outline;
 - with an encoder, what is left before FlowGuard trips on it (headroom);
 - the flow rate, measured by the encoder or estimated by the sync-feedback controller with a proportional sensor
-  (the print page shows the measured one only).
+  (the estimate marked with "~").
 
 A tap on a gate opens what can be done with it: select, load, preload, check or eject it, and pick its spool. Without
 a spool the dialog sets material, colour and nozzle temperature of the gate in Happy Hare's gate map instead, from a

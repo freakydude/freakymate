@@ -17,15 +17,17 @@ dirs = "7.0.0"
 futures-util.workspace = true
 image.workspace = true
 log.workspace = true
-reqwest = { version = "0.13.5", default-features = false }
+mdns-sd = "0.22.0"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"] }
+ring = "0.17.14"
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+rustls-native-certs = "0.8.5"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-tungstenite.workspace = true
 # The settings file: read with serde, saved by changing only what changed, so the user's comments stay.
-toml = "1.1.8"
-toml_edit = "0.25.17"
 
 # Network management via NetworkManager over D-Bus (pure Rust, no libdbus).
 [target.'cfg(target_os = "linux")'.dependencies]

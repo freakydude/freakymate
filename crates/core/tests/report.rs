@@ -11,7 +11,13 @@ use tokio::net::TcpListener;
 async fn start_fake(profile: MachineProfile) -> Endpoint {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
-    let config = ServerConfig { time_scale: 1000.0, status_interval: Duration::from_millis(20), profile, access: None };
+    let config = ServerConfig {
+        time_scale: 1000.0,
+        status_interval: Duration::from_millis(20),
+        profile,
+        access: None,
+        tls: None,
+    };
     tokio::spawn(serve(listener, config));
     Endpoint::parse(&address.to_string()).unwrap()
 }

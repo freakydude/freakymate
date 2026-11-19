@@ -83,7 +83,7 @@ architecture and packages first and stops with a message if something does not f
 
    Options: `-m <moonraker url>`, `-d <printer_data folder>` (default `~/printer_data`), `-c stable|beta` (update channel, see [Updates and channels](#updates-and-channels)).
    Run again, it keeps the address and folder of the existing installation unless you give them.
-   Settings go to `printer_data/config/sailhand.conf` (TOML), next to the Klipper configs, so they can be edited in
+   Settings go to `printer_data/config/sailhand.conf` (INI, like `moonraker.conf`), next to the Klipper configs, so they can be edited in
    Mainsail or Fluidd (see [Configuration](configuration.md#settings-file)). The log is `printer_data/logs/sailhand.log` (Mainsail: Machine → logs), see [Configuration](configuration.md#log).
    To remove it again, see [Uninstall](#uninstall).
 
@@ -153,8 +153,8 @@ Besides the Moonraker route there are plain packages for Debian-based and Arch-b
 On a desktop (Linux PC, Raspberry Pi OS with desktop, Windows) the program opens as a normal window and talks to any
 Moonraker over the network. On Debian and Ubuntu install the [`.deb`](#packages) and start Sailhand from the
 application menu or with `sailhand` in a terminal (skip the `systemctl` lines, they set up the kiosk); on Windows
-unpack `sailhand-x86_64-pc-windows-msvc.zip` and run `sailhand.exe`. There is no Windows installer yet. Set the
-Moonraker address on System → Settings or with `-m` (default `http://127.0.0.1:7125`). For fullscreen with a mouse,
+unpack `sailhand-x86_64-pc-windows-msvc.zip` and run `sailhand.exe`. There is no Windows installer yet. Choose the
+printer on System → Printers or set it with `-m` (default `http://127.0.0.1:7125`). For fullscreen with a mouse,
 switch on Fullscreen on System → Settings → Display; `-f` is the kiosk mode for a touch screen and hides the mouse
 pointer.
 

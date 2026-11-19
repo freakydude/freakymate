@@ -1,0 +1,125 @@
+// The Printers tab of the system pages: the Moonraker servers this display can use, saved, found on the network or active.
+
+import { Theme } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Confirm, Printer, PrinterChoice, PrinterItem } from "../state.slint";
+import { Card, IconButton, ListRow, ScrollList, TextWithValue } from "../components/controls.slint";
+import { TextEntryDialog } from "../components/entry-dialogs.slint";
+import { SystemTabs } from "../components/system-tabs.slint";
+
+// One printer: tap to use it; a button removes a saved one.
+component PrinterRow inherits ListRow {
+    in property <PrinterItem> printer;
+    callback selected;
+    property <bool> lit: root.printer.active || root.printer.reachability == "reachable";
+    tappable: !root.printer.active;
+    active: root.printer.active;
+    accessible-label: root.printer.name;
+    clicked => { root.selected(); }
+
+    HorizontalLayout {
+        padding-left: Theme.padding;
+        spacing: Theme.spacing;
+        Image {
+            cross-axis-self-alignment: center;
+            source: Icons.nav-printer;
+            colorize: root.lit ? Theme.foreground : Theme.muted;
+            width: Theme.icon-large;
+            height: Theme.icon-large;
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text {
+                text: root.printer.name;
+                color: root.lit ? Theme.foreground : Theme.muted;
+                font-size: Theme.font-normal;
+                font-weight: root.printer.active ? 700 : 400;
+                overflow: elide;
+            }
+            // The address stays whole; the status is shortened first.
+            TextWithValue {
+                text: root.printer.active
+                    ? (Printer.is-connected ? @tr("Connected")
+                        : Printer.connection == "connecting" ? @tr("Connecting …")
+                        : Printer.connection == "login-required" ? @tr("Login needed")
+                        : Printer.connection == "untrusted-certificate" ? @tr("Certificate not trusted")
+                        : @tr("Not reachable"))
+                    : !root.printer.saved ? @tr("Found")
+                    : root.printer.reachability == "reachable" ? @tr("Reachable")
+                    : root.printer.reachability == "checking" ? @tr("Checking …")
+                    : @tr("Not reachable");
+                value: root.printer.address;
+            }
+        }
+        if root.printer.saved: IconButton {
+            width: Theme.touch;
+            min-height: Theme.row-height-small;
+            icon: Icons.ui-delete;
+            accessible-label: @tr("Remove {}", root.printer.name);
+            clicked => {
+                Confirm.ask(@tr("Remove printer"), root.printer.active
+                    ? @tr("\"{}\" stays connected until you choose another printer. Its login and trusted certificate are deleted.", root.printer.name)
+                    : @tr("The login and trusted certificate of \"{}\" are deleted.", root.printer.name), "forget-printer", root.printer.address, true);
+            }
+        }
+    }
+}
+
+component PrintersCard inherits Card {
+    callback add-address;
+    // Below this width the button text goes under the icon.
+    property <bool> wide: root.width > 440px;
+    title: @tr("Printers");
+    icon: Icons.nav-printer;
+
+    HorizontalLayout {
+        spacing: Theme.spacing;
+        height: Theme.row-height-small;
+        Text {
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+            text: @tr("Printers announce themselves when [zeroconf] is in moonraker.conf.");
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            wrap: word-wrap;
+        }
+        IconButton {
+            icon: Icons.ui-plus;
+            text: @tr("Add");
+            horizontal: root.wide;
+            clicked => { root.add-address(); }
+        }
+    }
+    printer-list := ScrollList {
+        property <length> row-pitch: Theme.list-row-pitch;
+        vertical-stretch: 1;
+        content-height: PrinterChoice.printers.length * self.row-pitch;
+        for printer[index] in PrinterChoice.printers: PrinterRow {
+            y: index * printer-list.row-pitch;
+            width: printer-list.row-width;
+            printer: printer;
+            selected => { PrinterChoice.choose(printer.address); }
+        }
+    }
+}
+
+export component PrintersPage inherits Rectangle {
+    VerticalLayout {
+        padding: Theme.padding;
+        spacing: Theme.spacing;
+        SystemTabs { }
+        PrintersCard {
+            vertical-stretch: 1;
+            add-address => {
+                address.text = "";
+                address.open = true;
+            }
+        }
+    }
+
+    address := TextEntryDialog {
+        title: @tr("Moonraker address");
+        accepted(text) => { PrinterChoice.add(text); }
+    }
+}

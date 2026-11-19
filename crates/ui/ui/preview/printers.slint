@@ -1,0 +1,13 @@
+// Preview: System > Printers with the active printer, a reachable and an unreachable saved one, and one found on the network.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintersPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Sample.printers();
+        Navigation.page = Page.printers;
+    }
+}

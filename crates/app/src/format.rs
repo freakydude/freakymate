@@ -77,9 +77,44 @@ pub fn service_name(name: &str) -> String {
     chars.next().map_or_else(String::new, |first| first.to_uppercase().chain(chars).collect())
 }
 
+/// A certificate fingerprint (`AB:CD:…`, 32 pairs) as lines of 8 pairs, so all of it is readable on a small display.
+pub fn fingerprint_lines(fingerprint: &str) -> String {
+    let pairs: Vec<&str> = fingerprint.split(':').collect();
+    pairs.chunks(8).map(|line| line.join(":")).collect::<Vec<_>>().join("\n")
+}
+
+/// A certificate fingerprint as its first and last four pairs, to recognise it (`3F:A1:9C:07 … 5E:22:B0:4D`).
+pub fn fingerprint_short(fingerprint: &str) -> String {
+    let pairs: Vec<&str> = fingerprint.split(':').collect();
+    if pairs.len() <= 8 {
+        return fingerprint.to_owned();
+    }
+    format!("{} … {}", pairs[..4].join(":"), pairs[pairs.len() - 4..].join(":"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sample_fingerprint() -> String {
+        (0..32).map(|index| format!("{:02X}", index * 7 + 3)).collect::<Vec<_>>().join(":")
+    }
+
+    #[test]
+    fn a_fingerprint_is_split_into_four_lines_of_eight_pairs() {
+        let lines = fingerprint_lines(&sample_fingerprint());
+
+        assert_eq!(lines.lines().count(), 4);
+        assert!(lines.lines().all(|line| line.split(':').count() == 8));
+        assert_eq!(lines.replace('\n', ":"), sample_fingerprint());
+        assert_eq!(lines.lines().next(), Some("03:0A:11:18:1F:26:2D:34"));
+    }
+
+    #[test]
+    fn a_short_fingerprint_keeps_the_first_and_last_four_pairs() {
+        assert_eq!(fingerprint_short(&sample_fingerprint()), "03:0A:11:18 … C7:CE:D5:DC");
+        assert_eq!(fingerprint_short("AB:CD"), "AB:CD");
+    }
 
     #[test]
     fn durations_are_compact() {

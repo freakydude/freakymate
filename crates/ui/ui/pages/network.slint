@@ -4,31 +4,20 @@ import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
 import { Confirm, HostInterfaceItem, Network, Printer, WifiItem, WiredItem } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
-import { Card, IconButton, IconLabel, ScrollList, TextWithValue, ToggleRow } from "../components/controls.slint";
+import { Card, IconButton, ListRow, IconLabel, ScrollList, TextWithValue, ToggleRow } from "../components/controls.slint";
 import { TextEntryDialog } from "../components/entry-dialogs.slint";
 
 // One network: tap to connect; buttons to disconnect (active) or remove (saved).
-component WifiRow inherits Rectangle {
+component WifiRow inherits ListRow {
     in property <WifiItem> network;
     callback selected;
-    property <bool> can-connect: root.network.in-range && root.network.supported && !root.network.active;
-    // Room around the buttons, so they stay inside the highlighted border.
-    property <length> inset: 4px;
-    height: Theme.touch + 2 * self.inset;
-    border-radius: Theme.radius;
-    background: row-touch.pressed ? Theme.surface-active : root.network.active ? Theme.surface-active : Theme.surface-raised;
-    border-width: root.network.active ? 2px : 0px;
-    border-color: Theme.foreground;
-    accessible-role: button;
+    tappable: root.network.in-range && root.network.supported && !root.network.active;
+    active: root.network.active;
     accessible-label: root.network.ssid;
+    clicked => { root.selected(); }
 
-    row-touch := TouchArea {
-        enabled: root.can-connect;
-        clicked => { root.selected(); }
-    }
     HorizontalLayout {
         padding-left: Theme.padding;
-        padding: root.inset;
         spacing: Theme.spacing;
         Image {
             cross-axis-self-alignment: center;
@@ -66,6 +55,7 @@ component WifiRow inherits Rectangle {
         }
         if root.network.active: IconButton {
             width: Theme.touch;
+            min-height: Theme.row-height-small;
             icon: Icons.network-wifi-off;
             accessible-label: @tr("Disconnect {}", root.network.ssid);
             clicked => {
@@ -76,6 +66,7 @@ component WifiRow inherits Rectangle {
         }
         if root.network.known: IconButton {
             width: Theme.touch;
+            min-height: Theme.row-height-small;
             icon: Icons.ui-delete;
             accessible-label: @tr("Remove {}", root.network.ssid);
             clicked => {
@@ -136,7 +127,7 @@ component WifiCard inherits Card {
         separator: " ";
     }
     wifi-list := ScrollList {
-        property <length> row-pitch: Theme.touch + Theme.spacing-large;
+        property <length> row-pitch: Theme.list-row-pitch;
         vertical-stretch: 1;
         content-height: Network.networks.length * self.row-pitch;
         for network[index] in Network.networks: WifiRow {

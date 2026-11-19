@@ -29,7 +29,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       previous: ${{ steps.version.outputs.previous }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: version
@@ -91,7 +91,7 @@ jobs:
       RELEASE_ID: ${{ needs.draft.outputs.id }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
       - name: Publish the draft
         run: |
           bash .github/scripts/attach-to-release.sh "$RELEASE_ID" scripts/get-sailhand.sh

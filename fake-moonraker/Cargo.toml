@@ -9,8 +9,12 @@ publish = false
 
 [dependencies]
 axum = { version = "0.8.9", features = ["ws"] }
+rcgen = { version = "0.14.10", default-features = false, features = ["ring", "crypto"] }
+ring = "0.17.14"
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 serde_json.workspace = true
 tokio = { workspace = true, features = ["io-util"] }
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12", "logging"] }
 
 [dev-dependencies]
 futures-util = { workspace = true }

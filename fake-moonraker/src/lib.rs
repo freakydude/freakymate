@@ -20,4 +20,5 @@ pub mod server;
 pub mod session;
 pub mod spoolman;
 pub mod subscription;
+pub mod tls;
 pub mod wled;

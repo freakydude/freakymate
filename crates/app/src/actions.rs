@@ -5,6 +5,7 @@ use crate::settings_controller::SettingsController;
 use crate::{Actions, AppWindow};
 use sailhand_core::domain::machine_tree::LaneId;
 use sailhand_core::domain::manual_probe::Direction;
+use sailhand_core::moonraker::CertificateFingerprint;
 use sailhand_core::sources::happy_hare::commands::{Gates, ServoCommand};
 use sailhand_core::sources::klipper::tuning::TuningKey;
 use sailhand_core::sources::klipper::{Axis, CentreOf, EddyTap, TestZ};
@@ -345,6 +346,11 @@ fn bind_system(actions: &Actions, service: &PrinterService) {
     actions.on_log_in(move |username, password| login_service.log_in(&username, &password));
     let logout_service = service.clone();
     actions.on_log_out(move || logout_service.log_out());
+    let trust_service = service.clone();
+    actions.on_trust_certificate(move |text| match text.parse::<CertificateFingerprint>() {
+        Ok(fingerprint) => trust_service.trust_certificate(fingerprint),
+        Err(error) => log::warn!("Not trusting the certificate, its fingerprint is invalid: {error}"),
+    });
     actions.on_emergency_stop(send(service, || Command::EmergencyStop));
     actions.on_restart_klipper(send(service, || Command::RestartKlipper));
     actions.on_firmware_restart(send(service, || Command::FirmwareRestart));

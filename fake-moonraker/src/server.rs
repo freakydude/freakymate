@@ -4,6 +4,7 @@ use crate::access::AccessConfig;
 use crate::backend::Backend;
 use crate::machine::MachineProfile;
 use crate::session::Session;
+use crate::tls::{TlsIdentity, TlsListener};
 use axum::Router;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
@@ -27,6 +28,8 @@ pub struct ServerConfig {
     pub profile: MachineProfile,
     /// Wants a login like a Moonraker that does not trust the client; `None` trusts everyone.
     pub access: Option<AccessConfig>,
+    /// Serves HTTPS and WSS with this certificate instead of plain HTTP.
+    pub tls: Option<TlsIdentity>,
 }
 
 impl Default for ServerConfig {
@@ -36,6 +39,7 @@ impl Default for ServerConfig {
             status_interval: Duration::from_millis(250),
             profile: MachineProfile::default(),
             access: None,
+            tls: None,
         }
     }
 }
@@ -53,7 +57,10 @@ pub async fn serve(listener: TcpListener, config: ServerConfig) -> io::Result<()
     let state =
         AppState { backend, status_interval: config.status_interval, next_connection_id: Arc::new(AtomicU64::new(1)) };
 
-    let result = axum::serve(listener, router(state)).await;
+    let result = match &config.tls {
+        Some(identity) => axum::serve(TlsListener::new(listener, identity)?, router(state)).await,
+        None => axum::serve(listener, router(state)).await,
+    };
     simulation.abort();
     result
 }

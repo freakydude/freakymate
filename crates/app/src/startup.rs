@@ -14,7 +14,7 @@ use std::process::ExitCode;
 #[derive(Debug, Parser)]
 #[command(version = sailhand_core::VERSION, about)]
 pub struct Cli {
-    /// Moonraker address for this start, e.g. http://printer.local:7125 (default: saved setting)
+    /// Moonraker address used when no printer is chosen yet, e.g. http://printer.local:7125 (default: http://127.0.0.1:7125)
     #[arg(short, long)]
     moonraker: Option<String>,
     /// Kiosk mode on a touch screen: fullscreen, no window frame, no mouse pointer
@@ -25,7 +25,7 @@ pub struct Cli {
     #[cfg(target_os = "linux")]
     #[arg(long)]
     framebuffer: bool,
-    /// Settings file, TOML (default: <config dir>/sailhand/settings.conf; the installer uses printer_data/config/sailhand.conf)
+    /// Settings file, INI like moonraker.conf (default: <config dir>/sailhand/settings.conf; the installer uses printer_data/config/sailhand.conf)
     #[arg(long)]
     settings: Option<PathBuf>,
     /// Credentials file for Moonraker logins (default: <config dir>/sailhand/credentials.json)
