@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn method_calls_on_params_are_no_parameters() {
-        // Collection jschuh/klipper-macros, macro `m701`: `params.__setitem__("L", params.U)`.
+        // A pattern of filament macro collections: `params.__setitem__("L", params.U)`.
         let template = "{% set dummy = params.__setitem__(\"L\", params.U) %}{% set x = params.get('A') %}";
 
         assert_eq!(parse_params(template), [param("U", None)]);

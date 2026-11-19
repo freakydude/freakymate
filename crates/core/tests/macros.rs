@@ -1,5 +1,5 @@
-//! The macro reader against real public configurations (`tests/fixtures/klipper-configs/`, source and commit at the top
-//! of each file): the section names and templates go through a small reader that follows Klipper's `configfile.py`
+//! The macro reader against a configuration written for these tests (`tests/fixtures/klipper-configs/`): the
+//! section names and templates go through a small reader that follows Klipper's `configfile.py`
 //! (`ConfigFileReader`, Python's `RawConfigParser`), then through the same steps as the service.
 
 use sailhand_core::sources::Sources;
@@ -125,95 +125,98 @@ impl Printer {
     }
 }
 
-#[test]
-fn reads_the_macros_of_klippers_sample_macros() {
-    let printer = Printer::from_config("klipper-sample-macros.cfg");
+const FIXTURE: &str = "macro-patterns.cfg";
 
-    assert_eq!(
-        printer.sources.klipper.macros,
-        ["END_PRINT", "G130", "M117", "M300", "M486", "M600", "M808", "QUERY_BME280", "QUERY_HTU21D", "START_PRINT"]
-    );
-    assert_eq!(printer.params("START_PRINT"), ["BED_TEMP=60", "EXTRUDER_TEMP=190"]);
-    assert_eq!(printer.params("M300"), ["S=1000", "P=100"]);
-    assert_eq!(printer.params("M600"), ["X=50", "Y=0", "Z=10"]);
-    assert!(printer.params("END_PRINT").is_empty());
+fn printer() -> Printer {
+    Printer::from_config(FIXTURE)
+}
+
+#[test]
+fn reads_the_macros_and_skips_other_sections() {
+    let printer = printer();
+
+    for name in ["WARM_UP", "MOVE_AWAY", "COOL_DOWN", "PICK_TOOL", "PAUSE", "RESUME"] {
+        assert!(printer.sources.klipper.has_macro(name), "{name} missing");
+    }
+    // Sections that are no macros do not become macros.
+    for other in ["STEPPER_X", "PRINTER", "REFRESH", "NOTHING"] {
+        assert!(!printer.details().contains_key(other), "{other} read as macro");
+    }
+    // Helpers (`_...`) are no macros the UI lists.
+    assert!(!printer.sources.klipper.has_macro("_HIDDEN"));
+    assert!(printer.params("COOL_DOWN").is_empty());
+}
+
+#[test]
+fn literal_defaults_become_placeholders_in_order_of_first_use() {
+    let printer = printer();
+
+    assert_eq!(printer.params("WARM_UP"), ["BED=60", "NOZZLE=200"]);
+    assert_eq!(printer.params("MOVE_AWAY"), ["X", "Y", "SPEED=3000"]);
+    assert_eq!(printer.params("RESUME"), ["VELOCITY=50"]);
 }
 
 #[test]
 fn parameters_tested_with_in_params_are_found() {
-    let printer = Printer::from_config("klipper-sample-macros.cfg");
+    let printer = printer();
 
-    // M486 tests `'T' in params` and uses `params.P`, `params.S`, `params.U` and `params.C`/`params.T`.
-    let names: Vec<String> =
-        printer.params("M486").iter().map(|param| param.split('=').next().unwrap().to_owned()).collect();
-    for expected in ["T", "C", "P", "S", "U"] {
-        assert!(names.iter().any(|name| name == expected), "M486 lacks {expected}: {names:?}");
-    }
-    // M808 combines `is defined` and `is not defined`.
-    assert_eq!(printer.params("M808"), ["K", "L"]);
+    assert_eq!(printer.params("PICK_TOOL"), ["TOOL", "SLOT", "FORCE"]);
+}
+
+#[test]
+fn defined_tests_are_found() {
+    assert_eq!(printer().params("CHECK_LIMITS"), ["LOW", "HIGH"]);
+}
+
+#[test]
+fn method_calls_on_params_are_no_parameters() {
+    // `params.get(...)` and `params.__setitem__(...)` are calls; only `params.ONE` is a parameter.
+    assert_eq!(printer().params("SWAP_VALUES"), ["ONE", "TWO"]);
+}
+
+#[test]
+fn a_runtime_default_gets_no_placeholder() {
+    // `default(state.layer)` is no literal, and a later literal default does not belong to the parameter.
+    assert_eq!(printer().params("PAUSE_AT"), ["LAYER", "CALL", "RATE"]);
+}
+
+#[test]
+fn parameters_passed_on_by_a_loop_are_not_seen() {
+    // Only `LEN` stands in the template; what `{% for key in params %}` passes on cannot be scanned.
+    assert_eq!(printer().params("LOAD_THING"), ["LEN=50"]);
+}
+
+#[test]
+fn lower_case_macro_names_are_found_in_any_case() {
+    let printer = printer();
+
+    assert!(printer.sources.klipper.has_macro("LOAD_THING"));
+    assert!(printer.sources.klipper.has_macro("M701"));
+    assert!(printer.sources.klipper.has_macro("M702"));
+    assert_eq!(printer.params("M701"), ["U=40", "L=10"]);
+    assert_eq!(printer.params("M702"), ["L=5", "U=15"]);
 }
 
 #[test]
 fn a_macro_that_overrides_a_command_is_not_offered() {
-    let printer = Printer::from_config("klipper-sample-macros.cfg");
-
-    assert!(printer.details()["M117"].renamed);
-    assert!(!printer.offered().contains(&"M117".to_owned()));
-    assert!(printer.offered().contains(&"M300".to_owned()));
-}
-
-#[test]
-fn reads_the_macros_of_the_voron_two_configuration() {
-    let printer = Printer::from_config("voron2-octopus.cfg");
-
-    assert_eq!(printer.sources.klipper.macros, ["G32", "PARK", "PRINT_END", "PRINT_START"]);
-    assert!(printer.params("PRINT_START").is_empty());
-    // Sections that are no macros do not become macros.
-    assert!(!printer.details().contains_key("STEPPER_X"));
-}
-
-#[test]
-fn reads_the_macros_of_mainsail_config() {
-    let printer = Printer::from_config("mainsail-client.cfg");
-
-    for name in
-        ["CANCEL_PRINT", "PAUSE", "RESUME", "SET_PAUSE_AT_LAYER", "SET_PAUSE_NEXT_LAYER", "SET_PRINT_STATS_INFO"]
-    {
-        assert!(printer.sources.klipper.has_macro(name), "{name} missing");
-    }
-    // These replace commands of Klipper and are not offered; the helpers (`_...`) are no objects the UI lists.
+    let printer = printer();
     let offered = printer.offered();
-    for renamed in ["CANCEL_PRINT", "PAUSE", "RESUME", "SET_PRINT_STATS_INFO"] {
-        assert!(!offered.contains(&renamed.to_owned()), "{renamed} is offered");
-    }
-    assert!(offered.contains(&"SET_PAUSE_AT_LAYER".to_owned()));
-    assert_eq!(printer.params("RESUME"), ["VELOCITY"]);
-    assert_eq!(printer.params("SET_PAUSE_AT_LAYER"), ["ENABLE", "LAYER", "MACRO"]);
-    assert_eq!(printer.params("SET_PRINT_STATS_INFO"), ["CURRENT_LAYER"]);
+
+    assert!(printer.details()["PAUSE"].renamed);
+    assert!(printer.details()["RESUME"].renamed);
+    assert!(!offered.contains(&"PAUSE".to_owned()));
+    assert!(!offered.contains(&"RESUME".to_owned()));
+    assert!(offered.contains(&"WARM_UP".to_owned()));
+    assert!(!printer.details()["WARM_UP"].renamed);
 }
 
 #[test]
-fn reads_the_macros_of_a_macro_collection() {
-    let printer = Printer::from_config("jschuh-filament.cfg");
-
-    assert!(printer.sources.klipper.has_macro("LOAD_FILAMENT"));
-    assert!(printer.sources.klipper.has_macro("UNLOAD_FILAMENT"));
-    // The names of the collection are lower case in the file; Klipper's commands are not case sensitive.
-    assert!(printer.sources.klipper.has_macro("M701"));
-    assert!(printer.sources.klipper.has_macro("M702"));
-    // `L` and `U` stand in the template (first use decides the order); `Z` and `T` of the usage line are passed on by
-    // `{% for k in params %}`, which no scan of the template can see.
-    assert_eq!(printer.params("M701"), ["U", "L"]);
-    assert_eq!(printer.params("M702"), ["L", "U"]);
-}
-
-#[test]
-fn a_form_for_a_real_macro_builds_the_command() {
-    let printer = Printer::from_config("klipper-sample-macros.cfg");
-    let mut form = MacroForm::open("START_PRINT", printer.details().get("START_PRINT"));
+fn a_form_for_a_macro_builds_the_command() {
+    let printer = printer();
+    let mut form = MacroForm::open("WARM_UP", printer.details().get("WARM_UP"));
 
     form.set_value(0, "65").unwrap();
 
-    assert_eq!(form.fields().iter().map(|field| field.placeholder.as_str()).collect::<Vec<_>>(), ["60", "190"]);
-    assert_eq!(form.script(), "START_PRINT BED_TEMP=65");
+    assert_eq!(form.fields().iter().map(|field| field.placeholder.as_str()).collect::<Vec<_>>(), ["60", "200"]);
+    assert_eq!(form.script(), "WARM_UP BED=65");
 }
