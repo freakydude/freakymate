@@ -1,8 +1,8 @@
 //! In-memory networks for development without NetworkManager (Windows, screenshots, tests).
 
 use super::{
-    AccessPoint, Availability, NetworkCommand, NetworkError, NetworkState, Security, WiredLink, wifi_networks,
-    wifi_profile,
+    AccessPoint, Adapter, AdapterKind, AdapterState, Availability, NetworkCommand, NetworkError, NetworkState,
+    Security, mark_other_adapters, selected_adapter, sort_adapters, wifi_networks, wifi_profile,
 };
 use std::time::Duration;
 
@@ -10,13 +10,18 @@ use std::time::Duration;
 const CONNECT_DELAY: Duration = Duration::from_millis(800);
 /// Password that the simulation rejects, to try the error path.
 const WRONG_PASSWORD: &str = "wrongpassword";
+/// Interfaces of the simulated adapters; addresses, gateway, speed and MACs below are assumed example values.
+const WIFI_INTERFACE: &str = "wlan0";
+const ETHERNET_INTERFACE: &str = "eth0";
+const GATEWAY: &str = "192.168.1.1";
 
 pub struct Simulated {
     access_points: Vec<AccessPoint>,
     known: Vec<String>,
     active: Option<String>,
     wifi_enabled: bool,
-    wired: Vec<WiredLink>,
+    /// The wired adapter is connected; its cable stays plugged.
+    wired_connected: bool,
 }
 
 impl Default for Simulated {
@@ -34,12 +39,7 @@ impl Default for Simulated {
             known: vec!["Workshop".to_owned(), "Garage".to_owned(), "Holiday Flat".to_owned()],
             active: Some("Workshop".to_owned()),
             wifi_enabled: true,
-            wired: vec![WiredLink {
-                interface: "eth0".to_owned(),
-                cable: true,
-                connected: true,
-                address: Some("192.168.1.42".to_owned()),
-            }],
+            wired_connected: true,
         }
     }
 }
@@ -47,11 +47,14 @@ impl Default for Simulated {
 impl Simulated {
     pub async fn apply(&mut self, command: &NetworkCommand) -> Result<(), NetworkError> {
         match command {
-            NetworkCommand::Refresh | NetworkCommand::Scan => Ok(()),
-            NetworkCommand::Connect { ssid, password, hidden } => {
+            NetworkCommand::Refresh | NetworkCommand::Select { .. } => Ok(()),
+            NetworkCommand::Scan { interface } => self.require_wifi(interface),
+            NetworkCommand::Connect { interface, ssid, password, hidden } => {
+                self.require_wifi(interface)?;
                 self.connect(ssid, password.as_deref(), *hidden).await
             }
-            NetworkCommand::Disconnect => {
+            NetworkCommand::Disconnect { interface } => {
+                self.require_wifi(interface)?;
                 self.disconnect();
                 Ok(())
             }
@@ -64,22 +67,62 @@ impl Simulated {
         }
     }
 
-    pub fn read(&self) -> NetworkState {
+    pub fn read(&self, requested: Option<&str>) -> NetworkState {
         let active = self.active.as_deref().filter(|_| self.wifi_enabled);
+        let mut adapters = vec![self.wifi_adapter(active), self.ethernet_adapter()];
+        sort_adapters(&mut adapters);
+        let selected = selected_adapter(&adapters, requested);
+        let mut networks = Vec::new();
+        if self.wifi_enabled && selected.as_deref() == Some(WIFI_INTERFACE) {
+            networks = wifi_networks(&self.access_points, &self.known, active);
+            mark_other_adapters(&mut networks, &adapters, WIFI_INTERFACE);
+        }
         NetworkState {
             availability: Availability::Managed,
-            wifi_present: true,
             wifi_enabled: self.wifi_enabled,
-            active_ssid: active.map(str::to_owned),
-            wifi_address: active.map(|_| "192.168.1.57".to_owned()),
-            networks: if self.wifi_enabled {
-                wifi_networks(&self.access_points, &self.known, active)
-            } else {
-                Vec::new()
-            },
-            wired: self.wired.clone(),
+            adapters,
+            selected,
+            networks,
             busy: None,
         }
+    }
+
+    fn wifi_adapter(&self, active: Option<&str>) -> Adapter {
+        let state = match (self.wifi_enabled, active) {
+            (false, _) => AdapterState::Unavailable,
+            (true, Some(_)) => AdapterState::Connected,
+            (true, None) => AdapterState::Disconnected,
+        };
+        Adapter {
+            interface: WIFI_INTERFACE.to_owned(),
+            kind: AdapterKind::Wifi,
+            state,
+            ssid: active.map(str::to_owned),
+            address: active.map(|_| "192.168.1.57".to_owned()),
+            prefix: active.map(|_| 24),
+            gateway: active.map(|_| GATEWAY.to_owned()),
+            speed_mbit: None,
+            mac: Some("dc:a6:32:01:02:03".to_owned()),
+        }
+    }
+
+    fn ethernet_adapter(&self) -> Adapter {
+        let connected = self.wired_connected;
+        Adapter {
+            interface: ETHERNET_INTERFACE.to_owned(),
+            kind: AdapterKind::Ethernet,
+            state: if connected { AdapterState::Connected } else { AdapterState::Disconnected },
+            ssid: None,
+            address: connected.then(|| "192.168.1.42".to_owned()),
+            prefix: connected.then_some(24),
+            gateway: connected.then(|| GATEWAY.to_owned()),
+            speed_mbit: connected.then_some(1000),
+            mac: Some("dc:a6:32:01:02:04".to_owned()),
+        }
+    }
+
+    fn require_wifi(&self, interface: &str) -> Result<(), NetworkError> {
+        if interface == WIFI_INTERFACE { Ok(()) } else { Err(NetworkError::NotFound(interface.to_owned())) }
     }
 
     pub async fn connect(&mut self, ssid: &str, password: Option<&str>, hidden: bool) -> Result<(), NetworkError> {
@@ -131,13 +174,10 @@ impl Simulated {
     }
 
     pub fn set_wired(&mut self, interface: &str, connected: bool) -> Result<(), NetworkError> {
-        let link = self
-            .wired
-            .iter_mut()
-            .find(|link| link.interface == interface)
-            .ok_or_else(|| NetworkError::NotFound(interface.to_owned()))?;
-        link.connected = connected && link.cable;
-        link.address = link.connected.then(|| "192.168.1.42".to_owned());
+        if interface != ETHERNET_INTERFACE {
+            return Err(NetworkError::NotFound(interface.to_owned()));
+        }
+        self.wired_connected = connected;
         Ok(())
     }
 }
@@ -146,15 +186,22 @@ impl Simulated {
 mod tests {
     use super::*;
 
+    fn wifi(state: &NetworkState) -> &Adapter {
+        state.adapters.iter().find(|adapter| adapter.interface == WIFI_INTERFACE).unwrap()
+    }
+
     #[tokio::test]
     async fn joins_forgets_and_switches() {
         let mut network = Simulated::default();
-        assert_eq!(network.read().active_ssid.as_deref(), Some("Workshop"));
+        let state = network.read(None);
+        assert_eq!(wifi(&state).ssid.as_deref(), Some("Workshop"));
+        assert_eq!(state.selected.as_deref(), Some(WIFI_INTERFACE));
+        assert_eq!(state.adapters[1].speed_mbit, Some(1000));
 
         assert_eq!(network.connect("Cafe Guest", None, false).await, Ok(()));
-        assert!(network.read().networks.iter().any(|network| network.ssid == "Cafe Guest" && network.known));
+        assert!(network.read(None).networks.iter().any(|network| network.ssid == "Cafe Guest" && network.known));
         network.disconnect();
-        assert_eq!(network.read().active_ssid, None);
+        assert_eq!(wifi(&network.read(None)).ssid, None);
         network.connect("Cafe Guest", None, false).await.unwrap();
         assert_eq!(
             network.connect("Neighbour", Some(WRONG_PASSWORD), false).await,
@@ -162,11 +209,24 @@ mod tests {
         );
 
         network.forget("Cafe Guest").unwrap();
-        assert_eq!(network.read().active_ssid, None);
+        assert_eq!(wifi(&network.read(None)).ssid, None);
 
         network.set_wifi_enabled(false);
-        assert!(network.read().networks.is_empty());
+        let state = network.read(None);
+        assert!(state.networks.is_empty());
+        assert_eq!(wifi(&state).state, AdapterState::Unavailable);
         network.set_wired("eth0", false).unwrap();
-        assert!(!network.read().wired[0].connected);
+        let state = network.read(Some("eth0"));
+        assert_eq!(state.selected.as_deref(), Some("eth0"));
+        assert_eq!(state.adapters[1].state, AdapterState::Disconnected);
+        assert_eq!(state.adapters[1].address, None);
+    }
+
+    #[tokio::test]
+    async fn rejects_unknown_interfaces() {
+        let mut network = Simulated::default();
+        let scan = NetworkCommand::Scan { interface: "eth0".into() };
+        assert_eq!(network.apply(&scan).await, Err(NetworkError::NotFound("eth0".into())));
+        assert_eq!(network.set_wired("wlan0", true), Err(NetworkError::NotFound("wlan0".into())));
     }
 }

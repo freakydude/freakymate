@@ -1,7 +1,7 @@
 // Sample data for previews (VS Code Slint preview, slint-viewer, scripts/ui-preview.sh).
 // Not part of the app: nothing in app.slint imports this folder. In the app, Rust fills these globals.
 
-import { FilamentPathItem, MotionTab, Navigation, Network, Page, PathPartKind, Printer, PrinterChoice, Severity, UiSettings } from "../state.slint";
+import { AdapterStatus, FilamentPathItem, MotionTab, Navigation, Network, Page, PathPartKind, Printer, PrinterChoice, Severity, UiSettings } from "../state.slint";
 
 export global Sample {
     // The way at a head without sensors of its own, as the core builds it (`LoadPath::parts`, `PathScope::HeadOnly`) and
@@ -406,10 +406,7 @@ export global Sample {
     public function managed-network() {
         Network.managed = true;
         Network.local = true;
-        Network.wifi-present = true;
         Network.wifi-enabled = true;
-        Network.active-ssid = "Workshop";
-        Network.wifi-address = "192.168.1.57";
         Network.networks = [
             {
                 ssid: "Workshop",
@@ -418,7 +415,8 @@ export global Sample {
                 supported: true,
                 known: true,
                 active: true,
-                in-range: true
+                in-range: true,
+                active-on-other: ""
             },
             {
                 ssid: "Cafe Guest",
@@ -427,7 +425,8 @@ export global Sample {
                 supported: true,
                 known: false,
                 active: false,
-                in-range: true
+                in-range: true,
+                active-on-other: ""
             },
             {
                 ssid: "Garage",
@@ -436,7 +435,8 @@ export global Sample {
                 supported: true,
                 known: true,
                 active: false,
-                in-range: true
+                in-range: true,
+                active-on-other: ""
             },
             {
                 ssid: "Office",
@@ -445,7 +445,8 @@ export global Sample {
                 supported: false,
                 known: false,
                 active: false,
-                in-range: true
+                in-range: true,
+                active-on-other: ""
             },
             {
                 ssid: "Neighbour",
@@ -454,7 +455,8 @@ export global Sample {
                 supported: true,
                 known: false,
                 active: false,
-                in-range: true
+                in-range: true,
+                active-on-other: ""
             },
             {
                 ssid: "Holiday Flat",
@@ -463,10 +465,28 @@ export global Sample {
                 supported: true,
                 known: true,
                 active: false,
-                in-range: false
+                in-range: false,
+                active-on-other: ""
             },
         ];
-        Network.wired = [{ interface: "eth0", cable: true, connected: true, address: "192.168.1.42" }];
+        Network.adapters = [
+            { interface: "wlan0", wireless: true, status: AdapterStatus.connected, ssid: "Workshop", address: "192.168.1.57", prefix: 24, gateway: "192.168.1.1", speed: 0, mac: "dc:a6:32:01:02:03" },
+            { interface: "eth0", wireless: false, status: AdapterStatus.connected, ssid: "", address: "192.168.1.42", prefix: 24, gateway: "192.168.1.1", speed: 1000, mac: "dc:a6:32:01:02:04" },
+        ];
+        Network.selected = Network.adapters[0];
         Navigation.page = Page.network;
+    }
+
+    // Network tab with two Wi-Fi and two Ethernet adapters; Garage is joined by the second Wi-Fi adapter.
+    public function managed-network-many() {
+        self.managed-network();
+        Network.adapters = [
+            { interface: "wlan0", wireless: true, status: AdapterStatus.connected, ssid: "Workshop", address: "192.168.1.57", prefix: 24, gateway: "192.168.1.1", speed: 0, mac: "dc:a6:32:01:02:03" },
+            { interface: "wlx00c0ca3f12ab", wireless: true, status: AdapterStatus.connected, ssid: "Garage", address: "192.168.1.61", prefix: 24, gateway: "192.168.1.1", speed: 0, mac: "00:c0:ca:3f:12:ab" },
+            { interface: "end0", wireless: false, status: AdapterStatus.connected, ssid: "", address: "192.168.1.42", prefix: 24, gateway: "192.168.1.1", speed: 1000, mac: "02:81:3c:5e:21:7a" },
+            { interface: "enx00e04c680a1b", wireless: false, status: AdapterStatus.unavailable, ssid: "", address: "", prefix: 0, gateway: "", speed: 0, mac: "00:e0:4c:68:0a:1b" },
+        ];
+        Network.selected = Network.adapters[0];
+        Network.networks[2].active-on-other = "wlx00c0ca3f12ab";
     }
 }

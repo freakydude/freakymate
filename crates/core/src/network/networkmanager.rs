@@ -1,8 +1,8 @@
 //! NetworkManager over D-Bus, see <https://networkmanager.dev/docs/api/latest/>.
 
 use super::{
-    AccessPoint, Availability, NetworkCommand, NetworkError, NetworkState, Security, WiredLink, wifi_networks,
-    wifi_profile,
+    AccessPoint, Adapter, AdapterKind, AdapterState, Availability, NetworkCommand, NetworkError, NetworkState,
+    Security, mark_other_adapters, selected_adapter, sort_adapters, wifi_networks, wifi_profile,
 };
 use std::collections::HashMap;
 use std::time::Duration;
@@ -12,7 +12,7 @@ use zbus::{Connection, proxy};
 
 const DEVICE_TYPE_ETHERNET: u32 = 1;
 const DEVICE_TYPE_WIFI: u32 = 2;
-/// Device state below which a wired device has no cable (`NM_DEVICE_STATE_UNAVAILABLE`).
+/// Device states up to this one cannot be used (unmanaged 10, `NM_DEVICE_STATE_UNAVAILABLE` 20).
 const DEVICE_STATE_UNAVAILABLE: u32 = 20;
 /// First state of an activation in progress (`NM_DEVICE_STATE_PREPARE`); it runs until `ACTIVATED`.
 const DEVICE_STATE_PREPARE: u32 = 40;
@@ -68,6 +68,16 @@ trait Device {
 
     #[zbus(property)]
     fn ip4_config(&self) -> zbus::Result<OwnedObjectPath>;
+
+    #[zbus(property)]
+    fn hw_address(&self) -> zbus::Result<String>;
+}
+
+#[proxy(interface = "org.freedesktop.NetworkManager.Device.Wired", default_service = "org.freedesktop.NetworkManager")]
+trait Wired {
+    /// Link speed in Mbit/s, 0 when unknown.
+    #[zbus(property)]
+    fn speed(&self) -> zbus::Result<u32>;
 }
 
 #[proxy(
@@ -105,6 +115,10 @@ trait Ap {
 trait Ip4Config {
     #[zbus(property)]
     fn address_data(&self) -> zbus::Result<Vec<HashMap<String, OwnedValue>>>;
+
+    /// Empty when there is none.
+    #[zbus(property)]
+    fn gateway(&self) -> zbus::Result<String>;
 }
 
 #[proxy(
@@ -181,48 +195,55 @@ impl NetworkManager {
 
     pub async fn apply(&self, command: &NetworkCommand) -> Result<(), NetworkError> {
         match command {
-            NetworkCommand::Refresh => Ok(()),
-            NetworkCommand::Scan => self.scan().await,
-            NetworkCommand::Connect { ssid, password, hidden } => {
-                self.connect_wifi(ssid, password.as_deref(), *hidden).await
+            NetworkCommand::Refresh | NetworkCommand::Select { .. } => Ok(()),
+            NetworkCommand::Scan { interface } => self.scan(interface).await,
+            NetworkCommand::Connect { interface, ssid, password, hidden } => {
+                self.connect_wifi(interface, ssid, password.as_deref(), *hidden).await
             }
-            NetworkCommand::Disconnect => self.disconnect_wifi().await,
+            NetworkCommand::Disconnect { interface } => self.disconnect_wifi(interface).await,
             NetworkCommand::Forget { ssid } => self.forget(ssid).await,
             NetworkCommand::SetWifiEnabled(enabled) => self.set_wifi_enabled(*enabled).await,
             NetworkCommand::SetWired { interface, connected } => self.set_wired(interface, *connected).await,
         }
     }
 
-    pub async fn read(&self) -> Result<NetworkState, NetworkError> {
+    /// Reads all adapters; `requested` is the interface the UI wants to show, see [`selected_adapter`].
+    pub async fn read(&self, requested: Option<&str>) -> Result<NetworkState, NetworkError> {
         let known = self.saved_wifi().await?;
         let known_names: Vec<String> = known.iter().map(|saved| saved.ssid.clone()).collect();
-        let mut state = NetworkState {
-            availability: Availability::Managed,
-            wifi_enabled: self.manager.wireless_enabled().await?,
-            ..NetworkState::default()
-        };
-        if let Some((path, device)) = self.find_wifi_device().await? {
-            state.wifi_present = true;
-            let wireless = at!(WirelessProxy, &self.connection, path);
-            let active = self.active_ssid(&wireless).await?;
-            let access_points = self.access_points(&wireless).await?;
-            state.networks = wifi_networks(&access_points, &known_names, active.as_deref());
-            if active.is_some() {
-                state.wifi_address = self.address(&device).await?;
-            }
-            state.active_ssid = active;
-        }
+        let mut adapters = Vec::new();
         for path in self.manager.get_devices().await? {
             let device = at!(DeviceProxy, &self.connection, path);
-            if device.device_type().await? == DEVICE_TYPE_ETHERNET {
-                state.wired.push(self.wired_link(&device).await?);
-            }
+            let kind = match device.device_type().await? {
+                DEVICE_TYPE_ETHERNET => AdapterKind::Ethernet,
+                DEVICE_TYPE_WIFI => AdapterKind::Wifi,
+                _ => continue,
+            };
+            adapters.push(self.adapter(&path, &device, kind).await?);
         }
-        Ok(state)
+        sort_adapters(&mut adapters);
+        let selected = selected_adapter(&adapters, requested);
+        let mut networks = Vec::new();
+        if let Some(adapter) = adapters.iter().find(|adapter| Some(&adapter.interface) == selected.as_ref())
+            && adapter.kind == AdapterKind::Wifi
+        {
+            let (_, wireless) = self.wifi_device(&adapter.interface).await?;
+            let access_points = self.access_points(&wireless).await?;
+            networks = wifi_networks(&access_points, &known_names, adapter.ssid.as_deref());
+            mark_other_adapters(&mut networks, &adapters, &adapter.interface);
+        }
+        Ok(NetworkState {
+            availability: Availability::Managed,
+            wifi_enabled: self.manager.wireless_enabled().await?,
+            adapters,
+            selected,
+            networks,
+            busy: None,
+        })
     }
 
-    pub async fn scan(&self) -> Result<(), NetworkError> {
-        let (_, wireless) = self.wifi_device().await?;
+    pub async fn scan(&self, interface: &str) -> Result<(), NetworkError> {
+        let (_, wireless) = self.wifi_device(interface).await?;
         // NetworkManager refuses scans in quick succession; the cached list is still fine.
         if let Err(error) = wireless.request_scan(HashMap::new()).await {
             log::debug!("Wi-Fi scan not started: {error}");
@@ -230,8 +251,14 @@ impl NetworkManager {
         Ok(())
     }
 
-    pub async fn connect_wifi(&self, ssid: &str, password: Option<&str>, hidden: bool) -> Result<(), NetworkError> {
-        let (device, wireless) = self.wifi_device().await?;
+    pub async fn connect_wifi(
+        &self,
+        interface: &str,
+        ssid: &str,
+        password: Option<&str>,
+        hidden: bool,
+    ) -> Result<(), NetworkError> {
+        let (device, wireless) = self.wifi_device(interface).await?;
         let saved = self.saved_wifi().await?;
         let existing: Vec<&SavedWifi> = saved.iter().filter(|saved| saved.ssid == ssid).collect();
         if password.is_none()
@@ -263,8 +290,8 @@ impl NetworkManager {
     }
 
     /// NetworkManager does not auto-connect the device again until the user picks a network.
-    pub async fn disconnect_wifi(&self) -> Result<(), NetworkError> {
-        let (path, _) = self.wifi_device().await?;
+    pub async fn disconnect_wifi(&self, interface: &str) -> Result<(), NetworkError> {
+        let (path, _) = self.wifi_device(interface).await?;
         let device = at!(DeviceProxy, &self.connection, path);
         Ok(device.disconnect().await?)
     }
@@ -301,27 +328,16 @@ impl NetworkManager {
         Err(NetworkError::NotFound(interface.to_owned()))
     }
 
-    async fn wifi_device(&self) -> Result<(OwnedObjectPath, WirelessProxy<'static>), NetworkError> {
-        let (path, _) =
-            self.find_wifi_device().await?.ok_or_else(|| NetworkError::NotFound("Wi-Fi adapter".to_owned()))?;
-        let wireless = at!(WirelessProxy, &self.connection, path);
-        Ok((path, wireless))
-    }
-
-    /// The one Wi-Fi adapter the UI shows and acts on, see [`wifi_preference`].
-    async fn find_wifi_device(&self) -> Result<Option<(OwnedObjectPath, DeviceProxy<'static>)>, NetworkError> {
-        let mut best: Option<(u8, OwnedObjectPath, DeviceProxy<'static>)> = None;
+    /// The Wi-Fi device with this interface name.
+    async fn wifi_device(&self, interface: &str) -> Result<(OwnedObjectPath, WirelessProxy<'static>), NetworkError> {
         for path in self.manager.get_devices().await? {
             let device = at!(DeviceProxy, &self.connection, path);
-            if device.device_type().await? != DEVICE_TYPE_WIFI {
-                continue;
-            }
-            let preference = wifi_preference(device.state().await?);
-            if best.as_ref().is_none_or(|(current, ..)| preference < *current) {
-                best = Some((preference, path, device));
+            if device.device_type().await? == DEVICE_TYPE_WIFI && device.interface().await? == interface {
+                let wireless = at!(WirelessProxy, &self.connection, path);
+                return Ok((path, wireless));
             }
         }
-        Ok(best.map(|(_, path, device)| (path, device)))
+        Err(NetworkError::NotFound(interface.to_owned()))
     }
 
     async fn access_points(&self, wireless: &WirelessProxy<'_>) -> Result<Vec<AccessPoint>, NetworkError> {
@@ -364,24 +380,50 @@ impl NetworkManager {
         Ok(Some(self.access_point(&path).await?.ssid))
     }
 
-    async fn wired_link(&self, device: &DeviceProxy<'_>) -> Result<WiredLink, NetworkError> {
-        let state = device.state().await?;
-        let connected = state == DEVICE_STATE_ACTIVATED;
-        Ok(WiredLink {
+    async fn adapter(
+        &self,
+        path: &OwnedObjectPath,
+        device: &DeviceProxy<'_>,
+        kind: AdapterKind,
+    ) -> Result<Adapter, NetworkError> {
+        let mut adapter = Adapter {
             interface: device.interface().await?,
-            cable: state > DEVICE_STATE_UNAVAILABLE,
-            connected,
-            address: if connected { self.address(device).await? } else { None },
-        })
+            kind,
+            state: adapter_state(device.state().await?),
+            mac: Some(device.hw_address().await?).filter(|mac| !mac.is_empty()),
+            ..Adapter::default()
+        };
+        match kind {
+            AdapterKind::Wifi => {
+                let wireless = at!(WirelessProxy, &self.connection, path);
+                adapter.ssid = self.active_ssid(&wireless).await?;
+            }
+            AdapterKind::Ethernet => {
+                let wired = at!(WiredProxy, &self.connection, path);
+                adapter.speed_mbit = Some(wired.speed().await?).filter(|speed| *speed > 0);
+            }
+        }
+        self.read_ip4(device, &mut adapter).await?;
+        Ok(adapter)
     }
 
-    async fn address(&self, device: &DeviceProxy<'_>) -> Result<Option<String>, NetworkError> {
+    /// Fills address, prefix and gateway when the device has an IPv4 configuration.
+    async fn read_ip4(&self, device: &DeviceProxy<'_>, adapter: &mut Adapter) -> Result<(), NetworkError> {
         let path = device.ip4_config().await?;
         if path.as_str() == NO_OBJECT {
-            return Ok(None);
+            return Ok(());
         }
         let config = at!(Ip4ConfigProxy, &self.connection, path);
-        Ok(config.address_data().await?.iter().find_map(|entry| entry.get("address").and_then(text)))
+        let entries = config.address_data().await?;
+        if let Some(entry) = entries.iter().find(|entry| entry.get("address").and_then(text).is_some()) {
+            adapter.address = entry.get("address").and_then(text);
+            adapter.prefix = entry
+                .get("prefix")
+                .and_then(|value| u32::try_from(value).ok())
+                .and_then(|prefix| u8::try_from(prefix).ok());
+        }
+        adapter.gateway = Some(config.gateway().await?).filter(|gateway| !gateway.is_empty());
+        Ok(())
     }
 
     async fn saved_wifi(&self) -> Result<Vec<SavedWifi>, NetworkError> {
@@ -421,16 +463,13 @@ impl NetworkManager {
     }
 }
 
-/// Rank of a Wi-Fi adapter by its device state, lower is preferred; on a tie the first adapter wins.
-///
-/// With a second adapter (say a USB stick next to the built-in one) the UI must manage the one that
-/// carries the connection; acting on another would move the saved profile over to it.
-fn wifi_preference(state: u32) -> u8 {
-    match state {
-        DEVICE_STATE_ACTIVATED => 0,
-        DEVICE_STATE_PREPARE..DEVICE_STATE_ACTIVATED => 1,
-        state if state > DEVICE_STATE_UNAVAILABLE => 2,
-        _ => 3,
+/// Reduces the NetworkManager device state (`NMDeviceState`) to what the UI distinguishes.
+fn adapter_state(nm_state: u32) -> AdapterState {
+    match nm_state {
+        DEVICE_STATE_ACTIVATED => AdapterState::Connected,
+        DEVICE_STATE_PREPARE..DEVICE_STATE_ACTIVATED => AdapterState::Connecting,
+        state if state > DEVICE_STATE_UNAVAILABLE => AdapterState::Disconnected,
+        _ => AdapterState::Unavailable,
     }
 }
 
@@ -491,9 +530,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn connected_adapter_comes_before_connecting_idle_and_unavailable_ones() {
+    fn reduces_device_states() {
         // NM_DEVICE_STATE: 10 unmanaged, 20 unavailable, 30 disconnected, 70 ip-config, 100 activated, 110 deactivating.
-        let order = [100, 70, 30, 110, 20, 10].map(wifi_preference);
-        assert_eq!(order, [0, 1, 2, 2, 3, 3]);
+        use AdapterState::*;
+        let states = [100, 70, 30, 110, 20, 10].map(adapter_state);
+        assert_eq!(states, [Connected, Connecting, Disconnected, Disconnected, Unavailable, Unavailable]);
     }
 }

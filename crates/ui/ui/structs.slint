@@ -498,6 +498,8 @@ export struct WifiItem {
     active: bool,
     // false: saved network that is currently not received.
     in-range: bool,
+    // Another Wi-Fi adapter (interface) has joined this network; `active` only refers to the selected one. "" if none.
+    active-on-other: string,
 }
 
 // One printer (Moonraker server) in the list of the Printers page; the order comes from the core.
@@ -513,11 +515,22 @@ export struct PrinterItem {
     reachability: string,
 }
 
-export struct WiredItem {
+export enum AdapterStatus { unavailable, disconnected, connecting, connected }
+
+// One network adapter (Wi-Fi or Ethernet) of this host.
+export struct AdapterItem {
     interface: string,
-    cable: bool,
-    connected: bool,
+    wireless: bool,
+    status: AdapterStatus,
+    // "" if none.
+    ssid: string,
     address: string,
+    // 0 if unknown.
+    prefix: int,
+    gateway: string,
+    // Mbit/s, 0 if unknown.
+    speed: int,
+    mac: string,
 }
 
 export struct HostInterfaceItem {

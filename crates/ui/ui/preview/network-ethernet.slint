@@ -1,0 +1,13 @@
+// Preview: System > Network with several adapters, Ethernet adapter selected.
+
+import { AppWindow } from "../app.slint";
+import { Network } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component NetworkEthernetPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Sample.managed-network-many();
+        Network.selected = Network.adapters[2];
+    }
+}

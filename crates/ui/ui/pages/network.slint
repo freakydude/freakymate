@@ -2,7 +2,7 @@
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Confirm, HostInterfaceItem, Network, Printer, WifiItem, WiredItem } from "../state.slint";
+import { AdapterItem, AdapterStatus, Confirm, HostInterfaceItem, Network, Printer, WifiItem } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
 import { Card, IconButton, ListRow, IconLabel, ScrollList, TextWithValue, ToggleRow } from "../components/controls.slint";
 import { TextEntryDialog } from "../components/entry-dialogs.slint";
@@ -38,6 +38,7 @@ component WifiRow inherits ListRow {
             }
             Text {
                 text: root.network.active ? @tr("Connected")
+                    : root.network.active-on-other != "" ? @tr("Connected on {}", root.network.active-on-other)
                     : !root.network.in-range ? @tr("Saved, not in range")
                     : !root.network.supported ? @tr("Not supported")
                     : root.network.known ? @tr("Saved") : root.network.secured ? @tr("Password needed") : @tr("Open");
@@ -78,12 +79,94 @@ component WifiRow inherits ListRow {
     }
 }
 
+// One adapter of the list: a tap selects it; the icon tells kind and status.
+component AdapterRow inherits Rectangle {
+    in property <AdapterItem> adapter;
+    in property <bool> selected;
+    property <bool> connected: root.adapter.status == AdapterStatus.connected;
+    property <bool> connecting: root.adapter.status == AdapterStatus.connecting;
+    property <bool> unavailable: root.adapter.status == AdapterStatus.unavailable;
+    height: Theme.row-height-small;
+    border-radius: Theme.radius;
+    background: row-touch.pressed ? Theme.surface-active : Theme.surface-raised;
+    accessible-role: button;
+    accessible-label: root.adapter.interface;
+
+    row-touch := TouchArea {
+        clicked => { Network.select(root.adapter.interface); }
+    }
+    HorizontalLayout {
+        padding-left: Theme.padding;
+        padding-right: Theme.padding;
+        spacing: Theme.spacing;
+        Image {
+            cross-axis-self-alignment: center;
+            source: root.adapter.wireless
+                ? (root.connected || root.connecting ? Icons.system-network : Icons.network-wifi-off)
+                : (root.unavailable ? Icons.network-ethernet-off : Icons.network-ethernet);
+            colorize: root.connected ? Theme.foreground : Theme.muted;
+            width: Theme.icon-large;
+            height: Theme.icon-large;
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text {
+                text: root.adapter.interface;
+                color: Theme.foreground;
+                font-size: Theme.font-normal;
+                overflow: elide;
+            }
+            Text {
+                text: root.connected ? (root.adapter.wireless
+                        ? root.adapter.ssid + (root.adapter.address != "" ? " · " + root.adapter.address : "")
+                        : root.adapter.address)
+                    : root.connecting ? @tr("Connecting")
+                    : root.unavailable ? (root.adapter.wireless
+                        ? (Network.wifi-enabled ? @tr("Not available") : @tr("Switched off"))
+                        : @tr("No cable"))
+                    : (root.adapter.wireless ? @tr("Not connected") : @tr("Disconnected"));
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                overflow: elide;
+            }
+        }
+    }
+    Rectangle {
+        border-radius: Theme.radius;
+        border-width: root.selected ? 2px : 0px;
+        border-color: Theme.accent;
+    }
+}
+
+component AdaptersCard inherits Card {
+    title: @tr("Adapters");
+    icon: Icons.network-ethernet;
+
+    adapter-list := ScrollList {
+        property <length> row-pitch: Theme.list-row-pitch;
+        vertical-stretch: 1;
+        content-height: Network.adapters.length * self.row-pitch;
+        for adapter[index] in Network.adapters: AdapterRow {
+            y: index * adapter-list.row-pitch;
+            width: adapter-list.row-width;
+            adapter: adapter;
+            selected: adapter.interface == Network.selected.interface;
+        }
+    }
+    if Network.adapters.length == 0: Text {
+        text: @tr("No network adapter.");
+        color: Theme.muted;
+        font-size: Theme.font-small;
+    }
+}
+
 component WifiCard inherits Card {
     callback choose(WifiItem);
     callback hidden-network;
     // Below this width the button texts go under the icons.
     property <bool> wide: root.width > 440px;
-    title: @tr("Wi-Fi");
+    title: @tr("Wi-Fi · {}", Network.selected.interface);
     icon: Icons.system-network;
 
     HorizontalLayout {
@@ -119,13 +202,6 @@ component WifiCard inherits Card {
             clicked => { root.hidden-network(); }
         }
     }
-    // What is being changed right now shows in the status bar; here the state, with the address kept whole.
-    TextWithValue {
-        text: Network.active-ssid != "" ? @tr("Connected to {}", Network.active-ssid)
-            : Network.wifi-enabled ? @tr("Not connected") : @tr("Wi-Fi is switched off");
-        value: Network.active-ssid != "" && Network.wifi-address != "" ? "(" + Network.wifi-address + ")" : "";
-        separator: " ";
-    }
     wifi-list := ScrollList {
         property <length> row-pitch: Theme.list-row-pitch;
         vertical-stretch: 1;
@@ -137,6 +213,11 @@ component WifiCard inherits Card {
             selected => { root.choose(network); }
         }
     }
+    if !Network.wifi-enabled: Text {
+        text: @tr("Wi-Fi is switched off");
+        color: Theme.muted;
+        font-size: Theme.font-small;
+    }
     if Network.wifi-enabled && Network.networks.length == 0: Text {
         text: @tr("No networks found.");
         color: Theme.muted;
@@ -144,48 +225,85 @@ component WifiCard inherits Card {
     }
 }
 
-component WiredCard inherits Card {
-    title: @tr("Ethernet");
+// One fact of the Ethernet card; nothing without a value.
+component FactRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <length> label-width;
+    visible: root.value != "";
+    spacing: Theme.spacing;
+    Text {
+        width: root.label-width;
+        text: root.label;
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.value;
+        color: Theme.foreground;
+        font-size: Theme.font-normal;
+        vertical-alignment: center;
+        horizontal-stretch: 1;
+        overflow: elide;
+    }
+}
+
+component EthernetCard inherits Card {
+    property <length> label-width: 120px;
+    property <length> button-width: 200px;
+    property <AdapterItem> adapter: Network.selected;
+    property <bool> on: root.adapter.status == AdapterStatus.connected || root.adapter.status == AdapterStatus.connecting;
+    title: @tr("Ethernet · {}", Network.selected.interface);
     icon: Icons.network-ethernet;
 
-    for link in Network.wired: HorizontalLayout {
-        spacing: Theme.spacing-medium;
+    FactRow {
+        label: @tr("State");
+        label-width: root.label-width;
+        value: root.adapter.status == AdapterStatus.connected ? @tr("Connected")
+            : root.adapter.status == AdapterStatus.connecting ? @tr("Connecting")
+            : root.adapter.status == AdapterStatus.disconnected ? @tr("Disconnected") : @tr("No cable");
+    }
+    FactRow {
+        label: @tr("Address");
+        label-width: root.label-width;
+        value: root.adapter.address == "" ? "" : root.adapter.address + (root.adapter.prefix > 0 ? "/" + root.adapter.prefix : "");
+    }
+    FactRow {
+        label: @tr("Gateway");
+        label-width: root.label-width;
+        value: root.adapter.gateway;
+    }
+    FactRow {
+        label: @tr("Speed");
+        label-width: root.label-width;
+        value: root.adapter.speed > 0 ? root.adapter.speed + " Mbit/s" : "";
+    }
+    FactRow {
+        label: @tr("MAC");
+        label-width: root.label-width;
+        value: root.adapter.mac;
+    }
+    Rectangle { vertical-stretch: 1; }
+    HorizontalLayout {
+        alignment: end;
         height: Theme.touch;
-        VerticalLayout {
-            alignment: center;
-            horizontal-stretch: 1;
-            IconLabel {
-                icon: link.cable ? Icons.network-ethernet : Icons.network-ethernet-off;
-                text: link.interface;
-                color: Theme.foreground;
-            }
-            Text {
-                text: !link.cable ? @tr("No cable") : link.connected ? link.address : @tr("Disconnected");
-                color: Theme.muted;
-                font-size: Theme.font-small;
-                overflow: elide;
-            }
-        }
         IconButton {
-            width: Theme.touch;
-            icon: link.connected ? Icons.network-ethernet-off : Icons.network-ethernet;
-            accessible-label: link.connected ? @tr("Disconnect {}", link.interface) : @tr("Connect {}", link.interface);
-            enabled: link.cable;
+            width: root.button-width;
+            horizontal: true;
+            icon: root.on ? Icons.network-ethernet-off : Icons.network-ethernet;
+            text: root.on ? @tr("Disconnect") : @tr("Connect");
+            enabled: root.on || root.adapter.status != AdapterStatus.unavailable;
             clicked => {
-                if (link.connected) {
-                    Confirm.ask(@tr("Disconnect {}", link.interface), Printer.is-printing
+                if (root.on) {
+                    Confirm.ask(@tr("Disconnect {}", root.adapter.interface), Printer.is-printing
                         ? @tr("A print is running. This printer may no longer be reachable over the network.")
-                        : @tr("This printer may no longer be reachable over the network."), "wired-off", link.interface, true);
+                        : @tr("This printer may no longer be reachable over the network."), "wired-off", root.adapter.interface, true);
                 } else {
-                    Network.set-wired(link.interface, true);
+                    Network.set-wired(root.adapter.interface, true);
                 }
             }
         }
-    }
-    if Network.wired.length == 0: Text {
-        text: @tr("No Ethernet adapter.");
-        color: Theme.muted;
-        font-size: Theme.font-small;
     }
 }
 
@@ -243,6 +361,7 @@ component HostNetworkCard inherits Card {
 }
 
 export component NetworkSection inherits Rectangle {
+    property <length> adapters-width: 248px;
     property <string> password-title;
 
     // Asks for confirmation while printing, otherwise connects right away.
@@ -257,11 +376,13 @@ export component NetworkSection inherits Rectangle {
         }
     }
 
-    if Network.managed && Network.wifi-present: HorizontalLayout {
+    if Network.managed: HorizontalLayout {
         spacing: Theme.spacing;
-        // Wi-Fi takes about 70 %, the wired card the rest but at least 200 px.
-        WifiCard {
-            horizontal-stretch: 7;
+        AdaptersCard {
+            width: root.adapters-width;
+        }
+        if Network.selected.interface != "" && Network.selected.wireless: WifiCard {
+            horizontal-stretch: 1;
             choose(network) => {
                 if (network.known || !network.secured) {
                     root.start-connect(network.ssid, "", false);
@@ -278,16 +399,10 @@ export component NetworkSection inherits Rectangle {
                 ssid.open = true;
             }
         }
-        VerticalLayout {
-            horizontal-stretch: 3;
-            min-width: 200px;
-            spacing: Theme.spacing;
-            WiredCard { }
-            Rectangle { vertical-stretch: 1; }
+        if Network.selected.interface != "" && !Network.selected.wireless: EthernetCard {
+            horizontal-stretch: 1;
         }
     }
-
-    if Network.managed && !Network.wifi-present: WiredCard { }
 
     if !Network.managed: HostNetworkCard { }
 

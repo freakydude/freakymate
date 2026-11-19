@@ -1,5 +1,6 @@
 //! Network management of the host sailhand runs on: Wi-Fi and Ethernet via NetworkManager
-//! (Linux), or a simulation for development and tests.
+//! (Linux), or a simulation for development and tests. Every Wi-Fi and Ethernet adapter of the host is
+//! listed; the UI shows one of them at a time.
 //!
 //! Moonraker can only report the printer host's interfaces; changing them needs local access to
 //! NetworkManager. The UI therefore offers management only when this host is the printer host.
@@ -64,17 +65,44 @@ pub struct WifiNetwork {
     /// A saved connection exists for this network.
     pub known: bool,
     pub active: bool,
+    /// Another Wi-Fi adapter (interface) has joined this network; `active` only refers to the selected one.
+    pub active_on_other: Option<String>,
     /// Currently received; saved networks out of range are listed too.
     pub in_range: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AdapterKind {
+    #[default]
+    Ethernet,
+    Wifi,
+}
+
+/// NetworkManager device state reduced to what the UI distinguishes; the order is the preference order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub enum AdapterState {
+    #[default]
+    Unavailable,
+    Disconnected,
+    Connecting,
+    Connected,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct WiredLink {
+pub struct Adapter {
     pub interface: String,
-    /// A cable is plugged in.
-    pub cable: bool,
-    pub connected: bool,
+    pub kind: AdapterKind,
+    pub state: AdapterState,
+    /// Wi-Fi network the adapter has joined.
+    pub ssid: Option<String>,
+    /// First IPv4 address, e.g. "192.168.1.42", and its prefix length (24).
     pub address: Option<String>,
+    pub prefix: Option<u8>,
+    pub gateway: Option<String>,
+    /// Link speed in Mbit/s; NetworkManager reports 0 when unknown, that becomes None.
+    pub speed_mbit: Option<u32>,
+    /// Hardware (MAC) address.
+    pub mac: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -90,13 +118,14 @@ pub enum Availability {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct NetworkState {
     pub availability: Availability,
-    pub wifi_present: bool,
     pub wifi_enabled: bool,
-    pub active_ssid: Option<String>,
-    pub wifi_address: Option<String>,
-    /// Visible and saved networks in one list, see [`wifi_networks`].
+    /// Wi-Fi adapters first, then Ethernet, each sorted by interface name.
+    pub adapters: Vec<Adapter>,
+    /// Interface shown on the right, see [`selected_adapter`]; None without adapters.
+    pub selected: Option<String>,
+    /// Networks of the selected adapter when it is Wi-Fi, else empty; visible and saved networks in one
+    /// list, see [`wifi_networks`].
     pub networks: Vec<WifiNetwork>,
-    pub wired: Vec<WiredLink>,
     /// Running operation, e.g. "Connecting to Workshop".
     pub busy: Option<String>,
 }
@@ -104,15 +133,24 @@ pub struct NetworkState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NetworkCommand {
     Refresh,
-    Scan,
+    /// Chooses the adapter shown on the right; handled by the service, not by the backends.
+    Select {
+        interface: String,
+    },
+    Scan {
+        interface: String,
+    },
     /// Joins a network; without password a saved or open network is used.
     Connect {
+        interface: String,
         ssid: String,
         password: Option<String>,
         hidden: bool,
     },
     /// Leaves the current Wi-Fi network and keeps it saved.
-    Disconnect,
+    Disconnect {
+        interface: String,
+    },
     Forget {
         ssid: String,
     },
@@ -205,6 +243,7 @@ pub fn wifi_networks(access_points: &[AccessPoint], known: &[String], active: Op
                 security: point.security,
                 known: known.contains(&point.ssid),
                 active: active == Some(point.ssid.as_str()),
+                active_on_other: None,
                 in_range: true,
             }),
         }
@@ -221,6 +260,49 @@ pub fn wifi_networks(access_points: &[AccessPoint], known: &[String], active: Op
         ..WifiNetwork::default()
     }));
     networks
+}
+
+/// Wi-Fi adapters first, then Ethernet, each by interface name.
+pub fn sort_adapters(adapters: &mut [Adapter]) {
+    adapters.sort_by(|left, right| {
+        (left.kind == AdapterKind::Ethernet, &left.interface)
+            .cmp(&(right.kind == AdapterKind::Ethernet, &right.interface))
+    });
+}
+
+/// The adapter the UI shows: the requested one if it exists, else the Wi-Fi adapter with the best state
+/// (the first on a tie), else the first adapter.
+///
+/// With a second Wi-Fi adapter (say a USB stick next to the built-in one) the UI must default to the
+/// one that carries the connection; acting on another would move the saved profile over to it.
+pub fn selected_adapter(adapters: &[Adapter], requested: Option<&str>) -> Option<String> {
+    let chosen = requested
+        .and_then(|interface| adapters.iter().find(|adapter| adapter.interface == interface))
+        .or_else(|| {
+            // `max_by_key` returns the last maximum; reversing keeps the first on a tie.
+            adapters
+                .iter()
+                .rev()
+                .filter(|adapter| adapter.kind == AdapterKind::Wifi)
+                .max_by_key(|adapter| adapter.state)
+        })
+        .or_else(|| adapters.first());
+    chosen.map(|adapter| adapter.interface.clone())
+}
+
+/// Marks networks that another Wi-Fi adapter than `selected` has joined.
+pub fn mark_other_adapters(networks: &mut [WifiNetwork], adapters: &[Adapter], selected: &str) {
+    for network in networks {
+        network.active_on_other = adapters
+            .iter()
+            .find(|adapter| {
+                adapter.kind == AdapterKind::Wifi
+                    && adapter.interface != selected
+                    && adapter.state == AdapterState::Connected
+                    && adapter.ssid.as_deref() == Some(network.ssid.as_str())
+            })
+            .map(|adapter| adapter.interface.clone());
+    }
 }
 
 /// Signal strength as bars 1..=3 for the icon.
@@ -298,6 +380,62 @@ mod tests {
         assert_eq!(Security::from_flags(AP_FLAG_PRIVACY, 0, AP_KEY_MGMT_SAE), Security::Wpa3);
         assert_eq!(Security::from_flags(AP_FLAG_PRIVACY, AP_KEY_MGMT_802_1X, 0), Security::Unsupported);
         assert_eq!(Security::from_flags(AP_FLAG_PRIVACY, 0, 0), Security::Unsupported);
+    }
+
+    fn adapter(interface: &str, kind: AdapterKind, state: AdapterState, ssid: Option<&str>) -> Adapter {
+        Adapter { interface: interface.into(), kind, state, ssid: ssid.map(str::to_owned), ..Adapter::default() }
+    }
+
+    #[test]
+    fn sorts_wifi_before_ethernet_by_name() {
+        let mut adapters = [
+            adapter("eth1", AdapterKind::Ethernet, AdapterState::Connected, None),
+            adapter("wlan1", AdapterKind::Wifi, AdapterState::Connected, None),
+            adapter("eth0", AdapterKind::Ethernet, AdapterState::Connected, None),
+            adapter("wlan0", AdapterKind::Wifi, AdapterState::Connected, None),
+        ];
+        sort_adapters(&mut adapters);
+        let names: Vec<&str> = adapters.iter().map(|adapter| adapter.interface.as_str()).collect();
+        assert_eq!(names, ["wlan0", "wlan1", "eth0", "eth1"]);
+    }
+
+    #[test]
+    fn selects_requested_then_best_wifi_then_first() {
+        use AdapterKind::{Ethernet, Wifi};
+        use AdapterState::{Connected, Connecting, Disconnected, Unavailable};
+        let adapters = [
+            adapter("wlan0", Wifi, Disconnected, None),
+            adapter("wlan1", Wifi, Connected, Some("Home")),
+            adapter("wlan2", Wifi, Connected, None),
+            adapter("eth0", Ethernet, Connected, None),
+        ];
+        assert_eq!(selected_adapter(&adapters, Some("eth0")).as_deref(), Some("eth0"));
+        assert_eq!(selected_adapter(&adapters, Some("gone")).as_deref(), Some("wlan1"));
+        assert_eq!(selected_adapter(&adapters, None).as_deref(), Some("wlan1"));
+
+        let idle = [adapter("wlan0", Wifi, Unavailable, None), adapter("wlan1", Wifi, Connecting, None)];
+        assert_eq!(selected_adapter(&idle, None).as_deref(), Some("wlan1"));
+        let wired_only = [adapter("eth0", Ethernet, Connected, None), adapter("eth1", Ethernet, Connected, None)];
+        assert_eq!(selected_adapter(&wired_only, None).as_deref(), Some("eth0"));
+        assert_eq!(selected_adapter(&[], Some("wlan0")), None);
+    }
+
+    #[test]
+    fn marks_networks_joined_by_another_adapter() {
+        use AdapterKind::Wifi;
+        use AdapterState::{Connected, Connecting};
+        let adapters = [
+            adapter("wlan0", Wifi, Connected, Some("Home")),
+            adapter("wlan1", Wifi, Connected, Some("Workshop")),
+            adapter("wlan2", Wifi, Connecting, Some("Cafe")),
+        ];
+        let points =
+            [point("Home", 80, Security::Wpa), point("Workshop", 70, Security::Wpa), point("Cafe", 60, Security::Open)];
+        let mut networks = wifi_networks(&points, &[], Some("Home"));
+        mark_other_adapters(&mut networks, &adapters, "wlan0");
+        let marks: Vec<(&str, Option<&str>)> =
+            networks.iter().map(|network| (network.ssid.as_str(), network.active_on_other.as_deref())).collect();
+        assert_eq!(marks, [("Home", None), ("Workshop", Some("wlan1")), ("Cafe", None)]);
     }
 
     #[test]
