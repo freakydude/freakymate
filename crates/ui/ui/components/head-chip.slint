@@ -92,7 +92,7 @@ export component ChangerHint inherits HorizontalLayout {
 
     Image {
         cross-axis-self-alignment: center;
-        source: Printer.changer-note == "error" ? Icons.ui-error : Printer.changer-note == "mismatch" ? Icons.ui-warning : Icons.ui-info;
+        source: Printer.changer-note == "error" ? Icons.state-error : Printer.changer-note == "mismatch" ? Icons.ui-warning : Icons.ui-info;
         colorize: StateIcons.severity-color(Printer.changer-note == "error" ? Severity.error : Printer.changer-note == "mismatch" ? Severity.attention : Severity.info);
         width: Theme.icon-small;
         height: Theme.icon-small;
@@ -133,7 +133,7 @@ export component AfcHint inherits HorizontalLayout {
 
     Image {
         cross-axis-self-alignment: center;
-        source: Icons.ui-error;
+        source: Icons.state-error;
         colorize: StateIcons.severity-color(Severity.error);
         width: Theme.icon-small;
         height: Theme.icon-small;

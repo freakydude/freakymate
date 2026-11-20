@@ -61,7 +61,7 @@ export component AfcServiceTab inherits VerticalLayout {
             height: Theme.touch;
             IconLabel {
                 horizontal-stretch: 1;
-                icon: root.error ? Icons.ui-error : Printer.afc-state == "Idle" ? Icons.ui-check : Icons.ui-info;
+                icon: root.error ? Icons.state-error : Printer.afc-state == "Idle" ? Icons.ui-check : Icons.ui-info;
                 color: StateIcons.severity-color(root.error ? Severity.error : Printer.afc-state == "Idle" ? Severity.neutral : Severity.info);
                 text: Printer.afc-state == "" ? "-" : Printer.afc-state;
             }

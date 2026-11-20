@@ -107,7 +107,7 @@ export component TextEntryDialog inherits Scrim {
                     }
 
                     if root.secret: IconButton {
-                        icon: root.reveal ? Icons.ui-unlock : Icons.ui-lock;
+                        icon: root.reveal ? Icons.ui-show : Icons.ui-hide;
                         width: 56px;
                         checked: root.reveal;
                         accessible-label: @tr("Show password");
