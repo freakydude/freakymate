@@ -148,11 +148,18 @@ fn filament_length(job: &PrintJob, metadata: Option<&FileMetadata>) -> String {
     }
 }
 
-/// `since 14:03 · 12 min` while paused, if the pause was seen beginning.
+/// Shorter pauses show only since when: `0 min` would read odd, seconds would change the banner every second.
+const PAUSE_DURATION_SHOWN_FROM_SECONDS: f64 = 60.0;
+
+/// `since 14:03 · 12 min` while paused, if the pause was seen beginning; in its first minute only `since 14:03`.
 fn paused_since(job: &PrintJob, now: DateTime<Local>) -> String {
     let Some(since) = job.paused_since.filter(|_| job.state == PrintState::Paused) else { return String::new() };
-    let paused_for = (now.timestamp() as f64 - since).max(0.0);
-    format!("since {} · {}", format::unix_moment(now, since), format::duration_minutes(paused_for))
+    let start = format!("since {}", format::unix_moment(now, since));
+    let paused_for = now.timestamp() as f64 - since;
+    if paused_for < PAUSE_DURATION_SHOWN_FROM_SECONDS {
+        return start;
+    }
+    format!("{start} · {}", format::duration_minutes(paused_for))
 }
 
 /// When the shown job ended, from the job history; empty while it runs or if the history does not know (Moonraker
@@ -712,8 +719,10 @@ mod tests {
             ..PrintJob::default()
         };
         let unseen = PrintJob { paused_since: None, ..paused.clone() };
+        let fresh = PrintJob { paused_since: Some(now().timestamp() as f64 - 40.0), ..paused.clone() };
 
         assert_eq!(job_texts(&paused, None, None, None, now()).paused_since, "since 11:48 · 12 min");
+        assert_eq!(job_texts(&fresh, None, None, None, now()).paused_since, "since 11:59");
         assert_eq!(job_texts(&unseen, None, None, None, now()).paused_since, "");
     }
 
