@@ -4,6 +4,7 @@
 // differently, with the button that helps.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, HeadItem, Printer, Severity } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
@@ -59,7 +60,7 @@ export component HeadChip inherits Rectangle {
             overflow: elide;
         }
         if root.head.has-nozzle: Text {
-            text: round(root.head.temperature) + "°";
+            text: Units.degrees(root.head.temperature);
             color: Theme.muted;
             font-size: Theme.font-small;
             vertical-alignment: center;
@@ -91,7 +92,7 @@ export component ChangerHint inherits HorizontalLayout {
 
     Image {
         cross-axis-self-alignment: center;
-        source: Printer.changer-note == "error" ? Icons.ui-error : Printer.changer-note == "mismatch" ? Icons.ui-warning : Icons.ui-info;
+        source: Printer.changer-note == "error" ? Icons.state-error : Printer.changer-note == "mismatch" ? Icons.ui-warning : Icons.ui-info;
         colorize: StateIcons.severity-color(Printer.changer-note == "error" ? Severity.error : Printer.changer-note == "mismatch" ? Severity.attention : Severity.info);
         width: Theme.icon-small;
         height: Theme.icon-small;
@@ -132,7 +133,7 @@ export component AfcHint inherits HorizontalLayout {
 
     Image {
         cross-axis-self-alignment: center;
-        source: Icons.ui-error;
+        source: Icons.state-error;
         colorize: StateIcons.severity-color(Severity.error);
         width: Theme.icon-small;
         height: Theme.icon-small;

@@ -11,6 +11,7 @@ export component PrintPreparedMmuPreview inherits AppWindow {
         Sample.mmu();
         Navigation.page = Page.print;
         Printer.print-state = "complete";
+        Printer.job-state = "complete";
         Printer.filename = "benchy.gcode";
         Printer.job-name = "benchy";
         Printer.prepared-path = "cube-mc5-all_pla-t0_t1_t3_t4.gcode";
@@ -20,7 +21,7 @@ export component PrintPreparedMmuPreview inherits AppWindow {
             material: "PLA, PETG",
             weight: "32.6 g",
             nozzle: "0.4",
-            time: "1h 48m",
+            time: "1 h 48 min",
             extruder-temperature: "220°",
             bed-temperature: "60°",
         };

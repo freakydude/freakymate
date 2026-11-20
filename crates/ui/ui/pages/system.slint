@@ -27,12 +27,7 @@ export component SystemPage inherits Rectangle {
             Card {
                 title: @tr("Klipper");
                 icon: Icons.nav-printer;
-                IconLabel {
-                    icon: Printer.is-connected ? Icons.system-connected : Icons.system-disconnected;
-                    text: Printer.endpoint;
-                    font-size: Theme.font-small;
-                    color: Theme.muted;
-                }
+                // The address stands on the Printers tab, the state in the status bar.
                 HorizontalLayout {
                     spacing: Theme.spacing;
                     height: root.action-row-height;

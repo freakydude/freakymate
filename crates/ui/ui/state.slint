@@ -39,18 +39,30 @@ export global Printer {
     in property <string> activity: "ready";
     // A command from here that waits long for its answer (homing, leveling, an update); "" if none.
     in property <string> running-command;
+    // The job the print page shows: Klipper's, or one Klipper lost in a shutdown or restart (then "error" while
+    // print-state is Klipper's own "standby"). Its file, state and figures follow.
     in property <string> filename;
+    in property <string> job-state: "standby";
     in property <string> job-name;
     in property <float> progress;
+    // False for a lost job Sailhand did not see printing: no progress to show.
+    in property <bool> progress-known: true;
+    // Printing time, without heating before the first extrusion and without pauses.
     in property <string> elapsed;
+    // Time from the start to the end, with heating and pauses.
+    in property <string> total-duration;
     in property <string> remaining;
     in property <string> eta;
     in property <string> layers;
-    // Height of the current layer and of the object, e.g. "2.40 / 24.0 mm"; empty if neither is known.
+    // Height of the current layer, or the one an ended job reached, and of the object, e.g. "2.40 / 24.00 mm"; empty
+    // if neither is known.
     in property <string> print-heights;
+    // Weight where known ("12 / 54 g"), else length.
     in property <string> filament;
-    // When a finished job ended, from the job history; "-" if unknown (`mmu-has-extreme-threshold` false).
+    // When a finished job ended, from the job history; empty if unknown (no history).
     in property <string> ended;
+    // Since when the print is paused ("since 14:03 · 12 min"); empty if the beginning was not seen.
+    in property <string> paused-since;
     // What the sources state about a pause or an error, one fact per line; empty if nothing is stated.
     in property <string> interruption-text;
     // Where the print stands at a pause or an error ("Layer 50 · 10.00 mm"); empty if unknown (`mmu-has-extreme-threshold` false).
@@ -587,6 +599,10 @@ export enum MotionTab { axes, tune, expert, calibrate }
 // Tabs of the Thermal page; a tab the printer has nothing for falls back to the heaters.
 export enum HeatTab { heaters, fans, sensors }
 
+// Sections of the Settings tab; Network is `Page.network` (it is watched while shown), the others live on
+// `Page.settings`. A section without content falls back to the first one that has some.
+export enum SettingsSection { display, access, logs, about }
+
 export global Navigation {
     in-out property <Page> page: Page.print;
     in-out property <bool> files-open;
@@ -602,6 +618,7 @@ export global Navigation {
     // Page of gate tiles the Gates tab shows, counted from 0 within its view; -1 opens on the unit of the loaded gate.
     in-out property <int> mmu-page: -1;
     in-out property <HeatTab> heat-tab;
+    in-out property <SettingsSection> settings-section;
     // Motion page; the page shows Tune instead while a print locks the axes, so the choice comes back afterwards.
     in-out property <MotionTab> motion-tab;
     in-out property <bool> history-open;

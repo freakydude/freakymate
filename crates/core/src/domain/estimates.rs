@@ -23,8 +23,8 @@ pub const ORIGIN_SPOOL_DIAMETER: &str = "filament diameter of the active spool i
 pub const ORIGIN_ASSUMED_DIAMETER: &str = "assumed filament diameter of 1.75 mm";
 pub const ORIGIN_LAST_PRINT: &str = "last completed print";
 pub const ORIGIN_SLICER_ESTIMATE: &str = "slicer estimate";
-pub const ORIGIN_LAST_PRINT_LENGTH: &str = "length of the last print, scaled by the slicer weight";
-pub const ORIGIN_SPOOL_DENSITY: &str = "length of the last print, diameter and density of the spool";
+pub const ORIGIN_LAST_PRINT_LENGTH: &str = "length of the print, scaled by the slicer weight";
+pub const ORIGIN_SPOOL_DENSITY: &str = "length of the print, diameter and density of the spool";
 
 /// Total print time of a file: what the last completed print took, else the slicer estimate.
 pub fn expected_print_seconds(metadata: Option<&FileMetadata>, last_print: Option<&LastPrint>) -> Option<Sourced<f64>> {
@@ -42,25 +42,35 @@ fn is_positive(seconds: &Sourced<f64>) -> bool {
     seconds.value > 0.0
 }
 
-/// Weight of the filament of a file in grams. Moonraker records only the length a print used. With the one spool of
-/// that print the weight follows from its diameter and density; otherwise it is the slicer's weight scaled by the used
-/// length (same density and diameter assumed). Without a print there is the slicer's weight, as a prediction.
+/// Weight of the filament of a file in grams: what its last print used (see [`used_filament_grams`]), else the
+/// slicer's weight, as a prediction.
 pub fn filament_weight_grams(
     metadata: &FileMetadata,
     last_print: Option<&LastPrint>,
     spool: Option<&Spool>,
 ) -> Option<Sourced<f64>> {
-    let slicer_weight = metadata.filament_weight_total;
-    let from_spool = last_print.zip(spool).and_then(|(last_print, spool)| {
-        let weight = spool.weight_of_length(last_print.filament_used)?;
-        Some(Sourced::measured(weight, ORIGIN_SPOOL_DENSITY))
-    });
-    let scaled = last_print.and_then(|last_print| {
+    let used = last_print.and_then(|last_print| used_filament_grams(Some(metadata), last_print.filament_used, spool));
+    let estimated = metadata.filament_weight_total.map(|grams| Sourced::estimated(grams, ORIGIN_SLICER_ESTIMATE));
+    prefer_measured(used, estimated)
+}
+
+/// Weight in grams of the filament length a print used. Klipper and Moonraker count only the length. With the one
+/// spool of that print the weight follows from its diameter and density; otherwise it is the slicer's weight scaled
+/// by the length (same density and diameter assumed).
+pub fn used_filament_grams(
+    metadata: Option<&FileMetadata>,
+    used_millimetres: f64,
+    spool: Option<&Spool>,
+) -> Option<Sourced<f64>> {
+    let from_spool = spool
+        .and_then(|spool| spool.weight_of_length(used_millimetres))
+        .map(|weight| Sourced::measured(weight, ORIGIN_SPOOL_DENSITY));
+    let scaled = metadata.and_then(|metadata| {
         let planned_length = metadata.filament_total.filter(|length| *length > 0.0)?;
-        Some(Sourced::measured(slicer_weight? * last_print.filament_used / planned_length, ORIGIN_LAST_PRINT_LENGTH))
+        let grams = metadata.filament_weight_total? * used_millimetres / planned_length;
+        Some(Sourced::measured(grams, ORIGIN_LAST_PRINT_LENGTH))
     });
-    let estimated = slicer_weight.map(|grams| Sourced::estimated(grams, ORIGIN_SLICER_ESTIMATE));
-    prefer_measured(from_spool, prefer_measured(scaled, estimated))
+    prefer_measured(from_spool, scaled)
 }
 
 /// Number of layers of a job: what Klipper reports (`SET_PRINT_STATS_INFO`), else the object height of the file
@@ -219,6 +229,12 @@ mod tests {
         let weight = filament_weight_grams(&without_length, Some(&last_print), None).unwrap();
 
         assert_eq!(weight.provenance, Provenance::Estimated);
+    }
+
+    #[test]
+    fn used_filament_has_no_weight_without_spool_or_slicer_weight() {
+        assert_eq!(used_filament_grams(None, 9_000.0, None), None);
+        assert!(used_filament_grams(Some(&metadata()), 9_000.0, None).is_some());
     }
 
     #[test]

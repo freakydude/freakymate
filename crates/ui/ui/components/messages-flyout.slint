@@ -67,7 +67,7 @@ export component MessagesFlyout inherits Rectangle {
                         spacing: Theme.spacing;
                         Image {
                             y: 0px;
-                            source: message.is-error ? Icons.ui-error : Icons.ui-info;
+                            source: message.is-error ? Icons.state-error : Icons.ui-info;
                             colorize: message.is-error ? StateIcons.severity-color(Severity.error) : StateIcons.severity-color(Severity.info);
                             width: Theme.icon-small;
                             height: Theme.icon-small;

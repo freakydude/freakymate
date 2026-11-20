@@ -2,13 +2,14 @@
 
 use super::ask;
 use crate::session::Session;
-use sailhand::{Actions, Confirm, Page, Printer};
+use sailhand::{Actions, Confirm, Navigation, Page, Printer, SettingsSection};
 use sailhand_core::ConnectionState;
 use slint::ComponentHandle;
 use std::time::Duration;
 
-/// "Log in" on the connection page (800x480 layout).
-const LOG_IN_BUTTON: (f32, f32) = (656.0, 230.0);
+/// Centre of "Log in" on the connection page (800x480 layout, y 170–225). The button column is centred vertically, so
+/// every button added to it (Printers, #226) moves this one.
+const LOG_IN_BUTTON: (f32, f32) = (656.0, 198.0);
 
 /// Before the printer is ready: the connection page asks for a login, a wrong password is refused, the right one
 /// opens the connection.
@@ -45,6 +46,7 @@ pub(super) fn type_and_enter(session: &mut Session, text: &str) {
 
 /// The settings show the user and offer to log out; the logout leads back to the login.
 pub(super) fn logged_in(session: &mut Session) -> Result<(), String> {
+    session.window.global::<Navigation>().set_settings_section(SettingsSection::Access);
     session.show_page(Page::Settings, "settings-logged-in")?;
     if session.window.global::<Printer>().get_login_user() != "test" {
         return Err("the settings do not show the logged-in user".into());

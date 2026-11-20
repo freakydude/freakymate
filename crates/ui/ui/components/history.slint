@@ -1,6 +1,7 @@
 // Temperature history of one heater or sensor: the last minutes from Moonraker, growing while it is open.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, Navigation, Printer } from "../state.slint";
 import { ButtonKind, IconButton, Note } from "controls.slint";
@@ -229,7 +230,7 @@ export component HistoryDialog inherits Scrim {
                     alignment: center;
                     Text { text: @tr("Target"); color: Theme.muted; font-size: Theme.font-small; horizontal-alignment: center; }
                     Text {
-                        text: root.pid-target > 0 ? round(root.pid-target) + " °C" : "—";
+                        text: root.pid-target > 0 ? Units.temperature(root.pid-target, 0) : "—";
                         color: root.pid-target > 0 ? Theme.accent : Theme.muted;
                         font-size: Theme.font-large;
                         font-weight: 600;
@@ -262,7 +263,7 @@ export component HistoryDialog inherits Scrim {
     }
 
     pid-entry := NumberEntryDialog {
-        unit: "°C";
+        unit: Units.celsius-symbol;
         title: @tr("PID tune target");
         hint: Printer.history-pid-range;
         hint-warning: Actions.heater-target-outside(Printer.history-object, self.text);

@@ -16,7 +16,7 @@ use crate::moonraker::{
     CallError, CertificateFingerprint, Connection, ConnectionState, Endpoint, Notification, Tls, UntrustedCertificate,
 };
 use crate::sources::happy_hare::stale_gate_map;
-use crate::sources::klipper::{FanWatch, HeightWatch, KlippyState, PendingTargets, PrintState};
+use crate::sources::klipper::{FanWatch, HeightWatch, JobWatch, KlippyState, PendingTargets, PrintState};
 use crate::sources::moonraker_server::gcode_store::ConsoleKind;
 use crate::sources::moonraker_server::update_manager;
 use crate::sources::moonraker_server::wled::{self, WledStrip};
@@ -24,7 +24,7 @@ use crate::sources::moonraker_server::{ServerComponents, server_info};
 use crate::sources::{ObjectStore, PrinterStatus, Sources};
 use serde_json::{Value, json};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{Semaphore, mpsc};
 
 pub(super) async fn run(
@@ -269,6 +269,7 @@ pub(super) struct Session<'a> {
     /// What each fan's tachometer has measured since Klipper started; the snapshot marks the stalled ones.
     pub(super) fan_watch: FanWatch,
     pub(super) height_watch: HeightWatch,
+    pub(super) job_watch: JobWatch,
     /// The spools the lanes keep (gates, tool macros) at the last look; `None` until Spoolman was asked once.
     pub(super) spoolman_lane_spools: Option<Vec<u32>>,
     /// Limits the file details in flight, so a long file list does not flood Moonraker.
@@ -305,6 +306,7 @@ impl<'a> Session<'a> {
             pending_targets: PendingTargets::default(),
             fan_watch: FanWatch::default(),
             height_watch: HeightWatch::default(),
+            job_watch: JobWatch::default(),
             spoolman_lane_spools: None,
             file_details: Arc::new(Semaphore::new(PARALLEL_FILE_DETAILS)),
             wled: Vec::new(),
@@ -643,14 +645,16 @@ impl<'a> Session<'a> {
         }
     }
 
-    /// The state with the heater targets that were sent but not yet reported back, the fans that do not turn and the
-    /// height of the layer being printed.
+    /// The state with the heater targets that were sent but not yet reported back, the fans that do not turn, the
+    /// height of the layer being printed, since when the print is paused and the job Klipper forgot in a restart.
     pub(super) fn current_status(&mut self) -> PrinterStatus {
         let mut status = PrinterStatus::from_store(&self.store);
         let now = Instant::now();
         self.pending_targets.apply(&mut status.heaters, now);
         self.fan_watch.apply(&mut status.fans, now);
         self.height_watch.apply(&mut status.job, status.motion.gcode_position[2], now);
+        let unix_now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0.0, |elapsed| elapsed.as_secs_f64());
+        status.previous_job = self.job_watch.apply(&mut status.job, unix_now).map(Box::new);
         status.leds.extend(self.wled.iter().map(WledStrip::led));
         status
     }

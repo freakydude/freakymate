@@ -59,8 +59,10 @@ pub struct PrintJob {
     pub filament_used: f64,
     pub current_layer: Option<u32>,
     pub total_layer: Option<u32>,
-    /// Height of the layer being printed, see [`super::HeightWatch`]; `None` while no job is active.
+    /// Height of the layer being printed, or the one an ended job reached, see [`super::HeightWatch`].
     pub height: Option<f64>,
+    /// When the pause began (Unix seconds), if it was seen beginning, see [`super::JobWatch`].
+    pub paused_since: Option<f64>,
 }
 
 pub(super) fn read_job(print_stats: &Value, display_status: &Value, virtual_sdcard: &Value) -> PrintJob {
@@ -81,5 +83,6 @@ pub(super) fn read_job(print_stats: &Value, display_status: &Value, virtual_sdca
         current_layer: count(info, "current_layer"),
         total_layer: count(info, "total_layer"),
         height: None,
+        paused_since: None,
     }
 }

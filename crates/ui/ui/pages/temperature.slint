@@ -1,6 +1,7 @@
 // Thermal: heaters with presets, fans, further temperature sensors; each in its own tab.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { Icons } from "../icons.slint";
 import { StateIcons } from "../state-icons.slint";
 import { Actions, FanItem, HeaterItem, HeatTab, Navigation, Printer, SensorItem, UiSettings, Severity } from "../state.slint";
@@ -69,7 +70,7 @@ component HeaterRow inherits Rectangle {
             HorizontalLayout {
                 spacing: Theme.spacing;
                 Text {
-                    text: root.heater.temperature.to-fixed(1) + " °C";
+                    text: Units.temperature(root.heater.temperature, 1);
                     color: StateIcons.severity-color(root.heater.scale.level);
                     font-size: Theme.font-large;
                     font-weight: 600;
@@ -107,7 +108,7 @@ component HeaterRow inherits Rectangle {
                     horizontal-alignment: center;
                 }
                 Text {
-                    text: root.heater.target > 0 ? round(root.heater.target) + " °C" : @tr("Off");
+                    text: root.heater.target > 0 ? Units.temperature(root.heater.target, 0) : @tr("Off");
                     color: root.heater.target > 0 ? Theme.accent : Theme.muted;
                     font-size: Theme.font-large;
                     font-weight: 600;
@@ -160,7 +161,7 @@ component FanRow inherits Rectangle {
             width: 170px;
             Text { text: root.fan.label; color: Theme.muted; font-size: Theme.font-small; overflow: elide; }
             TextWithValue {
-                text: round(fan-slider.shown) + " %";
+                text: Units.percent(fan-slider.shown);
                 value: root.fan.rpm;
                 separator: "  ·  ";
                 color: root.fan.stalled ? StateIcons.severity-color(Severity.error) : Theme.foreground;
@@ -234,7 +235,7 @@ component HeatersTab inherits Rectangle {
                 StepSelector {
                     label: @tr("Step");
                     values: UiSettings.temperature-steps;
-                    unit: " °C";
+                    unit: Units.celsius-symbol;
                     selected <=> UiSettings.temperature-step;
                     changed => { UiSettings.steps-changed(); }
                 }
@@ -325,7 +326,7 @@ component SensorsTab inherits Rectangle {
                 HorizontalLayout {
                     spacing: Theme.spacing;
                     Text {
-                        text: sensor.known ? sensor.temperature.to-fixed(1) + " °C" : "–";
+                        text: sensor.known ? Units.temperature(sensor.temperature, 1) : "–";
                         color: sensor.known ? StateIcons.severity-color(sensor.scale.level) : Theme.muted;
                         font-size: Theme.font-large;
                         font-weight: 600;
@@ -394,7 +395,7 @@ export component TemperaturePage inherits Rectangle {
     // The heater whose target is being typed. Klipper enforces its limits (min/max_temp) and reports a refusal.
     property <string> target-heater;
     target-entry := NumberEntryDialog {
-        unit: "°C";
+        unit: Units.celsius-symbol;
         hint-warning: Actions.heater-target-outside(root.target-heater, self.text);
         accepted(text) => {
             if (text.is-float()) {

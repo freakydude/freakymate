@@ -3,6 +3,7 @@
 // page shows Tune instead.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, MotionTab, Navigation, Printer, UiSettings } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
@@ -87,7 +88,7 @@ component AxesTab inherits Rectangle {
             StepSelector {
                 label: @tr("Step");
                 values: UiSettings.move-steps;
-                unit: " mm";
+                unit: Units.millimetre-symbol;
                 selected <=> UiSettings.move-step;
                 changed => { UiSettings.steps-changed(); }
             }

@@ -798,3 +798,14 @@ fn pid_calibrate_needs_both_parameters_and_a_known_target_in_range() {
     assert!(run(&mut printer(), "PID_CALIBRATE HEATER=extruder TARGET=500").is_err());
     assert!(run(&mut printer(), "PID_CALIBRATE HEATER=nozzle TARGET=200").is_err());
 }
+
+#[test]
+fn a_shutdown_in_a_job_ends_it_in_the_history() {
+    let mut printer = Printer::with_profile(1.0, MachineProfile::voron());
+    printer.start_print(&Catalog::demo().find("benchy.gcode").unwrap().clone()).unwrap();
+    assert_eq!(printer.ended_job(1.0), None);
+
+    printer.emergency_stop();
+
+    assert_eq!(printer.ended_job(1.0).unwrap()["status"], "klippy_shutdown");
+}

@@ -3,6 +3,7 @@
 // moves the printer), the button acts on the changer.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { Icons } from "../icons.slint";
 import { Actions, HeadItem, Navigation, Printer, Severity } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
@@ -74,7 +75,7 @@ component HeadRow inherits Rectangle {
         }
         Text {
             width: 56px;
-            text: root.head.has-nozzle ? round(root.head.temperature) + "°" : "";
+            text: root.head.has-nozzle ? Units.degrees(root.head.temperature) : "";
             color: Theme.muted;
             font-size: Theme.font-normal;
             horizontal-alignment: right;

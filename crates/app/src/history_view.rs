@@ -2,7 +2,7 @@
 //! Moonraker keeps in its temperature store (`server.temperature_store`) is shown; objects it does not keep (for
 //! example stepper drivers) have no history.
 
-use crate::{AppWindow, ChartLabel, Navigation, PidValueItem, Printer, chart, items};
+use crate::{AppWindow, ChartLabel, Navigation, PidValueItem, Printer, chart, format, items};
 use sailhand_core::domain::pid_tuning::PidTuning;
 use sailhand_core::sources::PrinterStatus;
 use sailhand_core::sources::klipper::PidValues;
@@ -194,8 +194,8 @@ fn current_text(status: &PrinterStatus, object: &str) -> String {
     };
     let Some(temperature) = temperature else { return "–".to_owned() };
     match target.filter(|target| *target > 0.0) {
-        Some(target) => format!("{temperature:.1} °C / {target:.0} °C"),
-        None => format!("{temperature:.1} °C"),
+        Some(target) => format::temperature_of(temperature, target),
+        None => format::temperature(temperature, 1),
     }
 }
 
@@ -222,7 +222,7 @@ mod tests {
             }],
             ..PrinterStatus::default()
         };
-        assert_eq!(current_text(&status, "extruder"), "212.4 °C / 215 °C");
+        assert_eq!(current_text(&status, "extruder"), "212.4 / 215 °C");
         assert_eq!(current_text(&status, "tmc2240 stepper_x"), "–");
         assert_eq!(label(&status, "tmc2240 stepper_x"), "Stepper X");
     }

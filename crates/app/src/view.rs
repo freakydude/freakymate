@@ -5,7 +5,7 @@ use chrono::{DateTime, Local};
 use sailhand_core::domain::estimates;
 use sailhand_core::domain::filament_match::{self, Difference, ToolMatch, Verdict};
 use sailhand_core::domain::file_catalog::FileInfo;
-use sailhand_core::domain::job_end;
+use sailhand_core::domain::job_end::{self, JobLoss};
 use sailhand_core::domain::pause::{Interruption, InterruptionFact};
 use sailhand_core::domain::print_hints::PrintHint;
 use sailhand_core::sources::happy_hare::{
@@ -32,7 +32,12 @@ pub struct JobTexts {
     pub layers: String,
     /// Height of the current layer and of the object, for example `2.40 / 24.0 mm`; empty if neither is known.
     pub heights: String,
+    /// Time from the start to the end, with heating and pauses.
+    pub total: String,
     pub filament: String,
+    /// Since when the print is paused and for how long (`since 14:03 · 12 min`); empty if not paused or not seen
+    /// beginning.
+    pub paused_since: String,
     /// Source of the expected print time behind the remaining time while a job runs; for the log.
     pub expectation_origin: Option<&'static str>,
 }
@@ -41,6 +46,7 @@ pub fn job_texts(
     job: &PrintJob,
     metadata: Option<&FileMetadata>,
     last_print: Option<&LastPrint>,
+    spool: Option<&Spool>,
     now: DateTime<Local>,
 ) -> JobTexts {
     let metadata = metadata.filter(|metadata| metadata.filename == job.filename);
@@ -53,11 +59,13 @@ pub fn job_texts(
     JobTexts {
         name: if job.filename.is_empty() { String::new() } else { format::job_name(&job.filename) },
         elapsed: if job.filename.is_empty() { NO_VALUE.to_owned() } else { format::duration(job.print_duration) },
+        total: if job.filename.is_empty() { NO_VALUE.to_owned() } else { format::duration(job.total_duration) },
         remaining: remaining.map_or_else(|| NO_VALUE.to_owned(), format::duration),
         eta: remaining.map_or_else(|| NO_VALUE.to_owned(), |seconds| format::finish_time(now, seconds)),
         layers: layers(job, metadata),
         heights: heights(job, metadata),
-        filament: filament(job, metadata),
+        filament: filament(job, metadata, spool),
+        paused_since: paused_since(job, now),
         expectation_origin: job
             .state
             .is_active()
@@ -69,6 +77,8 @@ fn layers(job: &PrintJob, metadata: Option<&FileMetadata>) -> String {
     // Layers derived from the object height are a prediction and carry a `~`.
     let total = estimates::total_layers(job, metadata).map(|total| show(total, |layers| layers.to_string()));
     match (job.current_layer, total) {
+        // A complete job printed every layer: the pair would say the same twice.
+        (_, Some(total)) if job.state == PrintState::Complete => total,
         (Some(current), Some(total)) => format!("{current} / {total}"),
         (Some(current), None) => current.to_string(),
         (None, Some(total)) if job.state == PrintState::Standby => total,
@@ -76,13 +86,12 @@ fn layers(job: &PrintJob, metadata: Option<&FileMetadata>) -> String {
     }
 }
 
-/// The current height shows each layer step (0.12 or 0.28 mm); for the object height one decimal is enough.
 fn heights(job: &PrintJob, metadata: Option<&FileMetadata>) -> String {
     let object = metadata.and_then(|metadata| metadata.object_height).filter(|height| *height > 0.0);
-    match (job.height, object) {
-        (Some(current), Some(object)) => format!("{current:.2} / {object:.1} mm"),
-        (Some(current), None) => format!("{current:.2} mm"),
-        (None, Some(object)) => format!("{object:.1} mm"),
+    let reached = job.height.filter(|_| job.state != PrintState::Complete || object.is_none());
+    match (reached, object) {
+        (Some(current), Some(object)) => format::height_of(current, object),
+        (Some(height), None) | (None, Some(height)) => format::height(height),
         (None, None) => String::new(),
     }
 }
@@ -90,9 +99,7 @@ fn heights(job: &PrintJob, metadata: Option<&FileMetadata>) -> String {
 /// The height a layer ahead will have, for example `~10.00 mm`; empty if it cannot be told.
 pub fn height_at_layer(job: &PrintJob, metadata: Option<&FileMetadata>, layer: u32) -> String {
     let metadata = metadata.filter(|metadata| metadata.filename == job.filename);
-    estimates::height_at_layer(job, metadata, layer)
-        .map(|height| show(height, |mm| format!("{mm:.2} mm")))
-        .unwrap_or_default()
+    estimates::height_at_layer(job, metadata, layer).map(|height| show(height, format::height)).unwrap_or_default()
 }
 
 /// The notice after planning a pause at `layer`, named as the dialog's button names it.
@@ -113,23 +120,62 @@ pub fn planned_layer_pause(plan: Option<PlannedLayerPause>) -> String {
     }
 }
 
-fn filament(job: &PrintJob, metadata: Option<&FileMetadata>) -> String {
+/// Filament as weight where it is known, otherwise as length: before the print what the file plans, afterwards what
+/// a complete job used, else what the job used of the plan.
+fn filament(job: &PrintJob, metadata: Option<&FileMetadata>, spool: Option<&Spool>) -> String {
+    let planned = metadata.and_then(|metadata| metadata.filament_weight_total).filter(|grams| *grams > 0.0);
+    let used = Some(job.filament_used)
+        .filter(|length| *length > 0.0)
+        .and_then(|length| estimates::used_filament_grams(metadata, length, spool));
+    match (job.state, used, planned) {
+        (PrintState::Standby, _, Some(planned)) => {
+            show(Sourced::estimated(planned, estimates::ORIGIN_SLICER_ESTIMATE), format::filament_weight)
+        }
+        (PrintState::Complete, Some(used), _) | (_, Some(used), None) => show(used, format::filament_weight),
+        (_, Some(used), Some(planned)) => format::filament_weight_progress(used.value, planned),
+        _ => filament_length(job, metadata),
+    }
+}
+
+fn filament_length(job: &PrintJob, metadata: Option<&FileMetadata>) -> String {
     let total = metadata.and_then(|metadata| metadata.filament_total);
     match (job.state, total) {
         (PrintState::Standby, Some(total)) => format::filament_length(total),
-        (_, Some(total)) if job.filament_used > 0.0 => {
-            format!("{} / {}", format::filament_meters(job.filament_used), format::filament_length(total))
-        }
+        (PrintState::Complete, _) if job.filament_used > 0.0 => format::filament_length(job.filament_used),
+        (_, Some(total)) if job.filament_used > 0.0 => format::filament_progress(job.filament_used, total),
         _ if job.filament_used > 0.0 => format::filament_length(job.filament_used),
         _ => NO_VALUE.to_owned(),
     }
 }
 
-/// When the shown job ended, from the job history; `-` while it runs or if the history does not know.
+/// Shorter pauses show only since when: `0 min` would read odd, seconds would change the banner every second.
+const PAUSE_DURATION_SHOWN_FROM_SECONDS: f64 = 60.0;
+
+/// `since 14:03 · 12 min` while paused, if the pause was seen beginning; in its first minute only `since 14:03`.
+fn paused_since(job: &PrintJob, now: DateTime<Local>) -> String {
+    let Some(since) = job.paused_since.filter(|_| job.state == PrintState::Paused) else { return String::new() };
+    let start = format!("since {}", format::unix_moment(now, since));
+    let paused_for = now.timestamp() as f64 - since;
+    if paused_for < PAUSE_DURATION_SHOWN_FROM_SECONDS {
+        return start;
+    }
+    format!("{start} · {}", format::duration_minutes(paused_for))
+}
+
+/// When the shown job ended, from the job history; empty while it runs or if the history does not know (Moonraker
+/// without its `history` component).
 pub fn ended_text(job: &PrintJob, newest: Option<&FinishedJob>, now: DateTime<Local>) -> String {
     newest
         .and_then(|newest| job_end::ended_at(job, newest))
-        .map_or_else(|| NO_VALUE.to_owned(), |end| format::unix_moment(now, end))
+        .map_or_else(String::new, |end| format::unix_moment(now, end))
+}
+
+/// What the history states about a job Klipper lost.
+pub fn job_loss_text(loss: JobLoss) -> String {
+    match loss {
+        JobLoss::Shutdown => "Klipper shut down during the print".to_owned(),
+        JobLoss::Disconnect => "Klipper stopped during the print".to_owned(),
+    }
 }
 
 /// What the sources state about a pause or an error, one fact per line; empty if nothing is stated.
@@ -160,7 +206,7 @@ fn fact_text(fact: &InterruptionFact) -> String {
 /// `Layer 50 · 10.00 mm`, or the part that is known.
 fn stands_at(job: &PrintJob) -> Option<String> {
     let layer = job.current_layer.map(|layer| format!("Layer {layer}"));
-    let height = job.height.map(|height| format!("{height:.2} mm"));
+    let height = job.height.map(format::height);
     let parts: Vec<String> = layer.into_iter().chain(height).collect();
     (!parts.is_empty()).then(|| parts.join(" · "))
 }
@@ -281,15 +327,17 @@ pub fn prepared_hints(hints: &[PrintHint]) -> PreparedHints {
         let line = match hint {
             PrintHint::NozzleDiameter { extruder, file, printer } => {
                 shown.nozzle_differs = true;
-                format!("File plans a {file} mm nozzle, the printer has {printer} mm{}", named(extruder))
+                let (file, printer) = (format::nozzle_diameter(*file), format::nozzle_diameter(*printer));
+                format!("File plans a {file} nozzle, the printer has {printer}{}", named(extruder))
             }
             PrintHint::NozzleTemperature { extruder, file, max } => {
                 shown.temperature_differs = true;
-                format!("Nozzle {file:.0}° is above the printer's maximum of {max:.0}°{}", named(extruder))
+                let (file, max) = (format::degrees(*file), format::degrees(*max));
+                format!("Nozzle {file} is above the printer's maximum of {max}{}", named(extruder))
             }
             PrintHint::BedTemperature { file, max } => {
                 shown.temperature_differs = true;
-                format!("Bed {file:.0}° is above the printer's maximum of {max:.0}°")
+                format!("Bed {} is above the printer's maximum of {}", format::degrees(*file), format::degrees(*max))
             }
         };
         shown.lines.push(line);
@@ -310,7 +358,7 @@ fn file_materials(metadata: &FileMetadata) -> String {
 
 /// A temperature of 0 means that the slicer sets none.
 fn degrees(temperature: Option<f64>) -> String {
-    temperature.filter(|degrees| *degrees > 0.0).map_or_else(String::new, |degrees| format!("{degrees:.0}°"))
+    temperature.filter(|degrees| *degrees > 0.0).map_or_else(String::new, format::degrees)
 }
 
 fn file_print_time(metadata: &FileMetadata, last_print: Option<&LastPrint>) -> Option<String> {
@@ -358,11 +406,6 @@ pub fn gate_tools_text(tools: &[usize]) -> String {
     tools.iter().map(|tool| format!("T{tool}")).collect::<Vec<_>>().join(" ")
 }
 
-/// The distance on the filament path, e.g. `412.6 mm`.
-pub fn path_distance(millimetres: f64) -> String {
-    format!("{millimetres:.1} mm")
-}
-
 /// The sides the buffer measures, as the word the UI maps (`BufferScale`).
 pub fn mmu_buffer_sides(sides: BufferSides) -> &'static str {
     match sides {
@@ -374,7 +417,7 @@ pub fn mmu_buffer_sides(sides: BufferSides) -> &'static str {
 
 /// What the encoder leaves before FlowGuard trips, of the length it watches, e.g. `7.5 / 12.0 mm`.
 pub fn encoder_headroom(encoder: EncoderHeadroom) -> String {
-    format!("{:.1} / {:.1} mm", encoder.headroom, encoder.detection_length)
+    format::encoder_headroom(encoder.headroom, encoder.detection_length)
 }
 
 /// `triggered` means filament is present at the sensor; `None` is a disabled sensor.
@@ -536,14 +579,14 @@ mod tests {
             ..PrintJob::default()
         };
 
-        let texts = job_texts(&job, Some(&metadata("dir/cube.gcode")), None, now());
+        let texts = job_texts(&job, Some(&metadata("dir/cube.gcode")), None, None, now());
 
         assert_eq!(texts.name, "cube");
-        assert_eq!(texts.elapsed, "6m 00s");
-        assert_eq!(texts.remaining, "54m 00s");
+        assert_eq!(texts.elapsed, "6 min 00 s");
+        assert_eq!(texts.remaining, "54 min 00 s");
         assert_eq!(texts.eta, "12:54");
         assert_eq!(texts.layers, "3 / ~100");
-        assert_eq!(texts.filament, "1.00 / 5.00 m");
+        assert_eq!(texts.filament, "1.0 / 5.0 m");
     }
 
     #[test]
@@ -557,9 +600,9 @@ mod tests {
         };
         let last_print = LastPrint { print_duration: 4200.0, filament_used: 4800.0, ..LastPrint::default() };
 
-        let texts = job_texts(&job, Some(&metadata("a.gcode")), Some(&last_print), now());
+        let texts = job_texts(&job, Some(&metadata("a.gcode")), Some(&last_print), None, now());
 
-        assert_eq!(texts.remaining, "1h 03m");
+        assert_eq!(texts.remaining, "1 h 03 min");
         assert_eq!(texts.expectation_origin, Some(estimates::ORIGIN_LAST_PRINT));
     }
 
@@ -573,9 +616,9 @@ mod tests {
             ..PrintJob::default()
         };
 
-        let texts = job_texts(&job, None, None, now());
+        let texts = job_texts(&job, None, None, None, now());
 
-        assert_eq!(texts.remaining, "30m 00s");
+        assert_eq!(texts.remaining, "30 min 00 s");
         assert_eq!(texts.layers, "-");
         assert_eq!(texts.expectation_origin, Some(ORIGIN_PACE_ONLY));
     }
@@ -584,13 +627,13 @@ mod tests {
     fn standby_shows_file_totals_and_no_eta() {
         let job = PrintJob { filename: "a.gcode".into(), ..PrintJob::default() };
 
-        let texts = job_texts(&job, Some(&metadata("a.gcode")), None, now());
+        let texts = job_texts(&job, Some(&metadata("a.gcode")), None, None, now());
 
         assert_eq!(texts.remaining, "-");
         assert_eq!(texts.eta, "-");
         assert_eq!(texts.expectation_origin, None);
         assert_eq!(texts.layers, "~100");
-        assert_eq!(texts.filament, "5.00 m");
+        assert_eq!(texts.filament, "5.0 m");
     }
 
     #[test]
@@ -603,11 +646,11 @@ mod tests {
             ..PrintJob::default()
         };
 
-        assert_eq!(job_texts(&job, Some(&metadata("a.gcode")), None, now()).layers, "3 / 120");
+        assert_eq!(job_texts(&job, Some(&metadata("a.gcode")), None, None, now()).layers, "3 / 120");
     }
 
     #[test]
-    fn heights_show_the_current_layer_finer_than_the_object() {
+    fn heights_show_each_layer_step_in_one_unit() {
         let file = metadata("a.gcode");
         let printing = PrintJob {
             state: PrintState::Printing,
@@ -618,11 +661,69 @@ mod tests {
         };
         let ended = PrintJob { state: PrintState::Complete, height: None, ..printing.clone() };
 
-        assert_eq!(job_texts(&printing, Some(&file), None, now()).heights, "2.60 / 20.0 mm");
-        assert_eq!(job_texts(&printing, None, None, now()).heights, "2.60 mm");
-        assert_eq!(job_texts(&ended, Some(&file), None, now()).heights, "20.0 mm");
-        assert_eq!(job_texts(&PrintJob::default(), None, None, now()).heights, "");
+        assert_eq!(job_texts(&printing, Some(&file), None, None, now()).heights, "2.60 / 20.00 mm");
+        assert_eq!(job_texts(&printing, None, None, None, now()).heights, "2.60 mm");
+        assert_eq!(job_texts(&ended, Some(&file), None, None, now()).heights, "20.00 mm");
+        assert_eq!(job_texts(&PrintJob::default(), None, None, None, now()).heights, "");
         assert_eq!(height_at_layer(&printing, Some(&file), 20), "~4.00 mm");
+    }
+
+    #[test]
+    fn an_ended_job_shows_the_height_it_reached_and_a_complete_one_its_object() {
+        let file = metadata("a.gcode");
+        let cancelled = PrintJob {
+            state: PrintState::Cancelled,
+            filename: "a.gcode".into(),
+            current_layer: Some(7),
+            total_layer: Some(100),
+            height: Some(1.4),
+            ..PrintJob::default()
+        };
+        let complete =
+            PrintJob { state: PrintState::Complete, current_layer: Some(100), height: Some(30.0), ..cancelled.clone() };
+
+        let cancelled_texts = job_texts(&cancelled, Some(&file), None, None, now());
+        let complete_texts = job_texts(&complete, Some(&file), None, None, now());
+
+        assert_eq!((cancelled_texts.heights, cancelled_texts.layers), ("1.40 / 20.00 mm".into(), "7 / 100".into()));
+        assert_eq!((complete_texts.heights, complete_texts.layers), ("20.00 mm".into(), "100".into()));
+    }
+
+    #[test]
+    fn filament_shows_as_weight_where_the_file_tells_it() {
+        let file = FileMetadata { filament_weight_total: Some(15.0), ..metadata("a.gcode") };
+        let cancelled = PrintJob {
+            state: PrintState::Cancelled,
+            filename: "a.gcode".into(),
+            filament_used: 1000.0,
+            total_duration: 900.0,
+            ..PrintJob::default()
+        };
+        let complete = PrintJob { state: PrintState::Complete, filament_used: 5000.0, ..cancelled.clone() };
+        let standby = PrintJob { filename: "a.gcode".into(), ..PrintJob::default() };
+
+        assert_eq!(job_texts(&cancelled, Some(&file), None, None, now()).filament, "3.0 / 15 g");
+        assert_eq!(job_texts(&complete, Some(&file), None, None, now()).filament, "15 g");
+        assert_eq!(job_texts(&standby, Some(&file), None, None, now()).filament, "~15 g");
+        assert_eq!(job_texts(&complete, None, None, None, now()).filament, "5.0 m");
+        assert_eq!(job_texts(&cancelled, Some(&file), None, None, now()).total, "15 min 00 s");
+    }
+
+    #[test]
+    fn a_pause_seen_beginning_tells_since_when_and_how_long() {
+        let since = now().timestamp() as f64 - 12.0 * 60.0;
+        let paused = PrintJob {
+            state: PrintState::Paused,
+            filename: "a.gcode".into(),
+            paused_since: Some(since),
+            ..PrintJob::default()
+        };
+        let unseen = PrintJob { paused_since: None, ..paused.clone() };
+        let fresh = PrintJob { paused_since: Some(now().timestamp() as f64 - 40.0), ..paused.clone() };
+
+        assert_eq!(job_texts(&paused, None, None, None, now()).paused_since, "since 11:48 · 12 min");
+        assert_eq!(job_texts(&fresh, None, None, None, now()).paused_since, "since 11:59");
+        assert_eq!(job_texts(&unseen, None, None, None, now()).paused_since, "");
     }
 
     #[test]
@@ -644,17 +745,22 @@ mod tests {
     fn metadata_of_other_file_is_ignored() {
         let job = PrintJob { filename: "a.gcode".into(), ..PrintJob::default() };
 
-        assert_eq!(job_texts(&job, Some(&metadata("b.gcode")), None, now()).filament, "-");
+        assert_eq!(job_texts(&job, Some(&metadata("b.gcode")), None, None, now()).filament, "-");
     }
 
     #[test]
     fn the_end_of_a_finished_job_comes_from_the_history() {
         let job = PrintJob { state: PrintState::Complete, filename: "a.gcode".into(), ..PrintJob::default() };
         let end = Local.with_ymd_and_hms(2026, 10, 21, 11, 32, 0).unwrap().timestamp() as f64;
-        let newest = FinishedJob { filename: "a.gcode".into(), status: "completed".into(), end_time: end };
+        let newest = FinishedJob {
+            filename: "a.gcode".into(),
+            status: "completed".into(),
+            end_time: end,
+            ..FinishedJob::default()
+        };
 
         assert_eq!(ended_text(&job, Some(&newest), now()), "11:32");
-        assert_eq!(ended_text(&job, None, now()), "-");
+        assert_eq!(ended_text(&job, None, now()), "");
     }
 
     #[test]
@@ -724,7 +830,7 @@ mod tests {
                 material: "PLA".into(),
                 weight: "~30 g".into(),
                 nozzle: "0.4".into(),
-                time: "~1h 00m".into(),
+                time: "~1 h 00 min".into(),
                 extruder_temperature: "215°".into(),
                 bed_temperature: "60°".into(),
                 chamber_temperature: "45°".into(),
@@ -738,7 +844,10 @@ mod tests {
 
         let facts = facts_of(Some(&file_metadata()), Some(&last_print));
 
-        assert_eq!((facts.material.as_str(), facts.weight.as_str(), facts.time.as_str()), ("PLA", "27 g", "55m 00s"));
+        assert_eq!(
+            (facts.material.as_str(), facts.weight.as_str(), facts.time.as_str()),
+            ("PLA", "27 g", "55 min 00 s")
+        );
     }
 
     #[test]
@@ -849,11 +958,6 @@ mod tests {
         assert_eq!(mmu_sensor_label("mmu_future_probe"), "Future probe");
         assert_eq!(mmu_sensor_label("hotend"), "Hotend");
         assert_eq!(mmu_sensor_label(""), "");
-    }
-
-    #[test]
-    fn the_path_distance_has_one_decimal() {
-        assert_eq!(path_distance(412.63), "412.6 mm");
     }
 
     #[test]

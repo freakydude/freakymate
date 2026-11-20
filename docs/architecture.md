@@ -89,7 +89,7 @@ time, weight, layers, flow; measured before estimated, see `sourced.rs`), `file_
 with metadata, last completed print and its spool), `filament_match.rs` (what the tools of a file ask for against the
 filament of the gates or the spool: a verdict per tool, only a hint, never a lock), `prepared_job.rs` (the file prepared
 as the job of the print page; kept only in the app and forgotten at a restart), `light.rs`, `screen_wake.rs`, `job_end.rs` (when the job Klipper shows ended, from the job
-history).
+history, and the job Klipper lost in a shutdown or restart, which the print page shows as failed).
 
 ## Data flow
 
@@ -166,8 +166,8 @@ history).
 - `pages/`: print (with the file list in `files.slint` and the prepared file in `print-prepared.slint`), motion (tabs Axes, Tune and Expert from `tune.slint`, and Calibrate in `calibrate.slint`), temperature, filament (with Happy Hare the
   tabs Gates in `mmu.slint` with the dialogs in `mmu-dialogs.slint`, Extruder, Tools in `mmu-tools.slint` and
   Service in `mmu-service.slint`;
-  otherwise the extruder alone), and the system tabs: system (machine), updates, network (`network-page.slint` with
-  `network.slint`), console (with the macro list), settings; connection replaces the printer pages while
+  otherwise the extruder alone), and the system tabs: system (machine), updates, printers, settings (sections Display, Network
+  in `network.slint`, Access, Logs, About), console (with the macro list); connection replaces the printer pages while
   Moonraker or Klipper is not ready or wants a login.
 - `preview/`: small components with sample data (`sample.slint`) for `scripts/ui-preview.sh`, never imported by the app.
 - Pages only read globals and only call `Actions`/`Confirm`; printer-related logic belongs in the core.

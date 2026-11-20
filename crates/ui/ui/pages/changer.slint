@@ -60,7 +60,7 @@ component ToolchangerCard inherits Card {
             spacing: Theme.spacing-small;
             alignment: center;
             IconLabel {
-                icon: root.status == "error" ? Icons.ui-error : root.status == "ready" ? Icons.ui-check : Icons.ui-info;
+                icon: root.status == "error" ? Icons.state-error : root.status == "ready" ? Icons.ui-check : Icons.ui-info;
                 color: StateIcons.severity-color(root.severity);
                 text: root.status-text;
             }

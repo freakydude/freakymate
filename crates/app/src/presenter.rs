@@ -26,6 +26,7 @@ use chrono::Local;
 use sailhand_core::domain::filament::{self, FilamentHandling};
 use sailhand_core::domain::filament_match::{self, ToolMatch};
 use sailhand_core::domain::heads::{self, ChangerNote};
+use sailhand_core::domain::job_end::{self, ShownJob};
 use sailhand_core::domain::machine_tree::LaneId;
 use sailhand_core::domain::manual_probe::Direction;
 use sailhand_core::domain::prepared_job::PreparedJob;
@@ -34,9 +35,9 @@ use sailhand_core::domain::spools::{self, Lane};
 use sailhand_core::domain::temperature_limits::HeaterWatch;
 use sailhand_core::domain::{estimates, light, pause};
 use sailhand_core::sources::PrinterStatus;
-use sailhand_core::sources::klipper::ExtruderState;
 use sailhand_core::sources::klipper::commands::{MeshNameProblem, mesh_name_problem};
 use sailhand_core::sources::klipper::{BED_HEATER, KlippyState, Leveling, NOZZLE_HEATER, tuning};
+use sailhand_core::sources::klipper::{ExtruderState, PrintJob};
 use sailhand_core::sources::moonraker_server::files::{FileEntry, FileMetadata, ThumbnailImage};
 use sailhand_core::sources::moonraker_server::gcode_store::{ConsoleKind, ConsoleLine};
 use sailhand_core::sources::moonraker_server::history::{FinishedJob, PrintHistory};
@@ -63,6 +64,10 @@ struct Cache {
     spool_list: Vec<Spool>,
     /// The newest job of the history, for the end of a finished print.
     newest_job: Option<FinishedJob>,
+    /// The spool of a printer with one lane, for the weight of the filament a job uses.
+    single_lane_spool: Option<Spool>,
+    /// The file of the job the print page shows, to notice when it changes.
+    shown_filename: String,
     /// The file prepared as the job of the print page.
     prepared: PreparedJob,
 }
@@ -240,17 +245,14 @@ impl Presenter {
         self.show_motion(&window, status, &lanes);
         self.show_devices(&printer, snapshot);
         let active_spool = spools::active_spool(&lanes).cloned();
+        self.cache.borrow_mut().single_lane_spool = active_spool.clone().filter(|_| lanes.len() == 1);
         self.show_temperatures(&printer, snapshot, &lanes);
         self.history.show_pid(status);
         self.print_objects.show(&printer, &status.print_objects, status.motion.bed());
         self.show_capabilities(&printer, snapshot);
         self.show_filament(&printer, snapshot, &lanes, active_spool.as_ref());
 
-        let previous_job =
-            std::mem::replace(&mut self.cache.borrow_mut().snapshot, snapshot.clone()).status.job.filename;
-        if previous_job != status.job.filename {
-            self.show_job_thumbnail();
-        }
+        self.cache.borrow_mut().snapshot = snapshot.clone();
         self.refresh_job_texts();
     }
 
@@ -316,22 +318,16 @@ impl Presenter {
         );
     }
 
-    /// The print: state, progress, interruption and the pause at a layer.
+    /// Klipper's print: its state, the first fact of a pause or an error for the status bar and the pause at a layer.
+    /// The job the print page shows follows in [`Self::refresh_job_texts`].
     fn show_job(&self, printer: &Printer, snapshot: &Snapshot) {
         let status = &snapshot.status;
         printer.set_print_state(status.job.state.as_str().into());
         printer.set_activity(status.activity.as_str().into());
-        printer.set_filename(status.job.filename.as_str().into());
-        printer.set_progress(status.job.progress as f32);
         let interruption = pause::interruption(status);
         printer.set_interruption_headline(
             interruption.as_ref().map(view::interruption_headline).unwrap_or_default().into(),
         );
-        let is_interrupted = interruption.is_some();
-        let interruption_text = interruption.map(|interruption| view::interruption_text(&interruption));
-        printer.set_interruption_text(interruption_text.unwrap_or_default().into());
-        let position = if is_interrupted { view::interruption_position(&status.job) } else { String::new() };
-        printer.set_interruption_position(position.into());
         let layer_pause = pause::layer_pause_offer(&snapshot.sources, status);
         printer.set_layer_pause_next(layer_pause.is_some_and(|offer| offer.next_layer));
         printer.set_layer_pause_at(layer_pause.is_some_and(|offer| offer.at_layer));
@@ -544,29 +540,50 @@ impl Presenter {
         self.history.close();
     }
 
-    /// Time-related texts; also called every second by the clock timer.
+    /// The job the print page shows (Klipper's, or one Klipper lost) with its texts; also called every second by the
+    /// clock timer for the times.
     pub fn refresh_job_texts(&self) {
         let Some(window) = self.window.upgrade() else { return };
         let printer = window.global::<Printer>();
         let now = Local::now();
         let cache = self.cache.borrow();
-        let job = &cache.snapshot.status.job;
-        let texts = view::job_texts(
-            job,
-            cache.files.catalog.metadata(&job.filename),
-            cache.files.catalog.last_print(&job.filename),
-            now,
-        );
+        let status = &cache.snapshot.status;
+        let shown = job_end::shown_job(&status.job, status.previous_job.as_deref(), cache.newest_job.as_ref());
+        let job = &shown.job;
+        printer.set_job_state(job.state.as_str().into());
+        printer.set_filename(job.filename.as_str().into());
+        printer.set_progress(job.progress as f32);
+        printer.set_progress_known(shown.progress_known);
+        let metadata = cache.files.catalog.metadata(&job.filename);
+        let texts =
+            view::job_texts(job, metadata, cache.files.catalog.last_print(&job.filename), job_spool(&cache, job), now);
         printer.set_job_name(texts.name.into());
         printer.set_elapsed(texts.elapsed.into());
+        printer.set_total_duration(texts.total.into());
         printer.set_remaining(texts.remaining.into());
         printer.set_eta(texts.eta.into());
         printer.set_layers(texts.layers.into());
         printer.set_print_heights(texts.heights.into());
         printer.set_filament(texts.filament.into());
+        printer.set_paused_since(texts.paused_since.into());
         printer.set_ended(view::ended_text(job, cache.newest_job.as_ref(), now).into());
+        let (details, position) = interruption_details(status, &shown);
+        printer.set_interruption_text(details.into());
+        printer.set_interruption_position(position.into());
         if let Some(origin) = texts.expectation_origin {
             self.note_origin("print time expectation", Some(origin));
+        }
+        let shown_changed = cache.shown_filename != job.filename;
+        let needs_details = metadata.is_none() && !job.filename.is_empty() && job.filename != status.job.filename;
+        let filename = job.filename.clone();
+        drop(cache);
+        if shown_changed {
+            self.cache.borrow_mut().shown_filename.clone_from(&filename);
+            self.show_job_thumbnail();
+            // Klipper's job has its details loaded by the service; a lost one is only in the history.
+            if needs_details {
+                self.service.query(Query::FileDetails { filename });
+            }
         }
     }
 
@@ -986,7 +1003,7 @@ impl Presenter {
         let (is_job, is_compared) = {
             let mut cache = self.cache.borrow_mut();
             cache.files.catalog.store_metadata(metadata);
-            let is_job = cache.snapshot.status.job.filename == filename;
+            let is_job = cache.shown_filename == filename;
             (is_job, is_job || cache.prepared.path() == Some(filename.as_str()))
         };
         self.files.update_row(&self.cache.borrow().files, &filename);
@@ -1019,7 +1036,7 @@ impl Presenter {
         let Some(window) = self.window.upgrade() else { return };
         let printer = window.global::<Printer>();
         let cache = self.cache.borrow();
-        match cache.files.thumbnails.get(&cache.snapshot.status.job.filename) {
+        match cache.files.thumbnails.get(&cache.shown_filename) {
             Some(image) => {
                 printer.set_job_thumbnail(image.clone());
                 printer.set_has_job_thumbnail(true);
@@ -1033,6 +1050,30 @@ impl Presenter {
 /// snapshot.
 fn is_other_printer(shown: &str, arrived: &str) -> bool {
     !shown.is_empty() && shown != arrived
+}
+
+/// The spool a job used, for the weight of its filament: the one spool the history records for an ended job, else
+/// the spool of a printer with one lane.
+fn job_spool<'a>(cache: &'a Cache, job: &PrintJob) -> Option<&'a Spool> {
+    match cache.newest_job.as_ref().filter(|newest| job_end::ended_at(job, newest).is_some()) {
+        Some(newest) => match newest.spool_ids.as_slice() {
+            [id] => cache.files.catalog.spool(*id),
+            _ => None,
+        },
+        None => cache.single_lane_spool.as_ref(),
+    }
+}
+
+/// What the banner of a paused or failed job states and where the print stands; empty without one.
+fn interruption_details(status: &PrinterStatus, shown: &ShownJob) -> (String, String) {
+    let details = match shown.loss {
+        Some(loss) => Some(view::job_loss_text(loss)),
+        None => pause::interruption(status).map(|interruption| view::interruption_text(&interruption)),
+    };
+    match details {
+        Some(details) => (details, view::interruption_position(&shown.job)),
+        None => (String::new(), String::new()),
+    }
 }
 
 #[cfg(test)]

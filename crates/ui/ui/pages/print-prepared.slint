@@ -2,6 +2,7 @@
 // nothing here keeps the print from starting.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { StateIcons } from "../state-icons.slint";
 import { ToolLabel } from "../components/tool-label.slint";
 import { Icons } from "../icons.slint";
@@ -282,7 +283,7 @@ export component PreparedJob inherits VerticalLayout {
             weight: 4;
             icon: Icons.print-nozzle-diameter;
             label: @tr("Nozzle diameter");
-            value: Printer.prepared.nozzle != "" ? Printer.prepared.nozzle + " mm" : "-";
+            value: Printer.prepared.nozzle != "" ? Printer.prepared.nozzle + " " + Units.millimetre-symbol : "-";
             value-color: Printer.prepared-nozzle-differs ? StateIcons.severity-color(Severity.attention) : Theme.foreground;
         }
         ValueTile {

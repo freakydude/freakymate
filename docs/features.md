@@ -5,7 +5,7 @@ What each page of Sailhand does. Functions only appear when the printer has them
 shown, as in Mainsail: macros, heaters, temperature sensors, fans, LEDs, LED effects and filament sensors (a hidden
 probe still counts as the probe).
 
-- **Print**: thumbnail, progress and remaining time as the main figures with elapsed time, filament and ETA under the bar, layers with current and object height, speed and flow; start, pause, resume, cancel, pause at a layer (planned pause shown), exclude objects (on a map of the bed if the slicer defines their outlines);
+- **Print**: thumbnail, progress and remaining time as the main figures with elapsed time, filament (in grams where the file or the spool tells the weight) and ETA under the bar, layers with current and object height, speed and flow; a pause shows since when; after the end, when it ended, the total time with heating and pauses, and how far a cancelled or failed print got (progress, layer, height); a print lost in a Klipper shutdown or restart stays on the page as failed until the next one; start, pause, resume, cancel, pause at a layer (planned pause shown), exclude objects (on a map of the bed if the slicer defines their outlines);
   file browser with thumbnails, filament (material of each tool), nozzle and print time of each file.
   - **Prepare**: a tap on a file marks it; with one file marked, **Prepare** makes it the job of the print page and
     **Delete** removes it (with several marked, only **Delete**, which names the files first). Preparing happens only

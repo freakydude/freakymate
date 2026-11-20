@@ -108,7 +108,7 @@ The development tools are separate programs and never shipped: `fake-moonraker` 
 
 - Versions come from git tags (`.github/scripts/version.sh`): releases are `vX.Y.0`, every later commit on `main` adds
   one to the patch number (`0.2.1`, `0.2.2`, ...). Pull request builds are `X.Y.Z-pr.<number>.<run>`, other branches
-  `X.Y.Z-dev.<commit>` (started manually), local builds `0.0.0-dev`. The version is shown on System → Settings and by
+  `X.Y.Z-dev.<commit>` (started manually), local builds `0.0.0-dev`. The version is shown on System → Settings → About and by
   `--version`.
 - Every push to `main` and every pull request: format, clippy, tests, builds and packages for all targets
   (`.github/workflows/ci.yml`), with cargo caching; a branch without a pull request can be built with **Run workflow**.

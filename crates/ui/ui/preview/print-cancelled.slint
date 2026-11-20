@@ -8,16 +8,18 @@ export component PrintCancelledPreview inherits AppWindow {
     init => {
         Sample.ready-printer();
         Printer.print-state = "cancelled";
+        Printer.job-state = "cancelled";
         Printer.filename = "benchy.gcode";
         Printer.job-name = "benchy";
         Printer.progress = 0.37;
-        Printer.elapsed = "1:52:03";
+        Printer.elapsed = "1 h 52 min";
+        Printer.total-duration = "2 h 10 min";
         Printer.remaining = "-";
         Printer.eta = "-";
         Printer.ended = "14:21";
         Printer.layers = "74 / 200";
-        Printer.print-heights = "40.0 mm";
-        Printer.filament = "5.20 m";
+        Printer.print-heights = "14.80 / 40.00 mm";
+        Printer.filament = "5.6 / 15 g";
         Navigation.page = Page.print;
     }
 }

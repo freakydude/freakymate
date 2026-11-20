@@ -20,7 +20,6 @@ import { ConsolePage } from "pages/console.slint";
 import { SystemPage } from "pages/system.slint";
 import { UpdatesPage } from "pages/updates.slint";
 import { SettingsPage } from "pages/settings.slint";
-import { NetworkPage } from "pages/network-page.slint";
 import { PrintersPage } from "pages/printers.slint";
 import { ConnectionPage } from "pages/connection.slint";
 
@@ -96,8 +95,8 @@ export component AppWindow inherits Window {
                     if Navigation.page == Page.console: ConsolePage { }
                     if Navigation.page == Page.system: SystemPage { }
                     if Navigation.page == Page.updates: UpdatesPage { }
-                    if Navigation.page == Page.settings: SettingsPage { }
-                    if Navigation.page == Page.network: NetworkPage { }
+                    // The network is a section of the settings; one page for both keeps the section list in place.
+                    if Navigation.page == Page.settings || Navigation.page == Page.network: SettingsPage { }
                     if Navigation.page == Page.printers: PrintersPage { }
                     if !Printer.ready && !root.page-works-offline: ConnectionPage { }
                 }

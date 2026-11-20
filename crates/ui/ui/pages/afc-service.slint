@@ -34,8 +34,6 @@ component HubReturnRow inherits Rectangle {
         }
         IconButton {
             width: 168px;
-            height: Theme.touch;
-            cross-axis-self-alignment: center;
             icon: Icons.mmu-unload;
             icon-size: Theme.icon-small;
             text: @tr("Back to hub");
@@ -63,7 +61,7 @@ export component AfcServiceTab inherits VerticalLayout {
             height: Theme.touch;
             IconLabel {
                 horizontal-stretch: 1;
-                icon: root.error ? Icons.ui-error : Printer.afc-state == "Idle" ? Icons.ui-check : Icons.ui-info;
+                icon: root.error ? Icons.state-error : Printer.afc-state == "Idle" ? Icons.ui-check : Icons.ui-info;
                 color: StateIcons.severity-color(root.error ? Severity.error : Printer.afc-state == "Idle" ? Severity.neutral : Severity.info);
                 text: Printer.afc-state == "" ? "-" : Printer.afc-state;
             }
@@ -83,12 +81,13 @@ export component AfcServiceTab inherits VerticalLayout {
         title: @tr("Pull a lane back out of the hub");
         icon: Icons.mmu-unload;
         returns := ScrollList {
-            property <length> row-step: Theme.row-height-small + Theme.spacing-small;
+            // Rows as high as their button, which needs `Theme.touch`.
+            property <length> row-step: Theme.touch + Theme.spacing-small;
             content-height: Printer.afc-hub-returns.length * self.row-step - Theme.spacing-small;
             for item[index] in Printer.afc-hub-returns: HubReturnRow {
                 y: index * returns.row-step;
                 width: returns.row-width;
-                height: Theme.row-height-small;
+                height: Theme.touch;
                 item: item;
             }
         }

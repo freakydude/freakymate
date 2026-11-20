@@ -118,7 +118,7 @@ export component OnScreenKeyboard inherits VerticalLayout {
 
         Key {
             label: @tr("backspace");
-            icon: Icons.ui-chevron-left;
+            icon: Icons.ui-backspace;
             horizontal-stretch: 2;
             pressed => { root.backspace(); }
         }
@@ -155,7 +155,7 @@ export component NumericKeypad inherits VerticalLayout {
         }
         if index == 0: Key {
             label: @tr("backspace");
-            icon: Icons.ui-chevron-left;
+            icon: Icons.ui-backspace;
             pressed => { root.backspace(); }
         }
         if index > 0: Key {

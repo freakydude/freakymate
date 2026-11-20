@@ -1,4 +1,4 @@
-// Preview: print page while paused. Move and Extrude stay usable in the navigation, so the filament can be changed. Open in the Slint preview or render with scripts/ui-preview.sh.
+// Preview: print page while paused, with since when. Move and Extrude stay usable in the navigation, so the filament can be changed. Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
 import { Navigation, Page, Printer } from "../state.slint";
@@ -8,7 +8,10 @@ export component PrintPausedPreview inherits AppWindow {
     init => {
         Sample.printing();
         Printer.print-state = "paused";
+        Printer.job-state = "paused";
         Printer.interruption-text = "Toolhead Runout: no filament";
+        Printer.interruption-position = "Layer 74 · 14.80 mm";
+        Printer.paused-since = "since 14:03 · 12 min";
         Printer.interruption-headline = "Toolhead Runout: no filament";
         Navigation.page = Page.print;
     }

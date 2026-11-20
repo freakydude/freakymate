@@ -2,7 +2,8 @@
 //!
 //! A Z hop lifts the nozzle for a moment on travel moves, so the height is the lowest Z of the last seconds. A pause
 //! lifts it too (the `PAUSE` macro parks the head): the height stays as it was before, which is where the print goes
-//! on.
+//! on. When the job ends, the height it reached stays until Klipper shows no job any more: no Klipper object keeps it,
+//! and the end macros lift the head.
 
 use super::job::{PrintJob, PrintState};
 use std::collections::VecDeque;
@@ -11,34 +12,57 @@ use std::time::{Duration, Instant};
 /// Longer than a Z hop on a travel move; a new layer shows this much later.
 const WINDOW: Duration = Duration::from_secs(2);
 
-/// The Z values of the last [`WINDOW`] while printing; forgotten when the job ends.
+/// The height a job reached is the lowest Z of this span before it ended, so the park move of a cancel macro, which
+/// runs while the job still prints, does not count. If a layer was started in this span, the height is the one of the
+/// layer before.
+const END_WINDOW: Duration = Duration::from_secs(10);
+
+/// The Z values of the last [`END_WINDOW`] while printing, and the height a job reached once it has ended.
 #[derive(Debug, Default)]
 pub struct HeightWatch {
     samples: VecDeque<(Instant, f64)>,
+    /// `Some` once the job has ended: the height it reached, if it was seen printing.
+    reached: Option<Option<f64>>,
 }
 
 impl HeightWatch {
     pub fn apply(&mut self, job: &mut PrintJob, z: f64, now: Instant) {
-        match job.state {
+        job.height = match job.state {
             PrintState::Printing => {
+                self.reached = None;
                 self.samples.push_back((now, z));
-                while self.samples.front().is_some_and(|(time, _)| now.duration_since(*time) > WINDOW) {
+                while self.samples.front().is_some_and(|(time, _)| now.duration_since(*time) > END_WINDOW) {
                     self.samples.pop_front();
                 }
+                self.current()
             }
             // The height before the pause stays and counts as fresh, so the parked head does not show on resume.
             PrintState::Paused => {
-                if let Some(height) = self.lowest() {
+                self.reached = None;
+                if let Some(height) = self.current() {
                     self.samples = VecDeque::from([(now, height)]);
                 }
+                self.current()
             }
-            _ => self.samples.clear(),
-        }
-        job.height = self.lowest();
+            PrintState::Complete | PrintState::Cancelled | PrintState::Error => {
+                *self.reached.get_or_insert_with(|| {
+                    let reached = self.samples.iter().map(|(_, z)| *z).reduce(f64::min);
+                    self.samples.clear();
+                    reached
+                })
+            }
+            PrintState::Standby => {
+                self.samples.clear();
+                self.reached = None;
+                None
+            }
+        };
     }
 
-    fn lowest(&self) -> Option<f64> {
-        self.samples.iter().map(|(_, z)| *z).reduce(f64::min)
+    /// The lowest Z of the last [`WINDOW`] the job was printing.
+    fn current(&self) -> Option<f64> {
+        let (newest, _) = self.samples.back()?;
+        self.samples.iter().filter(|(time, _)| newest.duration_since(*time) <= WINDOW).map(|(_, z)| *z).reduce(f64::min)
     }
 }
 
@@ -93,11 +117,32 @@ mod tests {
     }
 
     #[test]
-    fn there_is_no_height_without_a_running_job() {
+    fn an_ended_job_keeps_the_height_it_reached_before_the_end_macro_lifted_the_head() {
+        let mut run = Run::new();
+        run.at(0, PrintState::Printing, 12.4);
+        run.at(1000, PrintState::Printing, 22.4);
+        run.at(4000, PrintState::Printing, 22.4);
+
+        assert_eq!(run.at(4500, PrintState::Cancelled, 22.4), Some(12.4));
+        assert_eq!(run.at(60_000, PrintState::Cancelled, 22.4), Some(12.4));
+    }
+
+    #[test]
+    fn a_job_cancelled_in_a_pause_keeps_the_height_of_the_pause() {
         let mut run = Run::new();
         run.at(0, PrintState::Printing, 10.0);
+        run.at(60_000, PrintState::Paused, 30.0);
 
-        assert_eq!(run.at(100, PrintState::Complete, 50.0), None);
+        assert_eq!(run.at(120_000, PrintState::Cancelled, 30.0), Some(10.0));
+    }
+
+    #[test]
+    fn there_is_no_height_without_a_job_or_if_its_print_was_not_seen() {
+        let mut run = Run::new();
+        assert_eq!(run.at(0, PrintState::Complete, 50.0), None);
+
+        run.at(100, PrintState::Printing, 10.0);
         assert_eq!(run.at(200, PrintState::Standby, 0.0), None);
+        assert_eq!(run.at(300, PrintState::Complete, 50.0), None);
     }
 }

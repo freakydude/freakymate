@@ -1,0 +1,15 @@
+// Preview: the About section of the Settings page. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, SettingsSection, UiSettings } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component SettingsAboutPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        UiSettings.version = "0.6.0";
+        UiSettings.settings-file = "/home/pi/printer_data/config/sailhand.conf";
+        Navigation.settings-section = SettingsSection.about;
+        Navigation.page = Page.settings;
+    }
+}

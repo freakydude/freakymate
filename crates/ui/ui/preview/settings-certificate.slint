@@ -1,7 +1,7 @@
-// Preview: the Settings page with a trusted certificate. Open in the Slint preview or render with scripts/ui-preview.sh.
+// Preview: the Access section of the Settings page with a login and a trusted certificate. Open in the Slint preview or render with scripts/ui-preview.sh.
 
 import { AppWindow } from "../app.slint";
-import { Navigation, Page, Printer, UiSettings } from "../state.slint";
+import { Navigation, Page, Printer, SettingsSection, UiSettings } from "../state.slint";
 import { Sample } from "sample.slint";
 
 export component SettingsCertificatePreview inherits AppWindow {
@@ -11,6 +11,7 @@ export component SettingsCertificatePreview inherits AppWindow {
         UiSettings.moonraker = "https://voron.local";
         Printer.login-user = "frank";
         Printer.trusted-certificate = "3F:A1:9C:07 … 5E:22:B0:4D";
+        Navigation.settings-section = SettingsSection.access;
         Navigation.page = Page.settings;
     }
 }

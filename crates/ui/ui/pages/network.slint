@@ -117,10 +117,13 @@ component AdapterRow inherits Rectangle {
                 font-size: Theme.font-normal;
                 overflow: elide;
             }
-            Text {
-                text: root.connected ? (root.adapter.wireless
-                        ? root.adapter.ssid + (root.adapter.address != "" ? " · " + root.adapter.address : "")
-                        : root.adapter.address)
+            // Connected over Wi-Fi: the network name may be cut, the address stays whole.
+            if root.connected && root.adapter.wireless: TextWithValue {
+                text: root.adapter.ssid;
+                value: root.adapter.address;
+            }
+            if !(root.connected && root.adapter.wireless): Text {
+                text: root.connected ? root.adapter.address
                     : root.connecting ? @tr("Connecting")
                     : root.unavailable ? (root.adapter.wireless
                         ? (Network.wifi-enabled ? @tr("Not available") : @tr("Switched off"))
@@ -367,7 +370,7 @@ component HostNetworkCard inherits Card {
 }
 
 export component NetworkSection inherits Rectangle {
-    property <length> adapters-width: 248px;
+    in property <length> adapters-width: 248px;
     property <string> password-title;
 
     // Asks for confirmation while printing, otherwise connects right away.
