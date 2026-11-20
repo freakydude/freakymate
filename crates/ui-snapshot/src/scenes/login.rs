@@ -7,8 +7,9 @@ use sailhand_core::ConnectionState;
 use slint::ComponentHandle;
 use std::time::Duration;
 
-/// "Log in" on the connection page (800x480 layout).
-const LOG_IN_BUTTON: (f32, f32) = (656.0, 230.0);
+/// Centre of "Log in" on the connection page (800x480 layout, y 170–225). The button column is centred vertically, so
+/// every button added to it (Printers, #226) moves this one.
+const LOG_IN_BUTTON: (f32, f32) = (656.0, 198.0);
 
 /// Before the printer is ready: the connection page asks for a login, a wrong password is refused, the right one
 /// opens the connection.
