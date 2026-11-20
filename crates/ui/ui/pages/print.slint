@@ -1,6 +1,7 @@
 // Print job: preview, progress, controls and file selection.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, FileItem, Navigation, Printer, Severity } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
@@ -80,24 +81,15 @@ component ActionTile inherits IconButton {
 // word gives way when the card is narrow. Not `TextWithValue`: the value is bold and bright against a muted word,
 // without a separator, and an icon can stand in for the word.
 component ProgressDetail inherits HorizontalLayout {
-    in property <string> label;
     in property <image> icon;
     in property <string> value;
     spacing: Theme.spacing-small;
-    if root.icon.width > 0: Image {
+    Image {
         cross-axis-self-alignment: center;
         width: Theme.icon-compact;
         height: Theme.icon-compact;
         source: root.icon;
         colorize: Theme.muted;
-    }
-    if root.label != "": Text {
-        min-width: 0px;
-        text: root.label;
-        color: Theme.muted;
-        font-size: Theme.font-small;
-        vertical-alignment: center;
-        overflow: elide;
     }
     Text {
         text: root.value;
@@ -127,7 +119,7 @@ component ProgressCard inherits Rectangle {
         HorizontalLayout {
             spacing: Theme.spacing;
             Text {
-                text: round(Printer.progress * 100) + "%";
+                text: Units.share(Printer.progress);
                 color: Theme.foreground;
                 font-size: Theme.font-huge;
                 font-weight: 700;
@@ -163,11 +155,12 @@ component ProgressCard inherits Rectangle {
         }
         HorizontalLayout {
             spacing: Theme.spacing;
-            ProgressDetail { label: @tr("Elapsed"); value: Printer.elapsed; }
+            // Icons instead of words: the row has to hold durations like `12 h 34 min`, a filament pair and an ETA with date.
+            ProgressDetail { icon: Icons.print-duration; value: Printer.elapsed; }
             Rectangle { horizontal-stretch: 1; }
             ProgressDetail { icon: Icons.filament-spool; value: Printer.filament; }
             Rectangle { horizontal-stretch: 1; }
-            if root.state == "printing": ProgressDetail { label: @tr("ETA"); value: Printer.eta; }
+            if root.state == "printing": ProgressDetail { icon: Icons.print-eta; value: Printer.eta; }
         }
     }
 }
@@ -189,7 +182,7 @@ component LayerTile inherits ValueTile {
 component SpeedTile inherits ValueTile {
     icon: Icons.motion-speed;
     label: @tr("Flow {} mm³/s", Printer.live-flow.to-fixed(1));
-    value: round(Printer.live-velocity) + " mm/s";
+    value: Units.speed(Printer.live-velocity);
 }
 
 // The printer's job, running or ended: preview, name, progress and the figures of the print in the upper block; below

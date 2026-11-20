@@ -76,13 +76,11 @@ fn layers(job: &PrintJob, metadata: Option<&FileMetadata>) -> String {
     }
 }
 
-/// The current height shows each layer step (0.12 or 0.28 mm); for the object height one decimal is enough.
 fn heights(job: &PrintJob, metadata: Option<&FileMetadata>) -> String {
     let object = metadata.and_then(|metadata| metadata.object_height).filter(|height| *height > 0.0);
     match (job.height, object) {
-        (Some(current), Some(object)) => format!("{current:.2} / {object:.1} mm"),
-        (Some(current), None) => format!("{current:.2} mm"),
-        (None, Some(object)) => format!("{object:.1} mm"),
+        (Some(current), Some(object)) => format::height_of(current, object),
+        (Some(height), None) | (None, Some(height)) => format::height(height),
         (None, None) => String::new(),
     }
 }
@@ -90,9 +88,7 @@ fn heights(job: &PrintJob, metadata: Option<&FileMetadata>) -> String {
 /// The height a layer ahead will have, for example `~10.00 mm`; empty if it cannot be told.
 pub fn height_at_layer(job: &PrintJob, metadata: Option<&FileMetadata>, layer: u32) -> String {
     let metadata = metadata.filter(|metadata| metadata.filename == job.filename);
-    estimates::height_at_layer(job, metadata, layer)
-        .map(|height| show(height, |mm| format!("{mm:.2} mm")))
-        .unwrap_or_default()
+    estimates::height_at_layer(job, metadata, layer).map(|height| show(height, format::height)).unwrap_or_default()
 }
 
 /// The notice after planning a pause at `layer`, named as the dialog's button names it.
@@ -117,9 +113,7 @@ fn filament(job: &PrintJob, metadata: Option<&FileMetadata>) -> String {
     let total = metadata.and_then(|metadata| metadata.filament_total);
     match (job.state, total) {
         (PrintState::Standby, Some(total)) => format::filament_length(total),
-        (_, Some(total)) if job.filament_used > 0.0 => {
-            format!("{} / {}", format::filament_meters(job.filament_used), format::filament_length(total))
-        }
+        (_, Some(total)) if job.filament_used > 0.0 => format::filament_progress(job.filament_used, total),
         _ if job.filament_used > 0.0 => format::filament_length(job.filament_used),
         _ => NO_VALUE.to_owned(),
     }
@@ -160,7 +154,7 @@ fn fact_text(fact: &InterruptionFact) -> String {
 /// `Layer 50 · 10.00 mm`, or the part that is known.
 fn stands_at(job: &PrintJob) -> Option<String> {
     let layer = job.current_layer.map(|layer| format!("Layer {layer}"));
-    let height = job.height.map(|height| format!("{height:.2} mm"));
+    let height = job.height.map(format::height);
     let parts: Vec<String> = layer.into_iter().chain(height).collect();
     (!parts.is_empty()).then(|| parts.join(" · "))
 }
@@ -281,15 +275,17 @@ pub fn prepared_hints(hints: &[PrintHint]) -> PreparedHints {
         let line = match hint {
             PrintHint::NozzleDiameter { extruder, file, printer } => {
                 shown.nozzle_differs = true;
-                format!("File plans a {file} mm nozzle, the printer has {printer} mm{}", named(extruder))
+                let (file, printer) = (format::nozzle_diameter(*file), format::nozzle_diameter(*printer));
+                format!("File plans a {file} nozzle, the printer has {printer}{}", named(extruder))
             }
             PrintHint::NozzleTemperature { extruder, file, max } => {
                 shown.temperature_differs = true;
-                format!("Nozzle {file:.0}° is above the printer's maximum of {max:.0}°{}", named(extruder))
+                let (file, max) = (format::degrees(*file), format::degrees(*max));
+                format!("Nozzle {file} is above the printer's maximum of {max}{}", named(extruder))
             }
             PrintHint::BedTemperature { file, max } => {
                 shown.temperature_differs = true;
-                format!("Bed {file:.0}° is above the printer's maximum of {max:.0}°")
+                format!("Bed {} is above the printer's maximum of {}", format::degrees(*file), format::degrees(*max))
             }
         };
         shown.lines.push(line);
@@ -310,7 +306,7 @@ fn file_materials(metadata: &FileMetadata) -> String {
 
 /// A temperature of 0 means that the slicer sets none.
 fn degrees(temperature: Option<f64>) -> String {
-    temperature.filter(|degrees| *degrees > 0.0).map_or_else(String::new, |degrees| format!("{degrees:.0}°"))
+    temperature.filter(|degrees| *degrees > 0.0).map_or_else(String::new, format::degrees)
 }
 
 fn file_print_time(metadata: &FileMetadata, last_print: Option<&LastPrint>) -> Option<String> {
@@ -358,11 +354,6 @@ pub fn gate_tools_text(tools: &[usize]) -> String {
     tools.iter().map(|tool| format!("T{tool}")).collect::<Vec<_>>().join(" ")
 }
 
-/// The distance on the filament path, e.g. `412.6 mm`.
-pub fn path_distance(millimetres: f64) -> String {
-    format!("{millimetres:.1} mm")
-}
-
 /// The sides the buffer measures, as the word the UI maps (`BufferScale`).
 pub fn mmu_buffer_sides(sides: BufferSides) -> &'static str {
     match sides {
@@ -374,7 +365,7 @@ pub fn mmu_buffer_sides(sides: BufferSides) -> &'static str {
 
 /// What the encoder leaves before FlowGuard trips, of the length it watches, e.g. `7.5 / 12.0 mm`.
 pub fn encoder_headroom(encoder: EncoderHeadroom) -> String {
-    format!("{:.1} / {:.1} mm", encoder.headroom, encoder.detection_length)
+    format::encoder_headroom(encoder.headroom, encoder.detection_length)
 }
 
 /// `triggered` means filament is present at the sensor; `None` is a disabled sensor.
@@ -539,11 +530,11 @@ mod tests {
         let texts = job_texts(&job, Some(&metadata("dir/cube.gcode")), None, now());
 
         assert_eq!(texts.name, "cube");
-        assert_eq!(texts.elapsed, "6m 00s");
-        assert_eq!(texts.remaining, "54m 00s");
+        assert_eq!(texts.elapsed, "6 min 00 s");
+        assert_eq!(texts.remaining, "54 min 00 s");
         assert_eq!(texts.eta, "12:54");
         assert_eq!(texts.layers, "3 / ~100");
-        assert_eq!(texts.filament, "1.00 / 5.00 m");
+        assert_eq!(texts.filament, "1.0 / 5.0 m");
     }
 
     #[test]
@@ -559,7 +550,7 @@ mod tests {
 
         let texts = job_texts(&job, Some(&metadata("a.gcode")), Some(&last_print), now());
 
-        assert_eq!(texts.remaining, "1h 03m");
+        assert_eq!(texts.remaining, "1 h 03 min");
         assert_eq!(texts.expectation_origin, Some(estimates::ORIGIN_LAST_PRINT));
     }
 
@@ -575,7 +566,7 @@ mod tests {
 
         let texts = job_texts(&job, None, None, now());
 
-        assert_eq!(texts.remaining, "30m 00s");
+        assert_eq!(texts.remaining, "30 min 00 s");
         assert_eq!(texts.layers, "-");
         assert_eq!(texts.expectation_origin, Some(ORIGIN_PACE_ONLY));
     }
@@ -590,7 +581,7 @@ mod tests {
         assert_eq!(texts.eta, "-");
         assert_eq!(texts.expectation_origin, None);
         assert_eq!(texts.layers, "~100");
-        assert_eq!(texts.filament, "5.00 m");
+        assert_eq!(texts.filament, "5.0 m");
     }
 
     #[test]
@@ -607,7 +598,7 @@ mod tests {
     }
 
     #[test]
-    fn heights_show_the_current_layer_finer_than_the_object() {
+    fn heights_show_each_layer_step_in_one_unit() {
         let file = metadata("a.gcode");
         let printing = PrintJob {
             state: PrintState::Printing,
@@ -618,9 +609,9 @@ mod tests {
         };
         let ended = PrintJob { state: PrintState::Complete, height: None, ..printing.clone() };
 
-        assert_eq!(job_texts(&printing, Some(&file), None, now()).heights, "2.60 / 20.0 mm");
+        assert_eq!(job_texts(&printing, Some(&file), None, now()).heights, "2.60 / 20.00 mm");
         assert_eq!(job_texts(&printing, None, None, now()).heights, "2.60 mm");
-        assert_eq!(job_texts(&ended, Some(&file), None, now()).heights, "20.0 mm");
+        assert_eq!(job_texts(&ended, Some(&file), None, now()).heights, "20.00 mm");
         assert_eq!(job_texts(&PrintJob::default(), None, None, now()).heights, "");
         assert_eq!(height_at_layer(&printing, Some(&file), 20), "~4.00 mm");
     }
@@ -724,7 +715,7 @@ mod tests {
                 material: "PLA".into(),
                 weight: "~30 g".into(),
                 nozzle: "0.4".into(),
-                time: "~1h 00m".into(),
+                time: "~1 h 00 min".into(),
                 extruder_temperature: "215°".into(),
                 bed_temperature: "60°".into(),
                 chamber_temperature: "45°".into(),
@@ -738,7 +729,10 @@ mod tests {
 
         let facts = facts_of(Some(&file_metadata()), Some(&last_print));
 
-        assert_eq!((facts.material.as_str(), facts.weight.as_str(), facts.time.as_str()), ("PLA", "27 g", "55m 00s"));
+        assert_eq!(
+            (facts.material.as_str(), facts.weight.as_str(), facts.time.as_str()),
+            ("PLA", "27 g", "55 min 00 s")
+        );
     }
 
     #[test]
@@ -849,11 +843,6 @@ mod tests {
         assert_eq!(mmu_sensor_label("mmu_future_probe"), "Future probe");
         assert_eq!(mmu_sensor_label("hotend"), "Hotend");
         assert_eq!(mmu_sensor_label(""), "");
-    }
-
-    #[test]
-    fn the_path_distance_has_one_decimal() {
-        assert_eq!(path_distance(412.63), "412.6 mm");
     }
 
     #[test]

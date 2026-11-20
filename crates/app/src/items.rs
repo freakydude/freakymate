@@ -205,7 +205,7 @@ pub(crate) fn spool_colors(spool: &Spool) -> BarColors {
 pub(crate) fn heater_item(heater: &Heater, lanes: &[Lane], limits: Option<Limits>) -> HeaterItem {
     let recommended = spools::recommended_temperature(lanes, &heater.object);
     let spool_hint = spools::temperature_hint(heater.target, recommended)
-        .map_or_else(SharedString::new, |degrees| format!("{degrees:.0}°").into());
+        .map_or_else(SharedString::new, |degrees| format::degrees(degrees).into());
     HeaterItem {
         spool_hint,
         object: heater.object.as_str().into(),
@@ -223,9 +223,9 @@ pub(crate) fn heater_item(heater: &Heater, lanes: &[Lane], limits: Option<Limits
 
 /// The targets Klipper takes as a note for typing one; empty without `max_temp`.
 pub(crate) fn target_range(heater: &Heater) -> SharedString {
-    heater
-        .max_temp
-        .map_or_else(SharedString::new, |maximum| format!("Klipper: {:.0}–{maximum:.0} °C", heater.min_temp).into())
+    heater.max_temp.map_or_else(SharedString::new, |maximum| {
+        format!("Klipper: {}", format::temperature_range(heater.min_temp, maximum)).into()
+    })
 }
 
 /// The scale under a temperature; hidden without limits.
@@ -251,7 +251,7 @@ fn scale_item(limits: Option<Limits>) -> ScaleItem {
             Level::Warning => Severity::Attention,
             Level::Danger => Severity::Error,
         },
-        max_text: format!("max {:.0} °C", limits.max).into(),
+        max_text: format!("max {}", format::temperature(limits.max, 0)).into(),
     }
 }
 
@@ -376,7 +376,7 @@ pub(crate) fn load_path_item(
     FilamentPathItem {
         parts: ModelRc::new(VecModel::from(parts)),
         direction: path.direction,
-        distance: path.distance.map(view::path_distance).unwrap_or_default().into(),
+        distance: path.distance.map(format::path_distance).unwrap_or_default().into(),
         gate_label: label.into(),
         colors: bar_colors(colors),
     }

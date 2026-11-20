@@ -2,6 +2,7 @@
 //! therefore testable. The view box is 1000 high and as wide as the chart's aspect ratio makes it: Slint scales a
 //! path evenly, so a box of another shape would squeeze the chart into the middle.
 
+use crate::format;
 use sailhand_core::sources::moonraker_server::temperature_store::HISTORY_LENGTH;
 
 /// Height of the view box; its width is this times the aspect ratio of the chart.
@@ -68,7 +69,7 @@ pub fn grid(scale: ChartScale, aspect: f64, window: usize) -> Grid {
         let share = (scale.high - degrees) / span;
         let y = share * VIEW_HEIGHT;
         commands.push(format!("M 0 {y:.1} L {width:.1} {y:.1}"));
-        temperatures.push((format!("{degrees:.0} °C"), share as f32));
+        temperatures.push((format::temperature(degrees, 0), share as f32));
         degrees += step;
     }
     let mut times = Vec::new();
@@ -78,7 +79,7 @@ pub fn grid(scale: ChartScale, aspect: f64, window: usize) -> Grid {
         let share = 1.0 - seconds as f64 / (window - 1) as f64;
         let x = share * width;
         commands.push(format!("M {x:.1} 0 L {x:.1} {VIEW_HEIGHT}"));
-        times.push((format!("−{} min", seconds / 60), share as f32));
+        times.push((format!("−{}", format::duration_minutes(seconds as f64)), share as f32));
         seconds += time_step;
     }
     Grid { path: commands.join(" "), temperatures, times }

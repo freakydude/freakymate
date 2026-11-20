@@ -4,6 +4,7 @@
 // differently, with the button that helps.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, HeadItem, Printer, Severity } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
@@ -59,7 +60,7 @@ export component HeadChip inherits Rectangle {
             overflow: elide;
         }
         if root.head.has-nozzle: Text {
-            text: round(root.head.temperature) + "°";
+            text: Units.degrees(root.head.temperature);
             color: Theme.muted;
             font-size: Theme.font-small;
             vertical-alignment: center;

@@ -2,6 +2,7 @@
 // expert tab pressure advance and the motion and extrusion values of the configuration, changed until the next restart.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { StateIcons } from "../state-icons.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, Printer, TuningItem, UiSettings, Severity } from "../state.slint";
@@ -135,7 +136,7 @@ export component TuneBasicsTab inherits Rectangle {
                 Adjuster {
                     title: @tr("Z offset (babystep)");
                     icon: Icons.calibration-z-offset;
-                    value: Printer.z-offset.to-fixed(3) + " mm";
+                    value: Units.length(Printer.z-offset, 3);
                     can-reset: Printer.z-offset != 0;
                     decrease => { Actions.adjust-z-offset(-UiSettings.z-offset-step); }
                     increase => { Actions.adjust-z-offset(UiSettings.z-offset-step); }
@@ -179,7 +180,7 @@ export component TuneBasicsTab inherits Rectangle {
                 Adjuster {
                     title: @tr("Speed factor");
                     icon: Icons.motion-speed;
-                    value: round(Printer.speed-factor) + " %";
+                    value: Units.percent(Printer.speed-factor);
                     highlight: round(Printer.speed-factor) != 100;
                     can-reset: round(Printer.speed-factor) != 100;
                     decrease => { Actions.set-speed-factor(max(10, Printer.speed-factor - 5)); }

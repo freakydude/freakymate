@@ -1,6 +1,7 @@
 // Filament: the path of one head: the gates of the MMU or the lanes of AFC, extrude by hand, load and unload.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { Icons } from "../icons.slint";
 import { Actions, FilamentTab, HeadItem, Navigation, Printer, Severity, UiSettings } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
@@ -17,7 +18,7 @@ component LengthSelector inherits StepSelector {
     label: @tr("Length");
     values: Printer.extrude-lengths;
     max-enabled: Printer.extrude-limit;
-    unit: " mm";
+    unit: Units.millimetre-symbol;
     selected <=> UiSettings.extrude-length;
     changed => { UiSettings.steps-changed(); }
 }
@@ -25,7 +26,7 @@ component LengthSelector inherits StepSelector {
 component SpeedSelector inherits StepSelector {
     label: @tr("Speed");
     values: UiSettings.extrude-speeds;
-    unit: " mm/s";
+    unit: Units.speed-symbol;
     selected <=> UiSettings.extrude-speed;
     changed => { UiSettings.steps-changed(); }
 }
@@ -74,7 +75,7 @@ component ExtruderTab inherits Rectangle {
                     HorizontalLayout {
                         spacing: Theme.spacing;
                         Text {
-                            text: root.nozzle-temperature.to-fixed(1) + " / " + round(root.nozzle-target) + " °C";
+                            text: Units.temperature-of(root.nozzle-temperature, root.nozzle-target, 1);
                             color: Theme.foreground;
                             font-size: Theme.font-large;
                             font-weight: 600;

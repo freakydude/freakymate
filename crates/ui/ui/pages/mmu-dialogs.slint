@@ -1,6 +1,7 @@
 // Dialogs of the Gates tab: what can be done with one gate (a tap on its tile) and with the bypass.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { StateIcons } from "../state-icons.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Confirm, MmuDialogs, MmuGateItem, Printer, SpoolPicker, Severity } from "../state.slint";
@@ -66,7 +67,7 @@ export component GateDialog inherits Scrim {
     // spool they belong to Spoolman, for Happy Hare and AFC alike; with Happy Hare taking them from Spoolman (`pull`)
     // they cannot be set here either.
     property <bool> sets-filament: (!Printer.has-mmu || Printer.mmu-gate-map-local) && (!Printer.has-spoolman || root.item.spool-id < 0);
-    property <string> temperature-text: root.item.temperature > 0 ? root.item.temperature + " °C" : "";
+    property <string> temperature-text: root.item.temperature > 0 ? Units.temperature(root.item.temperature, 0) : "";
     visible: MmuDialogs.gate-row >= 0 && MmuDialogs.gate-row < Printer.mmu-gates.length;
 
     function close() {
@@ -266,7 +267,7 @@ export component GateDialog inherits Scrim {
 
     // A new material brings the default temperature of the source; this sets another one.
     temperature-entry := NumberEntryDialog {
-        unit: "°C";
+        unit: Units.celsius-symbol;
         hint: Printer.has-mmu ? @tr("Happy Hare heats to it when it loads this gate outside a print.") : @tr("AFC heats to it when it loads this lane outside a print.");
         accepted(text) => {
             if (text.is-float()) {

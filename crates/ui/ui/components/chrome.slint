@@ -1,6 +1,7 @@
 // Application frame: status bar at the top, navigation rail on the left.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { Icons } from "../icons.slint";
 import { Backlight, Confirm, Dialogs, Navigation, Network, Page, Printer, PrinterChoice, Severity } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
@@ -239,13 +240,13 @@ export component StatusBar inherits Rectangle {
             icon: Icons.thermal-nozzle;
             head: Printer.nozzle-head;
             heating: Printer.nozzle-selected && Printer.nozzle-target > 0;
-            text: !Printer.nozzle-selected ? @tr("No head") : round(Printer.nozzle-temperature) + "°" + (Printer.nozzle-target > 0 ? " / " + round(Printer.nozzle-target) + "°" : "");
+            text: !Printer.nozzle-selected ? @tr("No head") : Units.degrees(Printer.nozzle-temperature) + (Printer.nozzle-target > 0 ? " / " + Units.degrees(Printer.nozzle-target) : "");
         }
         if Printer.has-bed: TemperatureReading {
             visible: Printer.ready;
             icon: Icons.thermal-bed;
             heating: Printer.bed-target > 0;
-            text: round(Printer.bed-temperature) + "°" + (Printer.bed-target > 0 ? " / " + round(Printer.bed-target) + "°" : "");
+            text: Units.degrees(Printer.bed-temperature) + (Printer.bed-target > 0 ? " / " + Units.degrees(Printer.bed-target) : "");
         }
         // Opens the light panel; lit while the main light (chamber or case light) is on. A controllable backlight
         // of the display is reason enough, also without a ready printer.

@@ -1,0 +1,43 @@
+// Units of the numbers the UI formats itself (live values, sliders, steps). Texts that come from Rust follow the same
+// rules in crates/app/src/format.rs; a number and its unit are separated by a space, the compact `°` is not.
+export global Units {
+    out property <string> celsius-symbol: "°C";
+    out property <string> millimetre-symbol: "mm";
+    out property <string> speed-symbol: "mm/s";
+    out property <string> percent-symbol: "%";
+
+    // `215.3 °C`; whole degrees with 0 decimals.
+    public pure function temperature(celsius: float, decimals: int) -> string {
+        celsius.to-fixed(decimals) + " °C"
+    }
+
+    // Current and target in one unit, the target in whole degrees: `210.3 / 215 °C`.
+    public pure function temperature-of(celsius: float, target: float, decimals: int) -> string {
+        celsius.to-fixed(decimals) + " / " + round(target) + " °C"
+    }
+
+    // Compact whole degrees where the context says Celsius (status bar, tiles): `215°`.
+    public pure function degrees(celsius: float) -> string {
+        round(celsius) + "°"
+    }
+
+    // `37 %` of a value from 0 to 100.
+    public pure function percent(value: float) -> string {
+        round(value) + " %"
+    }
+
+    // `37 %` of a share from 0 to 1.
+    public pure function share(fraction: float) -> string {
+        round(fraction * 100) + " %"
+    }
+
+    // `0.025 mm`
+    public pure function length(millimetres: float, decimals: int) -> string {
+        millimetres.to-fixed(decimals) + " mm"
+    }
+
+    // `182 mm/s`
+    public pure function speed(millimetres-per-second: float) -> string {
+        round(millimetres-per-second) + " mm/s"
+    }
+}

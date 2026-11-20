@@ -1,6 +1,7 @@
 // Basic building blocks for touch input: buttons, step selection, cards, progress.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { StateIcons } from "../state-icons.slint";
 import { Severity } from "../structs.slint";
 
@@ -211,7 +212,7 @@ export component StepSelector inherits HorizontalLayout {
         border-width: value == root.selected ? 2px : 0px;
         border-color: Theme.accent;
         accessible-role: button;
-        accessible-label: value + root.unit;
+        accessible-label: root.unit != "" ? value + " " + root.unit : value;
         step-touch := TouchArea {
             enabled: value <= root.max-enabled;
             clicked => {
@@ -225,7 +226,7 @@ export component StepSelector inherits HorizontalLayout {
             padding-left: Theme.padding;
             padding-right: Theme.padding;
             Text {
-                text: value + root.unit;
+                text: root.unit != "" ? value + " " + root.unit : value;
                 color: value <= root.max-enabled ? Theme.foreground : Theme.disabled-foreground;
                 font-size: Theme.font-small;
                 font-weight: 600;

@@ -2,6 +2,7 @@
 // the texts of buffer and FlowGuard.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { Icons } from "../icons.slint";
 import { MmuGateItem, Printer, Severity } from "../state.slint";
 import { StateIcons } from "../state-icons.slint";
@@ -152,7 +153,7 @@ export component GateTile inherits SlotTile {
                 Text {
                     horizontal-stretch: 1;
                     visible: root.gate.temperature > 0 && root.gate.material != "" && self.width >= self.preferred-width;
-                    text: root.gate.temperature + " °C";
+                    text: Units.temperature(root.gate.temperature, 0);
                     color: Theme.muted;
                     font-size: Theme.font-small;
                     horizontal-alignment: right;

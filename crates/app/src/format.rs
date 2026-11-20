@@ -1,16 +1,94 @@
-//! Display text formats (duration, time of day, length, file names).
+//! Display text formats (durations, lengths, weights, time of day, names). Every quantity the UI shows goes through
+//! here; the functions below name each kind of value and how it fits its place (width, precision, unit).
+
+mod duration;
+mod quantity;
 
 use chrono::{DateTime, Local, TimeZone};
+use duration::{MINUTE, SECOND, duration_in};
+use quantity::{Fit, LENGTH, WEIGHT, quantity, quantity_pair};
 
-/// `45s`, `12m 05s`, `2h 07m`.
+/// Print times and estimates to the second: `45 s`, `12 min 05 s`, `2 h 07 min`, `1 d 03 h`.
 pub fn duration(seconds: f64) -> String {
-    let total = seconds.max(0.0).round() as u64;
-    let (hours, minutes, secs) = (total / 3600, (total % 3600) / 60, total % 60);
-    match (hours, minutes) {
-        (0, 0) => format!("{secs}s"),
-        (0, _) => format!("{minutes}m {secs:02}s"),
-        _ => format!("{hours}h {minutes:02}m"),
-    }
+    duration_in(seconds, &SECOND)
+}
+
+/// Whole minutes, for the time axis of a chart (`5 min`, `1 h 30 min`).
+pub fn duration_minutes(seconds: f64) -> String {
+    duration_in(seconds, &MINUTE)
+}
+
+/// Filament of a print: tenths of a metre show the progress (`0.4 m`, `12.3 m`).
+const FILAMENT_LENGTH: Fit = Fit::width(4, 100.0);
+
+/// Filament length of a print, e.g. `12.3 m`.
+pub fn filament_length(millimetres: f64) -> String {
+    quantity(millimetres.max(0.0), LENGTH, FILAMENT_LENGTH)
+}
+
+/// Used of planned filament in one unit, e.g. `1.9 / 5.2 m`.
+pub fn filament_progress(used_millimetres: f64, total_millimetres: f64) -> String {
+    quantity_pair(used_millimetres.max(0.0), total_millimetres.max(0.0), LENGTH, FILAMENT_LENGTH)
+}
+
+/// Filament weight; a decimal only below 10 g (`4.6 g`, `742 g`, `12 kg`).
+pub fn filament_weight(grams: f64) -> String {
+    quantity(grams.max(0.0), WEIGHT, Fit { width: 4, significant: 2, resolution: 0.1 })
+}
+
+/// Where the filament is on its path: to a tenth of a millimetre while it fits, metres once printing adds up
+/// (`412.6 mm`, `4821 mm`, `48.21 m`).
+pub fn path_distance(millimetres: f64) -> String {
+    quantity(millimetres, LENGTH, Fit::width(4, 0.1))
+}
+
+/// Heights of the print: each layer step shows (`0.28 mm`), above 100 mm one decimal is left (`245.0 mm`).
+const HEIGHT: Fit = Fit::width(4, 0.01);
+
+pub fn height(millimetres: f64) -> String {
+    quantity(millimetres, LENGTH, HEIGHT)
+}
+
+/// Current of object height, e.g. `0.20 / 245.0 mm`.
+pub fn height_of(current_millimetres: f64, object_millimetres: f64) -> String {
+    quantity_pair(current_millimetres, object_millimetres, LENGTH, HEIGHT)
+}
+
+/// What the encoder leaves of the length it watches, e.g. `7.5 / 12.0 mm`.
+pub fn encoder_headroom(headroom_millimetres: f64, detection_millimetres: f64) -> String {
+    quantity_pair(headroom_millimetres, detection_millimetres, LENGTH, Fit::width(3, 0.1))
+}
+
+/// Deviation of a bed mesh to the micrometre, e.g. `0.123 mm`.
+pub fn mesh_deviation(millimetres: f64) -> String {
+    quantity(millimetres, LENGTH, Fit::width(4, 0.001))
+}
+
+/// A nozzle diameter as given (`0.4 mm`, `0.25 mm`).
+pub fn nozzle_diameter(millimetres: f64) -> String {
+    format!("{millimetres} mm")
+}
+
+// Temperatures follow `units.slint` of the UI, which formats the live values itself.
+
+/// `215 °C`, or to tenths for a measured value (`214.8 °C`).
+pub fn temperature(celsius: f64, decimals: usize) -> String {
+    format!("{celsius:.decimals$} °C")
+}
+
+/// Measured and target temperature in one unit, the target in whole degrees: `210.3 / 215 °C`.
+pub fn temperature_of(celsius: f64, target_celsius: f64) -> String {
+    format!("{celsius:.1} / {target_celsius:.0} °C")
+}
+
+/// A range in whole degrees: `180–300 °C`.
+pub fn temperature_range(low_celsius: f64, high_celsius: f64) -> String {
+    format!("{low_celsius:.0}–{high_celsius:.0} °C")
+}
+
+/// Compact whole degrees where the context says Celsius (file facts, hints): `215°`.
+pub fn degrees(celsius: f64) -> String {
+    format!("{celsius:.0}°")
 }
 
 pub fn clock(time: DateTime<Local>) -> String {
@@ -43,21 +121,6 @@ pub fn unix_date(unix_seconds: f64) -> String {
         .timestamp_opt(unix_seconds as i64, 0)
         .single()
         .map_or_else(String::new, |time| time.format("%d.%m.%Y %H:%M").to_string())
-}
-
-/// Filament length in meters from millimeters.
-pub fn filament_length(millimeters: f64) -> String {
-    format!("{} m", filament_meters(millimeters))
-}
-
-/// The number of `filament_length` alone, for two lengths that share one unit (`1.92 / 5.20 m`).
-pub fn filament_meters(millimeters: f64) -> String {
-    format!("{:.2}", millimeters.max(0.0) / 1000.0)
-}
-
-/// Filament weight in grams; one decimal below 10 g.
-pub fn filament_weight(grams: f64) -> String {
-    if grams < 10.0 { format!("{:.1} g", grams.max(0.0)) } else { format!("{grams:.0} g") }
 }
 
 /// Display name of a G-code file: without folder and extension.
@@ -117,11 +180,18 @@ mod tests {
     }
 
     #[test]
-    fn durations_are_compact() {
-        assert_eq!(duration(45.4), "45s");
-        assert_eq!(duration(725.0), "12m 05s");
-        assert_eq!(duration(7_620.0), "2h 07m");
-        assert_eq!(duration(-3.0), "0s");
+    fn temperatures_share_one_unit() {
+        assert_eq!(temperature(214.84, 1), "214.8 °C");
+        assert_eq!(temperature(215.0, 0), "215 °C");
+        assert_eq!(temperature_of(210.34, 215.0), "210.3 / 215 °C");
+        assert_eq!(temperature_range(0.0, 300.0), "0–300 °C");
+        assert_eq!(degrees(59.6), "60°");
+    }
+
+    #[test]
+    fn durations_to_the_second_or_minute() {
+        assert_eq!(duration(725.0), "12 min 05 s");
+        assert_eq!(duration_minutes(1_800.0), "30 min");
     }
 
     #[test]
@@ -152,10 +222,15 @@ mod tests {
 
     #[test]
     fn lengths_weights_and_names() {
-        assert_eq!(filament_length(1234.0), "1.23 m");
-        assert_eq!(filament_meters(1234.0), "1.23");
+        assert_eq!(filament_length(1234.0), "1.2 m");
+        assert_eq!(filament_progress(1_920.0, 5_200.0), "1.9 / 5.2 m");
         assert_eq!(filament_weight(4.56), "4.6 g");
         assert_eq!(filament_weight(23.4), "23 g");
+        assert_eq!(path_distance(48_213.7), "48.21 m");
+        assert_eq!(height_of(0.2, 245.0), "0.20 / 245.0 mm");
+        assert_eq!(encoder_headroom(7.5, 12.0), "7.5 / 12.0 mm");
+        assert_eq!(mesh_deviation(0.1234), "0.123 mm");
+        assert_eq!(nozzle_diameter(0.25), "0.25 mm");
         assert_eq!(job_name("parts/Voron Cube.gcode"), "Voron Cube");
         assert_eq!(job_name("plain"), "plain");
     }

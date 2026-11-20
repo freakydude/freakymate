@@ -3,7 +3,7 @@
 //! GPU. Blue is lower, red higher, on a scale symmetric around 0. Points Klipper only copied (corners of a round
 //! bed) stay empty, faulty regions are framed.
 
-use crate::{BedMeshMap, MeshCellItem, MeshFrameItem};
+use crate::{BedMeshMap, MeshCellItem, MeshFrameItem, format};
 use sailhand_core::sources::klipper::commands::MeshNameProblem;
 use sailhand_core::sources::klipper::{BedMesh, MeshPoint, MeshSpan};
 use slint::{Color, Image, Rgba8Pixel, SharedPixelBuffer};
@@ -36,7 +36,7 @@ pub fn picture(mesh: &BedMesh) -> MeshPicture {
         columns: columns as i32,
         rows: rows as i32,
         aspect: ((mesh.max[0] - mesh.min[0]) / (mesh.max[1] - mesh.min[1])) as f32,
-        range: mesh.range().map(|range| format!("{range:.3} mm")).unwrap_or_default().into(),
+        range: mesh.range().map(format::mesh_deviation).unwrap_or_default().into(),
         lowest: mesh.lowest().map(|lowest| signed(lowest, 3)).unwrap_or_default().into(),
         highest: mesh.highest().map(|highest| signed(highest, 3)).unwrap_or_default().into(),
         limit: format!("{limit:.3}").into(),

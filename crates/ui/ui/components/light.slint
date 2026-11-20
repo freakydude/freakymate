@@ -2,6 +2,7 @@
 // the effects of the led_effect plugin when it is installed.
 
 import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
 import { Icons } from "../icons.slint";
 import { Actions, Backlight, LedItem, Navigation, Printer } from "../state.slint";
 import { FlyoutPanel, IconButton, ScrollList, SliderRow, ToggleRow } from "controls.slint";
@@ -13,7 +14,7 @@ component LedRow inherits SliderRow {
     icon-color: root.led.on ? Theme.accent : Theme.muted;
     label: root.led.label;
     // Moonraker does not know a WLED strip's brightness after a preset; then only "on" is certain.
-    value-text: !root.led.on ? @tr("Off") : root.led.level-known ? round(root.shown) + " %" : @tr("On");
+    value-text: !root.led.on ? @tr("Off") : root.led.level-known ? Units.percent(root.shown) : @tr("On");
     value: root.led.level;
     off-clicked => { Actions.set-light(root.led.object, 0); }
     full-clicked => { Actions.set-light(root.led.object, 100); }
@@ -25,7 +26,7 @@ component DisplayRow inherits SliderRow {
     icon: Icons.system-brightness;
     icon-color: Theme.accent;
     label: @tr("Display");
-    value-text: round(root.shown) + " %";
+    value-text: Units.percent(root.shown);
     minimum: 10;
     value: Backlight.brightness;
     off-clicked => { Backlight.sleep(); }
