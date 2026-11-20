@@ -1,0 +1,29 @@
+// Preview: a print Klipper lost in a shutdown, from Moonraker's history after the restart: Klipper itself shows no
+// job (standby), the page shows the lost one as failed. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintLostPreview inherits AppWindow {
+    init => {
+        Sample.printing();
+        Printer.print-state = "standby";
+        Printer.activity = "ready";
+        Printer.job-state = "error";
+        Printer.progress-known = false;
+        Printer.elapsed = "48 min 12 s";
+        Printer.total-duration = "55 min 40 s";
+        Printer.remaining = "-";
+        Printer.eta = "-";
+        Printer.ended = "13:41";
+        Printer.layers = "-";
+        Printer.print-heights = "40.00 mm";
+        Printer.filament = "4.1 / 15 g";
+        Printer.layer-pause-next = false;
+        Printer.layer-pause-at = false;
+        Printer.interruption-text = "Klipper shut down during the print";
+        Printer.interruption-headline = "";
+        Navigation.page = Page.print;
+    }
+}

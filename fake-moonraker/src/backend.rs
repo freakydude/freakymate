@@ -150,8 +150,12 @@ impl Backend {
         let (result, ended_job) = {
             let mut printer = self.printer.lock().expect("printer lock poisoned");
             let was_active = printer.print_state().is_active();
+            let was_shut_down = printer.is_shut_down();
             let result = action(&mut printer);
-            let ended = was_active && !printer.print_state().is_active();
+            let is_active = printer.print_state().is_active();
+            let shut_down_in_job = is_active && !was_shut_down && printer.is_shut_down();
+            // After a shutdown the restart wipes the job; the history has recorded its end already.
+            let ended = (was_active && !is_active && !was_shut_down) || shut_down_in_job;
             (result, ended.then(|| printer.ended_job(unix_time())).flatten())
         };
         if let Some(job) = ended_job.filter(|_| self.history_enabled) {

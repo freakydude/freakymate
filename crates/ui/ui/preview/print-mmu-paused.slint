@@ -10,6 +10,7 @@ export component PrintMmuPausedPreview inherits AppWindow {
         Sample.printing();
         Navigation.page = Page.print;
         Printer.print-state = "paused";
+        Printer.job-state = "paused";
         Printer.mmu-gate = 1;
         Printer.mmu-tool = 1;
         Printer.mmu-paused = true;

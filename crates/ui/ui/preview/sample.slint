@@ -236,6 +236,7 @@ export global Sample {
     public function printing() {
         self.ready-printer();
         Printer.print-state = "printing";
+        Printer.job-state = "printing";
         Printer.activity = "busy";
         Printer.filename = "benchy.gcode";
         Printer.job-name = "benchy";

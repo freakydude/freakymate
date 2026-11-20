@@ -89,7 +89,7 @@ time, weight, layers, flow; measured before estimated, see `sourced.rs`), `file_
 with metadata, last completed print and its spool), `filament_match.rs` (what the tools of a file ask for against the
 filament of the gates or the spool: a verdict per tool, only a hint, never a lock), `prepared_job.rs` (the file prepared
 as the job of the print page; kept only in the app and forgotten at a restart), `light.rs`, `screen_wake.rs`, `job_end.rs` (when the job Klipper shows ended, from the job
-history).
+history, and the job Klipper lost in a shutdown or restart, which the print page shows as failed).
 
 ## Data flow
 

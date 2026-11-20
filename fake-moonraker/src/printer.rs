@@ -361,12 +361,14 @@ impl Printer {
         self.print_state
     }
 
-    /// The job as Moonraker's history records it when it ended; `None` while it runs or without a job.
+    /// The job as Moonraker's history records it when it ended; `None` while it runs or without a job. A shutdown
+    /// ends a running job in the history although `print_stats` still shows it (Moonraker `components/history.py`,
+    /// `_handle_shutdown`: `finish_job("klippy_shutdown", ...)` on `server:klippy_shutdown`).
     pub fn ended_job(&self, end_time: f64) -> Option<Value> {
         let status = match self.print_state {
             PrintState::Complete => "completed",
             PrintState::Cancelled => "cancelled",
-            PrintState::Error if self.klippy == KlippyState::Shutdown => "klippy_shutdown",
+            _ if self.klippy == KlippyState::Shutdown && !self.filename.is_empty() => "klippy_shutdown",
             PrintState::Error => "error",
             PrintState::Standby | PrintState::Printing | PrintState::Paused => return None,
         };
@@ -596,6 +598,10 @@ impl Printer {
 
     pub fn klippy_state(&self) -> &'static str {
         self.klippy.as_str()
+    }
+
+    pub fn is_shut_down(&self) -> bool {
+        self.klippy == KlippyState::Shutdown
     }
 
     /// A heater by its `HEATER=` name with its maximum target.

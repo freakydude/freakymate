@@ -83,6 +83,10 @@ impl FileCatalog {
         self.last_prints.get(path)
     }
 
+    pub fn spool(&self, id: u32) -> Option<&Spool> {
+        self.spools.get(&id)
+    }
+
     pub fn position(&self, path: &str) -> Option<usize> {
         self.entries.iter().position(|entry| entry.path == path)
     }

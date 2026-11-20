@@ -19,6 +19,8 @@ component InterruptionBanner inherits Rectangle {
     in property <string> details;
     // Where the print stands, beside the title.
     in property <string> position;
+    // Since when a pause lasts, after the title; empty if not known.
+    in property <string> since;
     property <color> tone: root.failed ? StateIcons.severity-color(Severity.error) : StateIcons.severity-color(Severity.attention);
     background: Theme.surface;
     border-radius: Theme.radius;
@@ -47,6 +49,12 @@ component InterruptionBanner inherits Rectangle {
                     color: root.tone;
                     font-size: Theme.font-normal;
                     font-weight: 600;
+                }
+                if root.since != "": Text {
+                    text: root.since;
+                    color: Theme.muted;
+                    font-size: Theme.font-small;
+                    vertical-alignment: center;
                 }
                 Text {
                     horizontal-stretch: 1;
@@ -101,12 +109,13 @@ component ProgressDetail inherits HorizontalLayout {
 }
 
 // The main thing of a job: how far it is and how long it still takes, or when it ended; under the bar the figures
-// that go with it.
+// that go with it. A complete job leads with the time it took instead of a full 100 %.
 component ProgressCard inherits Rectangle {
     in property <bool> finished;
     vertical-stretch: 0;
-    property <string> state: Printer.print-state;
-    property <Severity> severity: StateIcons.print-severity(Printer.print-state);
+    property <string> state: Printer.job-state;
+    property <bool> complete: root.state == "complete";
+    property <Severity> severity: StateIcons.print-severity(root.state);
     background: Theme.surface;
     border-radius: Theme.radius;
 
@@ -118,10 +127,11 @@ component ProgressCard inherits Rectangle {
         alignment: center;
         HorizontalLayout {
             spacing: Theme.spacing;
+            // The total time is longer than a share and goes one step smaller, as the end time beside it does.
             Text {
-                text: Units.share(Printer.progress);
+                text: root.complete ? Printer.total-duration : Printer.progress-known ? Units.share(Printer.progress) : "-";
                 color: Theme.foreground;
-                font-size: Theme.font-huge;
+                font-size: root.complete ? Theme.font-large : Theme.font-huge;
                 font-weight: 700;
                 vertical-alignment: center;
             }
@@ -140,8 +150,9 @@ component ProgressCard inherits Rectangle {
                 source: !root.finished ? Icons.print-remaining : root.state == "complete" ? Icons.print-complete : root.state == "cancelled" ? Icons.print-cancel : Icons.state-error;
                 colorize: root.severity == Severity.fine || root.severity == Severity.error ? StateIcons.severity-color(root.severity) : Theme.muted;
             }
-            // While it runs the time that is left; afterwards when it ended, which is longer and one step smaller.
-            Text {
+            // While it runs the time that is left; afterwards when it ended, which is longer and one step smaller. Without
+            // Moonraker's history the end is not known and left out.
+            if !root.finished || Printer.ended != "": Text {
                 text: root.finished ? Printer.ended : Printer.remaining;
                 color: Theme.foreground;
                 font-size: root.finished ? Theme.font-large : Theme.font-huge;
@@ -150,14 +161,18 @@ component ProgressCard inherits Rectangle {
             }
         }
         ProgressBar {
+            visible: Printer.progress-known;
             progress: Printer.progress;
             bar-color: root.severity == Severity.attention || root.severity == Severity.error ? StateIcons.severity-color(root.severity) : Theme.accent;
         }
         HorizontalLayout {
             spacing: Theme.spacing;
             // Icons instead of words: the row has to hold durations like `12 h 34 min`, a filament pair and an ETA with date.
+            // The total time of an ended job stands here unless it leads the card.
             ProgressDetail { icon: Icons.print-duration; value: Printer.elapsed; }
             Rectangle { horizontal-stretch: 1; }
+            if root.finished && !root.complete: ProgressDetail { icon: Icons.print-total-duration; value: Printer.total-duration; }
+            if root.finished && !root.complete: Rectangle { horizontal-stretch: 1; }
             ProgressDetail { icon: Icons.filament-spool; value: Printer.filament; }
             Rectangle { horizontal-stretch: 1; }
             if root.state == "printing": ProgressDetail { icon: Icons.print-eta; value: Printer.eta; }
@@ -228,19 +243,20 @@ component JobView inherits VerticalLayout {
             if Printer.has-mmu: HorizontalLayout {
                 spacing: Theme.spacing;
                 LayerTile { clicked => { root.plan-layer-pause(); } }
-                if Printer.print-state == "printing": SpeedTile { }
+                if Printer.job-state == "printing": SpeedTile { }
             }
             if !Printer.has-mmu: LayerTile { clicked => { root.plan-layer-pause(); } }
-            if !Printer.has-mmu && Printer.print-state == "printing": SpeedTile { }
+            if !Printer.has-mmu && Printer.job-state == "printing": SpeedTile { }
             // Free room stays under the tiles, so nothing moves when the speed tile leaves with a pause.
             Rectangle { vertical-stretch: 1; }
         }
     }
     // A pause or an error shows what is known about it, over the full width.
-    if Printer.print-state == "paused" || Printer.print-state == "error": InterruptionBanner {
-        failed: Printer.print-state == "error";
+    if Printer.job-state == "paused" || Printer.job-state == "error": InterruptionBanner {
+        failed: Printer.job-state == "error";
         details: Printer.interruption-text;
         position: Printer.interruption-position;
+        since: Printer.paused-since;
     }
     if Printer.has-spoolman && !Printer.has-mmu: SpoolStrip { }
     if Printer.has-mmu: MmuStrip { }
@@ -311,7 +327,7 @@ export component PrintPage inherits Rectangle {
     property <bool> prepared: Printer.prepared-path != "" && !Printer.is-printing;
     // No job and nothing prepared: the newest files instead of an empty preview.
     property <bool> idle: !root.prepared && !root.has-job;
-    property <bool> finished: Printer.print-state == "complete" || Printer.print-state == "cancelled" || Printer.print-state == "error";
+    property <bool> finished: Printer.job-state == "complete" || Printer.job-state == "cancelled" || Printer.job-state == "error";
     property <length> side-width: 220px;
 
     HorizontalLayout {

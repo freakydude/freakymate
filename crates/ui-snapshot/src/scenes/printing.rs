@@ -122,6 +122,10 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
     session.window.global::<Confirm>().invoke_execute();
     session.wait_until("print cancelled", |snapshot| snapshot.status.job.state == PrintState::Cancelled)?;
     wait_for_end_time(session)?;
+    // The height the job reached stays beside the object height, though the cancel macro lifts the head.
+    if !session.window.global::<Printer>().get_print_heights().contains(" / ") {
+        return Err("the cancelled job does not show the height it reached".into());
+    }
     session.capture("print-cancelled")?;
     print_error(session)
 }
@@ -156,7 +160,7 @@ pub(super) fn pause_at_next_layer(session: &mut Session) -> Result<(), String> {
 /// The end of a job comes from the history, which the service reads once the job has ended.
 pub(super) fn wait_for_end_time(session: &mut Session) -> Result<(), String> {
     for _ in 0..40 {
-        if session.window.global::<Printer>().get_ended() != "-" {
+        if !session.window.global::<Printer>().get_ended().is_empty() {
             return Ok(());
         }
         session.pump(Duration::from_millis(100));

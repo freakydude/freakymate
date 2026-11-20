@@ -11,6 +11,7 @@ export component PrintPreparedMmuPreview inherits AppWindow {
         Sample.mmu();
         Navigation.page = Page.print;
         Printer.print-state = "complete";
+        Printer.job-state = "complete";
         Printer.filename = "benchy.gcode";
         Printer.job-name = "benchy";
         Printer.prepared-path = "cube-mc5-all_pla-t0_t1_t3_t4.gcode";

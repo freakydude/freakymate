@@ -14,6 +14,7 @@ mod firmware_retraction;
 mod heaters;
 mod height_watch;
 mod job;
+mod job_watch;
 mod leveling;
 mod macros;
 mod motion;
@@ -36,6 +37,7 @@ pub use firmware_retraction::Retraction;
 pub use heaters::{BED_HEATER, DEFAULT_MIN_EXTRUDE_TEMP, Heater, NOZZLE_HEATER, PidValues, TemperatureSensor};
 pub use height_watch::HeightWatch;
 pub use job::{PrintJob, PrintState};
+pub use job_watch::JobWatch;
 pub use leveling::Leveling;
 pub use macros::{
     MacroDetails, MacroField, MacroForm, MacroParam, MacroValueError, OfferedMacro, details_from_settings,

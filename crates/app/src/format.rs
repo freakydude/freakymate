@@ -31,9 +31,17 @@ pub fn filament_progress(used_millimetres: f64, total_millimetres: f64) -> Strin
     quantity_pair(used_millimetres.max(0.0), total_millimetres.max(0.0), LENGTH, FILAMENT_LENGTH)
 }
 
+/// Filament weight: a decimal only below 10 g.
+const FILAMENT_WEIGHT: Fit = Fit { width: 4, significant: 2, resolution: 0.1 };
+
 /// Filament weight; a decimal only below 10 g (`4.6 g`, `742 g`, `12 kg`).
 pub fn filament_weight(grams: f64) -> String {
-    quantity(grams.max(0.0), WEIGHT, Fit { width: 4, significant: 2, resolution: 0.1 })
+    quantity(grams.max(0.0), WEIGHT, FILAMENT_WEIGHT)
+}
+
+/// Filament weight a print used of what its file plans, e.g. `12 / 54 g`.
+pub fn filament_weight_progress(used_grams: f64, planned_grams: f64) -> String {
+    quantity_pair(used_grams.max(0.0), planned_grams.max(0.0), WEIGHT, FILAMENT_WEIGHT)
 }
 
 /// Where the filament is on its path: to a tenth of a millimetre while it fits, metres once printing adds up

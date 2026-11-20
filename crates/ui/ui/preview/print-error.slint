@@ -8,9 +8,11 @@ export component PrintErrorPreview inherits AppWindow {
     init => {
         Sample.printing();
         Printer.print-state = "error";
+        Printer.job-state = "error";
         Printer.remaining = "-";
         Printer.eta = "-";
         Printer.ended = "14:05";
+        Printer.total-duration = "1 h 02 min";
         Printer.layer-pause-next = false;
         Printer.layer-pause-at = false;
         Printer.interruption-text = "Move out of range: 310.000 150.000 12.400 [482.120]";

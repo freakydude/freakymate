@@ -33,6 +33,14 @@ pub struct FinishedJob {
     pub status: String,
     /// Unix seconds.
     pub end_time: f64,
+    /// Seconds spent printing, without heating before the first extrusion and without pauses.
+    pub print_duration: f64,
+    /// Seconds from the start to the end, with heating and pauses.
+    pub total_duration: f64,
+    /// Filament length in millimeters.
+    pub filament_used: f64,
+    /// Spoolman spools the job used (`auxiliary_data`); empty without Spoolman.
+    pub spool_ids: Vec<u32>,
 }
 
 /// The job history as far as the UI uses it.
@@ -67,6 +75,8 @@ struct HistoryJob {
     #[serde(default)]
     print_duration: f64,
     #[serde(default)]
+    total_duration: f64,
+    #[serde(default)]
     filament_used: f64,
     #[serde(default)]
     auxiliary_data: Vec<AuxiliaryEntry>,
@@ -86,7 +96,15 @@ impl HistoryJob {
     /// A job that is still running has no end time yet (`null`).
     fn finished(&self) -> Option<FinishedJob> {
         let end_time = self.end_time.filter(|_| self.status != "in_progress")?;
-        Some(FinishedJob { filename: self.filename.clone(), status: self.status.clone(), end_time })
+        Some(FinishedJob {
+            filename: self.filename.clone(),
+            status: self.status.clone(),
+            end_time,
+            print_duration: self.print_duration,
+            total_duration: self.total_duration,
+            filament_used: self.filament_used,
+            spool_ids: self.spool_ids(),
+        })
     }
 }
 
@@ -116,13 +134,23 @@ mod tests {
     #[test]
     fn the_newest_job_is_the_first_of_the_list() {
         let history = parse_print_history(&json!({ "jobs": [
-            { "filename": "a.gcode", "status": "cancelled", "end_time": 1_700_000_600.0 },
+            { "filename": "a.gcode", "status": "cancelled", "end_time": 1_700_000_600.0, "print_duration": 50.0,
+              "total_duration": 300.0, "filament_used": 100.0,
+              "auxiliary_data": [{ "provider": "spoolman", "name": "spool_ids", "value": [18] }] },
             { "filename": "a.gcode", "status": "completed", "end_time": 1_600_000_000.0 }
         ] }));
 
         assert_eq!(
             history.newest,
-            Some(FinishedJob { filename: "a.gcode".into(), status: "cancelled".into(), end_time: 1_700_000_600.0 })
+            Some(FinishedJob {
+                filename: "a.gcode".into(),
+                status: "cancelled".into(),
+                end_time: 1_700_000_600.0,
+                print_duration: 50.0,
+                total_duration: 300.0,
+                filament_used: 100.0,
+                spool_ids: vec![18],
+            })
         );
     }
 

@@ -18,6 +18,11 @@ pub struct PrinterStatus {
     pub klippy_message: String,
     pub activity: Activity,
     pub job: PrintJob,
+    /// The last job with a file while Klipper shows none, as Sailhand saw it last (see [`JobWatch`]): after a Klipper
+    /// restart only Moonraker's history knows how it ended.
+    ///
+    /// [`JobWatch`]: crate::sources::klipper::JobWatch
+    pub previous_job: Option<Box<PrintJob>>,
     pub motion: Motion,
     pub extruder: ExtruderState,
     /// Extruder first, then bed, then additional heaters in object order.
@@ -58,6 +63,7 @@ impl PrinterStatus {
             klippy_message: klipper.klippy_message,
             activity: klipper.activity,
             job: klipper.job,
+            previous_job: None,
             motion: klipper.motion,
             extruder: klipper.extruder,
             heaters: klipper.heaters,

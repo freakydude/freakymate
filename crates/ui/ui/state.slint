@@ -39,18 +39,30 @@ export global Printer {
     in property <string> activity: "ready";
     // A command from here that waits long for its answer (homing, leveling, an update); "" if none.
     in property <string> running-command;
+    // The job the print page shows: Klipper's, or one Klipper lost in a shutdown or restart (then "error" while
+    // print-state is Klipper's own "standby"). Its file, state and figures follow.
     in property <string> filename;
+    in property <string> job-state: "standby";
     in property <string> job-name;
     in property <float> progress;
+    // False for a lost job Sailhand did not see printing: no progress to show.
+    in property <bool> progress-known: true;
+    // Printing time, without heating before the first extrusion and without pauses.
     in property <string> elapsed;
+    // Time from the start to the end, with heating and pauses.
+    in property <string> total-duration;
     in property <string> remaining;
     in property <string> eta;
     in property <string> layers;
-    // Height of the current layer and of the object, e.g. "2.40 / 24.00 mm"; empty if neither is known.
+    // Height of the current layer, or the one an ended job reached, and of the object, e.g. "2.40 / 24.00 mm"; empty
+    // if neither is known.
     in property <string> print-heights;
+    // Weight where known ("12 / 54 g"), else length.
     in property <string> filament;
-    // When a finished job ended, from the job history; "-" if unknown (`mmu-has-extreme-threshold` false).
+    // When a finished job ended, from the job history; empty if unknown (no history).
     in property <string> ended;
+    // Since when the print is paused ("since 14:03 · 12 min"); empty if the beginning was not seen.
+    in property <string> paused-since;
     // What the sources state about a pause or an error, one fact per line; empty if nothing is stated.
     in property <string> interruption-text;
     // Where the print stands at a pause or an error ("Layer 50 · 10.00 mm"); empty if unknown (`mmu-has-extreme-threshold` false).

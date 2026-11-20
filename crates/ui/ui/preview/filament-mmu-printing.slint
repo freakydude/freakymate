@@ -9,6 +9,7 @@ export component FilamentMmuPrintingPreview inherits AppWindow {
     init => {
         Sample.mmu();
         Printer.print-state = "printing";
+        Printer.job-state = "printing";
         Navigation.page = Page.filament;
         Navigation.filament-tab = FilamentTab.gates;
     }
