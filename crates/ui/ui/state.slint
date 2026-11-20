@@ -599,6 +599,10 @@ export enum MotionTab { axes, tune, expert, calibrate }
 // Tabs of the Thermal page; a tab the printer has nothing for falls back to the heaters.
 export enum HeatTab { heaters, fans, sensors }
 
+// Sections of the Settings tab; Network is `Page.network` (it is watched while shown), the others live on
+// `Page.settings`. A section without content falls back to the first one that has some.
+export enum SettingsSection { display, access, logs, about }
+
 export global Navigation {
     in-out property <Page> page: Page.print;
     in-out property <bool> files-open;
@@ -614,6 +618,7 @@ export global Navigation {
     // Page of gate tiles the Gates tab shows, counted from 0 within its view; -1 opens on the unit of the loaded gate.
     in-out property <int> mmu-page: -1;
     in-out property <HeatTab> heat-tab;
+    in-out property <SettingsSection> settings-section;
     // Motion page; the page shows Tune instead while a print locks the axes, so the choice comes back afterwards.
     in-out property <MotionTab> motion-tab;
     in-out property <bool> history-open;

@@ -2,7 +2,7 @@
 
 use super::ask;
 use crate::session::Session;
-use sailhand::{Actions, Confirm, Page, Printer};
+use sailhand::{Actions, Confirm, Navigation, Page, Printer, SettingsSection};
 use sailhand_core::ConnectionState;
 use slint::ComponentHandle;
 use std::time::Duration;
@@ -45,6 +45,7 @@ pub(super) fn type_and_enter(session: &mut Session, text: &str) {
 
 /// The settings show the user and offer to log out; the logout leads back to the login.
 pub(super) fn logged_in(session: &mut Session) -> Result<(), String> {
+    session.window.global::<Navigation>().set_settings_section(SettingsSection::Access);
     session.show_page(Page::Settings, "settings-logged-in")?;
     if session.window.global::<Printer>().get_login_user() != "test" {
         return Err("the settings do not show the logged-in user".into());

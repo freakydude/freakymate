@@ -1,5 +1,6 @@
-// Tabs of the system pages: the machine (Klipper, host, power devices), updates, the host's network, the printers, the console
-// and the settings of this display. Each tab is a page of its own; the navigation rail keeps System marked on all of them.
+// Tabs of the system pages: the machine (Klipper, host, power devices), updates, the printers, the settings of this
+// display (with the host's network) and the console as the way out at the end. Each tab is a page of its own; the
+// navigation rail keeps System marked on all of them.
 
 import { Icons } from "../icons.slint";
 import { Navigation, Page, Printer } from "../state.slint";
@@ -8,10 +9,11 @@ import { TabBar, TabButton } from "controls.slint";
 component SystemTab inherits TabButton {
     in property <Page> page;
     in property <string> label;
-    // Six tabs share the width of the page.
+    // The tabs share the width of the page.
     min-width: 0px;
     text: root.label;
-    checked: Navigation.page == root.page;
+    // The network is a section of the settings with a page of its own.
+    checked: Navigation.page == root.page || (root.page == Page.settings && Navigation.page == Page.network);
     clicked => { Navigation.page = root.page; }
 }
 
@@ -26,13 +28,12 @@ export component SystemTabs inherits TabBar {
         count: Printer.updates-available;
         enabled: Printer.is-connected;
     }
-    SystemTab { page: Page.network; icon: Icons.system-network; label: @tr("Network"); }
     SystemTab { page: Page.printers; icon: Icons.nav-printer; label: @tr("Printers"); }
+    SystemTab { page: Page.settings; icon: Icons.nav-settings; label: @tr("Settings"); }
     SystemTab {
         page: Page.console;
         icon: Icons.nav-console;
         label: @tr("Console");
         enabled: Printer.is-connected;
     }
-    SystemTab { page: Page.settings; icon: Icons.nav-settings; label: @tr("Settings"); }
 }

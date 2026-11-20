@@ -1,0 +1,16 @@
+// Preview: the Logs section of the Settings page as on Android, after an export. Open in the Slint preview or render
+// with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, SettingsSection, UiSettings } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component SettingsLogsPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        UiSettings.log-export-available = true;
+        UiSettings.log-export-result = "Saved as Download/sailhand-2026-11-20.log";
+        Navigation.settings-section = SettingsSection.logs;
+        Navigation.page = Page.settings;
+    }
+}

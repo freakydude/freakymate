@@ -1,11 +1,13 @@
-// The Settings tab of the system pages: settings of this display (printer, fullscreen, standby). The
-// settings of the console are on the Console tab, temperature presets in the settings file, see docs/configuration.md.
+// The Settings tab of the system pages: settings of this display, picked from a list on the left (display, the host's
+// network, access to the printer, logs, about). A section without content is not listed. The settings of the console
+// are on the Console tab, temperature presets in the settings file, see docs/configuration.md.
 
 import { Theme } from "../theme.slint";
 import { Icons } from "../icons.slint";
-import { Backlight, Confirm, Navigation, Page, Printer, PrinterChoice, UiSettings } from "../state.slint";
+import { Backlight, Confirm, Navigation, Network, Page, Printer, PrinterChoice, SettingsSection, UiSettings } from "../state.slint";
 import { Card, IconButton, ToggleRow } from "../components/controls.slint";
 import { SystemTabs } from "../components/system-tabs.slint";
+import { NetworkSection } from "network.slint";
 
 // One row of minute choices for the standby; 0 is never.
 component MinutesRow inherits VerticalLayout {
@@ -26,73 +28,45 @@ component MinutesRow inherits VerticalLayout {
     }
 }
 
-// Android only: copies the log into the Download folder, where it can be attached to a bug report.
-component LogExportRow inherits VerticalLayout {
-    spacing: Theme.spacing-tight;
-    IconButton {
-        height: Theme.row-height-small;
-        icon: Icons.ui-save;
-        text: @tr("Export log");
-        horizontal: true;
-        enabled: !UiSettings.log-export-running;
-        clicked => { UiSettings.log-export-clicked(); }
-    }
-    if UiSettings.log-export-result != "": Text {
-        text: UiSettings.log-export-result;
-        color: Theme.disabled-foreground;
-        font-size: Theme.font-small;
-        wrap: word-wrap;
-    }
-}
+// One entry of the section list; the chosen one has the accent border like the adapters of the network.
+component SectionRow inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    in property <bool> selected;
+    callback clicked;
+    height: Theme.row-height-small;
+    border-radius: Theme.radius;
+    background: row-touch.pressed ? Theme.surface-active : Theme.surface-raised;
+    accessible-role: button;
+    accessible-label: root.text;
 
-component ConnectionCard inherits Card {
-    title: @tr("Printer");
-    icon: Icons.nav-printer;
-
-    Text {
-        text: PrinterChoice.active-name;
-        color: Theme.foreground;
-        font-size: Theme.font-normal;
-        font-weight: 700;
-        overflow: elide;
-    }
-    Text {
-        text: UiSettings.moonraker;
-        color: Theme.muted;
-        font-size: Theme.font-small;
-        overflow: elide;
-    }
-    // Only when the display shows credentials; a trusted display has nothing to say here.
-    if Printer.login-user != "" || Printer.api-key: Text {
-        text: Printer.login-user != "" ? @tr("Logged in as {}", Printer.login-user) : @tr("With API key");
-        color: Theme.muted;
-        font-size: Theme.font-small;
-        overflow: elide;
-    }
-    if Printer.trusted-certificate != "": Text {
-        text: @tr("Trusted certificate {}", Printer.trusted-certificate);
-        color: Theme.muted;
-        font-size: Theme.font-small;
-        wrap: word-wrap;
+    row-touch := TouchArea {
+        clicked => { root.clicked(); }
     }
     HorizontalLayout {
+        padding-left: Theme.padding;
+        padding-right: Theme.padding;
         spacing: Theme.spacing;
-        IconButton {
-            height: Theme.row-height-small;
-            icon: Icons.nav-printer;
-            text: @tr("Printers");
-            horizontal: true;
-            clicked => { Navigation.page = Page.printers; }
+        Image {
+            cross-axis-self-alignment: center;
+            source: root.icon;
+            colorize: root.selected ? Theme.accent : Theme.foreground;
+            width: Theme.icon-large;
+            height: Theme.icon-large;
         }
-        if Printer.login-user != "": IconButton {
-            height: Theme.row-height-small;
-            icon: Icons.ui-lock;
-            text: @tr("Log out");
-            horizontal: true;
-            clicked => {
-                Confirm.ask(@tr("Log out"), @tr("The next connection needs the password again."), "log-out", "", false);
-            }
+        Text {
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            text: root.text;
+            color: root.selected ? Theme.accent : Theme.foreground;
+            font-size: Theme.font-normal;
+            overflow: elide;
         }
+    }
+    Rectangle {
+        border-radius: Theme.radius;
+        border-width: root.selected ? 2px : 0px;
+        border-color: Theme.accent;
     }
 }
 
@@ -140,7 +114,122 @@ component DisplayCard inherits Card {
     }
 }
 
+// How this display reaches the active printer: login or API key and the trusted certificate.
+component AccessCard inherits Card {
+    title: @tr("Access");
+    icon: Icons.ui-lock;
+
+    Text {
+        text: PrinterChoice.active-name;
+        color: Theme.foreground;
+        font-size: Theme.font-normal;
+        font-weight: 700;
+        overflow: elide;
+    }
+    Text {
+        text: UiSettings.moonraker;
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        overflow: elide;
+    }
+    if Printer.login-user != "" || Printer.api-key: Text {
+        text: Printer.login-user != "" ? @tr("Logged in as {}", Printer.login-user) : @tr("With API key");
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        overflow: elide;
+    }
+    if Printer.trusted-certificate != "": Text {
+        text: @tr("Trusted certificate {}", Printer.trusted-certificate);
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        wrap: word-wrap;
+    }
+    if Printer.login-user != "": HorizontalLayout {
+        alignment: start;
+        IconButton {
+            height: Theme.row-height-small;
+            icon: Icons.ui-lock;
+            text: @tr("Log out");
+            horizontal: true;
+            clicked => {
+                Confirm.ask(@tr("Log out"), @tr("The next connection needs the password again."), "log-out", "", false);
+            }
+        }
+    }
+}
+
+// Android only: copies the log into the Download folder, where it can be attached to a bug report.
+component LogsCard inherits Card {
+    title: @tr("Logs");
+    icon: Icons.system-log;
+
+    Text {
+        text: @tr("Copies the log into the Download folder, e.g. for a bug report.");
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        alignment: start;
+        IconButton {
+            height: Theme.row-height-small;
+            icon: Icons.ui-save;
+            text: @tr("Export log");
+            horizontal: true;
+            enabled: !UiSettings.log-export-running;
+            clicked => { UiSettings.log-export-clicked(); }
+        }
+    }
+    if UiSettings.log-export-result != "": Text {
+        text: UiSettings.log-export-result;
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        wrap: word-wrap;
+    }
+}
+
+component AboutCard inherits Card {
+    title: @tr("About");
+    icon: Icons.ui-info;
+
+    Text {
+        text: @tr("Sailhand {}", UiSettings.version);
+        color: Theme.foreground;
+        font-size: Theme.font-normal;
+        wrap: word-wrap;
+    }
+    // Without a file the user can reach (Android keeps it in the app's private folder) only the version.
+    if UiSettings.settings-file != "": Text {
+        text: @tr("Settings saved in {}", UiSettings.settings-file);
+        color: Theme.muted;
+        font-size: Theme.font-small;
+        wrap: word-wrap;
+    }
+}
+
 export component SettingsPage inherits Rectangle {
+    // Wide enough for the longest section name; the network next to it keeps room for its Wi-Fi buttons.
+    property <length> sections-width: 148px;
+    property <length> adapters-width: 216px;
+
+    property <bool> has-display: UiSettings.fullscreen-available || UiSettings.keep-screen-on-available
+        || Backlight.available;
+    property <bool> has-access: Printer.login-user != "" || Printer.api-key || Printer.trusted-certificate != "";
+    property <bool> has-logs: UiSettings.log-export-available;
+    property <bool> network-shown: Navigation.page == Page.network;
+    // The chosen section, or the first one with content when it has none (e.g. after logging out).
+    property <SettingsSection> shown: Navigation.settings-section == SettingsSection.display && root.has-display
+            ? SettingsSection.display
+        : Navigation.settings-section == SettingsSection.access && root.has-access ? SettingsSection.access
+        : Navigation.settings-section == SettingsSection.logs && root.has-logs ? SettingsSection.logs
+        : Navigation.settings-section == SettingsSection.about ? SettingsSection.about
+        : root.has-display ? SettingsSection.display : SettingsSection.about;
+
+    function open(section: SettingsSection) {
+        Navigation.settings-section = section;
+        Navigation.page = Page.settings;
+    }
+
     VerticalLayout {
         padding: Theme.padding;
         spacing: Theme.spacing;
@@ -150,26 +239,55 @@ export component SettingsPage inherits Rectangle {
             vertical-stretch: 1;
             spacing: Theme.spacing;
 
-            VerticalLayout {
-                // Room for "Change" and "Log out" side by side; below each other they would not fit in height.
-                width: 290px;
-                spacing: Theme.spacing;
-                ConnectionCard { vertical-stretch: 0; }
-                Rectangle { vertical-stretch: 1; }
-                if UiSettings.log-export-available: LogExportRow { vertical-stretch: 0; }
-                Text {
-                    // Without a file the user can reach (Android keeps it in the app's private folder) only the version.
-                    text: UiSettings.settings-file == "" ? @tr("Sailhand {}", UiSettings.version)
-                        : @tr("Sailhand {}\nSaved in {}", UiSettings.version, UiSettings.settings-file);
-                    color: Theme.disabled-foreground;
-                    font-size: Theme.font-small;
-                    wrap: word-wrap;
+            Card {
+                width: root.sections-width;
+                if root.has-display: SectionRow {
+                    icon: Icons.system-brightness;
+                    text: @tr("Display");
+                    selected: !root.network-shown && root.shown == SettingsSection.display;
+                    clicked => { root.open(SettingsSection.display); }
                 }
+                SectionRow {
+                    icon: Icons.system-network;
+                    text: @tr("Network");
+                    selected: root.network-shown;
+                    clicked => { Navigation.page = Page.network; }
+                }
+                if root.has-access: SectionRow {
+                    icon: Icons.ui-lock;
+                    text: @tr("Access");
+                    selected: !root.network-shown && root.shown == SettingsSection.access;
+                    clicked => { root.open(SettingsSection.access); }
+                }
+                if root.has-logs: SectionRow {
+                    icon: Icons.system-log;
+                    text: @tr("Logs");
+                    selected: !root.network-shown && root.shown == SettingsSection.logs;
+                    clicked => { root.open(SettingsSection.logs); }
+                }
+                SectionRow {
+                    icon: Icons.ui-info;
+                    text: @tr("About");
+                    selected: !root.network-shown && root.shown == SettingsSection.about;
+                    clicked => { root.open(SettingsSection.about); }
+                }
+                Rectangle { vertical-stretch: 1; }
             }
 
-            VerticalLayout {
+            if root.network-shown: NetworkSection {
                 horizontal-stretch: 1;
-                DisplayCard { vertical-stretch: 0; }
+                adapters-width: root.adapters-width;
+                init => {
+                    Network.refresh();
+                    Network.scan();
+                }
+            }
+            if !root.network-shown: VerticalLayout {
+                horizontal-stretch: 1;
+                if root.shown == SettingsSection.display: DisplayCard { vertical-stretch: 0; }
+                if root.shown == SettingsSection.access: AccessCard { vertical-stretch: 0; }
+                if root.shown == SettingsSection.logs: LogsCard { vertical-stretch: 0; }
+                if root.shown == SettingsSection.about: AboutCard { vertical-stretch: 0; }
                 Rectangle { vertical-stretch: 1; }
             }
         }
