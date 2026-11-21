@@ -114,10 +114,11 @@ component AxesTab inherits Rectangle {
             }
 
             // The mode switch at the left, the step (Buttons) or the speed limit (Live) next to it.
+            // Up to six steps fill the row; space-between leaves out the spacing a filler would cost.
             HorizontalLayout {
                 spacing: Theme.spacing;
+                alignment: space-between;
                 ModeSwitch { live <=> Navigation.axes-live; }
-                Rectangle { horizontal-stretch: 1; }
                 if !Navigation.axes-live: StepSelector {
                     label: @tr("Step");
                     values: UiSettings.move-steps;

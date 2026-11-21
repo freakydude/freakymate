@@ -15,7 +15,8 @@ export component ModeSwitch inherits HorizontalLayout {
 
     spacing: Theme.spacing-small;
     for label[i] in [@tr("Buttons"), @tr("Live")]: Rectangle {
-        min-width: 76px;
+        // As wide as icon and word, never squeezed below: the row is full with six steps beside it.
+        min-width: chip-content.preferred-width;
         height: Theme.row-height-small;
         border-radius: Theme.radius;
         background: (i == 1) == root.live || chip-touch.pressed ? Theme.surface-active : Theme.surface-raised;
@@ -27,9 +28,9 @@ export component ModeSwitch inherits HorizontalLayout {
             clicked => { root.live = i == 1; }
         }
 
-        HorizontalLayout {
-            padding-left: Theme.padding;
-            padding-right: Theme.padding;
+        chip-content := HorizontalLayout {
+            padding-left: Theme.spacing-medium;
+            padding-right: Theme.spacing-medium;
             spacing: Theme.spacing-small;
             alignment: center;
             Image {
