@@ -13,6 +13,8 @@ pub(super) fn parse(name: &str, args: &[&str]) -> Result<Option<Command>, Comman
         "G90" => Ok(Command::AbsolutePositioning),
         "G91" => Ok(Command::RelativePositioning),
         "G0" | "G1" => Ok(Command::Move(parse_move(args)?)),
+        "SAVE_GCODE_STATE" => Ok(Command::SaveGcodeState(state_name(args))),
+        "RESTORE_GCODE_STATE" => Ok(Command::RestoreGcodeState(state_name(args))),
         "SET_GCODE_OFFSET" => {
             Ok(Command::SetGcodeOffset { z: named_value(args, "Z")?, z_adjust: named_value(args, "Z_ADJUST")? })
         }
@@ -60,4 +62,8 @@ fn parse_axes(args: &[&str]) -> Vec<Axis> {
             _ => None,
         })
         .collect()
+}
+
+fn state_name(args: &[&str]) -> String {
+    named_text(args, "NAME").unwrap_or_else(|| "default".to_owned())
 }

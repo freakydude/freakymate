@@ -361,6 +361,28 @@ export struct PrintObjectItem {
     outline: string,
 }
 
+// The live pad of Motion > Axes: the reachable area in the displayed coordinates (those of `Printer.position-*`), Z
+// from the lowest height the pad drives to (`z-floor`) up to the axis maximum. `floor-is-print`: the floor is the
+// height of the paused print, not Z 0. `known`: Klipper reported axis limits.
+export struct AxesAreaItem {
+    known: bool,
+    x-min: float,
+    x-max: float,
+    y-min: float,
+    y-max: float,
+    z-floor: float,
+    z-max: float,
+    floor-is-print: bool,
+}
+
+// The number entry of one axis ("Move X to"): `position` in G-code coordinates, which the entry starts from and takes;
+// `now` the same, formatted with unit; `range` what Klipper takes for this axis, formatted ("0 – 301 mm").
+export struct AxisEntryItem {
+    position: float,
+    now: string,
+    range: string,
+}
+
 // View box of the bed map: the bed in mm, Y upwards; `grid` as path commands.
 export struct BedMapItem {
     shown: bool,

@@ -18,6 +18,7 @@ mod job_watch;
 mod leveling;
 mod macros;
 mod motion;
+pub mod moves;
 mod pending;
 mod setup;
 mod status;
@@ -44,7 +45,7 @@ pub use macros::{
     macro_script, offered_macros,
 };
 pub use motion::{Axis, Bed, BedPoint, HomedAxes, Motion};
-pub use pending::PendingTargets;
+pub use pending::{PendingMoves, PendingTargets};
 pub use setup::{Setup, lists_command, tool_commands};
 pub(in crate::sources) use status::KlipperParts;
 pub use status::{Activity, KlippyState, label};

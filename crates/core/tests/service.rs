@@ -120,6 +120,19 @@ async fn connects_detects_capabilities_and_follows_state() {
 
     service.send(Command::Jog { axis: Axis::X, distance: 25.0 });
     wait_for(&mut channels, |snapshot| snapshot.status.motion.position[0] == 25.0).await;
+
+    // With a G-code offset every step moves by its distance, and quick steps build on each other before Klipper
+    // reports the position back.
+    service.send(Command::RunGcode { script: "SET_GCODE_OFFSET Z=-0.5".into() });
+    wait_for(&mut channels, |snapshot| snapshot.status.motion.gcode_position[2] == 0.5).await;
+    for _ in 0..3 {
+        service.send(Command::Jog { axis: Axis::Z, distance: 5.0 });
+    }
+    let moved = wait_for(&mut channels, |snapshot| snapshot.status.motion.gcode_position[2] == 15.5).await;
+    assert_eq!(moved.status.motion.position[2], 15.0);
+    service.send(Command::MoveTo { axis: Axis::Z, position: 2.0 });
+    let typed = wait_for(&mut channels, |snapshot| snapshot.status.motion.gcode_position[2] == 2.0).await;
+    assert_eq!(typed.status.motion.position[2], 1.5);
 }
 
 #[tokio::test(flavor = "multi_thread")]

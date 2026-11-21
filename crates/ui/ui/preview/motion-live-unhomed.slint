@@ -1,0 +1,21 @@
+// Preview: Motion > Axes in Live mode with X, Y and Z not homed. Open in the Slint preview or render with
+// scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { MotionTab, Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component MotionLiveUnhomedPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Printer.homed-x = false;
+        Printer.homed-y = false;
+        Printer.homed-z = false;
+        Navigation.page = Page.motion;
+        Navigation.motion-tab = MotionTab.axes;
+    }
+
+    // The Motion page opens on the buttons (its init resets the switch), so the preview switches once it is up.
+    property <Page> page: Navigation.page;
+    changed page => { Navigation.axes-live = true; }
+}

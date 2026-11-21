@@ -87,6 +87,23 @@ fn load_selected_gate(session: &mut Session) -> Result<(), String> {
     })
 }
 
+/// `M117` shows as the caption of the job thumbnail; an empty `M117` clears it again.
+fn display_message(session: &mut Session) -> Result<(), String> {
+    const MESSAGE: &str = "Part 2 of 3: lid with hinge. Check the first layer of the brim";
+    session.window.global::<Navigation>().set_page(Page::Print);
+    session.service.send(Command::RunGcode { script: format!("M117 {MESSAGE}") });
+    session.wait_until("display message set", |snapshot| snapshot.status.job.display_message == MESSAGE)?;
+    session.pump(Duration::from_millis(300));
+    session.capture("print-message")?;
+    session.service.send(Command::RunGcode { script: "M117".into() });
+    session.wait_until("display message cleared", |snapshot| snapshot.status.job.display_message.is_empty())?;
+    session.pump(Duration::from_millis(300));
+    if !session.window.global::<Printer>().get_display_message().is_empty() {
+        return Err("display-message still set after an empty M117".into());
+    }
+    Ok(())
+}
+
 pub(super) fn printing(session: &mut Session) -> Result<(), String> {
     load_selected_gate(session)?;
     session.service.send(Command::StartPrint { filename: "benchy.gcode".into() });
@@ -104,7 +121,7 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
     // The axes stand still: Axes and Calibrate are greyed out and the page shows Tune.
     session.show_page(Page::Motion, "motion-printing")?;
 
-    session.window.global::<Navigation>().set_page(Page::Print);
+    display_message(session)?;
     pause_at_next_layer(session)?;
     session.capture("print-paused")?;
     // Jogging stays possible, homing, leveling and motors off do not (the paused print resumes from its position).
@@ -112,6 +129,10 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
         return Err("position-locked off while the print is paused".into());
     }
     session.show_page(Page::Motion, "motion-paused")?;
+    // The pad stops at the height of the paused print.
+    session.window.global::<Navigation>().set_axes_live(true);
+    session.capture("motion-paused-live")?;
+    session.window.global::<Navigation>().set_axes_live(false);
     session.show_page(Page::Filament, "printing-paused-filament")?;
     session.window.global::<Navigation>().set_page(Page::Print);
     exclude_object(session)?;

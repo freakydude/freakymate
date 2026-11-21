@@ -2,10 +2,10 @@
 
 import { Icons } from "icons.slint";
 import { Theme } from "theme.slint";
-import { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, PrinterItem, WifiItem, AdapterStatus, AdapterItem, HostInterfaceItem } from "structs.slint";
+import { Severity, Page, AxesAreaItem, AxisEntryItem, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, PrinterItem, WifiItem, AdapterStatus, AdapterItem, HostInterfaceItem } from "structs.slint";
 import { Actions } from "actions.slint";
 
-export { Severity, Page, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, PrinterItem, WifiItem, AdapterStatus, AdapterItem, HostInterfaceItem } from "structs.slint";
+export { Severity, Page, AxesAreaItem, AxisEntryItem, HeaterItem, HeadItem, SensorItem, FanItem, LedItem, LedEffectItem, TuningItem, FilamentSensorItem, BarColors, MmuGateItem, MmuGatePage, MmuPageRange, ToolMatchItem, ChartLabel, PidValueItem, FilamentPathItem, PathPartItem, PathPartKind, SpoolItem, MmuSensorItem, AfcHubReturnItem, AfcToolItem, PrintObjectItem, BedMapItem, BedMeshMap, MeshCellItem, MeshFrameItem, ScrewItem, EddyValue, FileItem, ConsoleItem, MessageItem, MacroItem, MacroParamItem, PowerItem, UpdateItem, PresetItem, PrinterItem, WifiItem, AdapterStatus, AdapterItem, HostInterfaceItem } from "structs.slint";
 export { Actions } from "actions.slint";
 
 
@@ -69,6 +69,9 @@ export global Printer {
     in property <string> interruption-position;
     // The first fact of it alone, for the status bar.
     in property <string> interruption-headline;
+    // What a macro shows with M117 or SET_DISPLAY_TEXT (`display_status.message`); empty when none is set or an
+    // empty M117 cleared it.
+    in property <string> display-message;
     // A pause at a layer can be planned with Mainsail's macros (only while the slicer reports the layers).
     in property <bool> layer-pause-next;
     in property <bool> layer-pause-at;
@@ -89,6 +92,9 @@ export global Printer {
     in property <bool> homed-x;
     in property <bool> homed-y;
     in property <bool> homed-z;
+    in property <AxesAreaItem> axes-area;
+    // X, Y, Z in this order.
+    in property <[AxisEntryItem]> axis-entries: [{}, {}, {}];
     in property <float> z-offset;
     // `z_thermal_adjust`: the Z shift it applies on top of the babystep; shown only when the module is on.
     in property <bool> has-thermal-z;
@@ -429,6 +435,11 @@ export global UiSettings {
     // Both sides of the manual probe: the minus side descending, then the plus side ascending.
     in property <[float]> manual-probe-steps: [-1, -0.1, -0.05, -0.01, 0.01, 0.05, 0.1, 1];
     in-out property <float> move-step: 10;
+    // Live pad: the speed limits on offer and the chosen one (mm/s); the pad sends `Actions.drive` at this interval
+    // while held, Rust sets it from the core.
+    in property <[float]> drive-speeds: [10, 50, 150];
+    in-out property <float> drive-speed: 50;
+    in property <duration> drive-interval: 100ms;
     in-out property <float> z-offset-step: 0.025;
     in-out property <float> temperature-step: 5;
     in-out property <float> extrude-length: 10;
@@ -621,6 +632,8 @@ export global Navigation {
     in-out property <SettingsSection> settings-section;
     // Motion page; the page shows Tune instead while a print locks the axes, so the choice comes back afterwards.
     in-out property <MotionTab> motion-tab;
+    // Motion > Axes shows the live pad instead of the buttons; back to the buttons whenever the page opens.
+    in-out property <bool> axes-live;
     in-out property <bool> history-open;
     // Width to height of the drawing area of the temperature chart; the chart's lines are drawn for this shape.
     in-out property <float> history-aspect: 2;

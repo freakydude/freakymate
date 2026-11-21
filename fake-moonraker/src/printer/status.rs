@@ -125,7 +125,7 @@ impl Printer {
                 "extrude_factor": self.extrude_factor,
             },
             "print_stats": self.print_stats_json(),
-            "display_status": { "progress": round(self.progress(), 4), "message": null },
+            "display_status": { "progress": round(self.progress(), 4), "message": self.display_message },
             "motion_report": {
                 "live_position": self.rounded_position(),
                 "live_velocity": 0.0,

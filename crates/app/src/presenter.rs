@@ -21,7 +21,7 @@ use crate::{
     AppWindow, FanItem, FilamentSensorItem, HeadItem, HeaterItem, HostInterfaceItem, LedEffectItem, LedItem, Network,
     PowerItem, Printer, SensorItem, ToolMatchItem, TuningItem, UiSettings, UpdateItem,
 };
-use crate::{bed_map, format, thumbnail, view};
+use crate::{axes_view, bed_map, format, thumbnail, view};
 use chrono::Local;
 use sailhand_core::domain::filament::{self, FilamentHandling};
 use sailhand_core::domain::filament_match::{self, ToolMatch};
@@ -36,7 +36,7 @@ use sailhand_core::domain::temperature_limits::HeaterWatch;
 use sailhand_core::domain::{estimates, light, pause};
 use sailhand_core::sources::PrinterStatus;
 use sailhand_core::sources::klipper::commands::{MeshNameProblem, mesh_name_problem};
-use sailhand_core::sources::klipper::{BED_HEATER, KlippyState, Leveling, NOZZLE_HEATER, tuning};
+use sailhand_core::sources::klipper::{Axis, BED_HEATER, KlippyState, Leveling, NOZZLE_HEATER, moves, tuning};
 use sailhand_core::sources::klipper::{ExtruderState, PrintJob};
 use sailhand_core::sources::moonraker_server::files::{FileEntry, FileMetadata, ThumbnailImage};
 use sailhand_core::sources::moonraker_server::gcode_store::{ConsoleKind, ConsoleLine};
@@ -349,6 +349,8 @@ impl Presenter {
         printer.set_homed_x(motion.homed.x);
         printer.set_homed_y(motion.homed.y);
         printer.set_homed_z(motion.homed.z);
+        printer.set_axes_area(axes_view::axes_area(motion, &status.job));
+        printer.set_axis_entries(ModelRc::new(VecModel::from(axes_view::axis_entries(motion))));
         printer.set_z_offset(motion.homing_origin[2] as f32);
         printer.set_has_thermal_z(motion.thermal_z_adjust.is_some());
         printer.set_thermal_z(motion.thermal_z_adjust.unwrap_or_default() as f32);
@@ -552,6 +554,7 @@ impl Presenter {
         let job = &shown.job;
         printer.set_job_state(job.state.as_str().into());
         printer.set_filename(job.filename.as_str().into());
+        printer.set_display_message(status.job.display_message.trim().into());
         printer.set_progress(job.progress as f32);
         printer.set_progress_known(shown.progress_known);
         let metadata = cache.files.catalog.metadata(&job.filename);
@@ -913,6 +916,12 @@ impl Presenter {
     }
 
     /// Klipper would refuse `typed` as the target of `heater`; a text that is no number is not judged.
+    /// Klipper would refuse the typed position of `axis` (G-code coordinates); false while it is no number.
+    pub fn move_target_outside(&self, axis: Axis, typed: &str) -> bool {
+        let Ok(position) = typed.trim().parse::<f64>() else { return false };
+        moves::outside_range(&self.snapshot().status.motion, axis, position)
+    }
+
     pub fn heater_target_outside(&self, heater: &str, typed: &str) -> bool {
         let Ok(target) = typed.trim().parse::<f64>() else { return false };
         self.snapshot().status.heater(heater).is_some_and(|heater| !heater.accepts_target(target))

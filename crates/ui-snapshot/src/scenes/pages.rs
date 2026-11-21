@@ -111,6 +111,7 @@ pub(super) fn pages(session: &mut Session) -> Result<(), String> {
                 session.show_page(Page::Motion, "motion-expert")?;
             }
             session.window.global::<Navigation>().set_motion_tab(MotionTab::Axes);
+            live_pad(session)?;
         }
         if page == Page::Filament && session.presenter.snapshot().status.mmu.is_some() {
             session.window.global::<Navigation>().set_filament_tab(FilamentTab::Gates);
@@ -228,5 +229,30 @@ fn unit_pages(session: &mut Session) -> Result<(), String> {
         session.capture(&format!("filament-units-{page}"))?;
     }
     session.window.global::<Navigation>().set_mmu_page(-1);
+    Ok(())
+}
+
+/// Middle of the XY pad in the 800x480 layout, and how far the finger drags to the right (logical pixels).
+const XY_PAD_CENTRE: (f32, f32) = (285.0, 254.0);
+const PAD_DRAG: f32 = 90.0;
+
+/// Motion > Axes in the Live view: the pads, then a drag to the right that must move the head in +X while held.
+fn live_pad(session: &mut Session) -> Result<(), String> {
+    session.window.global::<Navigation>().set_axes_live(true);
+    session.service.send(Command::Home { x: true, y: true, z: true });
+    session.wait_until("homed for the pad", |snapshot| snapshot.status.motion.homed.all())?;
+    session.capture("motion-live")?;
+    if session.has_reference_layout() {
+        let start = session.presenter.snapshot().status.motion.position[0];
+        let (x, y) = XY_PAD_CENTRE;
+        session.press(x, y);
+        session.pointer_move(x + PAD_DRAG, y);
+        session.pump(Duration::from_millis(600));
+        session.capture("motion-live-drag")?;
+        session.release(x + PAD_DRAG, y);
+        session
+            .wait_until("the pad moved the head in +X", |snapshot| snapshot.status.motion.position[0] > start + 5.0)?;
+    }
+    session.window.global::<Navigation>().set_axes_live(false);
     Ok(())
 }

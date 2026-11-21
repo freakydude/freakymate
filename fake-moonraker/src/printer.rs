@@ -14,6 +14,7 @@ use crate::machine::{FILAMENT_SENSORS, MachineProfile};
 use crate::pid_tuning::{self, PidConfig, PidRun};
 use crate::print_objects::{self, Definitions};
 use serde_json::{Map, Value, json};
+use std::collections::HashMap;
 use std::time::Duration;
 
 mod afc;
@@ -246,6 +247,8 @@ pub struct Printer {
     homed: [bool; 3],
     relative_positioning: bool,
     relative_extrusion: bool,
+    /// Positioning modes (relative positioning, relative extrusion) by the name of `SAVE_GCODE_STATE`.
+    saved_gcode_states: HashMap<String, (bool, bool)>,
     fan_speed: f64,
     speed_factor: f64,
     extrude_factor: f64,
@@ -266,6 +269,8 @@ pub struct Printer {
     print_state: PrintState,
     filename: String,
     message: String,
+    /// `display_status.message`: set by `M117` and `SET_DISPLAY_TEXT`, kept across prints.
+    display_message: Option<String>,
     print_duration: f64,
     total_duration: f64,
     job: Option<PrintJob>,
@@ -321,6 +326,7 @@ impl Printer {
             homed: [false; 3],
             relative_positioning: false,
             relative_extrusion: false,
+            saved_gcode_states: HashMap::new(),
             fan_speed: 0.0,
             speed_factor: 1.0,
             extrude_factor: 1.0,
@@ -341,6 +347,7 @@ impl Printer {
             print_state: PrintState::Standby,
             filename: String::new(),
             message: String::new(),
+            display_message: None,
             print_duration: 0.0,
             total_duration: 0.0,
             job: None,
@@ -485,6 +492,16 @@ impl Printer {
             Command::SetFanSpeed(speed) => self.set_part_fan_speed(speed),
             Command::AbsolutePositioning => self.relative_positioning = false,
             Command::RelativePositioning => self.relative_positioning = true,
+            Command::SaveGcodeState(name) => {
+                self.saved_gcode_states.insert(name, (self.relative_positioning, self.relative_extrusion));
+            }
+            Command::RestoreGcodeState(name) => {
+                let Some(&(positioning, extrusion)) = self.saved_gcode_states.get(&name) else {
+                    // Klipper's text (klippy/extras/gcode_move.py, cmd_RESTORE_GCODE_STATE).
+                    return Err(CommandError::new(format!("Unknown g-code state: {name}")));
+                };
+                (self.relative_positioning, self.relative_extrusion) = (positioning, extrusion);
+            }
             Command::Move(movement) => self.move_toolhead(movement)?,
             Command::DisableSteppers => self.homed = [false; 3],
             Command::SetGcodeOffset { z, z_adjust } => self.set_z_offset(z, z_adjust),
@@ -516,6 +533,7 @@ impl Printer {
             Command::Toolchanger(command) => self.apply_toolchanger(command)?,
             Command::Afc(command) => self.apply_afc(command)?,
             Command::LayerPause(command) => self.layer_pause.apply(command),
+            Command::DisplayText(message) => self.display_message = message,
             Command::FakePrintError => self.fail_print()?,
             // The session delays the answer of a dwell; the printer itself does nothing.
             Command::Help | Command::Dwell(_) | Command::Ignored => {}
@@ -795,7 +813,7 @@ impl Printer {
             if !self.homed[index] {
                 return Err(CommandError::new("Must home axis first"));
             }
-            let position = self.resolve(self.position[index], value);
+            let position = self.resolve(index, value);
             if !(AXIS_MINIMUM[index]..=AXIS_MAXIMUM[index]).contains(&position) {
                 return Err(CommandError::new("Move out of range"));
             }
@@ -815,8 +833,15 @@ impl Printer {
         Ok(())
     }
 
-    fn resolve(&self, current: f64, value: f64) -> f64 {
-        if self.relative_positioning { current + value } else { value }
+    /// Where a G-code value takes the toolhead: an absolute value is in G-code coordinates, to which Klipper adds
+    /// the G-code offset (`homing_origin`; klippy/extras/gcode_move.py `cmd_G1`).
+    fn resolve(&self, index: usize, value: f64) -> f64 {
+        if self.relative_positioning {
+            self.position[index] + value
+        } else {
+            let origin = if index == Axis::Z.index() { self.z_offset } else { 0.0 };
+            value + origin
+        }
     }
 
     fn set_z_offset(&mut self, z: Option<f64>, z_adjust: Option<f64>) {

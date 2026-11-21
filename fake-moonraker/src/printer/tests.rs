@@ -109,6 +109,19 @@ fn gcode_offset_adjusts_homing_origin() {
 }
 
 #[test]
+fn absolute_moves_add_the_gcode_offset_and_the_state_comes_back() {
+    let mut printer = printer();
+    run(&mut printer, "G28\nSET_GCODE_OFFSET Z=-0.5\nG91").unwrap();
+    run(&mut printer, "SAVE_GCODE_STATE NAME=s\nG90\nG1 Z10\nRESTORE_GCODE_STATE NAME=s").unwrap();
+    assert_eq!(printer.status()["toolhead"]["position"][2], json!(9.5));
+    assert_eq!(printer.status()["gcode_move"]["gcode_position"][2], json!(10.0));
+    // Restored to relative positioning: a further G1 moves by its value.
+    run(&mut printer, "G1 Z1").unwrap();
+    assert_eq!(printer.status()["toolhead"]["position"][2], json!(10.5));
+    assert!(run(&mut printer, "RESTORE_GCODE_STATE NAME=missing").is_err());
+}
+
+#[test]
 fn print_runs_to_completion_and_switches_heaters_off() {
     let mut printer = printer();
     let file = Catalog::demo().find("calibration_cube.gcode").unwrap().clone();
@@ -808,4 +821,18 @@ fn a_shutdown_in_a_job_ends_it_in_the_history() {
     printer.emergency_stop();
 
     assert_eq!(printer.ended_job(1.0).unwrap()["status"], "klippy_shutdown");
+}
+
+#[test]
+fn the_display_message_is_set_and_cleared_like_klipper() {
+    let mut printer = printer();
+    assert!(printer.status()["display_status"]["message"].is_null());
+    run(&mut printer, "M117 Hello World").unwrap();
+    assert_eq!(printer.status()["display_status"]["message"], "Hello World");
+    run(&mut printer, "M117").unwrap();
+    assert!(printer.status()["display_status"]["message"].is_null());
+    run(&mut printer, "SET_DISPLAY_TEXT MSG=\"Layer 2\"").unwrap();
+    assert_eq!(printer.status()["display_status"]["message"], "Layer 2");
+    run(&mut printer, "SET_DISPLAY_TEXT").unwrap();
+    assert!(printer.status()["display_status"]["message"].is_null());
 }

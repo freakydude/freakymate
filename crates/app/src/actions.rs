@@ -2,7 +2,7 @@
 
 use crate::presenter::Presenter;
 use crate::settings_controller::SettingsController;
-use crate::{Actions, AppWindow};
+use crate::{Actions, AppWindow, UiSettings};
 use sailhand_core::domain::machine_tree::LaneId;
 use sailhand_core::domain::manual_probe::Direction;
 use sailhand_core::moonraker::CertificateFingerprint;
@@ -10,7 +10,7 @@ use sailhand_core::sources::happy_hare::commands::{Gates, ServoCommand};
 use sailhand_core::sources::klipper::tuning::TuningKey;
 use sailhand_core::sources::klipper::{Axis, CentreOf, EddyTap, TestZ};
 use sailhand_core::{Command, PrinterService, Query};
-use slint::platform::WindowEvent;
+use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::rc::Rc;
 use std::time::Duration;
@@ -22,7 +22,7 @@ pub fn bind(
     settings: &Rc<SettingsController>,
 ) {
     let actions = window.global::<Actions>();
-    bind_motion(&actions, service);
+    bind_motion(window, &actions, service, presenter);
     bind_temperatures(&actions, service, presenter, settings);
     bind_calibration(&actions, service, presenter);
     bind_filament(&actions, service);
@@ -39,7 +39,7 @@ pub fn bind(
     actions.on_press_key(move |text| press_key(&key_window, text));
 }
 
-fn bind_motion(actions: &Actions, service: &PrinterService) {
+fn bind_motion(window: &AppWindow, actions: &Actions, service: &PrinterService, presenter: &Rc<Presenter>) {
     let home_service = service.clone();
     actions.on_home(move |x, y, z| home_service.send(Command::Home { x, y, z }));
     let jog_service = service.clone();
@@ -47,6 +47,23 @@ fn bind_motion(actions: &Actions, service: &PrinterService) {
         if let Some(axis) = parse_axis(&axis) {
             jog_service.send(Command::Jog { axis, distance: f64::from(distance) });
         }
+    });
+    let move_service = service.clone();
+    actions.on_move_to(move |axis, position| {
+        if let Some(axis) = parse_axis(&axis) {
+            move_service.send(Command::MoveTo { axis, position: f64::from(position) });
+        }
+    });
+    let drive_service = service.clone();
+    let drive_window = window.as_weak();
+    actions.on_drive(move |x, y, z| {
+        let Some(window) = drive_window.upgrade() else { return };
+        let max_speed = f64::from(window.global::<UiSettings>().get_drive_speed());
+        drive_service.send(Command::Drive { deflection: [x, y, z].map(f64::from), max_speed });
+    });
+    let outside_presenter = Rc::clone(presenter);
+    actions.on_move_target_outside(move |axis, typed| {
+        parse_axis(&axis).is_some_and(|axis| outside_presenter.move_target_outside(axis, &typed))
     });
     actions.on_disable_motors(send(service, || Command::DisableMotors));
     actions.on_level(send(service, || Command::Level));
@@ -436,12 +453,26 @@ fn bind_layer_pause(actions: &Actions, service: &PrinterService, presenter: &Rc<
 /// Types a key of the on-screen keyboard into the focused field, as a physical keyboard would. Deferred, because the
 /// tap that caused it is still being handled.
 fn press_key(window: &slint::Weak<AppWindow>, text: SharedString) {
+    let kind = key_kind(&text);
+    log::debug!("on-screen key: {kind}");
     let window = window.clone();
     slint::Timer::single_shot(Duration::ZERO, move || {
         let Some(window) = window.upgrade() else { return };
+        log::debug!("on-screen key delivered: {kind}");
         window.window().dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
         window.window().dispatch_event(WindowEvent::KeyReleased { text });
     });
+}
+
+/// Which kind of key, for the log; never the character itself, since the same keys type passwords.
+fn key_kind(text: &str) -> &'static str {
+    match text.chars().next() {
+        Some(key) if key == char::from(Key::Return) => "enter",
+        Some(key) if key == char::from(Key::Backspace) => "backspace",
+        Some(key) if key.is_control() || u32::from(key) >= 0xF700 => "control",
+        Some(_) => "character",
+        None => "none",
+    }
 }
 
 /// A weight as typed, in grams; a comma as decimal separator is fine. Zero and negative are no weights.
@@ -524,6 +555,13 @@ fn round_offset(value: f32) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn on_screen_keys_are_logged_by_kind_only() {
+        assert_eq!(key_kind(&SharedString::from(Key::Return)), "enter");
+        assert_eq!(key_kind(&SharedString::from(Key::Backspace)), "backspace");
+        assert_eq!(key_kind("7"), "character");
+    }
 
     #[test]
     fn axis_names_and_rounding() {

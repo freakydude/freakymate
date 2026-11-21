@@ -1,0 +1,18 @@
+// Preview: Motion > Axes in Live mode (the live pad, idle). Open in the Slint preview or render with
+// scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { MotionTab, Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component MotionLivePreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.motion;
+        Navigation.motion-tab = MotionTab.axes;
+    }
+
+    // The Motion page opens on the buttons (its init resets the switch), so the preview switches once it is up.
+    property <Page> page: Navigation.page;
+    changed page => { Navigation.axes-live = true; }
+}

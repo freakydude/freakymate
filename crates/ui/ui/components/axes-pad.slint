@@ -1,0 +1,445 @@
+// The live view of Motion > Axes: a joystick pad for X/Y and one for Z, the switch between buttons and pad, and the
+// number entry "Move X to". The pads show where the head is (rulers at the edges, so the finger does not cover the
+// values) and send the finger's deflection from where it touched down as `Actions.drive`, every
+// `UiSettings.drive-interval` while held; nothing on release, the timer stops with the touch.
+
+import { Theme } from "../theme.slint";
+import { Units } from "../units.slint";
+import { Icons } from "../icons.slint";
+import { Actions, AxisEntryItem, Printer, UiSettings } from "../state.slint";
+import { NumberEntryDialog } from "entry-dialogs.slint";
+
+// Two chips like those of the StepSelector: Buttons | Live.
+export component ModeSwitch inherits HorizontalLayout {
+    in-out property <bool> live;
+
+    spacing: Theme.spacing-small;
+    for label[i] in [@tr("Buttons"), @tr("Live")]: Rectangle {
+        min-width: 76px;
+        height: Theme.row-height-small;
+        border-radius: Theme.radius;
+        background: (i == 1) == root.live || chip-touch.pressed ? Theme.surface-active : Theme.surface-raised;
+        border-width: (i == 1) == root.live ? 2px : 0px;
+        border-color: Theme.accent;
+        accessible-role: button;
+        accessible-label: label;
+        chip-touch := TouchArea {
+            clicked => { root.live = i == 1; }
+        }
+
+        HorizontalLayout {
+            padding-left: Theme.padding;
+            padding-right: Theme.padding;
+            spacing: Theme.spacing-small;
+            alignment: center;
+            Image {
+                source: i == 0 ? Icons.nav-move : Icons.motion-speed;
+                colorize: Theme.foreground;
+                width: Theme.icon-small;
+                height: Theme.icon-small;
+                y: (parent.height - self.height) / 2;
+            }
+            Text {
+                text: label;
+                color: Theme.foreground;
+                font-size: Theme.font-small;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// Marker triangles of the rulers, pointing at the head.
+component RulerMarker inherits Path {
+    // Where the tip points: "up" (X ruler under its pad), "right" (Y ruler left of its pad), "left" (Z ruler).
+    in property <string> tip;
+    viewbox-width: 8;
+    viewbox-height: 8;
+    fill: Theme.accent;
+    commands: root.tip == "right" ? "M 8 4 L 0 0 L 0 8 Z" : root.tip == "left" ? "M 0 4 L 8 0 L 8 8 Z" : "M 4 0 L 8 8 L 0 8 Z";
+}
+
+// The marks of a held pad: the touch-down point, the finger and the line between them (pad coordinates).
+component DragMarks inherits Rectangle {
+    in property <bool> pressed;
+    in property <length> origin-x;
+    in property <length> origin-y;
+    in property <length> finger-x;
+    in property <length> finger-y;
+
+    property <length> origin-ring: 44px;
+    property <length> finger-circle: 48px;
+    property <length> line-width: 2px;
+
+    if root.pressed: Path {
+        x: 0;
+        y: 0;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        stroke: Theme.accent;
+        stroke-width: root.line-width;
+        MoveTo { x: root.origin-x / 1px; y: root.origin-y / 1px; }
+        LineTo { x: root.finger-x / 1px; y: root.finger-y / 1px; }
+    }
+    if root.pressed: Rectangle {
+        x: root.origin-x - root.origin-ring / 2;
+        y: root.origin-y - root.origin-ring / 2;
+        width: root.origin-ring;
+        height: root.origin-ring;
+        border-radius: root.origin-ring / 2;
+        border-width: 2px;
+        border-color: Theme.muted;
+    }
+    if root.pressed: Rectangle {
+        x: root.finger-x - root.finger-circle / 2;
+        y: root.finger-y - root.finger-circle / 2;
+        width: root.finger-circle;
+        height: root.finger-circle;
+        border-radius: root.finger-circle / 2;
+        background: Theme.foreground.with-alpha(0.25);
+    }
+}
+
+// X/Y: a pad of the shape of the reachable area, with the X ruler under it and the Y ruler left of it.
+component XyPad inherits Rectangle {
+    property <length> y-ruler-width: 64px;
+    property <length> x-ruler-height: 28px;
+    property <length> head-dot: 14px;
+    property <length> marker: 8px;
+    property <length> ruler-gap: 3px;
+    property <length> x-label-width: 96px;
+    property <float> grid-step: 50;
+    property <float> crosshair-alpha: 0.45;
+    // Full deflection at this share of the shorter side of the pad.
+    property <float> full-scale-share: 0.4;
+
+    property <bool> enabled: Printer.homed-x && Printer.homed-y && Printer.axes-area.known;
+    property <float> span-x: max(Printer.axes-area.x-max - Printer.axes-area.x-min, 1);
+    property <float> span-y: max(Printer.axes-area.y-max - Printer.axes-area.y-min, 1);
+    property <length> available-width: root.width - root.y-ruler-width;
+    property <length> available-height: root.height - root.x-ruler-height;
+    property <length> pad-width: min(root.available-width, root.available-height * root.span-x / root.span-y);
+    property <length> pad-height: root.pad-width * root.span-y / root.span-x;
+    property <length> pad-x: root.y-ruler-width + (root.available-width - root.pad-width) / 2;
+    property <length> head-x: root.pad-width * clamp((Printer.position-x - Printer.axes-area.x-min) / root.span-x, 0, 1);
+    property <length> head-y: root.pad-height * (1 - clamp((Printer.position-y - Printer.axes-area.y-min) / root.span-y, 0, 1));
+    property <length> full-scale: root.full-scale-share * min(root.pad-width, root.pad-height);
+    // Deflection of the finger as a vector with the length clamped to 1; Y up.
+    property <float> raw-x: touch.pressed ? (touch.mouse-x - touch.pressed-x) / root.full-scale : 0;
+    property <float> raw-y: touch.pressed ? (touch.pressed-y - touch.mouse-y) / root.full-scale : 0;
+    property <float> magnitude: sqrt(root.raw-x * root.raw-x + root.raw-y * root.raw-y);
+    property <float> deflection-x: root.raw-x / max(root.magnitude, 1);
+    property <float> deflection-y: root.raw-y / max(root.magnitude, 1);
+
+    Timer {
+        interval: UiSettings.drive-interval;
+        running: touch.pressed && root.enabled;
+        triggered => { Actions.drive(root.deflection-x, root.deflection-y, 0); }
+    }
+
+    pad := Rectangle {
+        x: root.pad-x;
+        y: 0;
+        width: root.pad-width;
+        height: root.pad-height;
+        border-radius: Theme.radius;
+        background: Theme.surface;
+        border-width: 1px;
+        border-color: Theme.border;
+        clip: true;
+
+        // Grid every 50 mm, centred on the middle of the bed: one line through it, then outwards in both directions.
+        for k in 21: Rectangle {
+            x: root.pad-width * (((Printer.axes-area.x-min + Printer.axes-area.x-max) / 2 + (k - 10) * root.grid-step - Printer.axes-area.x-min) / root.span-x);
+            y: 0;
+            width: 1px;
+            height: parent.height;
+            background: Theme.border;
+        }
+        for k in 21: Rectangle {
+            x: 0;
+            y: root.pad-height * (1 - ((Printer.axes-area.y-min + Printer.axes-area.y-max) / 2 + (k - 10) * root.grid-step - Printer.axes-area.y-min) / root.span-y);
+            width: parent.width;
+            height: 1px;
+            background: Theme.border;
+        }
+
+        if root.enabled: Rectangle { x: root.head-x; y: 0; width: 1px; height: parent.height; background: Theme.accent.with-alpha(root.crosshair-alpha); }
+        if root.enabled: Rectangle { x: 0; y: root.head-y; width: parent.width; height: 1px; background: Theme.accent.with-alpha(root.crosshair-alpha); }
+        if root.enabled: Rectangle {
+            x: root.head-x - root.head-dot / 2;
+            y: root.head-y - root.head-dot / 2;
+            width: root.head-dot;
+            height: root.head-dot;
+            border-radius: root.head-dot / 2;
+            background: Theme.accent;
+        }
+
+        if root.enabled && !touch.pressed: Text {
+            y: parent.height - self.height - Theme.padding;
+            width: parent.width;
+            text: @tr("Touch and drag: direction and speed");
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            horizontal-alignment: center;
+        }
+        if !root.enabled: Text {
+            width: parent.width;
+            height: parent.height;
+            text: @tr("Home X and Y first");
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        DragMarks {
+            pressed: touch.pressed;
+            origin-x: touch.pressed-x;
+            origin-y: touch.pressed-y;
+            finger-x: touch.mouse-x;
+            finger-y: touch.mouse-y;
+        }
+        touch := TouchArea {
+            enabled: root.enabled;
+        }
+    }
+
+    // X ruler under the pad.
+    Rectangle { x: root.pad-x; y: root.pad-height + root.ruler-gap; width: root.pad-width; height: 1px; background: Theme.muted; }
+    if root.enabled: RulerMarker {
+        x: root.pad-x + root.head-x - root.marker / 2;
+        y: root.pad-height + root.ruler-gap + 1px;
+        width: root.marker;
+        height: root.marker;
+    }
+    if root.enabled: Text {
+        x: root.pad-x + clamp(root.head-x - self.width / 2, 0px, root.pad-width - self.width);
+        y: root.pad-height + root.ruler-gap + root.marker + 1px;
+        width: root.x-label-width;
+        text: "X " + Printer.position-x.to-fixed(1);
+        color: Theme.foreground;
+        font-size: Theme.font-label;
+        font-weight: 700;
+        horizontal-alignment: center;
+    }
+
+    // Y ruler left of the pad.
+    Rectangle { x: root.pad-x - root.ruler-gap - 1px; y: 0; width: 1px; height: root.pad-height; background: Theme.muted; }
+    if root.enabled: RulerMarker {
+        tip: "right";
+        x: root.pad-x - root.ruler-gap - root.marker;
+        y: root.head-y - root.marker / 2;
+        width: root.marker;
+        height: root.marker;
+    }
+    if root.enabled: VerticalLayout {
+        x: root.pad-x - root.y-ruler-width;
+        y: clamp(root.head-y - self.height / 2, 0px, root.pad-height - self.height);
+        height: self.preferred-height;
+        width: root.y-ruler-width - root.ruler-gap - root.marker - Theme.spacing-small;
+        Text {
+            text: "Y";
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            font-weight: 700;
+            horizontal-alignment: right;
+        }
+        Text {
+            text: Printer.position-y.to-fixed(1);
+            color: Theme.foreground;
+            font-size: Theme.font-label;
+            font-weight: 700;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+// Z: a tall pad, up is up; the scale runs from the lowest height the pad drives to (the bed, or the height of the
+// paused print) at the bottom to the top of the axis; the Z ruler sits right of it.
+component ZPad inherits Rectangle {
+    property <length> pad-width: 124px;
+    property <length> z-ruler-width: 80px;
+    property <length> x-ruler-height: 28px;
+    property <length> head-dot: 14px;
+    property <length> marker: 8px;
+    property <length> ruler-gap: 3px;
+    property <length> floor-mark-width: 14px;
+    property <float> crosshair-alpha: 0.45;
+    property <float> full-scale-share: 0.4;
+
+    property <bool> enabled: Printer.homed-z && Printer.axes-area.known;
+    property <float> span: max(Printer.axes-area.z-max - Printer.axes-area.z-floor, 1);
+    property <length> pad-height: root.height - root.x-ruler-height;
+    property <length> head-z: root.pad-height * (1 - clamp((Printer.position-z - Printer.axes-area.z-floor) / root.span, 0, 1));
+    property <length> full-scale: root.full-scale-share * root.pad-height;
+    property <float> deflection: touch.pressed ? clamp((touch.pressed-y - touch.mouse-y) / root.full-scale, -1, 1) : 0;
+    property <string> floor-text: Printer.axes-area.floor-is-print
+        ? @tr("Print") + " " + Printer.axes-area.z-floor.to-fixed(2)
+        : "Z " + Printer.axes-area.z-floor.to-fixed(2);
+
+    min-width: root.pad-width + root.z-ruler-width;
+    max-width: root.pad-width + root.z-ruler-width;
+
+    Timer {
+        interval: UiSettings.drive-interval;
+        running: touch.pressed && root.enabled;
+        triggered => { Actions.drive(0, 0, root.deflection); }
+    }
+
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: root.pad-width;
+        height: root.pad-height;
+        border-radius: Theme.radius;
+        background: Theme.surface;
+        border-width: 1px;
+        border-color: Theme.border;
+        clip: true;
+
+        Image {
+            source: Icons.motion-z-plus;
+            colorize: Theme.muted;
+            width: Theme.icon;
+            height: Theme.icon;
+            x: (parent.width - self.width) / 2;
+            y: Theme.padding;
+        }
+        Image {
+            source: Icons.motion-z-minus;
+            colorize: Theme.muted;
+            width: Theme.icon;
+            height: Theme.icon;
+            x: (parent.width - self.width) / 2;
+            y: parent.height - self.height - Theme.padding;
+        }
+        // The head height as a line across the pad, like the crosshair of the XY pad.
+        if root.enabled: Rectangle { x: 0; y: root.head-z; width: parent.width; height: 1px; background: Theme.accent.with-alpha(root.crosshair-alpha); }
+        if root.enabled: Rectangle {
+            x: (parent.width - root.head-dot) / 2;
+            y: root.head-z - root.head-dot / 2;
+            width: root.head-dot;
+            height: root.head-dot;
+            border-radius: root.head-dot / 2;
+            background: Theme.accent;
+        }
+        if root.enabled && !touch.pressed: Text {
+            width: parent.width;
+            height: parent.height;
+            text: @tr("Hold and drag");
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        if !root.enabled: Text {
+            width: parent.width;
+            height: parent.height;
+            text: @tr("Home Z first");
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            wrap: word-wrap;
+        }
+
+        DragMarks {
+            pressed: touch.pressed;
+            origin-x: touch.pressed-x;
+            origin-y: touch.pressed-y;
+            finger-x: touch.mouse-x;
+            finger-y: touch.mouse-y;
+        }
+        touch := TouchArea {
+            enabled: root.enabled;
+        }
+    }
+
+    // Z ruler right of the pad; the floor mark at the bottom is a fact of the scale, not a warning.
+    Rectangle { x: root.pad-width + root.ruler-gap; y: 0; width: 1px; height: root.pad-height; background: Theme.muted; }
+    Rectangle {
+        x: root.pad-width + root.ruler-gap;
+        y: root.pad-height - 2px;
+        width: root.floor-mark-width;
+        height: 2px;
+        background: Theme.muted;
+    }
+    Text {
+        x: root.pad-width + root.ruler-gap;
+        y: root.pad-height + root.ruler-gap;
+        text: root.floor-text;
+        color: Theme.muted;
+        font-size: Theme.font-small;
+    }
+    if root.enabled: RulerMarker {
+        tip: "left";
+        x: root.pad-width + root.ruler-gap + 1px;
+        y: root.head-z - root.marker / 2;
+        width: root.marker;
+        height: root.marker;
+    }
+    if root.enabled: VerticalLayout {
+        x: root.pad-width + root.ruler-gap + root.marker + Theme.spacing-small;
+        y: clamp(root.head-z - self.height / 2, 0px, root.pad-height - self.height);
+        height: self.preferred-height;
+        Text {
+            text: "Z";
+            color: Theme.muted;
+            font-size: Theme.font-small;
+            font-weight: 700;
+        }
+        Text {
+            text: Printer.position-z.to-fixed(2);
+            color: Theme.foreground;
+            font-size: Theme.font-label;
+            font-weight: 700;
+        }
+    }
+}
+
+// The XY pad and the Z pad side by side.
+export component AxesPad inherits HorizontalLayout {
+    spacing: Theme.spacing;
+    XyPad { horizontal-stretch: 1; }
+    ZPad { }
+}
+
+// "Move X to": the number entry of one axis. Follows the live position until the person types; then the typed text
+// stays and only the hint keeps updating. Closes when the axis loses its homing.
+export component MoveEntryDialog inherits NumberEntryDialog {
+    in-out property <int> axis;
+
+    property <AxisEntryItem> entry: Printer.axis-entries[root.axis];
+    property <float> position: root.entry.position;
+    property <string> letter: root.axis == 0 ? "X" : root.axis == 1 ? "Y" : "Z";
+    property <string> name: root.axis == 0 ? "x" : root.axis == 1 ? "y" : "z";
+    property <bool> homed: root.axis == 0 ? Printer.homed-x : root.axis == 1 ? Printer.homed-y : Printer.homed-z;
+
+    title: @tr("Move {} to", root.letter);
+    unit: Units.millimetre-symbol;
+    hint: @tr("Now {}", root.entry.now) + " · " + root.entry.range;
+    hint-warning: Actions.move-target-outside(root.name, root.text);
+    accepted(text) => {
+        if (text.is-float()) {
+            Actions.move-to(root.name, text.to-float());
+        }
+    }
+
+    changed position => {
+        if (root.open && !root.edited) {
+            root.replace-text(root.position.to-fixed(2));
+        }
+    }
+    changed homed => {
+        if (!root.homed) {
+            root.open = false;
+        }
+    }
+
+    public function start(axis: int) {
+        root.axis = axis;
+        root.replace-text(root.position.to-fixed(2));
+        root.open = true;
+    }
+}

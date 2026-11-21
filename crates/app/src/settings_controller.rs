@@ -6,6 +6,7 @@ use crate::presenter::Presenter;
 use crate::{AppWindow, Backlight, PresetItem, UiSettings};
 use sailhand_core::backlight::{BacklightService, BacklightSettings, usable_brightness};
 use sailhand_core::settings::{MAX_SHOWN_PRESETS, SavedPrinter, Settings, SettingsStore, TemperaturePreset};
+use sailhand_core::sources::klipper::moves::DRIVE_INTERVAL;
 use sailhand_core::step_choices::{StepLists, mirrored_row, nearest_step};
 use sailhand_core::{Endpoint, PrinterService};
 use slint::{ComponentHandle, ModelRc, VecModel};
@@ -90,6 +91,7 @@ impl SettingsController {
         ui.set_log_export_available(cfg!(target_os = "android"));
         ui.set_hide_temperature_reports(settings.hide_temperature_reports);
         ui.set_move_step(settings.steps.move_mm as f32);
+        ui.set_drive_interval(DRIVE_INTERVAL.as_millis() as i64);
         ui.set_z_offset_step(settings.steps.z_offset_mm as f32);
         ui.set_temperature_step(settings.steps.temperature as f32);
         ui.set_extrude_length(settings.steps.extrude_mm as f32);

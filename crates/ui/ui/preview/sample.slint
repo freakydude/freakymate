@@ -32,6 +32,12 @@ export global Sample {
         Printer.position-x = 150;
         Printer.position-y = 150;
         Printer.position-z = 10;
+        Printer.axes-area = { known: true, x-min: 0, x-max: 301, y-min: 0, y-max: 309, z-floor: 0, z-max: 320, floor-is-print: false };
+        Printer.axis-entries = [
+            { position: 150, now: "150.00 mm", range: "0 – 301 mm" },
+            { position: 150, now: "150.00 mm", range: "0 – 309 mm" },
+            { position: 10, now: "10.00 mm", range: "0 – 320 mm" },
+        ];
         Printer.nozzle-temperature = 214.6;
         Printer.nozzle-target = 215;
         Printer.has-bed = true;

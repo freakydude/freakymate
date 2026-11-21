@@ -5,6 +5,11 @@ import { ToolMatchItem } from "structs.slint";
 export global Actions {
     callback home(bool, bool, bool);
     callback jog(string, float);
+    // Moves one axis ("x", "y", "z") to a position in G-code coordinates (number entry).
+    callback move-to(string, float);
+    // Live pad, one segment: how far the finger is from where it touched down, per axis from -1 to 1 (Y and Z: +
+    // is up); sent every `UiSettings.drive-interval` while held, nothing on release.
+    callback drive(float, float, float);
     callback disable-motors();
     callback level();
     callback set-heater(string, float);
@@ -160,6 +165,8 @@ export global Actions {
     pure callback start-tools(string) -> [ToolMatchItem];
     // Klipper would refuse the typed target of a heater (Klipper object, text as typed); false while it is no number.
     pure callback heater-target-outside(string, string) -> bool;
+    // Klipper would refuse the typed position of an axis ("x", "y", "z"; G-code coordinates); false while it is no number.
+    pure callback move-target-outside(string, string) -> bool;
     callback open-macro-form(string);
     callback set-macro-param(int, string);
     callback macro-form-script() -> string;

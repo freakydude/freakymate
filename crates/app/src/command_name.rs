@@ -15,6 +15,7 @@ pub fn command_name(command: &Command) -> String {
         Command::ClearLayerPause => "Clear Layer Pause".to_owned(),
         Command::Home { .. } => "Home".to_owned(),
         Command::Jog { .. } => "Jog".to_owned(),
+        Command::MoveTo { .. } | Command::Drive { .. } | Command::Move { .. } => "Move".to_owned(),
         Command::DisableMotors => "Disable Motors".to_owned(),
         Command::Level => "Level".to_owned(),
         Command::QuadGantryLevel => "Quad Gantry Level".to_owned(),

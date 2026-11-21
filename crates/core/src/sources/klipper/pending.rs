@@ -1,11 +1,15 @@
-//! Heater targets sent but not yet reported by Klipper.
+//! Heater targets and moves sent but not yet reported by Klipper.
 
 use super::heaters::Heater;
+use super::motion::Motion;
+use super::moves::{AxisTarget, PlannedMove};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-/// A sent target that Klipper has not reported back by then is given up (e.g. rejected command).
+/// A sent target or move that Klipper has not reported back by then is given up (e.g. rejected command).
 const PENDING_TARGET_TIMEOUT: Duration = Duration::from_secs(3);
+/// A G-code position closer than this to a sent one counts as reported (the script rounds to 0.0001 mm).
+const REPORTED_MM: f64 = 0.001;
 
 /// Shows a sent target at once and lets quick taps on + and − build on each other, until Klipper reports it back.
 #[derive(Debug, Default)]
@@ -32,9 +36,67 @@ impl PendingTargets {
     }
 }
 
+/// Lets quick steps and the segments of the live pad build on each other: Klipper reports the position only a few
+/// times a second, so the next move starts from where the last one was sent to.
+#[derive(Debug, Default)]
+pub struct PendingMoves {
+    axes: [Option<(AxisTarget, Instant)>; 3],
+}
+
+impl PendingMoves {
+    pub fn request(&mut self, planned: &PlannedMove, now: Instant) {
+        for target in &planned.targets {
+            self.axes[target.axis.index()] = Some((*target, now));
+        }
+    }
+
+    /// Shows pending moves in the reported positions; forgets reported and outdated ones.
+    pub fn apply(&mut self, motion: &mut Motion, now: Instant) {
+        for (index, pending) in self.axes.iter_mut().enumerate() {
+            let Some((target, sent)) = *pending else { continue };
+            let reported = (motion.gcode_position[index] - target.gcode).abs() < REPORTED_MM;
+            if reported || now.duration_since(sent) >= PENDING_TARGET_TIMEOUT {
+                *pending = None;
+                continue;
+            }
+            motion.position[index] = target.toolhead;
+            motion.gcode_position[index] = target.gcode;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sources::klipper::Axis;
+
+    #[test]
+    fn pending_moves_cover_the_delay_until_klipper_reports_back() {
+        let start = Instant::now();
+        let reported = |z: f64| Motion {
+            position: [0.0, 0.0, z + 0.07, 0.0],
+            gcode_position: [0.0, 0.0, z, 0.0],
+            ..Motion::default()
+        };
+        let to = |z: f64| PlannedMove {
+            targets: vec![AxisTarget { axis: Axis::Z, gcode: z, toolhead: z + 0.07 }],
+            speed: 10.0,
+        };
+        let mut pending = PendingMoves::default();
+        pending.request(&to(5.1), start);
+        pending.request(&to(5.2), start);
+
+        let mut motion = reported(5.1);
+        pending.apply(&mut motion, start + Duration::from_millis(200));
+        assert_eq!((motion.gcode_position[2], motion.position[2]), (5.2, 5.2 + 0.07));
+
+        let mut motion = reported(5.2);
+        pending.apply(&mut motion, start + Duration::from_millis(400));
+        pending.request(&to(5.3), start + Duration::from_millis(500));
+        let mut motion = reported(5.2);
+        pending.apply(&mut motion, start + PENDING_TARGET_TIMEOUT + Duration::from_secs(1));
+        assert_eq!(motion.gcode_position[2], 5.2);
+    }
 
     #[test]
     fn pending_targets_cover_the_delay_until_klipper_reports_back() {
