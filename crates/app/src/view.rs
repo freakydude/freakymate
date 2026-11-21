@@ -189,9 +189,11 @@ pub fn interruption_position(job: &PrintJob) -> String {
     stands_at(job).unwrap_or_default()
 }
 
-/// The first fact of a pause or an error for the status bar, without where the print stands; empty if none is stated.
+/// The first line of the first fact of a pause or an error for the status bar, without where the print stands; empty
+/// if none is stated. Happy Hare's `reason_for_pause` can span several lines; the bar has room for one.
 pub fn interruption_headline(interruption: &Interruption) -> String {
-    interruption.facts.first().map(fact_text).unwrap_or_default()
+    let first_fact = interruption.facts.first().map(fact_text).unwrap_or_default();
+    first_fact.lines().map(str::trim).find(|line| !line.is_empty()).unwrap_or_default().to_owned()
 }
 
 fn fact_text(fact: &InterruptionFact) -> String {
@@ -791,6 +793,18 @@ mod tests {
 
         assert_eq!(interruption_headline(&interruption), "Filament runout");
         assert_eq!(interruption_headline(&Interruption { failed: false, facts: Vec::new() }), "");
+    }
+
+    #[test]
+    fn the_headline_of_a_multi_line_mmu_reason_is_its_first_line() {
+        let interruption = Interruption {
+            failed: false,
+            facts: vec![InterruptionFact::MmuReason(
+                "\nFailure during check gate T0:\nNo filament detected\nGate marked as empty".into(),
+            )],
+        };
+
+        assert_eq!(interruption_headline(&interruption), "Failure during check gate T0:");
     }
 
     fn file_metadata() -> FileMetadata {
