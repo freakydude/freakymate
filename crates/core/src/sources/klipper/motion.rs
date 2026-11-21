@@ -102,6 +102,9 @@ pub struct Motion {
     /// The Z shift of `z_thermal_adjust` in mm, `None` without the module or while it is off. It moves Z as a
     /// transformation, so `homing_origin` does not show it.
     pub thermal_z_adjust: Option<f64>,
+    /// How long the moves Sailhand sent keep Klipper busy from now (s), an estimate set by
+    /// [`PendingMoves`](super::PendingMoves); the live pad keeps it filled.
+    pub queued_seconds: f64,
 }
 
 impl Motion {
@@ -136,6 +139,7 @@ pub(super) fn read_motion(
         speed_factor: number_or(gcode_move, "speed_factor", 1.0),
         extrude_factor: number_or(gcode_move, "extrude_factor", 1.0),
         thermal_z_adjust: flag(z_thermal_adjust, "enabled").then(|| number(z_thermal_adjust, "current_z_adjust")),
+        queued_seconds: 0.0,
     }
 }
 

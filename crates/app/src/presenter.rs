@@ -342,9 +342,10 @@ impl Presenter {
     fn show_motion(&self, window: &AppWindow, status: &PrinterStatus, lanes: &[Lane]) {
         let printer = window.global::<Printer>();
         let motion = &status.motion;
-        printer.set_position_x(motion.live_position[0] as f32);
-        printer.set_position_y(motion.live_position[1] as f32);
-        printer.set_position_z(motion.live_position[2] as f32);
+        let [x, y, z] = moves::shown_position(motion);
+        printer.set_position_x(x as f32);
+        printer.set_position_y(y as f32);
+        printer.set_position_z(z as f32);
         self.calibration.show_toolhead_height(&printer, &status.calibration, motion.live_position[2]);
         printer.set_homed_x(motion.homed.x);
         printer.set_homed_y(motion.homed.y);
