@@ -34,11 +34,12 @@ probe still counts as the probe).
     `nozzle_diameter`, and a first-layer temperature above the heater's `max_temp`; only a hint, the print can start.
 - **Motion**: the **Axes** tab jogs X/Y/Z with selectable steps, homes (all/XY/Z), turns motors off, runs Quad Gantry Level
   or Z-Tilt when configured. A tap on the X, Y or Z position opens a number pad to move that axis to a typed
-  position (G-code coordinates, like a `G1` in the console; the range Klipper takes is shown below, and the value
-  follows the head until you type). Steps and typed moves keep the G-code offset, the bed mesh and the positioning
+  position (X and Y in the configured axis range, Z as the height over the bed in G-code coordinates; the range
+  Klipper takes is shown below, and the value follows the head until you type). Steps and typed moves keep the G-code offset, the bed mesh and the positioning
   mode (G90/G91) of whoever moved before. The switch **Buttons | Live** below shows two joystick pads instead: touch
   down anywhere and drag, the head moves in that direction while you hold, faster the further you drag (up to the
-  chosen maximum and the printer's limits), and stops when you let go. The pads keep to the axis range; the Z pad
+  chosen maximum and the printer's limits), and stops about half a second after you let go (Klipper cannot take
+  back a planned move). The pads keep to the axis range; the Z pad
   stops at Z 0, and while a print is paused at the height of the print. The positions sit on rulers at the edges of
   the pads, so the finger does not cover them. Filament is locked while a print runs and the screen leaves it when a
   print starts; on Motion the Axes and Calibrate tabs are greyed out then and the page shows the Tune tab.

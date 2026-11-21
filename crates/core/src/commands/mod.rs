@@ -55,7 +55,8 @@ pub enum Command {
         axis: Axis,
         distance: f64,
     },
-    /// A typed position of one axis in G-code coordinates.
+    /// A typed position of one axis: X and Y where the toolhead stands (the configured axis range), Z as the G-code
+    /// height, see [`entry_position`](crate::sources::klipper::moves::entry_position).
     MoveTo {
         axis: Axis,
         position: f64,

@@ -274,7 +274,8 @@ mod tests {
         use crate::sources::klipper::Axis;
         use crate::sources::klipper::moves::AxisTarget;
         let target = |axis, gcode| AxisTarget { axis, gcode, toolhead: gcode };
-        let planned = PlannedMove { targets: vec![target(Axis::X, 12.5), target(Axis::Y, 0.00004)], speed: 25.0 };
+        let planned =
+            PlannedMove { targets: vec![target(Axis::X, 12.5), target(Axis::Y, 0.00004)], speed: 25.0, seconds: 0.5 };
         assert_eq!(
             move_axes(&planned),
             "SAVE_GCODE_STATE NAME=sailhand_move\nG90\nG1 X12.5 Y0 F1500\nRESTORE_GCODE_STATE NAME=sailhand_move"

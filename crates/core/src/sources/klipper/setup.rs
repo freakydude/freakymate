@@ -24,6 +24,8 @@ pub struct Setup {
     pub probe: bool,
     /// `max_z_velocity` of `[printer]` (mm/s), `None` if the file leaves it to Klipper's default.
     pub max_z_velocity: Option<f64>,
+    /// `max_z_accel` of `[printer]` (mm/s²), `None` if the file leaves it to Klipper's default.
+    pub max_z_accel: Option<f64>,
     /// Bed mesh, bed screws and the Z endstop, see [`CalibrationSetup`].
     pub calibration: CalibrationSetup,
     /// Additional heaters with a target temperature (`heater_generic`, `temperature_fan`, additional extruders).
@@ -104,8 +106,9 @@ impl Setup {
         let section = |object: &str| settings.and_then(|settings| section(settings, "", object));
         self.led_white = self.leds.iter().map(|led| (led.clone(), devices::white_channel(section(led)))).collect();
         self.tuning = TuningConfig::from_settings(settings);
-        self.max_z_velocity =
-            section("printer").and_then(|printer| printer.get("max_z_velocity")).and_then(Value::as_f64);
+        let printer_value = |key: &str| section("printer").and_then(|printer| printer.get(key)).and_then(Value::as_f64);
+        self.max_z_velocity = printer_value("max_z_velocity");
+        self.max_z_accel = printer_value("max_z_accel");
         self.calibration.apply_settings(settings);
         if self.eddy_probe.is_none() {
             self.eddy_probe = eddy::configured_name(settings).map(str::to_owned);

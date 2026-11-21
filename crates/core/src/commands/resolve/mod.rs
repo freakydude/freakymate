@@ -20,8 +20,8 @@ impl Command {
         let setup = &sources.klipper;
         let mode = status.calibration.mode.as_ref();
         let commands = match self {
-            Self::Jog { axis, distance } => motion::jog(status, axis, distance),
-            Self::MoveTo { axis, position } => motion::move_to(status, axis, position),
+            Self::Jog { axis, distance } => motion::jog(setup, status, axis, distance),
+            Self::MoveTo { axis, position } => motion::move_to(setup, status, axis, position),
             Self::Drive { deflection, max_speed } => motion::drive(setup, status, deflection, max_speed),
             Self::Level => calibration::level(setup)?,
             Self::ApplyZOffset => calibration::apply_z_offset(setup),
