@@ -10,7 +10,7 @@ use sailhand_core::sources::happy_hare::commands::{Gates, ServoCommand};
 use sailhand_core::sources::klipper::tuning::TuningKey;
 use sailhand_core::sources::klipper::{Axis, CentreOf, EddyTap, TestZ};
 use sailhand_core::{Command, PrinterService, Query};
-use slint::platform::WindowEvent;
+use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::rc::Rc;
 use std::time::Duration;
@@ -453,12 +453,26 @@ fn bind_layer_pause(actions: &Actions, service: &PrinterService, presenter: &Rc<
 /// Types a key of the on-screen keyboard into the focused field, as a physical keyboard would. Deferred, because the
 /// tap that caused it is still being handled.
 fn press_key(window: &slint::Weak<AppWindow>, text: SharedString) {
+    let kind = key_kind(&text);
+    log::debug!("on-screen key: {kind}");
     let window = window.clone();
     slint::Timer::single_shot(Duration::ZERO, move || {
         let Some(window) = window.upgrade() else { return };
+        log::debug!("on-screen key delivered: {kind}");
         window.window().dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
         window.window().dispatch_event(WindowEvent::KeyReleased { text });
     });
+}
+
+/// Which kind of key, for the log; never the character itself, since the same keys type passwords.
+fn key_kind(text: &str) -> &'static str {
+    match text.chars().next() {
+        Some(key) if key == char::from(Key::Return) => "enter",
+        Some(key) if key == char::from(Key::Backspace) => "backspace",
+        Some(key) if key.is_control() || u32::from(key) >= 0xF700 => "control",
+        Some(_) => "character",
+        None => "none",
+    }
 }
 
 /// A weight as typed, in grams; a comma as decimal separator is fine. Zero and negative are no weights.
@@ -541,6 +555,13 @@ fn round_offset(value: f32) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn on_screen_keys_are_logged_by_kind_only() {
+        assert_eq!(key_kind(&SharedString::from(Key::Return)), "enter");
+        assert_eq!(key_kind(&SharedString::from(Key::Backspace)), "backspace");
+        assert_eq!(key_kind("7"), "character");
+    }
 
     #[test]
     fn axis_names_and_rounding() {

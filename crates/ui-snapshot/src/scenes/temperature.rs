@@ -181,7 +181,8 @@ const KEY_2: (f32, f32) = (392.0, 369.0);
 const KEY_5: (f32, f32) = (392.0, 307.0);
 const KEY_ENTER: (f32, f32) = (528.0, 431.0);
 
-/// The nozzle target typed on the number pad must be taken with its first enter, every time.
+/// The nozzle target typed on the number pad must be taken with its first enter, every time (a report of 2026-11-21:
+/// the first enter did nothing, the next entries worked; not reproduced here).
 fn typed_target(session: &mut Session) -> Result<(), String> {
     let target = |snapshot: &sailhand_core::Snapshot| snapshot.status.heater("extruder").map(|heater| heater.target);
     for round in 1..=3 {
@@ -200,10 +201,7 @@ fn typed_target(session: &mut Session) -> Result<(), String> {
         let (x, y) = KEY_ENTER;
         session.tap(x, y);
         session.pump(Duration::from_millis(300));
-        let typed = session.window.global::<sailhand::Printer>().get_position_x();
-        let _ = typed;
         let reached = target(&session.presenter.snapshot());
-        eprintln!("round {round}: target {reached:?}");
         if reached != Some(215.0) {
             return Err(format!("round {round}: the typed target was not taken (target {reached:?})"));
         }
