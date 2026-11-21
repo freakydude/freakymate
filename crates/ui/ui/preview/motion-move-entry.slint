@@ -1,0 +1,19 @@
+// Preview: the number entry "Move X to" on Motion > Axes. Open in the Slint preview or render with
+// scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { MoveEntryDialog } from "../components/axes-pad.slint";
+import { MotionTab, Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component MotionMoveEntryPreview inherits AppWindow {
+    MoveEntryDialog {
+        init => { self.start(0); }
+    }
+
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.motion;
+        Navigation.motion-tab = MotionTab.axes;
+    }
+}

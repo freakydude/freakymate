@@ -129,6 +129,10 @@ pub(super) fn printing(session: &mut Session) -> Result<(), String> {
         return Err("position-locked off while the print is paused".into());
     }
     session.show_page(Page::Motion, "motion-paused")?;
+    // The pad stops at the height of the paused print.
+    session.window.global::<Navigation>().set_axes_live(true);
+    session.capture("motion-paused-live")?;
+    session.window.global::<Navigation>().set_axes_live(false);
     session.show_page(Page::Filament, "printing-paused-filament")?;
     session.window.global::<Navigation>().set_page(Page::Print);
     exclude_object(session)?;

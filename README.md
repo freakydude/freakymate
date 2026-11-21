@@ -16,8 +16,9 @@ desktop needed.
 
 ## At a glance
 
-- **Everyday printing:** files with thumbnails, start, pause, cancel, exclude objects, pause at a layer; jog, home,
-  level and calibrate; heaters, fans, light, filament, console with macros, updates and Wi-Fi.
+- **Everyday printing:** files with thumbnails, start, pause, cancel, exclude objects, pause at a layer; jog, move to a
+  typed position or live with joystick pads, home, level and calibrate; heaters, fans, light, filament, console with
+  macros, updates and Wi-Fi.
 - **Multi-material and several heads:** [Happy Hare](https://github.com/moggieuk/Happy-Hare) 4.1 or newer (also with
   several units), [AFC](https://github.com/AFCProject/AFC-Klipper-Add-On) and tool changers with
   [klipper-toolchanger](https://github.com/viesturz/klipper-toolchanger); ERCF, Tradrack, Box Turtle, StealthChanger

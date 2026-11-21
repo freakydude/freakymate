@@ -169,6 +169,45 @@ pub(super) fn taps(session: &mut Session) -> Result<(), String> {
     if missed > 0 {
         return Err(format!("{missed} of {TAP_ROUNDS} taps on Cool down were lost while the temperatures changed"));
     }
+    typed_target(session)
+}
+
+/// "Target" of the extruder row in the 800x480 layout.
+const NOZZLE_TARGET: (f32, f32) = (396.0, 145.0);
+
+/// Keys of the number pad of the target entry in the 800x480 layout.
+const KEY_1: (f32, f32) = (302.0, 369.0);
+const KEY_2: (f32, f32) = (392.0, 369.0);
+const KEY_5: (f32, f32) = (392.0, 307.0);
+const KEY_ENTER: (f32, f32) = (528.0, 431.0);
+
+/// The nozzle target typed on the number pad must be taken with its first enter, every time.
+fn typed_target(session: &mut Session) -> Result<(), String> {
+    let target = |snapshot: &sailhand_core::Snapshot| snapshot.status.heater("extruder").map(|heater| heater.target);
+    for round in 1..=3 {
+        session.service.send(Command::SetHeaterTarget { heater: "extruder".into(), target: 0.0 });
+        session.wait_until("nozzle off", |snapshot| target(snapshot) == Some(0.0))?;
+        session.pump(Duration::from_millis(300));
+        let (x, y) = NOZZLE_TARGET;
+        session.tap(x, y);
+        session.pump(Duration::from_millis(200));
+        for (x, y) in [KEY_2, KEY_1, KEY_5] {
+            session.tap(x, y);
+        }
+        if round == 1 {
+            session.capture("temperature-entry")?;
+        }
+        let (x, y) = KEY_ENTER;
+        session.tap(x, y);
+        session.pump(Duration::from_millis(300));
+        let typed = session.window.global::<sailhand::Printer>().get_position_x();
+        let _ = typed;
+        let reached = target(&session.presenter.snapshot());
+        eprintln!("round {round}: target {reached:?}");
+        if reached != Some(215.0) {
+            return Err(format!("round {round}: the typed target was not taken (target {reached:?})"));
+        }
+    }
     Ok(())
 }
 

@@ -14,17 +14,15 @@ fn motion_at(position: [f64; 4]) -> Motion {
 }
 
 fn script(command: Command) -> String {
-    let call = command.to_call(&motion_at([10.0, 10.0, 5.0, 0.0])).unwrap();
+    let call = command.to_call().unwrap();
     assert_eq!(call.method, "printer.gcode.script");
     call.params.unwrap()["script"].as_str().unwrap().to_owned()
 }
 
 #[test]
 fn each_command_reaches_its_source() {
-    let motion = Motion::default();
-    let method = |command: Command| command.to_call(&motion).unwrap().method;
+    let method = |command: Command| command.to_call().unwrap().method;
 
-    assert_eq!(script(Command::Jog { axis: Axis::Z, distance: 0.1 }), "G90\nG1 Z5.1 F600");
     assert_eq!(script(Command::MmuEject { gate: Some(1) }), "MMU_EJECT GATE=1");
     assert_eq!(script(Command::MmuCheckGates { gates: mmu::Gates::All }), "MMU_CHECK_GATE ALL=1");
     assert_eq!(
@@ -45,10 +43,29 @@ fn each_command_reaches_its_source() {
 
 #[test]
 fn commands_without_effect_are_not_sent() {
-    let at_minimum = motion_at([0.0; 4]);
-    assert_eq!(Command::Jog { axis: Axis::X, distance: -1.0 }.to_call(&at_minimum), None);
-    assert_eq!(Command::ExcludeObject { name: "Part 2".into() }.to_call(&at_minimum), None);
-    assert_eq!(Command::SetFanSpeed { fan: "heater_fan hotend".into(), speed: 1.0 }.to_call(&at_minimum), None);
+    assert_eq!(Command::ExcludeObject { name: "Part 2".into() }.to_call(), None);
+    assert_eq!(Command::SetFanSpeed { fan: "heater_fan hotend".into(), speed: 1.0 }.to_call(), None);
+}
+
+#[test]
+fn moves_resolve_to_gcode_coordinates_and_build_on_each_other() {
+    let mut status = PrinterStatus { motion: motion_at([10.0, 10.0, 5.07, 0.0]), ..PrinterStatus::default() };
+    status.motion.gcode_position = [10.0, 10.0, 5.0, 0.0];
+    let sources = Sources::default();
+    let resolved = |command: Command, status: &PrinterStatus| {
+        command.resolve(&sources, status).unwrap().into_iter().map(script).collect::<Vec<_>>()
+    };
+    let moved = |axes: &str, feed: u32| {
+        format!("SAVE_GCODE_STATE NAME=sailhand_move\nG90\nG1 {axes} F{feed}\nRESTORE_GCODE_STATE NAME=sailhand_move")
+    };
+    assert_eq!(resolved(Command::Jog { axis: Axis::Z, distance: 0.1 }, &status), [moved("Z5.1", 600)]);
+    assert_eq!(resolved(Command::MoveTo { axis: Axis::X, position: 42.0 }, &status), [moved("X42", 6000)]);
+    let mut at_minimum = status.clone();
+    at_minimum.motion.position[0] = 0.0;
+    assert!(resolved(Command::Jog { axis: Axis::X, distance: -1.0 }, &at_minimum).is_empty());
+    assert!(Command::Drive { deflection: [0.0; 3], max_speed: 50.0 }.resolve(&sources, &status).unwrap().is_empty());
+    assert!(Command::Drive { deflection: [1.0, 0.0, 0.0], max_speed: 50.0 }.moves_machine());
+    assert!(!Command::MoveTo { axis: Axis::Z, position: 1.0 }.loses_print_position());
 }
 
 fn printer(objects: &[&str]) -> Sources {
@@ -395,8 +412,8 @@ fn other_commands_stay_as_they_are() {
 
 #[test]
 fn intents_are_no_calls_of_their_own() {
-    assert_eq!(Command::Level.to_call(&Motion::default()), None);
-    assert_eq!(Command::CoolDown.to_call(&Motion::default()), None);
+    assert_eq!(Command::Level.to_call(), None);
+    assert_eq!(Command::CoolDown.to_call(), None);
 }
 
 #[test]
@@ -448,9 +465,7 @@ fn a_wled_strip_is_switched_and_dimmed_by_moonraker() {
     status.leds[0].on = true;
     assert_eq!(resolve(Command::ToggleLight, &status), wled(StripAction::Off));
     assert_eq!(resolve(dim, &status), wled(StripAction::Dim(0.5)));
-    let call = Command::SetWledStrip { strip: "chamber".into(), action: StripAction::Off }
-        .to_call(&Motion::default())
-        .unwrap();
+    let call = Command::SetWledStrip { strip: "chamber".into(), action: StripAction::Off }.to_call().unwrap();
     assert_eq!(call.method, "machine.wled.post_strip");
 }
 
@@ -628,14 +643,14 @@ fn a_preset_heats_only_the_bed_while_no_head_is_mounted() {
 
 #[test]
 fn head_commands_become_the_plugins_g_code() {
-    let script = |command: Command| match command.to_call(&Motion::default()).unwrap().params {
+    let script = |command: Command| match command.to_call().unwrap().params {
         Some(params) => params["script"].as_str().unwrap().to_owned(),
         None => String::new(),
     };
 
     assert_eq!(script(Command::PickUpHead { head: "left".into() }), "SELECT_TOOL TOOL=left");
     assert_eq!(script(Command::InitializeToolchanger { recover: true }), "INITIALIZE_TOOLCHANGER RECOVER=1");
-    assert!(Command::PickUpHead { head: "two words".into() }.to_call(&Motion::default()).is_none());
+    assert!(Command::PickUpHead { head: "two words".into() }.to_call().is_none());
 }
 
 #[test]

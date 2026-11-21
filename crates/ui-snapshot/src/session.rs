@@ -247,6 +247,11 @@ impl Session {
         });
     }
 
+    /// Moves the finger that is down to the position.
+    pub fn pointer_move(&mut self, x: f32, y: f32) {
+        self.window.window().dispatch_event(WindowEvent::PointerMoved { position: LogicalPosition::new(x, y) });
+    }
+
     /// Lifts the finger again at the position.
     pub fn release(&mut self, x: f32, y: f32) {
         self.window.window().dispatch_event(WindowEvent::PointerReleased {

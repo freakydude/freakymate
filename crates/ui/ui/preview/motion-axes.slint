@@ -1,0 +1,13 @@
+// Preview: Motion > Axes in Buttons mode. Open in the Slint preview or render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { MotionTab, Navigation, Page } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component MotionAxesPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.motion;
+        Navigation.motion-tab = MotionTab.axes;
+    }
+}

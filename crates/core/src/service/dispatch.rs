@@ -48,7 +48,7 @@ impl Session<'_> {
             self.refuse(command, CommandError::PrintRunning);
             return false;
         }
-        let Some(call) = command.to_call(&status.motion) else { return false };
+        let Some(call) = command.to_call() else { return false };
         let method = call.method;
         log::debug!("call {method} {}", call.params.as_ref().map(trail::brief).unwrap_or_default());
         // Every G-code script goes to the console, as Moonraker stores it in the console history: typed commands,
@@ -60,6 +60,10 @@ impl Session<'_> {
             Command::SetHeaterTarget { heater, target } => {
                 self.pending_targets.request(heater, *target, Instant::now());
                 true
+            }
+            Command::Move { planned } => {
+                self.pending_moves.request(planned, Instant::now());
+                false
             }
             _ => false,
         };

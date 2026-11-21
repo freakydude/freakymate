@@ -12,15 +12,16 @@ use crate::domain::machine_tree::LaneId;
 use crate::moonraker::Call;
 use crate::sources::happy_hare::commands as mmu;
 use crate::sources::klipper::commands::{self as klipper, run_gcode};
+use crate::sources::klipper::moves::PlannedMove;
 use crate::sources::klipper::tuning::TuningKey;
-use crate::sources::klipper::{Axis, CentreOf, EddyTap, Motion, TestZ};
+use crate::sources::klipper::{Axis, CentreOf, EddyTap, TestZ};
 use crate::sources::moonraker_server::wled::{self, StripAction};
 use crate::sources::moonraker_server::{files, machine, power, update_manager};
 use crate::sources::{led_effect, spoolman, toolchanger};
 
 /// A command triggered by a person. The UI only knows this level, not G-code or JSON-RPC.
 ///
-/// Some commands state an intent (`Level`, `ApplyPreset`, `CoolDown`, `StepHeater`, `ApplyZOffset`, `LoadFilament`,
+/// Some commands state an intent (`Jog`, `MoveTo`, `Drive`, `Level`, `ApplyPreset`, `CoolDown`, `StepHeater`, `ApplyZOffset`, `LoadFilament`,
 /// `UnloadFilament`, the layer pauses, `CalibrateZ`, `SetGateFilament`, `SetEndlessSpoolGroup` and the commands within a calibration mode); [`Command::resolve`] turns them into the commands this printer needs. Only those reach
 /// [`Command::to_call`].
 #[derive(Debug, Clone, PartialEq)]
@@ -49,10 +50,25 @@ pub enum Command {
         y: bool,
         z: bool,
     },
-    /// Relative move; the target is clamped to the axis range.
+    /// A step of the buttons; kept inside the axis range, built on steps not yet reported back.
     Jog {
         axis: Axis,
         distance: f64,
+    },
+    /// A typed position of one axis in G-code coordinates.
+    MoveTo {
+        axis: Axis,
+        position: f64,
+    },
+    /// One segment of the live pad, see [`drive`](crate::sources::klipper::moves::drive): `deflection` per axis X,
+    /// Y, Z from -1 to 1, `max_speed` in mm/s.
+    Drive {
+        deflection: [f64; 3],
+        max_speed: f64,
+    },
+    /// What `Jog`, `MoveTo` and `Drive` become: a move planned in both of Klipper's coordinates.
+    Move {
+        planned: PlannedMove,
     },
     DisableMotors,
     /// Levels with what the printer has: quad gantry level, else Z tilt.
@@ -359,9 +375,8 @@ pub enum Command {
 }
 
 impl Command {
-    /// The call of the source that carries out this command; `motion` provides the current position for clamped
-    /// moves. `None` if the command would have no effect in the current state.
-    pub fn to_call(&self, motion: &Motion) -> Option<Call> {
+    /// The call of the source that carries out this command; `None` if the command would have no effect.
+    pub fn to_call(&self) -> Option<Call> {
         let call = match self {
             // Klipper
             Self::StartPrint { filename } => klipper::start_print(filename),
@@ -373,7 +388,7 @@ impl Command {
             Self::RestartKlipper => klipper::restart(),
             Self::FirmwareRestart => klipper::firmware_restart(),
             Self::Home { x, y, z } => run_gcode(klipper::home(*x, *y, *z)),
-            Self::Jog { axis, distance } => run_gcode(klipper::jog(motion, *axis, *distance)?),
+            Self::Move { planned } => run_gcode(klipper::move_axes(planned)),
             Self::DisableMotors => run_gcode(klipper::DISABLE_MOTORS),
             Self::QuadGantryLevel => run_gcode(klipper::QUAD_GANTRY_LEVEL),
             Self::ZTiltAdjust => run_gcode(klipper::Z_TILT_ADJUST),
@@ -444,7 +459,10 @@ impl Command {
             Self::RefreshUpdates => update_manager::refresh(),
             Self::Upgrade { name } => update_manager::upgrade(name),
             // Intents are resolved before; none of them is a call of its own.
-            Self::Level
+            Self::Jog { .. }
+            | Self::MoveTo { .. }
+            | Self::Drive { .. }
+            | Self::Level
             | Self::CalibrateZ
             | Self::CalibrateEddyDriveCurrent
             | Self::MoveToBedCentre { .. }
@@ -533,6 +551,9 @@ impl Command {
             self,
             Self::Home { .. }
                 | Self::Jog { .. }
+                | Self::MoveTo { .. }
+                | Self::Drive { .. }
+                | Self::Move { .. }
                 | Self::DisableMotors
                 | Self::Level
                 | Self::QuadGantryLevel

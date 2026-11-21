@@ -9,6 +9,7 @@ pub mod actions;
 #[cfg(target_os = "android")]
 pub mod android;
 pub mod app;
+mod axes_view;
 pub mod backlight_controller;
 mod bed_map;
 mod bed_mesh_view;

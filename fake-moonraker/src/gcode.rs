@@ -62,6 +62,10 @@ pub enum Command {
     SetFanSpeed(f64),
     AbsolutePositioning,
     RelativePositioning,
+    /// `SAVE_GCODE_STATE` / `RESTORE_GCODE_STATE` with `NAME` (Klipper's default name is `default`); only the
+    /// positioning modes are kept here.
+    SaveGcodeState(String),
+    RestoreGcodeState(String),
     Move(Move),
     DisableSteppers,
     SetGcodeOffset {

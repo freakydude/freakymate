@@ -144,10 +144,19 @@ export component NumberEntryDialog inherits Scrim {
     in property <bool> hint-warning;
     in-out property <string> text;
     in-out property <bool> open;
+    // The person typed since the dialog opened or since the text was last replaced from outside.
+    out property <bool> edited;
     callback accepted(string);
     // A tap on the status bar or the navigation cancels the entry.
     property <int> dismissals: Dialogs.dismissals;
     visible: root.open;
+
+    // Replaces the text from outside (a live value) and selects it all, so typing still replaces it.
+    public function replace-text(new-text: string) {
+        root.text = new-text;
+        root.edited = false;
+        field.select-all();
+    }
 
     changed dismissals => {
         root.open = false;
@@ -155,6 +164,7 @@ export component NumberEntryDialog inherits Scrim {
 
     changed open => {
         if (root.open) {
+            root.edited = false;
             field.focus();
             field.select-all();
         }
@@ -206,6 +216,7 @@ export component NumberEntryDialog inherits Scrim {
                             font-size: Theme.font-large;
                             font-weight: 600;
                             input-type: InputType.decimal;
+                            edited => { root.edited = true; }
                             accepted => {
                                 root.open = false;
                                 root.accepted(root.text);

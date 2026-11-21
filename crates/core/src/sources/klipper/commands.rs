@@ -1,7 +1,8 @@
 //! What Klipper is told: its methods behind Moonraker's `printer.*` and its own G-code. G-code of the plugins and
 //! macros reaches Klipper through [`run_gcode`] as well.
 
-use super::{Axis, BED_HEATER, EddyTap, FanKind, Motion, NOZZLE_HEATER, TestZ, instance};
+use super::moves::{MOVE_SPEED_XY, PlannedMove};
+use super::{BED_HEATER, EddyTap, FanKind, NOZZLE_HEATER, TestZ, instance};
 use crate::moonraker::Call;
 use serde_json::json;
 
@@ -9,9 +10,8 @@ use serde_json::json;
 const SECONDS_PER_MINUTE: f64 = 60.0;
 /// Fan speed in G-code (`M106 S`) runs from 0 to 255.
 const FAN_PWM_MAX: f64 = 255.0;
-/// Fixed speeds for manual moves in mm/s.
-const JOG_SPEED_XY: f64 = 100.0;
-const JOG_SPEED_Z: f64 = 10.0;
+/// The G-code state Sailhand's moves save and restore.
+const MOVE_STATE: &str = "sailhand_move";
 
 pub const DISABLE_MOTORS: &str = "M84";
 pub const QUAD_GANTRY_LEVEL: &str = "QUAD_GANTRY_LEVEL";
@@ -78,20 +78,20 @@ pub fn home(x: bool, y: bool, z: bool) -> String {
 
 /// An absolute move in X and Y at the speed of the manual moves; Z stays where it is.
 pub fn move_xy(x: f64, y: f64) -> String {
-    format!("G90\nG1 X{} Y{} F{}", number(x), number(y), number(JOG_SPEED_XY * SECONDS_PER_MINUTE))
+    format!("G90\nG1 X{} Y{} F{}", number(x), number(y), number(MOVE_SPEED_XY * SECONDS_PER_MINUTE))
 }
 
-/// A relative move as an absolute one, clamped to the axis range; `None` if the axis would not move.
-pub fn jog(motion: &Motion, axis: Axis, distance: f64) -> Option<String> {
-    let index = axis.index();
-    let current = motion.position[index];
-    let (minimum, maximum) = (motion.axis_minimum[index], motion.axis_maximum[index]);
-    let target = if maximum > minimum { (current + distance).clamp(minimum, maximum) } else { current + distance };
-    if (target - current).abs() < 1e-6 {
-        return None;
-    }
-    let speed = if axis == Axis::Z { JOG_SPEED_Z } else { JOG_SPEED_XY };
-    Some(format!("G90\nG1 {}{} F{}", axis.letter(), number(target), number(speed * SECONDS_PER_MINUTE)))
+/// Moves to G-code coordinates and leaves the positioning mode (G90/G91) and the feed rate as they were, like
+/// Mainsail's jog (`SAVE_GCODE_STATE NAME=_ui_movement`, src/components/mixins/control.ts). If Klipper refuses the
+/// `G1`, it skips the rest of the script, so the mode left behind is G90, Klipper's default, not G91.
+pub fn move_axes(planned: &PlannedMove) -> String {
+    let axes: Vec<String> =
+        planned.targets.iter().map(|target| format!("{}{}", target.axis.letter(), number(target.gcode))).collect();
+    format!(
+        "SAVE_GCODE_STATE NAME={MOVE_STATE}\nG90\nG1 {} F{}\nRESTORE_GCODE_STATE NAME={MOVE_STATE}",
+        axes.join(" "),
+        number(planned.speed * SECONDS_PER_MINUTE)
+    )
 }
 
 /// G-code for a target temperature, matching the kind of heater; below zero is off. `M104` names `T0`, because without
@@ -241,15 +241,6 @@ fn number(value: f64) -> String {
 mod tests {
     use super::*;
 
-    fn motion_at(position: [f64; 4]) -> Motion {
-        Motion {
-            position,
-            axis_minimum: [0.0, 0.0, -2.0, 0.0],
-            axis_maximum: [300.0, 300.0, 250.0, 0.0],
-            ..Motion::default()
-        }
-    }
-
     #[test]
     fn homing_selects_axes() {
         assert_eq!(home(true, true, false), "G28 X Y");
@@ -279,11 +270,15 @@ mod tests {
     }
 
     #[test]
-    fn jog_is_clamped_to_axis_limits() {
-        let motion = motion_at([10.0, 10.0, 5.0, 0.0]);
-        assert_eq!(jog(&motion, Axis::X, -50.0).as_deref(), Some("G90\nG1 X0 F6000"));
-        assert_eq!(jog(&motion, Axis::Z, 0.1).as_deref(), Some("G90\nG1 Z5.1 F600"));
-        assert_eq!(jog(&motion_at([0.0; 4]), Axis::X, -1.0), None);
+    fn a_move_keeps_the_positioning_mode_of_whoever_moved_before() {
+        use crate::sources::klipper::Axis;
+        use crate::sources::klipper::moves::AxisTarget;
+        let target = |axis, gcode| AxisTarget { axis, gcode, toolhead: gcode };
+        let planned = PlannedMove { targets: vec![target(Axis::X, 12.5), target(Axis::Y, 0.00004)], speed: 25.0 };
+        assert_eq!(
+            move_axes(&planned),
+            "SAVE_GCODE_STATE NAME=sailhand_move\nG90\nG1 X12.5 Y0 F1500\nRESTORE_GCODE_STATE NAME=sailhand_move"
+        );
     }
 
     #[test]

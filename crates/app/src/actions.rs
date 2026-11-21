@@ -2,7 +2,7 @@
 
 use crate::presenter::Presenter;
 use crate::settings_controller::SettingsController;
-use crate::{Actions, AppWindow};
+use crate::{Actions, AppWindow, UiSettings};
 use sailhand_core::domain::machine_tree::LaneId;
 use sailhand_core::domain::manual_probe::Direction;
 use sailhand_core::moonraker::CertificateFingerprint;
@@ -22,7 +22,7 @@ pub fn bind(
     settings: &Rc<SettingsController>,
 ) {
     let actions = window.global::<Actions>();
-    bind_motion(&actions, service);
+    bind_motion(window, &actions, service, presenter);
     bind_temperatures(&actions, service, presenter, settings);
     bind_calibration(&actions, service, presenter);
     bind_filament(&actions, service);
@@ -39,7 +39,7 @@ pub fn bind(
     actions.on_press_key(move |text| press_key(&key_window, text));
 }
 
-fn bind_motion(actions: &Actions, service: &PrinterService) {
+fn bind_motion(window: &AppWindow, actions: &Actions, service: &PrinterService, presenter: &Rc<Presenter>) {
     let home_service = service.clone();
     actions.on_home(move |x, y, z| home_service.send(Command::Home { x, y, z }));
     let jog_service = service.clone();
@@ -47,6 +47,23 @@ fn bind_motion(actions: &Actions, service: &PrinterService) {
         if let Some(axis) = parse_axis(&axis) {
             jog_service.send(Command::Jog { axis, distance: f64::from(distance) });
         }
+    });
+    let move_service = service.clone();
+    actions.on_move_to(move |axis, position| {
+        if let Some(axis) = parse_axis(&axis) {
+            move_service.send(Command::MoveTo { axis, position: f64::from(position) });
+        }
+    });
+    let drive_service = service.clone();
+    let drive_window = window.as_weak();
+    actions.on_drive(move |x, y, z| {
+        let Some(window) = drive_window.upgrade() else { return };
+        let max_speed = f64::from(window.global::<UiSettings>().get_drive_speed());
+        drive_service.send(Command::Drive { deflection: [x, y, z].map(f64::from), max_speed });
+    });
+    let outside_presenter = Rc::clone(presenter);
+    actions.on_move_target_outside(move |axis, typed| {
+        parse_axis(&axis).is_some_and(|axis| outside_presenter.move_target_outside(axis, &typed))
     });
     actions.on_disable_motors(send(service, || Command::DisableMotors));
     actions.on_level(send(service, || Command::Level));

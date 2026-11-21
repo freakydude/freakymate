@@ -67,6 +67,16 @@ pub fn encoder_headroom(headroom_millimetres: f64, detection_millimetres: f64) -
     quantity_pair(headroom_millimetres, detection_millimetres, LENGTH, Fit::width(3, 0.1))
 }
 
+/// An axis position to the hundredth, as Klipper takes it: `152.30 mm`.
+pub fn axis_position(millimetres: f64) -> String {
+    quantity(millimetres, LENGTH, Fit::width(5, 0.01))
+}
+
+/// The range an axis takes, e.g. `0.0–301.0 mm`.
+pub fn axis_range(low_millimetres: f64, high_millimetres: f64) -> String {
+    format!("{low_millimetres:.1}–{high_millimetres:.1} mm")
+}
+
 /// Deviation of a bed mesh to the micrometre, e.g. `0.123 mm`.
 pub fn mesh_deviation(millimetres: f64) -> String {
     quantity(millimetres, LENGTH, Fit::width(4, 0.001))
