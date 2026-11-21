@@ -1,0 +1,14 @@
+// Preview: Motion > Axes with six steps, the most the settings allow (core step_choices MAX_STEPS); the row is full.
+
+import { AppWindow } from "../app.slint";
+import { MotionTab, Navigation, Page, UiSettings } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component MotionAxesSixStepsPreview inherits AppWindow {
+    init => {
+        Sample.ready-printer();
+        Navigation.page = Page.motion;
+        Navigation.motion-tab = MotionTab.axes;
+        UiSettings.move-steps = [0.05, 0.1, 1, 10, 50, 100];
+    }
+}
