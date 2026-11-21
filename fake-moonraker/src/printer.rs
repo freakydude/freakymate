@@ -266,6 +266,8 @@ pub struct Printer {
     print_state: PrintState,
     filename: String,
     message: String,
+    /// `display_status.message`: set by `M117` and `SET_DISPLAY_TEXT`, kept across prints.
+    display_message: Option<String>,
     print_duration: f64,
     total_duration: f64,
     job: Option<PrintJob>,
@@ -341,6 +343,7 @@ impl Printer {
             print_state: PrintState::Standby,
             filename: String::new(),
             message: String::new(),
+            display_message: None,
             print_duration: 0.0,
             total_duration: 0.0,
             job: None,
@@ -516,6 +519,7 @@ impl Printer {
             Command::Toolchanger(command) => self.apply_toolchanger(command)?,
             Command::Afc(command) => self.apply_afc(command)?,
             Command::LayerPause(command) => self.layer_pause.apply(command),
+            Command::DisplayText(message) => self.display_message = message,
             Command::FakePrintError => self.fail_print()?,
             // The session delays the answer of a dwell; the printer itself does nothing.
             Command::Help | Command::Dwell(_) | Command::Ignored => {}

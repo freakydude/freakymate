@@ -79,6 +79,36 @@ component InterruptionBanner inherits Rectangle {
     }
 }
 
+// What a macro shows with M117 or SET_DISPLAY_TEXT, as a caption at the foot of the preview: the same place in every
+// state of the job, and no room taken from the band below.
+component DisplayMessageCaption inherits VerticalLayout {
+    alignment: end;
+    Rectangle {
+        background: Theme.surface.with-alpha(Theme.flyout-opacity);
+        HorizontalLayout {
+            padding: Theme.spacing-medium;
+            padding-left: Theme.padding;
+            spacing: Theme.spacing-small;
+            Image {
+                source: Icons.ui-info;
+                colorize: Theme.muted;
+                width: Theme.icon-compact;
+                height: Theme.icon-compact;
+            }
+            Text {
+                horizontal-stretch: 1;
+                min-width: 0px;
+                max-lines: 3;
+                text: Printer.display-message;
+                color: Theme.foreground;
+                font-size: Theme.font-label;
+                wrap: word-wrap;
+                overflow: elide;
+            }
+        }
+    }
+}
+
 // A tall button of the action column beside the job.
 component ActionTile inherits IconButton {
     property <length> tile-height: 96px;
@@ -219,6 +249,12 @@ component JobView inherits VerticalLayout {
             width: root.top-height;
             source: Printer.job-thumbnail;
             available: Printer.has-job-thumbnail;
+            if Printer.display-message != "": DisplayMessageCaption {
+                x: 0;
+                y: 0;
+                width: parent.width;
+                height: parent.height;
+            }
         }
         VerticalLayout {
             horizontal-stretch: 1;

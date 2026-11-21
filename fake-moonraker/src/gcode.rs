@@ -117,6 +117,8 @@ pub enum Command {
     /// Ends the running print with an error, like Klipper after a move out of range (`FAKE_PRINT_ERROR`; not in
     /// Klipper).
     FakePrintError,
+    /// `M117` and `SET_DISPLAY_TEXT`: sets or (`None`) clears the display message.
+    DisplayText(Option<String>),
     Ignored,
 }
 
@@ -396,6 +398,9 @@ fn parse_line(line: &str) -> Result<Command, CommandError> {
     let mut words = line.split_whitespace();
     let name = words.next().unwrap_or_default().to_ascii_uppercase();
     let args: Vec<&str> = words.collect();
+    if let Some(command) = parse_display_text(line, &name) {
+        return Ok(command);
+    }
 
     let groups = [
         motion::parse,
@@ -412,6 +417,25 @@ fn parse_line(line: &str) -> Result<Command, CommandError> {
         }
     }
     Ok(Command::Ignored)
+}
+
+/// `display_status.py`: `M117` takes the raw rest of the line (`get_raw_command_parameters() or None`),
+/// `SET_DISPLAY_TEXT` the parameter `MSG` (`gcmd.get("MSG", None)`); a quoted value keeps its inner spaces.
+fn parse_display_text(line: &str, name: &str) -> Option<Command> {
+    let rest = line.split_once(char::is_whitespace).map_or("", |(_, rest)| rest.trim());
+    let message = match name {
+        "M117" => Some(rest).filter(|text| !text.is_empty()),
+        "SET_DISPLAY_TEXT" => {
+            let start = rest.to_ascii_uppercase().find("MSG=");
+            let value = start.map(|start| &rest[start + "MSG=".len()..]);
+            value.map(|value| match value.strip_prefix('"') {
+                Some(quoted) => quoted.split('"').next().unwrap_or_default(),
+                None => value.split_whitespace().next().unwrap_or_default(),
+            })
+        }
+        _ => return None,
+    };
+    Some(Command::DisplayText(message.map(str::to_owned)))
 }
 
 fn letter_value(args: &[&str], letter: char) -> Result<Option<f64>, CommandError> {
@@ -694,7 +718,23 @@ mod tests {
 
     #[test]
     fn unknown_commands_are_ignored() {
-        assert_eq!(parse_script("M117 Hallo").unwrap(), vec![Command::Ignored]);
+        assert_eq!(parse_script("G999 Hallo").unwrap(), vec![Command::Ignored]);
+    }
+
+    #[test]
+    fn m117_takes_the_raw_rest_and_empty_clears() {
+        let text = |text: &str| vec![Command::DisplayText(Some(text.to_owned()))];
+        assert_eq!(parse_script("M117 Hello  Big World").unwrap(), text("Hello  Big World"));
+        assert_eq!(parse_script("m117 Part 2 of 3: lid").unwrap(), text("Part 2 of 3: lid"));
+        assert_eq!(parse_script("M117").unwrap(), vec![Command::DisplayText(None)]);
+    }
+
+    #[test]
+    fn set_display_text_takes_msg_and_none_clears() {
+        let text = |text: &str| vec![Command::DisplayText(Some(text.to_owned()))];
+        assert_eq!(parse_script("SET_DISPLAY_TEXT MSG=Hello").unwrap(), text("Hello"));
+        assert_eq!(parse_script("SET_DISPLAY_TEXT MSG=\"Hello world\"").unwrap(), text("Hello world"));
+        assert_eq!(parse_script("SET_DISPLAY_TEXT").unwrap(), vec![Command::DisplayText(None)]);
     }
 
     #[test]

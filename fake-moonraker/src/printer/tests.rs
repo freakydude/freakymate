@@ -809,3 +809,17 @@ fn a_shutdown_in_a_job_ends_it_in_the_history() {
 
     assert_eq!(printer.ended_job(1.0).unwrap()["status"], "klippy_shutdown");
 }
+
+#[test]
+fn the_display_message_is_set_and_cleared_like_klipper() {
+    let mut printer = printer();
+    assert!(printer.status()["display_status"]["message"].is_null());
+    run(&mut printer, "M117 Hello World").unwrap();
+    assert_eq!(printer.status()["display_status"]["message"], "Hello World");
+    run(&mut printer, "M117").unwrap();
+    assert!(printer.status()["display_status"]["message"].is_null());
+    run(&mut printer, "SET_DISPLAY_TEXT MSG=\"Layer 2\"").unwrap();
+    assert_eq!(printer.status()["display_status"]["message"], "Layer 2");
+    run(&mut printer, "SET_DISPLAY_TEXT").unwrap();
+    assert!(printer.status()["display_status"]["message"].is_null());
+}

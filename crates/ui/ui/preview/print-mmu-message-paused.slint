@@ -1,0 +1,34 @@
+// Preview: MMU pause with a two-line hint; the M117 message stays as caption on the small preview. Render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer, Severity } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintMmuMessagePausedPreview inherits AppWindow {
+    init => {
+        Sample.mmu();
+        Sample.printing();
+        Navigation.page = Page.print;
+        Printer.job-thumbnail = @image-url("../../../../fake-moonraker/assets/benchy-300x300.png");
+        Printer.has-job-thumbnail = true;
+        Printer.print-state = "paused";
+        Printer.job-state = "paused";
+        Printer.mmu-gate = 1;
+        Printer.mmu-tool = 1;
+        Printer.mmu-paused = true;
+        Printer.mmu-locked = true;
+        Printer.display-message = "Load the new filament, purge until the colour is clean, then press Resume";
+        Printer.interruption-text = "Runout on gate 1\nCheck the nozzle and extruder for a clog and remove any filament remains, then RESUME";
+        Printer.interruption-position = "Layer 50 · 10.00 mm";
+        Printer.interruption-headline = "Filament runout detected at the entry sensor of gate 1";
+        Printer.mmu-buffer-state = "tension";
+        Printer.mmu-buffer-bias = -1;
+        Printer.mmu-flowguard-state = "triggered";
+        Printer.mmu-flowguard-detail = "clog";
+        Printer.mmu-flowguard-statement = "triggered";
+        Printer.mmu-flowguard-line = Severity.error;
+        Printer.mmu-flowguard-clog-end = Severity.error;
+        Printer.mmu-flowguard-strip = Severity.error;
+        Printer.mmu-buffer-marker = Severity.error;
+    }
+}

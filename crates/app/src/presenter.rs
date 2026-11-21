@@ -552,6 +552,7 @@ impl Presenter {
         let job = &shown.job;
         printer.set_job_state(job.state.as_str().into());
         printer.set_filename(job.filename.as_str().into());
+        printer.set_display_message(status.job.display_message.trim().into());
         printer.set_progress(job.progress as f32);
         printer.set_progress_known(shown.progress_known);
         let metadata = cache.files.catalog.metadata(&job.filename);

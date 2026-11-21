@@ -53,6 +53,8 @@ pub struct PrintJob {
     pub state: PrintState,
     pub filename: String,
     pub message: String,
+    /// What `M117` / `SET_DISPLAY_TEXT` show (`display_status.message`); empty when none or cleared.
+    pub display_message: String,
     pub progress: f64,
     pub print_duration: f64,
     pub total_duration: f64,
@@ -76,6 +78,7 @@ pub(super) fn read_job(print_stats: &Value, display_status: &Value, virtual_sdca
         state: PrintState::parse(text(print_stats, "state")),
         filename: text(print_stats, "filename").to_owned(),
         message: text(print_stats, "message").to_owned(),
+        display_message: text(display_status, "message").to_owned(),
         progress: progress.clamp(0.0, 1.0),
         print_duration: number(print_stats, "print_duration"),
         total_duration: number(print_stats, "total_duration"),
@@ -84,5 +87,21 @@ pub(super) fn read_job(print_stats: &Value, display_status: &Value, virtual_sdca
         total_layer: count(info, "total_layer"),
         height: None,
         paused_since: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn display_message_is_read_and_null_clears_it() {
+        let none = json!({});
+        let set = json!({ "progress": 0.5, "message": "Part 2 of 3" });
+        assert_eq!(read_job(&none, &set, &none).display_message, "Part 2 of 3");
+        let cleared = json!({ "progress": 0.5, "message": null });
+        assert_eq!(read_job(&none, &cleared, &none).display_message, "");
     }
 }

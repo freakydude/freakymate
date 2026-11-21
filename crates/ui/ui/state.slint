@@ -69,6 +69,9 @@ export global Printer {
     in property <string> interruption-position;
     // The first fact of it alone, for the status bar.
     in property <string> interruption-headline;
+    // What a macro shows with M117 or SET_DISPLAY_TEXT (`display_status.message`); empty when none is set or an
+    // empty M117 cleared it.
+    in property <string> display-message;
     // A pause at a layer can be planned with Mainsail's macros (only while the slicer reports the layers).
     in property <bool> layer-pause-next;
     in property <bool> layer-pause-at;

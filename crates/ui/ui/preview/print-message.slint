@@ -1,0 +1,17 @@
+// Preview: print page while printing, with a long M117 message as caption at the foot of the preview (three lines at most). Render with scripts/ui-preview.sh.
+
+import { AppWindow } from "../app.slint";
+import { Navigation, Page, Printer } from "../state.slint";
+import { Sample } from "sample.slint";
+
+export component PrintMessagePreview inherits AppWindow {
+    init => {
+        Sample.printing();
+        Printer.has-spoolman = true;
+        Printer.has-spool = true;
+        Printer.display-message = "Part 2 of 3: lid with hinge. Check the first layer of the brim before you leave the printer alone";
+        Navigation.page = Page.print;
+        Printer.job-thumbnail = @image-url("../../../../fake-moonraker/assets/benchy-300x300.png");
+        Printer.has-job-thumbnail = true;
+    }
+}
